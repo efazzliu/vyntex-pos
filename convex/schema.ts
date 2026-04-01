@@ -6,7 +6,10 @@ export default defineSchema({
     tokenIdentifier: v.string(),
     name: v.optional(v.string()),
     email: v.optional(v.string()),
-  }).index("by_token", ["tokenIdentifier"]),
+    role: v.optional(v.union(v.literal("admin"), v.literal("user"))),
+  })
+    .index("by_token", ["tokenIdentifier"])
+    .index("by_role", ["role"]),
 
   contactSubmissions: defineTable({
     name: v.string(),
@@ -44,5 +47,6 @@ export default defineSchema({
       v.literal("expired"),
       v.literal("suspended")
     ),
+    deviceId: v.optional(v.string()),
   }).index("by_user", ["userId"]),
 });
