@@ -2,7 +2,7 @@
   "name": "VYNTEX - Enterprise POS Platform",
   "short_name": "VYNTEX",
   "description": "Enterprise-grade POS platform for modern restaurants and shops",
-  "start_url": "/",
+  "start_url": "/pos",
   "display": "standalone",
   "background_color": "#0A0F1E",
   "theme_color": "#0A0F1E",

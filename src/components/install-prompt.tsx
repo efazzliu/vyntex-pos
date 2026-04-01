@@ -1,41 +1,23 @@
-import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button.tsx";
 import { Download, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-
-type BeforeInstallPromptEvent = Event & {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
-};
+import { useState } from "react";
+import { usePwaInstall } from "@/hooks/use-pwa-install.ts";
 
 export default function InstallPrompt() {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const { canInstall, triggerInstall, dismiss } = usePwaInstall();
   const [dismissed, setDismissed] = useState(false);
 
-  useEffect(() => {
-    const handler = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
-    };
-
-    window.addEventListener("beforeinstallprompt", handler);
-    return () => window.removeEventListener("beforeinstallprompt", handler);
-  }, []);
-
   const handleInstall = async () => {
-    if (!deferredPrompt) return;
-    await deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === "accepted") {
-      setDeferredPrompt(null);
-    }
+    await triggerInstall();
   };
 
   const handleDismiss = () => {
     setDismissed(true);
+    dismiss();
   };
 
-  if (!deferredPrompt || dismissed) return null;
+  if (!canInstall || dismissed) return null;
 
   return (
     <AnimatePresence>

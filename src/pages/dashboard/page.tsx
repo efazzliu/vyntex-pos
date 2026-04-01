@@ -16,7 +16,8 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils.ts";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
+import { usePwaInstall } from "@/hooks/use-pwa-install.ts";
 
 const VYN_TYPE_LABELS: Record<string, string> = {
   restaurant: "Restaurant POS",
@@ -56,7 +57,7 @@ function daysUntil(iso: string) {
 export default function DashboardOverview() {
   const restaurant = useQuery(api.dashboard.restaurants.getMyRestaurant);
   const [copied, setCopied] = useState(false);
-  const navigate = useNavigate();
+  const { canInstall, triggerInstall } = usePwaInstall();
 
   if (restaurant === undefined) {
     return (
@@ -88,8 +89,14 @@ export default function DashboardOverview() {
     }
   };
 
-  const handleInstall = () => {
-    navigate("/pos");
+  const handleInstall = async () => {
+    if (canInstall) {
+      await triggerInstall();
+    } else {
+      toast.info(
+        "To install: open this site in Chrome or Edge, then look for the install icon in the address bar, or use the browser menu."
+      );
+    }
   };
 
   return (
