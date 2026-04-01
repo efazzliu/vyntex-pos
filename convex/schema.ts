@@ -51,4 +51,38 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_licenseKey", ["licenseKey"]),
+
+  menuCategories: defineTable({
+    restaurantId: v.id("restaurants"),
+    name: v.string(),
+    color: v.string(),
+    displayOrder: v.number(),
+    isActive: v.boolean(),
+  }).index("by_restaurant", ["restaurantId"]),
+
+  menuItems: defineTable({
+    restaurantId: v.id("restaurants"),
+    categoryId: v.id("menuCategories"),
+    name: v.string(),
+    description: v.optional(v.string()),
+    price: v.number(),
+    available: v.boolean(),
+    displayOrder: v.number(),
+  })
+    .index("by_restaurant", ["restaurantId"])
+    .index("by_category", ["categoryId"]),
+
+  tables: defineTable({
+    restaurantId: v.id("restaurants"),
+    name: v.string(),
+    seats: v.number(),
+    zone: v.string(),
+    status: v.union(
+      v.literal("available"),
+      v.literal("occupied"),
+      v.literal("reserved")
+    ),
+  })
+    .index("by_restaurant", ["restaurantId"])
+    .index("by_restaurant_and_zone", ["restaurantId", "zone"]),
 });
