@@ -10,6 +10,11 @@ import About from "./pages/about/page.tsx";
 import Contact from "./pages/contact/page.tsx";
 import LegalTerms from "./pages/legal/terms/page.tsx";
 import LegalPrivacy from "./pages/legal/privacy/page.tsx";
+import DashboardLayout from "./pages/dashboard/_components/dashboard-layout.tsx";
+import DashboardOverview from "./pages/dashboard/page.tsx";
+import DashboardOrders from "./pages/dashboard/orders/page.tsx";
+import DashboardMenu from "./pages/dashboard/menu/page.tsx";
+import DashboardSettings from "./pages/dashboard/settings/page.tsx";
 
 export default function App() {
   return (
@@ -25,7 +30,12 @@ export default function App() {
             <Route path="/contact" element={<Contact />} />
             <Route path="/legal/terms" element={<LegalTerms />} />
             <Route path="/legal/privacy" element={<LegalPrivacy />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          </Route>
+          <Route element={<DashboardLayout />}>
+            <Route path="/dashboard" element={<DashboardOverview />} />
+            <Route path="/dashboard/orders" element={<DashboardOrders />} />
+            <Route path="/dashboard/menu" element={<DashboardMenu />} />
+            <Route path="/dashboard/settings" element={<DashboardSettings />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>

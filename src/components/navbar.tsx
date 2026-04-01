@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils.ts";
 import { Menu, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
-import { toast } from "sonner";
 
 const LOGO_URL = "https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz";
 
@@ -94,7 +93,7 @@ export default function Navbar() {
             <Authenticated>
               <Button
                 size="sm"
-                onClick={() => toast.info("Coming soon in a future milestone!")}
+                onClick={() => navigate("/dashboard")}
               >
                 Dashboard
               </Button>
@@ -147,7 +146,7 @@ export default function Navbar() {
                   <Button
                     size="sm"
                     className="w-full"
-                    onClick={() => toast.info("Coming soon in a future milestone!")}
+                    onClick={() => navigate("/dashboard")}
                   >
                     Dashboard
                   </Button>

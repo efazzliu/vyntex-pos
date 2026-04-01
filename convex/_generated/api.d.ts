@@ -9,6 +9,11 @@
  */
 
 import type * as contact from "../contact.js";
+import type * as dashboard_helpers from "../dashboard/helpers.js";
+import type * as dashboard_menu from "../dashboard/menu.js";
+import type * as dashboard_orders from "../dashboard/orders.js";
+import type * as dashboard_restaurants from "../dashboard/restaurants.js";
+import type * as dashboard_stats from "../dashboard/stats.js";
 import type * as users from "../users.js";
 
 import type {
@@ -19,6 +24,11 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   contact: typeof contact;
+  "dashboard/helpers": typeof dashboard_helpers;
+  "dashboard/menu": typeof dashboard_menu;
+  "dashboard/orders": typeof dashboard_orders;
+  "dashboard/restaurants": typeof dashboard_restaurants;
+  "dashboard/stats": typeof dashboard_stats;
   users: typeof users;
 }>;
 
