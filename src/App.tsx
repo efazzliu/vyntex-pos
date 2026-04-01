@@ -1,5 +1,6 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { DefaultProviders } from "./components/providers/default.tsx";
+import { PwaInstallProvider } from "./components/providers/pwa-install-provider.tsx";
 import { useServiceWorker } from "@/hooks/use-service-worker.ts";
 import InstallPrompt from "@/components/install-prompt.tsx";
 import AuthCallback from "./pages/auth/Callback.tsx";
@@ -27,8 +28,9 @@ export default function App() {
 
   return (
     <DefaultProviders>
-      <BrowserRouter>
-        <Routes>
+      <PwaInstallProvider>
+        <BrowserRouter>
+          <Routes>
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route element={<PublicLayout />}>
             <Route path="/" element={<Index />} />
@@ -52,8 +54,9 @@ export default function App() {
           <Route path="/pos" element={<PosLauncher />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
-        <InstallPrompt />
-      </BrowserRouter>
+          <InstallPrompt />
+        </BrowserRouter>
+      </PwaInstallProvider>
     </DefaultProviders>
   );
 }
