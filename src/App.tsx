@@ -20,6 +20,7 @@ import AdminOverview from "./pages/admin/page.tsx";
 import AdminLicenses from "./pages/admin/licenses/page.tsx";
 import AdminUsers from "./pages/admin/users/page.tsx";
 import AdminContacts from "./pages/admin/contacts/page.tsx";
+import PosLauncher from "./pages/pos/page.tsx";
 
 export default function App() {
   useServiceWorker();
@@ -48,6 +49,7 @@ export default function App() {
             <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/admin/contacts" element={<AdminContacts />} />
           </Route>
+          <Route path="/pos" element={<PosLauncher />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
         <InstallPrompt />

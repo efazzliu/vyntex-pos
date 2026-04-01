@@ -48,5 +48,7 @@ export default defineSchema({
       v.literal("suspended")
     ),
     deviceId: v.optional(v.string()),
-  }).index("by_user", ["userId"]),
+  })
+    .index("by_user", ["userId"])
+    .index("by_licenseKey", ["licenseKey"]),
 });

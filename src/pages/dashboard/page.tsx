@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils.ts";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 const VYN_TYPE_LABELS: Record<string, string> = {
   restaurant: "Restaurant POS",
@@ -56,6 +56,7 @@ function daysUntil(iso: string) {
 export default function DashboardOverview() {
   const restaurant = useQuery(api.dashboard.restaurants.getMyRestaurant);
   const [copied, setCopied] = useState(false);
+  const navigate = useNavigate();
 
   if (restaurant === undefined) {
     return (
@@ -88,9 +89,7 @@ export default function DashboardOverview() {
   };
 
   const handleInstall = () => {
-    toast.info(
-      "The VYNTEX POS software will be available for download when PWA support is enabled."
-    );
+    navigate("/pos");
   };
 
   return (
