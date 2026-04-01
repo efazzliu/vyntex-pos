@@ -1,5 +1,7 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { DefaultProviders } from "./components/providers/default.tsx";
+import { useServiceWorker } from "@/hooks/use-service-worker.ts";
+import InstallPrompt from "@/components/install-prompt.tsx";
 import AuthCallback from "./pages/auth/Callback.tsx";
 import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
@@ -20,6 +22,8 @@ import AdminUsers from "./pages/admin/users/page.tsx";
 import AdminContacts from "./pages/admin/contacts/page.tsx";
 
 export default function App() {
+  useServiceWorker();
+
   return (
     <DefaultProviders>
       <BrowserRouter>
@@ -46,6 +50,7 @@ export default function App() {
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
+        <InstallPrompt />
       </BrowserRouter>
     </DefaultProviders>
   );

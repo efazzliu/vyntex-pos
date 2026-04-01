@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Offline - VYNTEX</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        font-family: 'Space Grotesk', system-ui, sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        background: #0A0F1E;
+        color: #e0e0e0;
+      }
+      .container {
+        text-align: center;
+        padding: 2rem;
+        max-width: 480px;
+      }
+      .icon {
+        width: 80px;
+        height: 80px;
+        margin: 0 auto 1.5rem;
+        border-radius: 20px;
+      }
+      h1 {
+        font-size: 1.75rem;
+        font-weight: 700;
+        margin-bottom: 0.75rem;
+        background: linear-gradient(135deg, #0066FF, #44CC00);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      p {
+        color: #8b93a7;
+        line-height: 1.6;
+        margin-bottom: 1.5rem;
+      }
+      button {
+        background: linear-gradient(135deg, #0066FF, #44CC00);
+        color: #fff;
+        border: none;
+        padding: 0.75rem 2rem;
+        border-radius: 8px;
+        font-family: inherit;
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: opacity 0.2s;
+      }
+      button:hover { opacity: 0.9; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <img src="/icon/icon-192.png" alt="VYNTEX" class="icon" />
+      <h1>You're Offline</h1>
+      <p>It looks like your internet connection is down. VYNTEX needs a connection to sync your data. Please check your network and try again.</p>
+      <button onclick="window.location.reload()">Try Again</button>
+    </div>
+  </body>
+</html>
