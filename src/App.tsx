@@ -4,6 +4,12 @@ import AuthCallback from "./pages/auth/Callback.tsx";
 import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import PublicLayout from "./components/public-layout.tsx";
+import VynTypes from "./pages/vyn-types/page.tsx";
+import Pricing from "./pages/pricing/page.tsx";
+import About from "./pages/about/page.tsx";
+import Contact from "./pages/contact/page.tsx";
+import LegalTerms from "./pages/legal/terms/page.tsx";
+import LegalPrivacy from "./pages/legal/privacy/page.tsx";
 
 export default function App() {
   return (
@@ -13,6 +19,12 @@ export default function App() {
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route element={<PublicLayout />}>
             <Route path="/" element={<Index />} />
+            <Route path="/vyn-types" element={<VynTypes />} />
+            <Route path="/pricing" element={<Pricing />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/legal/terms" element={<LegalTerms />} />
+            <Route path="/legal/privacy" element={<LegalPrivacy />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           </Route>
           <Route path="*" element={<NotFound />} />

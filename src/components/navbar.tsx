@@ -31,22 +31,19 @@ export default function Navbar() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Close mobile menu on route change
   useEffect(() => {
     setMobileOpen(false);
   }, [location.pathname]);
 
   const handleNavClick = (href: string) => {
-    if (href === "/") {
-      navigate("/");
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } else {
-      toast.info("Coming soon in a future milestone!");
-    }
+    navigate(href);
+    window.scrollTo({ top: 0, behavior: "smooth" });
     setMobileOpen(false);
   };
 
-  const isTransparent = !scrolled;
+  // Only transparent navbar on homepage hero
+  const isHomePage = location.pathname === "/";
+  const isTransparent = !scrolled && isHomePage;
 
   return (
     <motion.header
@@ -62,7 +59,6 @@ export default function Navbar() {
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo */}
           <Link to="/" className="flex items-center gap-2.5">
             <img src={LOGO_URL} alt="VYNTEX" className="h-8 w-8" />
             <span className="text-xl font-bold bg-gradient-to-r from-[#0066FF] to-[#44CC00] bg-clip-text text-transparent">
@@ -70,7 +66,6 @@ export default function Navbar() {
             </span>
           </Link>
 
-          {/* Desktop Nav */}
           <nav className="hidden md:flex items-center gap-1">
             {navLinks.map((link) => (
               <button
@@ -80,7 +75,8 @@ export default function Navbar() {
                   "px-3 py-2 text-sm font-medium transition-colors rounded-md cursor-pointer",
                   isTransparent
                     ? "text-white/70 hover:text-white hover:bg-white/10"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent",
+                  location.pathname === link.href && !isTransparent && "text-foreground bg-accent"
                 )}
               >
                 {link.label}
@@ -88,7 +84,6 @@ export default function Navbar() {
             ))}
           </nav>
 
-          {/* Auth buttons */}
           <div className="hidden md:flex items-center gap-3">
             <AuthLoading>
               <Skeleton className="h-8 w-20 rounded-md" />
@@ -97,13 +92,15 @@ export default function Navbar() {
               <SignInButton />
             </Unauthenticated>
             <Authenticated>
-              <Button size="sm" onClick={() => toast.info("Coming soon in a future milestone!")}>
+              <Button
+                size="sm"
+                onClick={() => toast.info("Coming soon in a future milestone!")}
+              >
                 Dashboard
               </Button>
             </Authenticated>
           </div>
 
-          {/* Mobile toggle */}
           <button
             className={cn(
               "md:hidden p-2 rounded-md cursor-pointer",
@@ -116,7 +113,6 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Mobile menu */}
       <AnimatePresence>
         {mobileOpen && (
           <motion.div
@@ -130,7 +126,12 @@ export default function Navbar() {
                 <button
                   key={link.label}
                   onClick={() => handleNavClick(link.href)}
-                  className="block w-full text-left px-3 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground rounded-md hover:bg-accent cursor-pointer transition-colors"
+                  className={cn(
+                    "block w-full text-left px-3 py-2.5 text-sm font-medium rounded-md cursor-pointer transition-colors",
+                    location.pathname === link.href
+                      ? "text-foreground bg-accent"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                  )}
                 >
                   {link.label}
                 </button>

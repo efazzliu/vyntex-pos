@@ -1,6 +1,7 @@
 import { Outlet } from "react-router-dom";
 import Navbar from "@/components/navbar.tsx";
 import Footer from "@/components/footer.tsx";
+import ChatWidget from "@/components/chat-widget.tsx";
 
 export default function PublicLayout() {
   return (
@@ -10,6 +11,7 @@ export default function PublicLayout() {
         <Outlet />
       </main>
       <Footer />
+      <ChatWidget />
     </div>
   );
 }
