@@ -2,6 +2,29 @@ import { ConvexError, v } from "convex/values";
 import { mutation, query } from "../_generated/server";
 import { getAuthUser } from "./helpers.ts";
 
+/**
+ * Generate a 16-character license key formatted as XXXX-XXXX-XXXX-XXXX.
+ * Uses an unambiguous character set (no I/O/0/1).
+ */
+function generateLicenseKey(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let key = "";
+  for (let i = 0; i < 16; i++) {
+    key += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return `${key.slice(0, 4)}-${key.slice(4, 8)}-${key.slice(8, 12)}-${key.slice(12, 16)}`;
+}
+
+/**
+ * Calculate license expiry based on plan.
+ */
+function getLicenseExpiryDate(plan: "starter" | "professional" | "enterprise"): string {
+  const now = new Date();
+  const days = plan === "starter" ? 30 : 365;
+  now.setUTCDate(now.getUTCDate() + days);
+  return now.toISOString();
+}
+
 export const getMyRestaurant = query({
   args: {},
   handler: async (ctx) => {
@@ -39,6 +62,11 @@ export const create = mutation({
     address: v.optional(v.string()),
     phone: v.optional(v.string()),
     currency: v.string(),
+    plan: v.union(
+      v.literal("starter"),
+      v.literal("professional"),
+      v.literal("enterprise")
+    ),
   },
   handler: async (ctx, args) => {
     const user = await getAuthUser(ctx);
@@ -50,9 +78,12 @@ export const create = mutation({
     if (existing) {
       throw new ConvexError({
         code: "CONFLICT",
-        message: "Restaurant already exists",
+        message: "License already exists for this account",
       });
     }
+    const licenseKey = generateLicenseKey();
+    const licenseExpiry = getLicenseExpiryDate(args.plan);
+
     return await ctx.db.insert("restaurants", {
       userId: user._id,
       name: args.name,
@@ -60,7 +91,10 @@ export const create = mutation({
       address: args.address,
       phone: args.phone,
       currency: args.currency,
-      plan: "starter",
+      plan: args.plan,
+      licenseKey,
+      licenseExpiry,
+      licenseStatus: "active",
     });
   },
 });
@@ -81,7 +115,7 @@ export const update = mutation({
     if (!restaurant) {
       throw new ConvexError({
         code: "NOT_FOUND",
-        message: "Restaurant not found",
+        message: "License not found",
       });
     }
     const updates: Record<string, string> = {};

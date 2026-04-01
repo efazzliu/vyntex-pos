@@ -13,16 +13,17 @@ import {
 } from "@/components/ui/select.tsx";
 import { toast } from "sonner";
 import { ConvexError } from "convex/values";
-import { Building2 } from "lucide-react";
+import { Building2, Sparkles } from "lucide-react";
+import { cn } from "@/lib/utils.ts";
 
 const LOGO_URL = "https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz";
 
 const businessTypes = [
-  { value: "restaurant", label: "Restaurant" },
-  { value: "cafe", label: "Cafe / Coffee Shop" },
-  { value: "bar", label: "Bar / Lounge" },
-  { value: "hotel", label: "Hotel" },
-  { value: "fitness", label: "Fitness Center" },
+  { value: "restaurant", label: "Restaurant POS" },
+  { value: "cafe", label: "Coffee POS" },
+  { value: "bar", label: "Bar POS" },
+  { value: "hotel", label: "Hotel POS" },
+  { value: "fitness", label: "Fitness POS" },
 ] as const;
 
 const currencies = [
@@ -31,6 +32,28 @@ const currencies = [
   { value: "GBP", label: "GBP (\u00A3)" },
   { value: "CAD", label: "CAD (C$)" },
   { value: "AUD", label: "AUD (A$)" },
+];
+
+const plans = [
+  {
+    value: "starter" as const,
+    label: "Starter",
+    price: "$49/mo",
+    description: "30-day license \u00B7 1 terminal",
+  },
+  {
+    value: "professional" as const,
+    label: "Professional",
+    price: "$99/mo",
+    description: "Annual license \u00B7 5 terminals",
+    popular: true,
+  },
+  {
+    value: "enterprise" as const,
+    label: "Enterprise",
+    price: "$199/mo",
+    description: "Annual license \u00B7 Unlimited",
+  },
 ];
 
 export default function SetupForm() {
@@ -43,6 +66,9 @@ export default function SetupForm() {
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
   const [currency, setCurrency] = useState("USD");
+  const [plan, setPlan] = useState<"starter" | "professional" | "enterprise">(
+    "professional"
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,14 +84,17 @@ export default function SetupForm() {
         address: address.trim() || undefined,
         phone: phone.trim() || undefined,
         currency,
+        plan,
       });
-      toast.success("Welcome to VYNTEX! Your dashboard is ready.");
+      toast.success(
+        "Welcome to VYNTEX! Your license key has been generated."
+      );
     } catch (error) {
       if (error instanceof ConvexError) {
         const { message } = error.data as { code: string; message: string };
         toast.error(message);
       } else {
-        toast.error("Failed to set up restaurant");
+        toast.error("Failed to activate license");
       }
     } finally {
       setLoading(false);
@@ -80,10 +109,10 @@ export default function SetupForm() {
             <img src={LOGO_URL} alt="VYNTEX" className="h-9 w-9" />
           </div>
           <h1 className="text-2xl font-bold text-foreground mb-2">
-            Set up your business
+            Activate your license
           </h1>
           <p className="text-muted-foreground">
-            Tell us about your business to get started with VYNTEX POS.
+            Set up your business to receive your VYNTEX POS license key.
           </p>
         </div>
 
@@ -91,6 +120,42 @@ export default function SetupForm() {
           onSubmit={handleSubmit}
           className="rounded-xl border border-border bg-card p-6 space-y-5"
         >
+          {/* Plan selection */}
+          <div className="space-y-2">
+            <Label>Select Plan</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {plans.map((p) => (
+                <button
+                  key={p.value}
+                  type="button"
+                  onClick={() => setPlan(p.value)}
+                  className={cn(
+                    "relative rounded-lg border p-3 text-left transition-all cursor-pointer",
+                    plan === p.value
+                      ? "border-primary bg-primary/5 ring-1 ring-primary"
+                      : "border-border hover:border-primary/40 hover:bg-accent/50"
+                  )}
+                >
+                  {p.popular && (
+                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-primary text-primary-foreground text-[10px] font-semibold rounded-full whitespace-nowrap flex items-center gap-0.5">
+                      <Sparkles className="size-2.5" />
+                      Popular
+                    </span>
+                  )}
+                  <p className="text-sm font-semibold text-foreground">
+                    {p.label}
+                  </p>
+                  <p className="text-xs font-bold text-primary mt-0.5">
+                    {p.price}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-1 leading-tight">
+                    {p.description}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="name">Business Name *</Label>
             <Input
@@ -103,7 +168,7 @@ export default function SetupForm() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="type">Business Type</Label>
+            <Label htmlFor="type">VYN Type</Label>
             <Select
               value={type}
               onValueChange={(v) =>
@@ -166,7 +231,7 @@ export default function SetupForm() {
           </div>
 
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Setting up..." : "Get Started"}
+            {loading ? "Activating..." : "Activate License"}
           </Button>
         </form>
       </div>

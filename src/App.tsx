@@ -12,8 +12,6 @@ import LegalTerms from "./pages/legal/terms/page.tsx";
 import LegalPrivacy from "./pages/legal/privacy/page.tsx";
 import DashboardLayout from "./pages/dashboard/_components/dashboard-layout.tsx";
 import DashboardOverview from "./pages/dashboard/page.tsx";
-import DashboardOrders from "./pages/dashboard/orders/page.tsx";
-import DashboardMenu from "./pages/dashboard/menu/page.tsx";
 import DashboardSettings from "./pages/dashboard/settings/page.tsx";
 
 export default function App() {
@@ -33,8 +31,6 @@ export default function App() {
           </Route>
           <Route element={<DashboardLayout />}>
             <Route path="/dashboard" element={<DashboardOverview />} />
-            <Route path="/dashboard/orders" element={<DashboardOrders />} />
-            <Route path="/dashboard/menu" element={<DashboardMenu />} />
             <Route path="/dashboard/settings" element={<DashboardSettings />} />
           </Route>
           <Route path="*" element={<NotFound />} />

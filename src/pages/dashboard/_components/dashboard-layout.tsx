@@ -9,22 +9,28 @@ import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { cn } from "@/lib/utils.ts";
 import SetupForm from "./setup-form.tsx";
+import ExpiredLicense from "./expired-license.tsx";
 import {
   LayoutDashboard,
-  ClipboardList,
-  UtensilsCrossed,
   Settings,
   LogOut,
   Menu,
   ChevronLeft,
+  ShieldAlert,
 } from "lucide-react";
 
 const LOGO_URL = "https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz";
 
+const VYN_TYPE_LABELS: Record<string, string> = {
+  restaurant: "Restaurant POS",
+  cafe: "Coffee POS",
+  bar: "Bar POS",
+  hotel: "Hotel POS",
+  fitness: "Fitness POS",
+};
+
 const sidebarLinks = [
   { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Orders", href: "/dashboard/orders", icon: ClipboardList },
-  { label: "Menu", href: "/dashboard/menu", icon: UtensilsCrossed },
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
@@ -32,19 +38,27 @@ function DashboardSidebar({
   collapsed,
   onToggle,
   mobile,
+  vynType,
+  licenseActive,
 }: {
   collapsed: boolean;
   onToggle: () => void;
   mobile?: boolean;
+  vynType?: string;
+  licenseActive?: boolean;
 }) {
   const location = useLocation();
   const { user, removeUser } = useAuth();
-  const restaurant = useQuery(api.dashboard.restaurants.getMyRestaurant);
 
   const isActive = (href: string) => {
     if (href === "/dashboard") return location.pathname === "/dashboard";
     return location.pathname.startsWith(href);
   };
+
+  // If license is expired, only show Overview link
+  const visibleLinks = licenseActive
+    ? sidebarLinks
+    : sidebarLinks.filter((l) => l.href === "/dashboard");
 
   return (
     <aside
@@ -78,21 +92,21 @@ function DashboardSidebar({
         )}
       </div>
 
-      {/* Restaurant name */}
-      {!collapsed && restaurant && (
+      {/* License type badge */}
+      {!collapsed && vynType && (
         <div className="px-4 py-3 border-b border-white/10">
           <p className="text-xs text-white/40 uppercase tracking-wider">
-            Restaurant
+            Active License
           </p>
           <p className="text-sm font-medium text-white/90 truncate">
-            {restaurant.name}
+            {VYN_TYPE_LABELS[vynType] ?? vynType}
           </p>
         </div>
       )}
 
       {/* Nav links */}
       <nav className="flex-1 px-2 py-4 space-y-1">
-        {sidebarLinks.map((link) => (
+        {visibleLinks.map((link) => (
           <Link
             key={link.href}
             to={link.href}
@@ -109,6 +123,16 @@ function DashboardSidebar({
             {!collapsed && link.label}
           </Link>
         ))}
+
+        {/* Expired indicator in sidebar */}
+        {!licenseActive && !collapsed && (
+          <div className="mt-3 mx-1 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+            <div className="flex items-center gap-2 text-red-400 text-xs font-medium">
+              <ShieldAlert className="size-4 shrink-0" />
+              License Expired
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* User section */}
@@ -142,6 +166,17 @@ function DashboardSidebar({
   );
 }
 
+/**
+ * Check if license is expired by comparing the expiry date string to now.
+ */
+function isLicenseExpired(
+  licenseStatus: string,
+  licenseExpiry: string
+): boolean {
+  if (licenseStatus === "expired" || licenseStatus === "suspended") return true;
+  return new Date(licenseExpiry) < new Date();
+}
+
 function DashboardContent() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -161,7 +196,11 @@ function DashboardContent() {
     return (
       <div className="flex items-center justify-center h-dvh">
         <div className="flex flex-col items-center gap-4">
-          <img src={LOGO_URL} alt="VYNTEX" className="h-12 w-12 animate-pulse" />
+          <img
+            src={LOGO_URL}
+            alt="VYNTEX"
+            className="h-12 w-12 animate-pulse"
+          />
           <Skeleton className="h-4 w-40" />
         </div>
       </div>
@@ -173,6 +212,11 @@ function DashboardContent() {
     return <SetupForm />;
   }
 
+  const expired = isLicenseExpired(
+    restaurant.licenseStatus,
+    restaurant.licenseExpiry
+  );
+
   return (
     <div className="flex h-dvh bg-background overflow-hidden">
       {/* Desktop sidebar */}
@@ -180,6 +224,8 @@ function DashboardContent() {
         <DashboardSidebar
           collapsed={sidebarCollapsed}
           onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+          vynType={restaurant.type}
+          licenseActive={!expired}
         />
       </div>
 
@@ -195,6 +241,8 @@ function DashboardContent() {
               collapsed={false}
               onToggle={() => setMobileOpen(false)}
               mobile
+              vynType={restaurant.type}
+              licenseActive={!expired}
             />
           </div>
         </div>
@@ -219,7 +267,7 @@ function DashboardContent() {
         </header>
 
         <main className="flex-1 overflow-y-auto">
-          <Outlet />
+          {expired ? <ExpiredLicense restaurant={restaurant} /> : <Outlet />}
         </main>
       </div>
     </div>
@@ -232,7 +280,11 @@ export default function DashboardLayout() {
       <AuthLoading>
         <div className="flex items-center justify-center h-dvh">
           <div className="flex flex-col items-center gap-4">
-            <img src={LOGO_URL} alt="VYNTEX" className="h-12 w-12 animate-pulse" />
+            <img
+              src={LOGO_URL}
+              alt="VYNTEX"
+              className="h-12 w-12 animate-pulse"
+            />
             <Skeleton className="h-4 w-40" />
           </div>
         </div>
@@ -240,12 +292,16 @@ export default function DashboardLayout() {
       <Unauthenticated>
         <div className="flex items-center justify-center h-dvh bg-background">
           <div className="text-center max-w-md mx-auto px-4">
-            <img src={LOGO_URL} alt="VYNTEX" className="h-16 w-16 mx-auto mb-6" />
+            <img
+              src={LOGO_URL}
+              alt="VYNTEX"
+              className="h-16 w-16 mx-auto mb-6"
+            />
             <h1 className="text-2xl font-bold text-foreground mb-2">
               Sign in to your dashboard
             </h1>
             <p className="text-muted-foreground mb-6">
-              Access your restaurant management tools, orders, and analytics.
+              Access your license, billing, and VYNTEX POS software.
             </p>
             <SignInButton />
           </div>

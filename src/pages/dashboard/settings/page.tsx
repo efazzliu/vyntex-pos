@@ -15,7 +15,17 @@ import {
 } from "@/components/ui/select.tsx";
 import { toast } from "sonner";
 import { ConvexError } from "convex/values";
-import { Building2, Mail, User, MapPin, Phone, Banknote } from "lucide-react";
+import {
+  Building2,
+  Mail,
+  User,
+  MapPin,
+  Phone,
+  Banknote,
+  Shield,
+  KeyRound,
+  Calendar,
+} from "lucide-react";
 
 const currencies = [
   { value: "USD", label: "USD ($)" },
@@ -30,6 +40,22 @@ const planLabels = {
   professional: "Professional",
   enterprise: "Enterprise",
 } as const;
+
+const vynTypeLabels: Record<string, string> = {
+  restaurant: "Restaurant POS",
+  cafe: "Coffee POS",
+  bar: "Bar POS",
+  hotel: "Hotel POS",
+  fitness: "Fitness POS",
+};
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
 
 export default function DashboardSettings() {
   const { user } = useAuth();
@@ -54,7 +80,7 @@ export default function DashboardSettings() {
 
   if (restaurant === undefined) {
     return (
-      <div className="p-6 lg:p-8 space-y-6">
+      <div className="p-6 lg:p-8 space-y-6 max-w-3xl">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-64 rounded-xl" />
         <Skeleton className="h-40 rounded-xl" />
@@ -62,15 +88,7 @@ export default function DashboardSettings() {
     );
   }
 
-  if (restaurant === null) {
-    return (
-      <div className="p-6 lg:p-8">
-        <p className="text-muted-foreground">
-          Please complete the setup first.
-        </p>
-      </div>
-    );
-  }
+  if (restaurant === null) return null; // Layout handles this
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,11 +122,11 @@ export default function DashboardSettings() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">Settings</h1>
         <p className="text-sm text-muted-foreground">
-          Manage your business profile and account.
+          Manage your business profile and license details.
         </p>
       </div>
 
-      {/* Business profile */}
+      {/* Business profile form */}
       <form
         onSubmit={handleSave}
         className="rounded-xl border border-border bg-card p-6 space-y-5"
@@ -122,7 +140,7 @@ export default function DashboardSettings() {
               Business Profile
             </h2>
             <p className="text-xs text-muted-foreground">
-              Update your restaurant information
+              Update your business information
             </p>
           </div>
         </div>
@@ -192,6 +210,54 @@ export default function DashboardSettings() {
         </div>
       </form>
 
+      {/* License details (read-only) */}
+      <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+        <div className="flex items-center gap-3 pb-4 border-b border-border">
+          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#0066FF]/10 to-[#44CC00]/10 flex items-center justify-center">
+            <Shield className="size-5 text-primary" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-foreground">
+              License Details
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Your current license information
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center gap-3 text-sm">
+            <Building2 className="size-4 text-muted-foreground shrink-0" />
+            <span className="text-muted-foreground">VYN Type:</span>
+            <span className="text-foreground font-medium">
+              {vynTypeLabels[restaurant.type] ?? restaurant.type}
+            </span>
+          </div>
+          <div className="flex items-center gap-3 text-sm">
+            <Banknote className="size-4 text-muted-foreground shrink-0" />
+            <span className="text-muted-foreground">Plan:</span>
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+              {planLabels[restaurant.plan]}
+            </span>
+          </div>
+          <div className="flex items-center gap-3 text-sm">
+            <KeyRound className="size-4 text-muted-foreground shrink-0" />
+            <span className="text-muted-foreground">License Key:</span>
+            <code className="text-foreground font-mono text-xs tracking-wider bg-muted px-2 py-0.5 rounded">
+              {restaurant.licenseKey}
+            </code>
+          </div>
+          <div className="flex items-center gap-3 text-sm">
+            <Calendar className="size-4 text-muted-foreground shrink-0" />
+            <span className="text-muted-foreground">Expires:</span>
+            <span className="text-foreground font-medium">
+              {formatDate(restaurant.licenseExpiry)}
+            </span>
+          </div>
+        </div>
+      </div>
+
       {/* Account info */}
       <div className="rounded-xl border border-border bg-card p-6 space-y-4">
         <div className="flex items-center gap-3 pb-4 border-b border-border">
@@ -199,7 +265,9 @@ export default function DashboardSettings() {
             <User className="size-5 text-primary" />
           </div>
           <div>
-            <h2 className="text-base font-semibold text-foreground">Account</h2>
+            <h2 className="text-base font-semibold text-foreground">
+              Account
+            </h2>
             <p className="text-xs text-muted-foreground">
               Your account details
             </p>
@@ -219,20 +287,6 @@ export default function DashboardSettings() {
             <span className="text-muted-foreground">Email:</span>
             <span className="text-foreground font-medium">
               {user?.profile.email || "Not set"}
-            </span>
-          </div>
-          <div className="flex items-center gap-3 text-sm">
-            <Building2 className="size-4 text-muted-foreground shrink-0" />
-            <span className="text-muted-foreground">Business Type:</span>
-            <span className="text-foreground font-medium capitalize">
-              {restaurant.type}
-            </span>
-          </div>
-          <div className="flex items-center gap-3 text-sm">
-            <Banknote className="size-4 text-muted-foreground shrink-0" />
-            <span className="text-muted-foreground">Plan:</span>
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-              {planLabels[restaurant.plan]}
             </span>
           </div>
         </div>
