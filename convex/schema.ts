@@ -37,12 +37,14 @@ export default defineSchema({
       v.literal("professional"),
       v.literal("enterprise")
     ),
-    licenseKey: v.string(),
-    licenseExpiry: v.string(),
-    licenseStatus: v.union(
-      v.literal("active"),
-      v.literal("expired"),
-      v.literal("suspended")
+    licenseKey: v.optional(v.string()),
+    licenseExpiry: v.optional(v.string()),
+    licenseStatus: v.optional(
+      v.union(
+        v.literal("active"),
+        v.literal("expired"),
+        v.literal("suspended")
+      )
     ),
   }).index("by_user", ["userId"]),
 });
