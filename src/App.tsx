@@ -13,6 +13,11 @@ import LegalPrivacy from "./pages/legal/privacy/page.tsx";
 import DashboardLayout from "./pages/dashboard/_components/dashboard-layout.tsx";
 import DashboardOverview from "./pages/dashboard/page.tsx";
 import DashboardSettings from "./pages/dashboard/settings/page.tsx";
+import AdminLayout from "./pages/admin/_components/admin-layout.tsx";
+import AdminOverview from "./pages/admin/page.tsx";
+import AdminLicenses from "./pages/admin/licenses/page.tsx";
+import AdminUsers from "./pages/admin/users/page.tsx";
+import AdminContacts from "./pages/admin/contacts/page.tsx";
 
 export default function App() {
   return (
@@ -32,6 +37,12 @@ export default function App() {
           <Route element={<DashboardLayout />}>
             <Route path="/dashboard" element={<DashboardOverview />} />
             <Route path="/dashboard/settings" element={<DashboardSettings />} />
+          </Route>
+          <Route element={<AdminLayout />}>
+            <Route path="/admin" element={<AdminOverview />} />
+            <Route path="/admin/licenses" element={<AdminLicenses />} />
+            <Route path="/admin/users" element={<AdminUsers />} />
+            <Route path="/admin/contacts" element={<AdminContacts />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>

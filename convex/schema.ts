@@ -6,7 +6,7 @@ export default defineSchema({
     tokenIdentifier: v.string(),
     name: v.optional(v.string()),
     email: v.optional(v.string()),
-    role: v.optional(v.union(v.literal("admin"), v.literal("user"))),
+    role: v.union(v.literal("admin"), v.literal("user")),
   })
     .index("by_token", ["tokenIdentifier"])
     .index("by_role", ["role"]),

@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as admin from "../admin.js";
 import type * as contact from "../contact.js";
 import type * as dashboard_helpers from "../dashboard/helpers.js";
 import type * as dashboard_restaurants from "../dashboard/restaurants.js";
@@ -20,6 +21,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  admin: typeof admin;
   contact: typeof contact;
   "dashboard/helpers": typeof dashboard_helpers;
   "dashboard/restaurants": typeof dashboard_restaurants;

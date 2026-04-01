@@ -22,11 +22,12 @@ export const updateCurrentUser = mutation({
     if (user !== null) {
       return user._id;
     }
-    // If it's a new identity, create a new User.
+    // If it's a new identity, create a new User with default "user" role.
     return await ctx.db.insert("users", {
       name: identity.name,
       email: identity.email,
       tokenIdentifier: identity.tokenIdentifier,
+      role: "user",
     });
   },
 });

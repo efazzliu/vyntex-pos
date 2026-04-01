@@ -29,6 +29,21 @@ export async function getAuthUser(ctx: QueryCtx | MutationCtx) {
 }
 
 /**
+ * Require the calling user to have the "admin" role.
+ * Returns the user if authorized.
+ */
+export async function requireAdmin(ctx: QueryCtx | MutationCtx) {
+  const user = await getAuthUser(ctx);
+  if (user.role !== "admin") {
+    throw new ConvexError({
+      code: "FORBIDDEN",
+      message: "Admin access required",
+    });
+  }
+  return user;
+}
+
+/**
  * Get the authenticated user's restaurant.
  * Throws if not authenticated, user not found, or restaurant not found.
  */
