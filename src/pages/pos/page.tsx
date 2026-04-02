@@ -11,8 +11,9 @@ import ActivationScreen from "./_components/activation-screen.tsx";
 import AdminSetupScreen from "./_components/admin-setup-screen.tsx";
 import PinLoginScreen from "./_components/pin-login-screen.tsx";
 import PosApp from "./_components/pos-app.tsx";
+import PosInstallScreen from "./_components/pos-install-screen.tsx";
 
-type LaunchStep = "loading" | "activation" | "admin-setup" | "pin-login" | "ready";
+type LaunchStep = "loading" | "install" | "activation" | "admin-setup" | "pin-login" | "ready";
 
 export default function PosLauncher() {
   const [step, setStep] = useState<LaunchStep>("loading");
@@ -20,6 +21,20 @@ export default function PosLauncher() {
   const [activeStaff, setActiveStaff] = useState<ActiveStaff | null>(null);
 
   useEffect(() => {
+    // If opened with ?install=true, show the install screen
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("install") === "true") {
+      // Clean the URL param
+      params.delete("install");
+      const cleanUrl =
+        window.location.pathname +
+        (params.toString() ? `?${params.toString()}` : "");
+      window.history.replaceState({}, "", cleanUrl);
+
+      setStep("install");
+      return;
+    }
+
     checkLocalState();
   }, []);
 
@@ -87,6 +102,10 @@ export default function PosLauncher() {
         </motion.div>
       </div>
     );
+  }
+
+  if (step === "install") {
+    return <PosInstallScreen />;
   }
 
   if (step === "activation") {

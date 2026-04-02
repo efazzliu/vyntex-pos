@@ -42,69 +42,24 @@ function clearGlobalPrompt() {
 /**
  * Global provider that captures the `beforeinstallprompt` event once at app root
  * so every component in the tree can access it regardless of mount timing.
- *
- * If the URL contains `?install=true`, the install prompt is auto-triggered
- * as soon as the prompt is available. This enables a seamless
- * install flow when opened from a dashboard "Install" button.
  */
 export function PwaInstallProvider({ children }: { children: ReactNode }) {
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
 
   useEffect(() => {
-    // 1. Check if the event was already captured globally before React mounted
+    // Check if the event was already captured globally before React mounted
     const existing = getGlobalPrompt();
-
-    const params = new URLSearchParams(window.location.search);
-    const autoInstall = params.get("install") === "true";
-
     if (existing) {
       clearGlobalPrompt();
-
-      if (autoInstall) {
-        // Clean the URL param so it doesn't re-trigger
-        params.delete("install");
-        const cleanUrl =
-          window.location.pathname +
-          (params.toString() ? `?${params.toString()}` : "");
-        window.history.replaceState({}, "", cleanUrl);
-
-        existing.prompt();
-        existing.userChoice.then(({ outcome }) => {
-          if (outcome !== "accepted") {
-            setDeferredPrompt(existing);
-          }
-        });
-        return;
-      }
-
       setDeferredPrompt(existing);
     }
 
-    // 2. Also listen for future events (e.g. if the browser fires it late)
+    // Also listen for future events
     const handler = (e: Event) => {
       e.preventDefault();
       clearGlobalPrompt();
-      const prompt = e as BeforeInstallPromptEvent;
-
-      const currentParams = new URLSearchParams(window.location.search);
-      if (currentParams.get("install") === "true") {
-        currentParams.delete("install");
-        const cleanUrl =
-          window.location.pathname +
-          (currentParams.toString() ? `?${currentParams.toString()}` : "");
-        window.history.replaceState({}, "", cleanUrl);
-
-        prompt.prompt();
-        prompt.userChoice.then(({ outcome }) => {
-          if (outcome !== "accepted") {
-            setDeferredPrompt(prompt);
-          }
-        });
-        return;
-      }
-
-      setDeferredPrompt(prompt);
+      setDeferredPrompt(e as BeforeInstallPromptEvent);
     };
 
     window.addEventListener("beforeinstallprompt", handler);
