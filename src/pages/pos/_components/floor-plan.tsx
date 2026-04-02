@@ -25,14 +25,21 @@ import {
   Pencil,
   Trash2,
   Users,
+  LogOut,
 } from "lucide-react";
 import type { TableStatus } from "../_lib/types.ts";
 import TableDialog from "./table-dialog.tsx";
+
+type WaiterInfo = {
+  name: string;
+  onLogout: () => void;
+};
 
 type FloorPlanProps = {
   licenseKey: string;
   isEditor: boolean; // true for admin, false for waiter
   onTableSelect?: (tableId: Id<"tables">) => void;
+  waiter?: WaiterInfo; // present when rendered full-screen for a waiter
 };
 
 const STATUS_COLORS: Record<TableStatus, { bg: string; border: string; text: string; label: string }> = {
@@ -50,7 +57,8 @@ function snapToGrid(value: number): number {
   return Math.round(value / GRID_SIZE) * GRID_SIZE;
 }
 
-export default function FloorPlan({ licenseKey, isEditor, onTableSelect }: FloorPlanProps) {
+export default function FloorPlan({ licenseKey, isEditor, onTableSelect, waiter }: FloorPlanProps) {
+  const isWaiterFullScreen = !!waiter;
   const tables = useQuery(api.pos.tables.getTables, { licenseKey });
   const moveTable = useMutation(api.pos.tables.moveTable);
   const deleteTable = useMutation(api.pos.tables.deleteTable);
@@ -242,35 +250,94 @@ export default function FloorPlan({ licenseKey, isEditor, onTableSelect }: Floor
   const selectedTableData = selectedTable ? tables.find((t) => t._id === selectedTable) : null;
 
   return (
-    <div className="p-6 lg:p-8 space-y-4 h-full flex flex-col">
-      <FloorPlanHeader
-        isEditor={isEditor}
-        editMode={editMode}
-        onToggleEdit={() => setEditMode(!editMode)}
-        onAddTable={handleAddTable}
-      />
-
-      {/* Legend */}
-      <div className="flex items-center gap-4 flex-wrap">
-        {Object.entries(STATUS_COLORS).map(([status, config]) => (
-          <div key={status} className="flex items-center gap-1.5 text-xs">
-            <div className={cn("w-3 h-3 rounded-sm", config.bg, "border", config.border)} />
-            <span className="text-[#8b93a7]">{config.label}</span>
+    <div className={cn(
+      "space-y-4 h-full flex flex-col",
+      isWaiterFullScreen ? "p-3" : "p-6 lg:p-8",
+    )}>
+      {/* Waiter floating bar (full-screen mode) */}
+      {isWaiterFullScreen && waiter && (
+        <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-[#131A2E] border border-[#1e2a45]">
+          <div className="w-8 h-8 rounded-full bg-[#44CC00] flex items-center justify-center text-xs font-bold text-white shrink-0">
+            {waiter.name
+              .split(" ")
+              .map((n) => n[0])
+              .join("")
+              .slice(0, 2)
+              .toUpperCase()}
           </div>
-        ))}
-        <div className="ml-auto flex items-center gap-1">
-          <button onClick={zoomOut} className="p-1.5 rounded-lg hover:bg-[#1e2a45] text-[#8b93a7] hover:text-white transition-colors cursor-pointer">
-            <ZoomOut className="size-4" />
-          </button>
-          <span className="text-xs text-[#5a6580] w-12 text-center">{Math.round(zoom * 100)}%</span>
-          <button onClick={zoomIn} className="p-1.5 rounded-lg hover:bg-[#1e2a45] text-[#8b93a7] hover:text-white transition-colors cursor-pointer">
-            <ZoomIn className="size-4" />
-          </button>
-          <button onClick={resetZoom} className="p-1.5 rounded-lg hover:bg-[#1e2a45] text-[#8b93a7] hover:text-white transition-colors cursor-pointer">
-            <Maximize2 className="size-4" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-white truncate">{waiter.name}</p>
+            <p className="text-[10px] text-[#44CC00] uppercase tracking-wider font-medium">Waiter</p>
+          </div>
+
+          {/* Legend */}
+          <div className="flex items-center gap-3 ml-4 flex-wrap">
+            {Object.entries(STATUS_COLORS).map(([status, config]) => (
+              <div key={status} className="flex items-center gap-1.5 text-xs">
+                <div className={cn("w-2.5 h-2.5 rounded-sm", config.bg, "border", config.border)} />
+                <span className="text-[#8b93a7] text-[11px]">{config.label}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Zoom controls */}
+          <div className="ml-auto flex items-center gap-1">
+            <button onClick={zoomOut} className="p-1.5 rounded-lg hover:bg-[#1e2a45] text-[#8b93a7] hover:text-white transition-colors cursor-pointer">
+              <ZoomOut className="size-4" />
+            </button>
+            <span className="text-xs text-[#5a6580] w-10 text-center">{Math.round(zoom * 100)}%</span>
+            <button onClick={zoomIn} className="p-1.5 rounded-lg hover:bg-[#1e2a45] text-[#8b93a7] hover:text-white transition-colors cursor-pointer">
+              <ZoomIn className="size-4" />
+            </button>
+            <button onClick={resetZoom} className="p-1.5 rounded-lg hover:bg-[#1e2a45] text-[#8b93a7] hover:text-white transition-colors cursor-pointer">
+              <Maximize2 className="size-4" />
+            </button>
+          </div>
+
+          {/* Logout */}
+          <button
+            onClick={waiter.onLogout}
+            className="ml-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-amber-400 hover:bg-amber-500/10 transition-colors text-xs font-medium cursor-pointer"
+          >
+            <LogOut className="size-3.5" />
+            Logout
           </button>
         </div>
-      </div>
+      )}
+
+      {/* Admin header + legend (non-waiter mode) */}
+      {!isWaiterFullScreen && (
+        <>
+          <FloorPlanHeader
+            isEditor={isEditor}
+            editMode={editMode}
+            onToggleEdit={() => setEditMode(!editMode)}
+            onAddTable={handleAddTable}
+          />
+
+          {/* Legend */}
+          <div className="flex items-center gap-4 flex-wrap">
+            {Object.entries(STATUS_COLORS).map(([status, config]) => (
+              <div key={status} className="flex items-center gap-1.5 text-xs">
+                <div className={cn("w-3 h-3 rounded-sm", config.bg, "border", config.border)} />
+                <span className="text-[#8b93a7]">{config.label}</span>
+              </div>
+            ))}
+            <div className="ml-auto flex items-center gap-1">
+              <button onClick={zoomOut} className="p-1.5 rounded-lg hover:bg-[#1e2a45] text-[#8b93a7] hover:text-white transition-colors cursor-pointer">
+                <ZoomOut className="size-4" />
+              </button>
+              <span className="text-xs text-[#5a6580] w-12 text-center">{Math.round(zoom * 100)}%</span>
+              <button onClick={zoomIn} className="p-1.5 rounded-lg hover:bg-[#1e2a45] text-[#8b93a7] hover:text-white transition-colors cursor-pointer">
+                <ZoomIn className="size-4" />
+              </button>
+              <button onClick={resetZoom} className="p-1.5 rounded-lg hover:bg-[#1e2a45] text-[#8b93a7] hover:text-white transition-colors cursor-pointer">
+                <Maximize2 className="size-4" />
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Floor plan canvas */}
       <div className="flex-1 overflow-auto rounded-xl border border-[#1e2a45] bg-[#0D1326] min-h-[500px]">
@@ -336,7 +403,7 @@ export default function FloorPlan({ licenseKey, isEditor, onTableSelect }: Floor
         </div>
       </div>
 
-      {/* Selected table actions */}
+      {/* Selected table actions (waiter: tap to order, admin: edit/remove) */}
       {selectedTableData && (
         <div className="flex items-center gap-3 p-3 rounded-xl bg-[#131A2E] border border-[#1e2a45]">
           <div className="flex-1 min-w-0">
@@ -347,6 +414,14 @@ export default function FloorPlan({ licenseKey, isEditor, onTableSelect }: Floor
               {selectedTableData.seats} seats · {selectedTableData.zone} · {STATUS_COLORS[selectedTableData.status as TableStatus]?.label ?? selectedTableData.status}
             </p>
           </div>
+          {isWaiterFullScreen && (
+            <Button
+              size="sm"
+              onClick={() => onTableSelect?.(selectedTableData._id)}
+            >
+              Open Table
+            </Button>
+          )}
           {isEditor && (
             <div className="flex items-center gap-2">
               <Button size="sm" variant="secondary" onClick={handleEditTable}>

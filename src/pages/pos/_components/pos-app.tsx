@@ -30,6 +30,20 @@ export default function PosApp({
     toast.info("Orders & checkout coming soon in a future milestone!");
   };
 
+  // Waiters get a full-screen floor plan with no sidebar
+  if (activeStaff.role === "waiter") {
+    return (
+      <div className="h-screen bg-[#0A0F1E] overflow-hidden">
+        <FloorPlan
+          licenseKey={activation.licenseKey}
+          isEditor={false}
+          onTableSelect={handleTableSelect}
+          waiter={{ name: activeStaff.name, onLogout }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen bg-[#0A0F1E] overflow-hidden">
       <PosSidebar
