@@ -44,6 +44,15 @@
       crossorigin
     />
 
+    <!-- Capture PWA install prompt before React mounts so it is never lost -->
+    <script>
+      window.__pwaInstallPrompt = null;
+      window.addEventListener("beforeinstallprompt", function (e) {
+        e.preventDefault();
+        window.__pwaInstallPrompt = e;
+      });
+    </script>
+
     <!-- Detect dark mode preference and set the class before next-themes loads. This avoids a flash of unstyled content (FOUC) when the page loads. -->
     <script>
       try {
