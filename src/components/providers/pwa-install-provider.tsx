@@ -27,6 +27,10 @@ const PwaInstallContext = createContext<PwaInstallContextValue>({
 /**
  * Global provider that captures the `beforeinstallprompt` event once at app root
  * so every component in the tree can access it regardless of mount timing.
+ *
+ * If the URL contains `?install=true`, the install prompt is auto-triggered
+ * as soon as the browser fires `beforeinstallprompt`. This enables a seamless
+ * install flow when opened from a dashboard "Install" button.
  */
 export function PwaInstallProvider({ children }: { children: ReactNode }) {
   const [deferredPrompt, setDeferredPrompt] =
@@ -35,7 +39,32 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const handler = (e: Event) => {
       e.preventDefault();
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
+      const prompt = e as BeforeInstallPromptEvent;
+
+      // Auto-trigger install if opened with ?install=true
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("install") === "true") {
+        // Clean the URL param so it doesn't re-trigger
+        params.delete("install");
+        const cleanUrl =
+          window.location.pathname +
+          (params.toString() ? `?${params.toString()}` : "");
+        window.history.replaceState({}, "", cleanUrl);
+
+        // Auto-trigger the prompt
+        prompt.prompt();
+        prompt.userChoice.then(({ outcome }) => {
+          if (outcome === "accepted") {
+            setDeferredPrompt(null);
+          } else {
+            // User dismissed — keep the prompt available for manual trigger
+            setDeferredPrompt(prompt);
+          }
+        });
+        return;
+      }
+
+      setDeferredPrompt(prompt);
     };
 
     window.addEventListener("beforeinstallprompt", handler);

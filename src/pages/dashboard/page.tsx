@@ -96,10 +96,7 @@ export default function DashboardOverview() {
       return;
     }
 
-    // Detect if running inside an iframe (Hercules preview or embed)
-    const isInIframe = window.self !== window.top;
-
-    // Detect if already installed as PWA (standalone mode)
+    // Detect if already installed as PWA
     const isStandalone =
       window.matchMedia("(display-mode: standalone)").matches ||
       ("standalone" in navigator && (navigator as Record<string, unknown>).standalone === true);
@@ -109,29 +106,18 @@ export default function DashboardOverview() {
       return;
     }
 
-    if (isInIframe) {
-      // Open the POS page in a new tab so the browser can trigger the install prompt
-      window.open(`${window.location.origin}/pos`, "_blank");
-      toast.info(
-        "Opening VYNTEX POS in your browser. Use the install icon in the address bar to install it."
-      );
-      return;
-    }
-
-    // Detect iOS (no beforeinstallprompt support)
+    // Detect iOS (no beforeinstallprompt support — needs manual Add to Home Screen)
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     if (isIOS) {
       toast.info(
-        "On iOS: tap the Share button at the bottom of Safari, then tap \"Add to Home Screen\" to install."
+        "On iOS: tap the Share button at the bottom of Safari, then tap \"Add to Home Screen\"."
       );
       return;
     }
 
-    // Fallback: navigate to /pos and suggest install from address bar
-    window.open(`${window.location.origin}/pos`, "_blank");
-    toast.info(
-      "Look for the install icon in your browser's address bar to install VYNTEX POS."
-    );
+    // Open /pos in a new tab with ?install=true — the PwaInstallProvider
+    // will auto-trigger the native install dialog as soon as the page loads
+    window.open(`${window.location.origin}/pos?install=true`, "_blank");
   };
 
   return (
@@ -258,7 +244,7 @@ export default function DashboardOverview() {
           onClick={handleInstall}
         >
           <Download className="size-5 mr-2" />
-          {canInstall ? "Install VYNTEX POS Software" : "Open & Install VYNTEX POS"}
+          Install VYNTEX POS Software
           <ArrowRight className="size-4 ml-2" />
         </Button>
       </div>
