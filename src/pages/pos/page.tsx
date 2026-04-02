@@ -8,7 +8,7 @@ import {
 } from "@/lib/local-db.ts";
 import ActivationScreen from "./_components/activation-screen.tsx";
 import AdminSetupScreen from "./_components/admin-setup-screen.tsx";
-import PosHome from "./_components/pos-home.tsx";
+import PosApp from "./_components/pos-app.tsx";
 
 type LaunchStep = "loading" | "activation" | "admin-setup" | "ready";
 
@@ -91,5 +91,5 @@ export default function PosLauncher() {
     );
   }
 
-  return <PosHome activation={activation} />;
+  return <PosApp activation={activation!} />;
 }
