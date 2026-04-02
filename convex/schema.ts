@@ -85,4 +85,25 @@ export default defineSchema({
   })
     .index("by_restaurant", ["restaurantId"])
     .index("by_restaurant_and_zone", ["restaurantId", "zone"]),
+
+  staff: defineTable({
+    restaurantId: v.id("restaurants"),
+    name: v.string(),
+    role: v.union(
+      v.literal("admin"),
+      v.literal("waiter"),
+      v.literal("kitchen")
+    ),
+    pinHash: v.string(),
+    isActive: v.boolean(),
+  }).index("by_restaurant", ["restaurantId"]),
+
+  shifts: defineTable({
+    staffId: v.id("staff"),
+    restaurantId: v.id("restaurants"),
+    clockIn: v.string(),
+    clockOut: v.optional(v.string()),
+  })
+    .index("by_staff", ["staffId"])
+    .index("by_restaurant", ["restaurantId"]),
 });

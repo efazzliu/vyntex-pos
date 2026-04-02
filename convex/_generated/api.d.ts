@@ -15,6 +15,7 @@ import type * as dashboard_restaurants from "../dashboard/restaurants.js";
 import type * as licenseActivation from "../licenseActivation.js";
 import type * as pos_helpers from "../pos/helpers.js";
 import type * as pos_menu from "../pos/menu.js";
+import type * as pos_staff from "../pos/staff.js";
 import type * as pos_tables from "../pos/tables.js";
 import type * as users from "../users.js";
 
@@ -32,6 +33,7 @@ declare const fullApi: ApiFromModules<{
   licenseActivation: typeof licenseActivation;
   "pos/helpers": typeof pos_helpers;
   "pos/menu": typeof pos_menu;
+  "pos/staff": typeof pos_staff;
   "pos/tables": typeof pos_tables;
   users: typeof users;
 }>;

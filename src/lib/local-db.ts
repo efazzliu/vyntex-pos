@@ -1,12 +1,13 @@
 /**
  * IndexedDB utilities for VYNTEX POS local storage.
- * Stores activation tokens and local admin credentials for offline access.
+ * Stores activation tokens, local admin credentials, and cached staff for offline access.
  */
 
 const DB_NAME = "vyntex-local";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const CONFIG_STORE = "config";
 const ADMINS_STORE = "admins";
+const STAFF_STORE = "staff";
 
 // ── Types ─────────────────────────────────────────────
 
@@ -29,6 +30,14 @@ export type LocalAdmin = {
   createdAt: string;
 };
 
+export type LocalStaff = {
+  convexId: string;
+  name: string;
+  role: "admin" | "waiter" | "kitchen";
+  pinHash: string;
+  isActive: boolean;
+};
+
 // ── Database ──────────────────────────────────────────
 
 function openDB(): Promise<IDBDatabase> {
@@ -45,6 +54,9 @@ function openDB(): Promise<IDBDatabase> {
           keyPath: "id",
           autoIncrement: true,
         });
+      }
+      if (!db.objectStoreNames.contains(STAFF_STORE)) {
+        db.createObjectStore(STAFF_STORE, { keyPath: "convexId" });
       }
     };
 
@@ -107,7 +119,7 @@ function dbGetAll<T>(storeName: string): Promise<T[]> {
 
 // ── Hashing ───────────────────────────────────────────
 
-async function hashString(input: string): Promise<string> {
+export async function hashString(input: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(input);
   const hashBuffer = await crypto.subtle.digest("SHA-256", data);
@@ -200,4 +212,48 @@ export async function verifyPin(pin: string): Promise<LocalAdmin | null> {
   const admins = await getLocalAdmins();
   const hash = await hashString(pin);
   return admins.find((a) => a.pin === hash) ?? null;
+}
+
+// ── Staff Cache (for offline PIN verification) ────────
+
+/**
+ * Replace the entire local staff cache with fresh data from the server.
+ */
+export async function saveStaffCache(staffList: LocalStaff[]): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STAFF_STORE, "readwrite");
+    const store = tx.objectStore(STAFF_STORE);
+
+    // Clear existing cache
+    store.clear();
+
+    // Add all staff
+    for (const member of staffList) {
+      store.put(member);
+    }
+
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+/**
+ * Get all cached staff members from IndexedDB.
+ */
+export async function getStaffCache(): Promise<LocalStaff[]> {
+  return dbGetAll<LocalStaff>(STAFF_STORE);
+}
+
+/**
+ * Verify a PIN hash against the local staff cache.
+ * Used when offline and the Convex backend is unreachable.
+ */
+export async function verifyLocalStaffPin(
+  pinHash: string
+): Promise<{ convexId: string; name: string; role: "admin" | "waiter" | "kitchen" } | null> {
+  const staff = await getStaffCache();
+  const match = staff.find((s) => s.pinHash === pinHash && s.isActive);
+  if (!match) return null;
+  return { convexId: match.convexId, name: match.name, role: match.role };
 }

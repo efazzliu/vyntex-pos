@@ -13,17 +13,18 @@ import {
   Package,
   Users,
 } from "lucide-react";
-
-type PosView = "home" | "menu" | "tables";
+import type { PosView, StaffRole } from "../_lib/types.ts";
 
 type PosHomeViewProps = {
   activation: ActivationData;
   onNavigate: (view: PosView) => void;
+  staffRole: StaffRole;
 };
 
 export default function PosHomeView({
   activation,
   onNavigate,
+  staffRole,
 }: PosHomeViewProps) {
   const categories = useQuery(api.pos.menu.getCategories, {
     licenseKey: activation.licenseKey,
@@ -94,20 +95,31 @@ export default function PosHomeView({
           Quick Actions
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <ActionCard
-            icon={UtensilsCrossed}
-            title="Manage Menu"
-            description="Add or edit categories and items"
-            color="#0066FF"
-            onClick={() => onNavigate("menu")}
-          />
-          <ActionCard
-            icon={LayoutGrid}
-            title="Manage Tables"
-            description="Set up zones and table layout"
-            color="#44CC00"
-            onClick={() => onNavigate("tables")}
-          />
+          {staffRole === "admin" && (
+            <>
+              <ActionCard
+                icon={UtensilsCrossed}
+                title="Manage Menu"
+                description="Add or edit categories and items"
+                color="#0066FF"
+                onClick={() => onNavigate("menu")}
+              />
+              <ActionCard
+                icon={LayoutGrid}
+                title="Manage Tables"
+                description="Set up zones and table layout"
+                color="#44CC00"
+                onClick={() => onNavigate("tables")}
+              />
+              <ActionCard
+                icon={Users}
+                title="Manage Staff"
+                description="Add or edit team members"
+                color="#FF6B00"
+                onClick={() => onNavigate("staff")}
+              />
+            </>
+          )}
           <ActionCard
             icon={ShoppingCart}
             title="Start Orders"
