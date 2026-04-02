@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { motion } from "motion/react";
 import { useOnlineStatus } from "@/hooks/use-online-status.ts";
@@ -40,6 +40,7 @@ export default function PinLoginScreen({
 
   // Reactively fetch staff list (caches for offline use)
   const staffList = useQuery(api.pos.staff.getStaff, { licenseKey });
+  const clockIn = useMutation(api.pos.staff.clockIn);
 
   // Cache staff in IndexedDB whenever the list updates
   useEffect(() => {
@@ -76,6 +77,12 @@ export default function PinLoginScreen({
               role: match.role,
             };
             setSuccess(staff);
+
+            // Auto clock-in when staff logs in (best-effort, don't block login)
+            clockIn({ licenseKey, staffId: match._id }).catch(() => {
+              // Silent fail — clock-in is nice-to-have, login still works
+            });
+
             setTimeout(() => onLogin(staff), 800);
             return;
           }
@@ -104,7 +111,7 @@ export default function PinLoginScreen({
         setVerifying(false);
       }
     },
-    [staffList, onLogin]
+    [staffList, onLogin, clockIn, licenseKey]
   );
 
   // Auto-verify when 4 digits are entered

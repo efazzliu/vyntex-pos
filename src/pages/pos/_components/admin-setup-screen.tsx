@@ -1,23 +1,29 @@
 import { useState } from "react";
+import { useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api.js";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Spinner } from "@/components/ui/spinner.tsx";
 import { motion } from "motion/react";
 import { AlertCircle, Eye, EyeOff, ShieldCheck, UserPlus } from "lucide-react";
-import { saveLocalAdmin } from "@/lib/local-db.ts";
+import { saveLocalAdmin, hashString } from "@/lib/local-db.ts";
 
 const LOGO_URL = "https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz";
 
 type AdminSetupScreenProps = {
   businessName: string;
+  licenseKey: string;
   onComplete: () => void;
 };
 
 export default function AdminSetupScreen({
   businessName,
+  licenseKey,
   onComplete,
 }: AdminSetupScreenProps) {
+  const createStaff = useMutation(api.pos.staff.createStaff);
+
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -35,7 +41,6 @@ export default function AdminSetupScreen({
   const handleSubmit = async () => {
     setError(null);
 
-    // Validation
     if (!name.trim()) {
       setError("Please enter a full name.");
       return;
@@ -59,7 +64,18 @@ export default function AdminSetupScreen({
     setLoading(true);
 
     try {
+      // Save local admin to IndexedDB for offline access
       await saveLocalAdmin(name.trim(), password, pin);
+
+      // Also create staff member in Convex so PIN login works
+      const pinHash = await hashString(pin);
+      await createStaff({
+        licenseKey,
+        name: name.trim(),
+        role: "admin",
+        pinHash,
+      });
+
       onComplete();
     } catch {
       setError("Failed to create admin profile. Please try again.");

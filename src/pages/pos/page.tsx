@@ -6,17 +6,19 @@ import {
   getLocalAdmins,
   type ActivationData,
 } from "@/lib/local-db.ts";
+import type { ActiveStaff } from "./_lib/types.ts";
 import ActivationScreen from "./_components/activation-screen.tsx";
 import AdminSetupScreen from "./_components/admin-setup-screen.tsx";
+import PinLoginScreen from "./_components/pin-login-screen.tsx";
 import PosApp from "./_components/pos-app.tsx";
 
-type LaunchStep = "loading" | "activation" | "admin-setup" | "ready";
+type LaunchStep = "loading" | "activation" | "admin-setup" | "pin-login" | "ready";
 
 export default function PosLauncher() {
   const [step, setStep] = useState<LaunchStep>("loading");
   const [activation, setActivation] = useState<ActivationData | null>(null);
+  const [activeStaff, setActiveStaff] = useState<ActiveStaff | null>(null);
 
-  // Check local state on mount
   useEffect(() => {
     checkLocalState();
   }, []);
@@ -32,22 +34,20 @@ export default function PosLauncher() {
 
       setActivation(stored);
 
-      // Check if local admin exists
       const admins = await getLocalAdmins();
       if (admins.length === 0) {
         setStep("admin-setup");
         return;
       }
 
-      setStep("ready");
+      // Always go through PIN login after activation is verified
+      setStep("pin-login");
     } catch {
-      // If IndexedDB fails, start from activation
       setStep("activation");
     }
   }
 
   const handleActivated = async () => {
-    // Re-read activation data after it was saved
     const stored = await getActivation();
     if (stored) {
       setActivation(stored);
@@ -56,7 +56,18 @@ export default function PosLauncher() {
   };
 
   const handleAdminCreated = () => {
+    // After admin setup, go to PIN login
+    setStep("pin-login");
+  };
+
+  const handlePinLogin = (staff: ActiveStaff) => {
+    setActiveStaff(staff);
     setStep("ready");
+  };
+
+  const handleLogout = () => {
+    setActiveStaff(null);
+    setStep("pin-login");
   };
 
   if (step === "loading") {
@@ -86,10 +97,28 @@ export default function PosLauncher() {
     return (
       <AdminSetupScreen
         businessName={activation?.businessName ?? "VYNTEX POS"}
+        licenseKey={activation?.licenseKey ?? ""}
         onComplete={handleAdminCreated}
       />
     );
   }
 
-  return <PosApp activation={activation!} />;
+  if (step === "pin-login") {
+    return (
+      <PinLoginScreen
+        businessName={activation?.businessName ?? "VYNTEX POS"}
+        licenseKey={activation?.licenseKey ?? ""}
+        onLogin={handlePinLogin}
+      />
+    );
+  }
+
+  // step === "ready"
+  return (
+    <PosApp
+      activation={activation!}
+      activeStaff={activeStaff!}
+      onLogout={handleLogout}
+    />
+  );
 }
