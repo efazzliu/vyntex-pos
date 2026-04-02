@@ -17,7 +17,6 @@ import {
 import { useState } from "react";
 import { cn } from "@/lib/utils.ts";
 import { Link } from "react-router-dom";
-import { usePwaInstall } from "@/hooks/use-pwa-install.ts";
 
 const VYN_TYPE_LABELS: Record<string, string> = {
   restaurant: "Restaurant POS",
@@ -57,7 +56,6 @@ function daysUntil(iso: string) {
 export default function DashboardOverview() {
   const restaurant = useQuery(api.dashboard.restaurants.getMyRestaurant);
   const [copied, setCopied] = useState(false);
-  const { canInstall, triggerInstall } = usePwaInstall();
 
   if (restaurant === undefined) {
     return (
@@ -90,12 +88,6 @@ export default function DashboardOverview() {
   };
 
   const handleInstall = async () => {
-    if (canInstall) {
-      // Directly trigger the native browser install prompt
-      await triggerInstall();
-      return;
-    }
-
     // Detect if already installed as PWA
     const isStandalone =
       window.matchMedia("(display-mode: standalone)").matches ||
@@ -115,8 +107,8 @@ export default function DashboardOverview() {
       return;
     }
 
-    // Open /pos in a new tab with ?install=true — the PwaInstallProvider
-    // will auto-trigger the native install dialog as soon as the page loads
+    // PWA scope is /pos — must install from within that scope.
+    // Open /pos with ?install=true so the prompt auto-triggers there.
     window.open(`${window.location.origin}/pos?install=true`, "_blank");
   };
 

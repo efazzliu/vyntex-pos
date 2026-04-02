@@ -1,5 +1,5 @@
-const CACHE_NAME = "vyntex-v1";
-const urlsToCache = ["/", "/icon/icon-192.png", "/icon/icon-512.png", "/offline.html"];
+const CACHE_NAME = "vyntex-v2";
+const urlsToCache = ["/pos", "/icon/icon-192.png", "/icon/icon-512.png", "/offline.html"];
 
 // Install event - cache core assets
 self.addEventListener("install", (event) => {
@@ -18,9 +18,13 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Handle navigation requests differently
+  // Handle navigation requests — serve /pos from cache when offline
   if (event.request.mode === "navigate") {
-    event.respondWith(fetch(event.request).catch(() => caches.match("/offline.html")));
+    event.respondWith(
+      fetch(event.request).catch(() =>
+        caches.match("/pos").then((cached) => cached || caches.match("/offline.html")),
+      ),
+    );
     return;
   }
 
@@ -81,7 +85,7 @@ self.addEventListener("notificationclick", (event) => {
       for (const client of clientList) {
         if ("focus" in client) return client.focus();
       }
-      if (clients.openWindow) return clients.openWindow("/");
+      if (clients.openWindow) return clients.openWindow("/pos");
     }),
   );
 });
