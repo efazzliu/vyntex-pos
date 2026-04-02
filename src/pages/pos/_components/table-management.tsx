@@ -39,19 +39,27 @@ const STATUS_CONFIG = {
   },
   occupied: {
     label: "Occupied",
+    borderClass: "border-red-800/40",
+    bgClass: "bg-red-950/20",
+    badgeBg: "bg-red-500/20",
+    badgeText: "text-red-400",
+    dotColor: "#f87171",
+  },
+  reserved: {
+    label: "Reserved",
     borderClass: "border-amber-800/40",
     bgClass: "bg-amber-950/20",
     badgeBg: "bg-amber-500/20",
     badgeText: "text-amber-400",
     dotColor: "#fbbf24",
   },
-  reserved: {
-    label: "Reserved",
-    borderClass: "border-purple-800/40",
-    bgClass: "bg-purple-950/20",
-    badgeBg: "bg-purple-500/20",
-    badgeText: "text-purple-400",
-    dotColor: "#a78bfa",
+  "bill-printed": {
+    label: "Bill Printed",
+    borderClass: "border-blue-800/40",
+    bgClass: "bg-blue-950/20",
+    badgeBg: "bg-blue-500/20",
+    badgeText: "text-blue-400",
+    dotColor: "#60a5fa",
   },
 } as const;
 
@@ -67,13 +75,14 @@ export default function TableManagement({ licenseKey }: TableManagementProps) {
 
   // Derive zones and grouped tables
   const { zones, grouped, stats } = useMemo(() => {
-    if (!tables) return { zones: [] as string[], grouped: {} as Record<string, Doc<"tables">[]>, stats: { total: 0, available: 0, occupied: 0, reserved: 0 } };
+    if (!tables) return { zones: [] as string[], grouped: {} as Record<string, Doc<"tables">[]>, stats: { total: 0, available: 0, occupied: 0, reserved: 0, billPrinted: 0 } };
 
     const zoneSet = new Set<string>();
     const groupMap: Record<string, Doc<"tables">[]> = {};
     let available = 0;
     let occupied = 0;
     let reserved = 0;
+    let billPrinted = 0;
 
     for (const t of tables) {
       zoneSet.add(t.zone);
@@ -81,6 +90,7 @@ export default function TableManagement({ licenseKey }: TableManagementProps) {
       groupMap[t.zone].push(t);
       if (t.status === "available") available++;
       else if (t.status === "occupied") occupied++;
+      else if (t.status === "bill-printed") billPrinted++;
       else reserved++;
     }
 
@@ -89,7 +99,7 @@ export default function TableManagement({ licenseKey }: TableManagementProps) {
     return {
       zones: sortedZones,
       grouped: groupMap,
-      stats: { total: tables.length, available, occupied, reserved },
+      stats: { total: tables.length, available, occupied, reserved, billPrinted },
     };
   }, [tables]);
 
@@ -182,11 +192,12 @@ export default function TableManagement({ licenseKey }: TableManagementProps) {
       />
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <MiniStat label="Total" value={stats.total} color="#0066FF" />
         <MiniStat label="Available" value={stats.available} color="#34d399" />
-        <MiniStat label="Occupied" value={stats.occupied} color="#fbbf24" />
-        <MiniStat label="Reserved" value={stats.reserved} color="#a78bfa" />
+        <MiniStat label="Occupied" value={stats.occupied} color="#f87171" />
+        <MiniStat label="Reserved" value={stats.reserved} color="#fbbf24" />
+        <MiniStat label="Bill Printed" value={stats.billPrinted} color="#60a5fa" />
       </div>
 
       {/* Zone Filters */}

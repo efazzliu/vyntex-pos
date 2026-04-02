@@ -6,6 +6,8 @@ import PosHomeView from "./pos-home-view.tsx";
 import MenuManagement from "./menu-management.tsx";
 import TableManagement from "./table-management.tsx";
 import StaffManagement from "./staff-management.tsx";
+import FloorPlan from "./floor-plan.tsx";
+import { toast } from "sonner";
 
 type PosAppProps = {
   activation: ActivationData;
@@ -20,9 +22,12 @@ export default function PosApp({
 }: PosAppProps) {
   const [activeView, setActiveView] = useState<PosView>("home");
 
-  // Non-admin roles can only see the home view (for now)
   const handleViewChange = (view: PosView) => {
     setActiveView(view);
+  };
+
+  const handleTableSelect = () => {
+    toast.info("Orders & checkout coming soon in a future milestone!");
   };
 
   return (
@@ -40,6 +45,13 @@ export default function PosApp({
             activation={activation}
             onNavigate={setActiveView}
             staffRole={activeStaff.role}
+          />
+        )}
+        {activeView === "floor" && (
+          <FloorPlan
+            licenseKey={activation.licenseKey}
+            isEditor={activeStaff.role === "admin"}
+            onTableSelect={handleTableSelect}
           />
         )}
         {activeView === "menu" && activeStaff.role === "admin" && (

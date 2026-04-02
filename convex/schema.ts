@@ -80,8 +80,12 @@ export default defineSchema({
     status: v.union(
       v.literal("available"),
       v.literal("occupied"),
-      v.literal("reserved")
+      v.literal("reserved"),
+      v.literal("bill-printed")
     ),
+    posX: v.optional(v.number()),
+    posY: v.optional(v.number()),
+    shape: v.optional(v.union(v.literal("square"), v.literal("circle"), v.literal("rectangle"))),
   })
     .index("by_restaurant", ["restaurantId"])
     .index("by_restaurant_and_zone", ["restaurantId", "zone"]),

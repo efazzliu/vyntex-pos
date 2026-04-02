@@ -12,6 +12,7 @@ import {
   FolderOpen,
   Package,
   Users,
+  MapPinned,
 } from "lucide-react";
 import type { PosView, StaffRole } from "../_lib/types.ts";
 
@@ -98,6 +99,13 @@ export default function PosHomeView({
           {staffRole === "admin" && (
             <>
               <ActionCard
+                icon={MapPinned}
+                title="Floor Plan"
+                description="View and arrange your table layout"
+                color="#00C2FF"
+                onClick={() => onNavigate("floor")}
+              />
+              <ActionCard
                 icon={UtensilsCrossed}
                 title="Manage Menu"
                 description="Add or edit categories and items"
@@ -119,6 +127,15 @@ export default function PosHomeView({
                 onClick={() => onNavigate("staff")}
               />
             </>
+          )}
+          {staffRole === "waiter" && (
+            <ActionCard
+              icon={MapPinned}
+              title="View Floor"
+              description="See table status and select a table"
+              color="#00C2FF"
+              onClick={() => onNavigate("floor")}
+            />
           )}
           <ActionCard
             icon={ShoppingCart}
@@ -150,8 +167,10 @@ export default function PosHomeView({
                   table.status === "available"
                     ? "border-emerald-800/40 bg-emerald-950/20"
                     : table.status === "occupied"
-                      ? "border-amber-800/40 bg-amber-950/20"
-                      : "border-purple-800/40 bg-purple-950/20"
+                      ? "border-red-800/40 bg-red-950/20"
+                      : table.status === "bill-printed"
+                        ? "border-blue-800/40 bg-blue-950/20"
+                        : "border-amber-800/40 bg-amber-950/20"
                 )}
               >
                 <p className="text-white font-semibold text-lg">{table.name}</p>
@@ -164,11 +183,13 @@ export default function PosHomeView({
                     table.status === "available"
                       ? "bg-emerald-500/20 text-emerald-400"
                       : table.status === "occupied"
-                        ? "bg-amber-500/20 text-amber-400"
-                        : "bg-purple-500/20 text-purple-400"
+                        ? "bg-red-500/20 text-red-400"
+                        : table.status === "bill-printed"
+                          ? "bg-blue-500/20 text-blue-400"
+                          : "bg-amber-500/20 text-amber-400"
                   )}
                 >
-                  {table.status}
+                  {table.status === "bill-printed" ? "Bill Printed" : table.status}
                 </span>
               </div>
             ))}

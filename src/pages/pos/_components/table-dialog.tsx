@@ -19,7 +19,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select.tsx";
+import { cn } from "@/lib/utils.ts";
 import { toast } from "sonner";
+import type { TableShape, TableStatus } from "../_lib/types.ts";
 
 type TableDialogProps = {
   open: boolean;
@@ -28,6 +30,12 @@ type TableDialogProps = {
   zones: string[];
   editing?: Doc<"tables"> | null;
 };
+
+const SHAPE_OPTIONS: { value: TableShape; label: string }[] = [
+  { value: "square", label: "Square" },
+  { value: "circle", label: "Circle" },
+  { value: "rectangle", label: "Rectangle" },
+];
 
 export default function TableDialog({
   open,
@@ -40,9 +48,8 @@ export default function TableDialog({
   const [seats, setSeats] = useState("4");
   const [zone, setZone] = useState("");
   const [newZone, setNewZone] = useState("");
-  const [status, setStatus] = useState<
-    "available" | "occupied" | "reserved"
-  >("available");
+  const [shape, setShape] = useState<TableShape>("square");
+  const [status, setStatus] = useState<TableStatus>("available");
   const [saving, setSaving] = useState(false);
 
   const createTable = useMutation(api.pos.tables.createTable);
@@ -55,12 +62,14 @@ export default function TableDialog({
         setSeats(editing.seats.toString());
         setZone(editing.zone);
         setNewZone("");
-        setStatus(editing.status);
+        setShape((editing.shape ?? "square") as TableShape);
+        setStatus(editing.status as TableStatus);
       } else {
         setName("");
         setSeats("4");
         setZone(zones[0] ?? "__new");
         setNewZone(zones.length === 0 ? "Main Floor" : "");
+        setShape("square");
         setStatus("available");
       }
     }
@@ -92,16 +101,24 @@ export default function TableDialog({
           seats: seatsNum,
           zone: finalZone,
           status,
+          shape,
         });
         toast.success("Table updated");
       } else {
+        // Place new tables at a random-ish open position
+        const posX = 40 + Math.floor(Math.random() * 400);
+        const posY = 40 + Math.floor(Math.random() * 300);
+
         await createTable({
           licenseKey,
           name: name.trim(),
           seats: seatsNum,
           zone: finalZone,
+          posX,
+          posY,
+          shape,
         });
-        toast.success("Table created");
+        toast.success("Table added to floor plan");
       }
       onOpenChange(false);
     } catch {
@@ -119,16 +136,18 @@ export default function TableDialog({
         </DialogHeader>
 
         <div className="space-y-5 py-2">
+          {/* Name */}
           <div className="space-y-2">
             <Label className="text-[#8b93a7]">Name</Label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g., T1, Table 1"
+              placeholder="e.g., Table 1, VIP, Bar Seat"
               className="bg-[#0A0F1E] border-[#1e2a45] text-white"
             />
           </div>
 
+          {/* Seats */}
           <div className="space-y-2">
             <Label className="text-[#8b93a7]">Seats</Label>
             <Input
@@ -140,6 +159,28 @@ export default function TableDialog({
             />
           </div>
 
+          {/* Shape */}
+          <div className="space-y-2">
+            <Label className="text-[#8b93a7]">Shape</Label>
+            <div className="flex gap-2">
+              {SHAPE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setShape(opt.value)}
+                  className={cn(
+                    "flex-1 py-2.5 rounded-lg border text-sm font-medium transition-all cursor-pointer",
+                    shape === opt.value
+                      ? "border-[#0066FF] bg-[#0066FF]/10 text-[#0066FF]"
+                      : "border-[#1e2a45] bg-[#0A0F1E] text-[#8b93a7] hover:text-white"
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Zone */}
           <div className="space-y-2">
             <Label className="text-[#8b93a7]">Zone</Label>
             <Select value={zone} onValueChange={setZone}>
@@ -165,14 +206,13 @@ export default function TableDialog({
             )}
           </div>
 
+          {/* Status (only when editing) */}
           {editing && (
             <div className="space-y-2">
               <Label className="text-[#8b93a7]">Status</Label>
               <Select
                 value={status}
-                onValueChange={(v) =>
-                  setStatus(v as "available" | "occupied" | "reserved")
-                }
+                onValueChange={(v) => setStatus(v as TableStatus)}
               >
                 <SelectTrigger className="bg-[#0A0F1E] border-[#1e2a45] text-white">
                   <SelectValue />
@@ -181,6 +221,7 @@ export default function TableDialog({
                   <SelectItem value="available">Available</SelectItem>
                   <SelectItem value="occupied">Occupied</SelectItem>
                   <SelectItem value="reserved">Reserved</SelectItem>
+                  <SelectItem value="bill-printed">Bill Printed</SelectItem>
                 </SelectContent>
               </Select>
             </div>

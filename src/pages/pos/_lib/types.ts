@@ -6,4 +6,7 @@ export type ActiveStaff = {
   role: StaffRole;
 };
 
-export type PosView = "home" | "menu" | "tables" | "staff";
+export type PosView = "home" | "menu" | "tables" | "staff" | "floor";
+
+export type TableStatus = "available" | "occupied" | "reserved" | "bill-printed";
+export type TableShape = "square" | "circle" | "rectangle";

@@ -40,6 +40,7 @@ function getNavItems(role: ActiveStaff["role"]): NavItem[] {
   if (role === "admin") {
     return [
       { id: "home", icon: Home, label: "Home" },
+      { id: "floor", icon: MapPinned, label: "Floor" },
       { id: "menu", icon: UtensilsCrossed, label: "Menu" },
       { id: "tables", icon: LayoutGrid, label: "Tables" },
       { id: "staff", icon: Users, label: "Staff" },
@@ -47,7 +48,10 @@ function getNavItems(role: ActiveStaff["role"]): NavItem[] {
   }
 
   if (role === "waiter") {
-    return [{ id: "home", icon: Home, label: "Home" }];
+    return [
+      { id: "home", icon: Home, label: "Home" },
+      { id: "floor", icon: MapPinned, label: "Floor" },
+    ];
   }
 
   // kitchen
@@ -77,11 +81,6 @@ function getComingSoonItems(role: ActiveStaff["role"]): ComingSoonItem[] {
 
   if (role === "waiter") {
     return [
-      {
-        icon: MapPinned,
-        label: "Floor",
-        message: "Floor plan coming soon!",
-      },
       {
         icon: ShoppingCart,
         label: "Orders",
