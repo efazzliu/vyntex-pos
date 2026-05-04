@@ -64,8 +64,8 @@ const STATUS_CONFIG = {
 } as const;
 
 export default function TableManagement({ licenseKey }: TableManagementProps) {
-  const tables = useQuery(api.pos.tables.getTables, { licenseKey });
-  const deleteTable = useMutation(api.pos.tables.deleteTable);
+  const tables = useQuery('pos.tables.getTables', { licenseKey });
+  const deleteTable = useMutation('pos.tables.deleteTable');
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTable, setEditingTable] = useState<Doc<"tables"> | null>(null);

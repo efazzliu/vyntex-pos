@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Vyntex POS</string>
+    <string name="title_activity_main">Vyntex POS</string>
+    <string name="package_name">com.vyntex.phone</string>
+    <string name="custom_url_scheme">com.vyntex.phone</string>
+</resources>

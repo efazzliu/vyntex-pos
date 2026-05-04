@@ -1,22 +1,22 @@
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
-import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { Button } from "@/components/ui/button.tsx";
-import { toast } from "sonner";
-import {
-  KeyRound,
-  Copy,
-  Check,
-  Download,
-  Shield,
-  Calendar,
-  CreditCard,
-  ArrowRight,
-  Monitor,
-} from "lucide-react";
 import { useState } from "react";
-import { cn } from "@/lib/utils.ts";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button.tsx";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { cn } from "@/lib/utils.ts";
+import { useDashboardRestaurant } from "@/hooks/use-dashboard-restaurant.ts";
+import {
+  ArrowRight,
+  Calendar,
+  Check,
+  Copy,
+  CreditCard,
+  Download,
+  HardDriveDownload,
+  KeyRound,
+  Monitor,
+  Shield,
+} from "lucide-react";
 
 const VYN_TYPE_LABELS: Record<string, string> = {
   restaurant: "Restaurant POS",
@@ -24,14 +24,6 @@ const VYN_TYPE_LABELS: Record<string, string> = {
   bar: "Bar POS",
   hotel: "Hotel POS",
   fitness: "Fitness POS",
-};
-
-const VYN_TYPE_ICONS: Record<string, string> = {
-  restaurant: "\uD83C\uDF7D\uFE0F",
-  cafe: "\u2615",
-  bar: "\uD83C\uDF7A",
-  hotel: "\uD83C\uDFE8",
-  fitness: "\uD83C\uDFCB\uFE0F",
 };
 
 const PLAN_LABELS: Record<string, string> = {
@@ -53,25 +45,87 @@ function daysUntil(iso: string) {
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
 }
 
+function trimEnvUrl(v: unknown): string | undefined {
+  if (typeof v !== "string") return undefined;
+  const t = v.trim();
+  return t.length > 0 && !t.includes("...") ? t : undefined;
+}
+
+function formatInstallerUpdatedAt(raw: string | undefined): string | null {
+  if (!raw) return null;
+  const d = new Date(raw);
+  if (!Number.isFinite(d.getTime())) return null;
+  return d.toLocaleString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function StatCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "blue" | "green" | "violet";
+}) {
+  const accent =
+    tone === "blue"
+      ? "border-l-blue-500 shadow-[inset_0_1px_0_0_rgba(59,130,246,0.08)]"
+      : tone === "green"
+        ? "border-l-emerald-500 shadow-[inset_0_1px_0_0_rgba(16,185,129,0.08)]"
+        : "border-l-violet-500 shadow-[inset_0_1px_0_0_rgba(139,92,246,0.08)]";
+
+  return (
+    <div
+      className={cn(
+        "rounded-xl border border-zinc-800/80 border-l-2 bg-zinc-950/60 p-5 backdrop-blur-sm",
+        accent,
+      )}
+    >
+      <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-zinc-500">
+        {label}
+      </p>
+      <p className="mt-2 text-lg font-semibold tracking-tight text-zinc-50">{value}</p>
+    </div>
+  );
+}
+
 export default function DashboardOverview() {
-  const restaurant = useQuery(api.dashboard.restaurants.getMyRestaurant);
+  const { restaurant } = useDashboardRestaurant();
   const [copied, setCopied] = useState(false);
+  const legacySingleUrl = trimEnvUrl(import.meta.env.VITE_RESTAURANT_POS_EXE_URL);
+  const installerUrlX64 =
+    trimEnvUrl(import.meta.env.VITE_RESTAURANT_POS_EXE_URL_X64) ??
+    legacySingleUrl ??
+    "/VyntexPOSSetup.exe";
+  const arm64ExeInPublic = import.meta.env.VITE_ARM64_INSTALLER_AVAILABLE === "true";
+  const installerUrlArm64 =
+    trimEnvUrl(import.meta.env.VITE_RESTAURANT_POS_EXE_URL_ARM64) ??
+    (arm64ExeInPublic ? "/VyntexPOSSetup-arm64.exe" : undefined);
+  const installerUpdatedAt = formatInstallerUpdatedAt(
+    import.meta.env.VITE_INSTALLER_UPDATED_AT,
+  );
 
   if (restaurant === undefined) {
     return (
-      <div className="p-6 lg:p-8 space-y-6">
-        <Skeleton className="h-8 w-64 mb-2" />
-        <Skeleton className="h-4 w-48" />
-        <div className="space-y-4 mt-6">
-          <Skeleton className="h-40 rounded-xl" />
-          <Skeleton className="h-36 rounded-xl" />
-          <Skeleton className="h-44 rounded-xl" />
+      <div className="mx-auto w-full max-w-6xl space-y-8 p-6 pb-12 lg:p-10">
+        <Skeleton className="h-36 rounded-2xl bg-zinc-900/80" />
+        <div className="grid gap-4 md:grid-cols-3">
+          <Skeleton className="h-24 rounded-xl bg-zinc-900/80" />
+          <Skeleton className="h-24 rounded-xl bg-zinc-900/80" />
+          <Skeleton className="h-24 rounded-xl bg-zinc-900/80" />
         </div>
+        <Skeleton className="h-52 rounded-2xl bg-zinc-900/80" />
       </div>
     );
   }
 
-  if (!restaurant) return null; // Layout handles null state
+  if (!restaurant) return null;
 
   const daysLeft = daysUntil(restaurant.licenseExpiry);
   const isExpiringSoon = daysLeft <= 7;
@@ -80,204 +134,170 @@ export default function DashboardOverview() {
     try {
       await navigator.clipboard.writeText(restaurant.licenseKey);
       setCopied(true);
-      toast.success("License key copied to clipboard");
-      setTimeout(() => setCopied(false), 2000);
+      toast.success("License key copied");
+      setTimeout(() => setCopied(false), 1800);
     } catch {
-      toast.error("Failed to copy. Please select and copy manually.");
+      toast.error("Could not copy. Please copy manually.");
     }
   };
 
-  const handleInstall = async () => {
-    // Detect if already installed as PWA
-    const isStandalone =
-      window.matchMedia("(display-mode: standalone)").matches ||
-      ("standalone" in navigator && (navigator as Record<string, unknown>).standalone === true);
-
-    if (isStandalone) {
-      toast.success("VYNTEX POS is already installed on this device.");
-      return;
-    }
-
-    // Detect iOS (no beforeinstallprompt support — needs manual Add to Home Screen)
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    if (isIOS) {
-      toast.info(
-        "On iOS: tap the Share button at the bottom of Safari, then tap \"Add to Home Screen\"."
-      );
-      return;
-    }
-
-    // PWA scope is /pos — must install from within that scope.
-    // Open /pos with ?install=true so the prompt auto-triggers there.
-    window.open(`${window.location.origin}/pos?install=true`, "_blank");
+  const openInstallerDownload = (url: string) => {
+    window.open(url, "_blank", "noopener,noreferrer");
+    toast.success("Download started");
   };
 
   return (
-    <div className="p-6 lg:p-8 space-y-6 max-w-3xl">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">
-          License & Software
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Manage your VYNTEX POS license and install the software.
-        </p>
-      </div>
+    <div className="mx-auto w-full max-w-6xl space-y-8 p-6 pb-12 text-zinc-200 lg:p-10">
+      <section className="relative overflow-hidden rounded-2xl border border-zinc-800/80 bg-zinc-950/70 p-6 shadow-2xl shadow-black/40 lg:p-8">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_80%_at_50%_-40%,rgba(59,130,246,0.12),transparent_55%)]" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(80%_50%_at_100%_100%,rgba(16,185,129,0.06),transparent_50%)]" />
+        <div className="relative">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
+            License overview
+          </p>
+          <h1 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-50 sm:text-3xl">
+            Vyntex POS Dashboard
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-zinc-400">
+            Manage your active plan, copy your key, and install the right Windows build in one
+            place.
+          </p>
+        </div>
+      </section>
 
-      {/* ── License Status Card ────────────────────────────── */}
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        {/* Gradient top strip */}
-        <div className="h-1.5 bg-gradient-to-r from-[#0066FF] to-[#44CC00]" />
-        <div className="p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#0066FF]/10 to-[#44CC00]/10 flex items-center justify-center text-2xl shrink-0">
-                {VYN_TYPE_ICONS[restaurant.type] ?? "\uD83C\uDF7D\uFE0F"}
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
-                  Active License
-                </p>
-                <h2 className="text-xl font-bold text-foreground">
-                  {VYN_TYPE_LABELS[restaurant.type] ?? restaurant.type}
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  {restaurant.name}
-                </p>
-              </div>
+      <section className="grid gap-4 md:grid-cols-3">
+        <StatCard
+          label="License Type"
+          value={VYN_TYPE_LABELS[restaurant.type] ?? restaurant.type}
+          tone="blue"
+        />
+        <StatCard label="Plan" value={PLAN_LABELS[restaurant.plan]} tone="violet" />
+        <StatCard label="Days Remaining" value={`${daysLeft} days`} tone="green" />
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-[1.25fr_1fr]">
+        <div className="rounded-2xl border border-zinc-800/80 bg-zinc-950/50 p-6 shadow-xl shadow-black/20 lg:p-7">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-zinc-500">
+                Active venue
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-zinc-50">
+                {restaurant.name}
+              </h2>
             </div>
-
-            <div className="flex items-center gap-3">
-              {/* Status badge */}
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-semibold">
-                <Shield className="size-3.5" />
-                Active
-              </div>
-              {/* Plan badge */}
-              <div className="px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                {PLAN_LABELS[restaurant.plan]}
-              </div>
+            <div className="shrink-0 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-400">
+              Active
             </div>
           </div>
 
-          {/* Expiry info */}
           <div
             className={cn(
-              "mt-5 flex items-center gap-2 px-4 py-3 rounded-lg text-sm",
+              "mt-5 rounded-xl border p-3.5 text-sm",
               isExpiringSoon
-                ? "bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 text-amber-700 dark:text-amber-400"
-                : "bg-muted/50 text-muted-foreground"
+                ? "border-amber-500/25 bg-amber-500/5 text-amber-100"
+                : "border-zinc-800/80 bg-black/35 text-zinc-300",
             )}
           >
-            <Calendar className="size-4 shrink-0" />
-            <span>
-              <span className="font-medium">Expires:</span>{" "}
-              {formatDate(restaurant.licenseExpiry)}
-              {isExpiringSoon
-                ? ` \u2014 ${daysLeft} day${daysLeft !== 1 ? "s" : ""} remaining!`
-                : ` (${daysLeft} days remaining)`}
-            </span>
+            <div className="flex items-center gap-2">
+              <Calendar className="size-4" />
+              <span>
+                Expires on <span className="font-semibold">{formatDate(restaurant.licenseExpiry)}</span>
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-xl border border-zinc-800/80 bg-black/40 p-4">
+            <div className="mb-2 flex items-center gap-2 text-sm font-medium text-zinc-200">
+              <KeyRound className="size-4 text-blue-400" />
+              License key
+            </div>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2.5 text-sm tracking-[0.14em] text-zinc-100">
+                {restaurant.licenseKey}
+              </code>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleCopy}
+                className="text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+              >
+                {copied ? <Check className="size-4 text-emerald-300" /> : <Copy className="size-4" />}
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* ── License Key Card ───────────────────────────────── */}
-      <div className="rounded-xl border border-border bg-card p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <KeyRound className="size-5 text-primary" />
-          <h2 className="text-base font-semibold text-foreground">
-            Your License Key
-          </h2>
-        </div>
+        <div className="rounded-2xl border border-zinc-800/80 bg-zinc-950/50 p-6 shadow-xl shadow-black/20 lg:p-7">
+          <div className="mb-5 flex items-center gap-2 text-sm font-medium text-zinc-200">
+            <HardDriveDownload className="size-4 text-blue-400" />
+            Install software
+          </div>
 
-        <div className="flex items-center gap-3 p-4 rounded-lg bg-[#0a0f1e] dark:bg-black/40">
-          <code className="flex-1 text-lg sm:text-xl font-mono tracking-[0.2em] text-white select-all">
-            {restaurant.licenseKey}
-          </code>
           <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleCopy}
-            className="text-white/60 hover:text-white hover:bg-white/10 shrink-0"
+            size="lg"
+            onClick={() => openInstallerDownload(installerUrlX64)}
+            className="h-auto w-full flex-col gap-1 rounded-xl border-0 bg-gradient-to-r from-blue-600 to-blue-500 py-3.5 text-white shadow-lg shadow-blue-950/50 transition hover:from-blue-500 hover:to-blue-400"
           >
-            {copied ? (
-              <Check className="size-4 text-emerald-400" />
-            ) : (
-              <Copy className="size-4" />
-            )}
+            <span className="flex items-center gap-2">
+              <Download className="size-4" />
+              Windows — 64-bit (Intel/AMD)
+            </span>
+            <span className="text-xs opacity-90">Recommended for most PCs</span>
           </Button>
-        </div>
 
-        <p className="text-xs text-muted-foreground mt-3">
-          Use this key to activate your VYNTEX POS software after installation.
-          Keep it safe and do not share it publicly.
-        </p>
-      </div>
+          {installerUrlArm64 ? (
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => openInstallerDownload(installerUrlArm64)}
+              className="mt-3 h-auto w-full flex-col gap-1 rounded-xl border-zinc-700/90 bg-zinc-900/80 py-3 text-zinc-100 hover:bg-zinc-800/90"
+            >
+              <span className="flex items-center gap-2">
+                <Monitor className="size-4" />
+                Windows — ARM64
+              </span>
+              <span className="text-xs opacity-80">Surface / Snapdragon devices</span>
+            </Button>
+          ) : null}
 
-      {/* ── Install Software Card ──────────────────────────── */}
-      <div className="rounded-xl border-2 border-dashed border-primary/30 bg-gradient-to-br from-primary/5 to-transparent p-6 sm:p-8">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
-          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#0066FF] to-[#44CC00] flex items-center justify-center shrink-0">
-            <Monitor className="size-7 text-white" />
-          </div>
-          <div className="flex-1">
-            <h2 className="text-lg font-bold text-foreground mb-1">
-              Install VYNTEX POS Software
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Download and install the VYNTEX POS application on your device.
-              Manage orders, menus, tables, and more directly from the app.
+          {installerUpdatedAt ? (
+            <p className="mt-4 text-xs text-zinc-500">
+              Latest build: <span className="font-medium text-zinc-400">{installerUpdatedAt}</span>
             </p>
-          </div>
+          ) : null}
         </div>
-        <Button
-          size="lg"
-          className="w-full mt-6 h-12 text-base bg-gradient-to-r from-[#0066FF] to-[#0055DD] hover:from-[#0055DD] hover:to-[#0044CC] text-white"
-          onClick={handleInstall}
-        >
-          <Download className="size-5 mr-2" />
-          Install VYNTEX POS Software
-          <ArrowRight className="size-4 ml-2" />
-        </Button>
-      </div>
+      </section>
 
-      {/* ── Quick links ────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <section className="grid gap-4 sm:grid-cols-2">
         <Link
           to="/dashboard/settings"
-          className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 hover:shadow-md transition-shadow group"
+          className="group flex items-center gap-4 rounded-xl border border-zinc-800/80 bg-zinc-950/50 p-4 transition-all hover:border-zinc-600/80 hover:bg-zinc-900/40"
         >
-          <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center shrink-0">
-            <CreditCard className="size-5 text-purple-600 dark:text-purple-400" />
+          <div className="rounded-lg bg-violet-500/10 p-2.5 ring-1 ring-violet-500/20">
+            <CreditCard className="size-4 text-violet-300" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground">
-              Business Settings
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Update profile & billing info
-            </p>
+            <p className="text-sm font-medium text-zinc-50">Business settings</p>
+            <p className="text-xs text-zinc-500">Profile, billing and preferences</p>
           </div>
-          <ArrowRight className="size-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+          <ArrowRight className="size-4 shrink-0 text-zinc-600 transition group-hover:translate-x-0.5 group-hover:text-zinc-300" />
         </Link>
+
         <Link
           to="/contact"
-          className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 hover:shadow-md transition-shadow group"
+          className="group flex items-center gap-4 rounded-xl border border-zinc-800/80 bg-zinc-950/50 p-4 transition-all hover:border-zinc-600/80 hover:bg-zinc-900/40"
         >
-          <div className="w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
-            <Shield className="size-5 text-emerald-600 dark:text-emerald-400" />
+          <div className="rounded-lg bg-emerald-500/10 p-2.5 ring-1 ring-emerald-500/20">
+            <Shield className="size-4 text-emerald-400" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground">
-              Support
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Get help with your license
-            </p>
+            <p className="text-sm font-medium text-zinc-50">Support</p>
+            <p className="text-xs text-zinc-500">Need help with activation or installer?</p>
           </div>
-          <ArrowRight className="size-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+          <ArrowRight className="size-4 shrink-0 text-zinc-600 transition group-hover:translate-x-0.5 group-hover:text-zinc-300" />
         </Link>
-      </div>
+      </section>
     </div>
   );
 }

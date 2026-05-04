@@ -1,13 +1,16 @@
+import { useTranslation } from "react-i18next";
 import PageHeader from "@/components/page-header.tsx";
 import { Link } from "react-router-dom";
 
 export default function TermsPage() {
+  const { t } = useTranslation("site");
+
   return (
     <>
       <PageHeader
-        badge="Legal"
-        title="Terms of Service"
-        subtitle="Last updated: April 1, 2026"
+        badge={t("legal.badge")}
+        title={t("legal.termsTitle")}
+        subtitle={t("legal.termsSubtitle")}
       />
 
       <section className="pb-24 bg-background">
@@ -15,7 +18,7 @@ export default function TermsPage() {
           <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:font-bold prose-headings:tracking-tight prose-p:text-muted-foreground prose-p:leading-relaxed prose-li:text-muted-foreground">
             <h2>1. Acceptance of Terms</h2>
             <p>
-              By accessing or using the VYNTEX platform, including any
+              By accessing or using the Vyntex POS platform, including any
               associated software, services, and documentation (collectively,
               the &quot;Service&quot;), you agree to be bound by these Terms of Service.
               If you do not agree to these Terms, you must not use the Service.
@@ -23,7 +26,7 @@ export default function TermsPage() {
 
             <h2>2. Description of Service</h2>
             <p>
-              VYNTEX provides a cloud-based point-of-sale (POS) platform
+              Vyntex POS provides a cloud-based point-of-sale (POS) platform
               designed for hospitality businesses. The Service includes order
               management, payment processing, analytics, inventory tracking,
               and related tools accessible via web and mobile applications.
@@ -52,7 +55,7 @@ export default function TermsPage() {
 
             <h2>5. License and Usage</h2>
             <p>
-              Upon subscription, VYNTEX grants you a non-exclusive,
+              Upon subscription, Vyntex POS grants you a non-exclusive,
               non-transferable, revocable license to use the Service for your
               internal business operations. Each license is tied to a unique
               permanent license key and a specific device. Unauthorized sharing,
@@ -72,8 +75,8 @@ export default function TermsPage() {
             <h2>7. Intellectual Property</h2>
             <p>
               All rights, title, and interest in the Service, including
-              software, designs, logos, and content, are owned by VYNTEX. You
-              retain ownership of your data but grant VYNTEX a limited license
+              software, designs, logos, and content, are owned by Vyntex POS. You
+              retain ownership of your data but grant Vyntex POS a limited license
               to process it as needed to provide the Service.
             </p>
 
@@ -92,7 +95,7 @@ export default function TermsPage() {
 
             <h2>9. Termination</h2>
             <p>
-              Either party may terminate the subscription at any time. VYNTEX
+              Either party may terminate the subscription at any time. Vyntex POS
               reserves the right to suspend or terminate access immediately if
               you violate these Terms. Upon termination, your license expires
               and you must cease using the Service. Data export is available
@@ -101,7 +104,7 @@ export default function TermsPage() {
 
             <h2>10. Limitation of Liability</h2>
             <p>
-              To the maximum extent permitted by law, VYNTEX shall not be
+              To the maximum extent permitted by law, Vyntex POS shall not be
               liable for any indirect, incidental, special, consequential, or
               punitive damages. Our total liability shall not exceed the
               amount paid by you in the 12 months preceding the claim.
@@ -109,7 +112,7 @@ export default function TermsPage() {
 
             <h2>11. Modifications</h2>
             <p>
-              VYNTEX may update these Terms from time to time. We will notify
+              Vyntex POS may update these Terms from time to time. We will notify
               you of material changes via email or through the Service.
               Continued use after changes take effect constitutes acceptance.
             </p>

@@ -53,20 +53,21 @@
 
 :root {
   --radius: 0.75rem;
-  --background: oklch(0.99 0.002 250);
-  --foreground: oklch(0.14 0.03 255);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.14 0.03 255);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.14 0.03 255);
+  /* Softer canvas than pure white — reduces “blank screen” glare on marketing pages */
+  --background: oklch(0.965 0.014 258);
+  --foreground: oklch(0.18 0.03 258);
+  --card: oklch(0.995 0.004 255);
+  --card-foreground: oklch(0.18 0.03 258);
+  --popover: oklch(0.995 0.004 255);
+  --popover-foreground: oklch(0.18 0.03 258);
   --primary: oklch(0.5 0.2 255);
   --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.96 0.01 250);
-  --secondary-foreground: oklch(0.2 0.04 255);
-  --muted: oklch(0.96 0.005 250);
-  --muted-foreground: oklch(0.48 0.02 255);
-  --accent: oklch(0.95 0.015 250);
-  --accent-foreground: oklch(0.2 0.04 255);
+  --secondary: oklch(0.94 0.012 258);
+  --secondary-foreground: oklch(0.22 0.04 258);
+  --muted: oklch(0.94 0.01 258);
+  --muted-foreground: oklch(0.45 0.025 258);
+  --accent: oklch(0.93 0.018 258);
+  --accent-foreground: oklch(0.22 0.04 258);
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.92 0.008 250);
   --input: oklch(0.92 0.008 250);
@@ -127,4 +128,190 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* ── POS Light Theme Overrides ─────────────────────────────── */
+/* Override hardcoded dark POS colors when light theme is active */
+
+[data-pos-theme="light"] {
+
+  /* ── Backgrounds ── */
+  &.bg-\[\#0A0F1E\],
+  .bg-\[\#0A0F1E\]     { background-color: #f0f2f5 !important; }
+  /* POS dashboard canvas (was missing → stayed dark in light theme) */
+  &.bg-\[\#050a14\],
+  .bg-\[\#050a14\]     { background-color: #f0f2f5 !important; }
+  &.bg-\[\#0f172a\],
+  .bg-\[\#0f172a\]     { background-color: #ffffff !important; }
+  &.bg-\[\#0d1117\],
+  .bg-\[\#0d1117\]     { background-color: #f0f2f5 !important; }
+  &.bg-\[\#0D1326\],
+  .bg-\[\#0D1326\]     { background-color: #f8f9fb !important; }
+  &.bg-\[\#111827\],
+  .bg-\[\#111827\]     { background-color: #f1f5f9 !important; }
+  &.bg-\[\#131A2E\],
+  .bg-\[\#131A2E\]     { background-color: #ffffff !important; }
+  &.bg-\[\#131A2E\]\/60,
+  .bg-\[\#131A2E\]\/60 { background-color: rgb(255 255 255 / 60%) !important; }
+  &.bg-\[\#1a1f2e\],
+  .bg-\[\#1a1f2e\]     { background-color: #e8ecf1 !important; }
+  &.bg-\[\#1a2240\],
+  .bg-\[\#1a2240\]     { background-color: #e2e8f0 !important; }
+  &.bg-\[\#1e2a45\],
+  .bg-\[\#1e2a45\]     { background-color: #e2e8f0 !important; }
+  &.bg-\[\#1e2a45\]\/30,
+  .bg-\[\#1e2a45\]\/30 { background-color: rgb(226 232 240 / 30%) !important; }
+  &.bg-\[\#1e2a45\]\/50,
+  .bg-\[\#1e2a45\]\/50 { background-color: rgb(226 232 240 / 50%) !important; }
+  &.bg-\[\#1e2a45\]\/60,
+  .bg-\[\#1e2a45\]\/60 { background-color: rgb(226 232 240 / 60%) !important; }
+  &.bg-\[\#1f2937\],
+  .bg-\[\#1f2937\]     { background-color: #e5e7eb !important; }
+  &.bg-\[\#2a3a5a\],
+  .bg-\[\#2a3a5a\]     { background-color: #cbd5e1 !important; }
+  &.bg-\[\#374151\],
+  .bg-\[\#374151\]     { background-color: #d1d5db !important; }
+
+  /* Slate utility surfaces (charts, skeletons, POS dashboard bits) */
+  .bg-slate-900\/80 { background-color: rgb(226 232 240 / 80%) !important; }
+  .bg-slate-900\/60 { background-color: rgb(226 232 240 / 60%) !important; }
+  .bg-slate-900\/50 { background-color: rgb(241 245 249 / 50%) !important; }
+  .bg-slate-800\/80 { background-color: rgb(226 232 240 / 80%) !important; }
+  .bg-slate-800 { background-color: #e2e8f0 !important; }
+
+  /* ── Hover backgrounds ── */
+  .hover\:bg-\[\#111827\]:hover     { background-color: #e5e7eb !important; }
+  .hover\:bg-\[\#1a1f2e\]:hover     { background-color: #dce0e8 !important; }
+  .hover\:bg-\[\#1a2240\]:hover     { background-color: #dce0e8 !important; }
+  .hover\:bg-\[\#1e2a45\]:hover     { background-color: #e2e8f0 !important; }
+  .hover\:bg-\[\#1e2a45\]\/30:hover { background-color: rgb(226 232 240 / 30%) !important; }
+  .hover\:bg-\[\#1e2a45\]\/50:hover { background-color: rgb(226 232 240 / 50%) !important; }
+  .hover\:bg-\[\#1e2a45\]\/60:hover { background-color: rgb(226 232 240 / 60%) !important; }
+  .hover\:bg-\[\#1f2937\]:hover     { background-color: #d1d5db !important; }
+  .hover\:bg-\[\#283350\]:hover     { background-color: #dde3ed !important; }
+  .hover\:bg-\[\#2a3a5c\]:hover     { background-color: #cbd5e1 !important; }
+  .hover\:bg-\[\#2a3a5a\]:hover     { background-color: #cbd5e1 !important; }
+  .hover\:bg-\[\#374151\]:hover     { background-color: #d1d5db !important; }
+
+  /* ── Borders ── */
+  .border-\[\#1e2a45\]     { border-color: #e2e8f0 !important; }
+  .border-\[\#1e2a45\]\/50 { border-color: rgb(226 232 240 / 50%) !important; }
+  .border-\[\#1e2a45\]\/60 { border-color: rgb(226 232 240 / 60%) !important; }
+  .border-\[\#1f2937\]     { border-color: #e5e7eb !important; }
+  .border-\[\#2a3a5c\]     { border-color: #cbd5e1 !important; }
+  .border-\[\#2a3a5a\]     { border-color: #cbd5e1 !important; }
+  .border-slate-800 { border-color: #e2e8f0 !important; }
+  .border-slate-800\/90 { border-color: rgb(226 232 240 / 90%) !important; }
+  .border-slate-700 { border-color: #cbd5e1 !important; }
+  .border-slate-700\/80 { border-color: rgb(203 213 225 / 80%) !important; }
+
+  /* ── Focus states ── */
+  .focus\:border-\[\#0066FF\]:focus { border-color: #0066FF !important; }
+  .focus\:border-\[\#44CC00\]:focus { border-color: #44CC00 !important; }
+
+  /* ── Primary text (white → dark) ── */
+  .text-white { color: #0f172a !important; }
+
+  /* ── Secondary / muted text ── */
+  .text-\[\#8b93a7\] { color: #64748b !important; }
+  .text-\[\#5a6580\] { color: #78849c !important; }
+  .text-\[\#4a5268\] { color: #64748b !important; }
+  .text-\[\#c0c7d6\] { color: #334155 !important; }
+  .text-\[\#3a4055\] { color: #94a3b8 !important; }
+  .text-\[\#3a4560\] { color: #94a3b8 !important; }
+  .text-\[\#6b7280\] { color: #6b7280 !important; }
+  .text-\[\#9ca3af\] { color: #6b7280 !important; }
+  .text-\[\#374151\] { color: #374151 !important; }
+
+  /* ── Hover text ── */
+  .hover\:text-white:hover       { color: #0f172a !important; }
+  .hover\:text-\[\#8b93a7\]:hover { color: #475569 !important; }
+  .hover\:text-\[\#5a6580\]:hover { color: #475569 !important; }
+
+  /* ── Placeholder text ── */
+  .placeholder\:text-\[\#3a4055\]::placeholder { color: #94a3b8 !important; }
+  .placeholder\:text-\[\#3a4560\]::placeholder { color: #94a3b8 !important; }
+
+  /* ── Dialog close button override ── */
+  .\[\&\>button\]\:text-\[\#8b93a7\] > button { color: #64748b !important; }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar-track { background: #f0f2f5; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; }
+
+  /* ── White opacity overlays (flip to dark in light mode) ── */
+  .bg-white\/20 { background-color: rgb(15 23 42 / 12%) !important; }
+  .bg-white\/5  { background-color: rgb(15 23 42 / 5%) !important; }
+
+  /* Brand / status chips on activation & home */
+  &.bg-\[\#0066FF\]\/10,
+  .bg-\[\#0066FF\]\/10 { background-color: rgb(0 102 255 / 10%) !important; }
+  &.bg-\[\#44CC00\]\/10,
+  .bg-\[\#44CC00\]\/10 { background-color: rgb(68 204 0 / 12%) !important; }
+  &.bg-amber-500\/10,
+  .bg-amber-500\/10 { background-color: rgb(245 158 11 / 12%) !important; }
+  &.bg-red-500\/10,
+  .bg-red-500\/10 { background-color: rgb(239 68 68 / 10%) !important; }
+
+  /* shadcn semantic colors still use dark-theme tokens on light POS canvas */
+  .text-muted-foreground { color: #475569 !important; }
+  .text-foreground { color: #0f172a !important; }
+
+  /* Empty state blocks (audit log errors, etc.) */
+  [data-slot="empty-title"] {
+    color: #0f172a !important;
+  }
+  [data-slot="empty-description"] {
+    color: #475569 !important;
+  }
+  [data-slot="empty-icon"][data-variant="icon"] {
+    background-color: #e2e8f0 !important;
+    color: #0f172a !important;
+  }
+}
+
+/* ── Phone app dark-mode polish (manager/admin dashboards) ────────────────── */
+.dark .phone-app-shell .bg-white,
+.dark .phone-app-shell .bg-white\/80,
+.dark .phone-app-shell .bg-white\/60 {
+  background-color: rgb(15 23 42 / 0.88) !important;
+}
+
+.dark .phone-app-shell .bg-slate-50,
+.dark .phone-app-shell .bg-slate-50\/80,
+.dark .phone-app-shell .bg-slate-100,
+.dark .phone-app-shell .bg-slate-100\/80 {
+  background-color: rgb(30 41 59 / 0.85) !important;
+}
+
+.dark .phone-app-shell .border-slate-200,
+.dark .phone-app-shell .border-slate-200\/80,
+.dark .phone-app-shell .border-slate-200\/90,
+.dark .phone-app-shell .border-slate-300,
+.dark .phone-app-shell .border-dashed {
+  border-color: rgb(71 85 105 / 0.85) !important;
+}
+
+.dark .phone-app-shell .text-\[\#0f172a\],
+.dark .phone-app-shell .text-slate-900,
+.dark .phone-app-shell .text-slate-800,
+.dark .phone-app-shell .text-slate-700 {
+  color: rgb(241 245 249) !important;
+}
+
+.dark .phone-app-shell .text-slate-600,
+.dark .phone-app-shell .text-slate-500,
+.dark .phone-app-shell .text-slate-400 {
+  color: rgb(148 163 184) !important;
+}
+
+.dark .phone-app-shell input,
+.dark .phone-app-shell select {
+  background-color: rgb(15 23 42 / 0.92) !important;
+  color: rgb(241 245 249) !important;
+  border-color: rgb(71 85 105 / 0.85) !important;
+}
+
+.dark .phone-app-shell input::placeholder {
+  color: rgb(148 163 184) !important;
 }

@@ -160,6 +160,204 @@ export const deleteLicense = mutation({
 
 // ── Contact Submissions ────────────────────────────────
 
+/** List conversations grouped by email, with latest message and unread count */
+export const listConversations = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+    const submissions = await ctx.db
+      .query("contactSubmissions")
+      .order("desc")
+      .collect();
+
+    const replies = await ctx.db.query("contactReplies").order("desc").collect();
+
+    // Group by email
+    const conversationMap = new Map<
+      string,
+      {
+        email: string;
+        name: string;
+        latestMessage: string;
+        latestTimestamp: number;
+        unreadCount: number;
+        totalMessages: number;
+        hasReplied: boolean;
+      }
+    >();
+
+    for (const sub of submissions) {
+      const existing = conversationMap.get(sub.email);
+      if (!existing) {
+        conversationMap.set(sub.email, {
+          email: sub.email,
+          name: sub.name,
+          latestMessage: sub.message,
+          latestTimestamp: sub._creationTime,
+          unreadCount: sub.status === "new" ? 1 : 0,
+          totalMessages: 1,
+          hasReplied: sub.status === "replied",
+        });
+      } else {
+        existing.totalMessages += 1;
+        if (sub.status === "new") existing.unreadCount += 1;
+        if (sub.status === "replied") existing.hasReplied = true;
+        // Update name to the latest one (submissions are desc, so first one is latest)
+      }
+    }
+
+    // Check replies for "hasReplied" and update latest timestamps
+    for (const reply of replies) {
+      const existing = conversationMap.get(reply.email);
+      if (existing) {
+        existing.hasReplied = true;
+        const replyTime = new Date(reply.createdAt).getTime();
+        if (replyTime > existing.latestTimestamp) {
+          existing.latestTimestamp = replyTime;
+          existing.latestMessage = reply.message;
+        }
+      }
+    }
+
+    // Sort by latest timestamp descending
+    return Array.from(conversationMap.values()).sort(
+      (a, b) => b.latestTimestamp - a.latestTimestamp
+    );
+  },
+});
+
+/** Get the full conversation thread for a given email */
+export const getConversation = query({
+  args: { email: v.string() },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+
+    const submissions = await ctx.db
+      .query("contactSubmissions")
+      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .order("asc")
+      .collect();
+
+    const replies = await ctx.db
+      .query("contactReplies")
+      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .order("asc")
+      .collect();
+
+    // Merge into a single timeline
+    type TimelineItem =
+      | { kind: "message"; id: string; name: string; message: string; subject?: string; type: string; timestamp: number }
+      | { kind: "reply"; id: string; adminName: string; message: string; timestamp: number };
+
+    const timeline: TimelineItem[] = [];
+
+    for (const sub of submissions) {
+      timeline.push({
+        kind: "message",
+        id: sub._id,
+        name: sub.name,
+        message: sub.message,
+        subject: sub.subject,
+        type: sub.type,
+        timestamp: sub._creationTime,
+      });
+    }
+
+    for (const rep of replies) {
+      timeline.push({
+        kind: "reply",
+        id: rep._id,
+        adminName: rep.adminName,
+        message: rep.message,
+        timestamp: new Date(rep.createdAt).getTime(),
+      });
+    }
+
+    // Sort by timestamp ascending
+    timeline.sort((a, b) => a.timestamp - b.timestamp);
+
+    return {
+      contactName: submissions[0]?.name ?? "Unknown",
+      email: args.email,
+      timeline,
+    };
+  },
+});
+
+/** Send an admin reply to a conversation */
+export const sendReply = mutation({
+  args: {
+    email: v.string(),
+    message: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const admin = await requireAdmin(ctx);
+
+    // Save the reply
+    await ctx.db.insert("contactReplies", {
+      email: args.email,
+      message: args.message,
+      adminName: admin.name ?? "Admin",
+      createdAt: new Date().toISOString(),
+    });
+
+    // Mark all submissions from this email as replied
+    const submissions = await ctx.db
+      .query("contactSubmissions")
+      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .collect();
+
+    for (const sub of submissions) {
+      if (sub.status !== "replied") {
+        await ctx.db.patch(sub._id, { status: "replied" });
+      }
+    }
+  },
+});
+
+/** Mark all messages in a conversation as read */
+export const markConversationRead = mutation({
+  args: { email: v.string() },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const submissions = await ctx.db
+      .query("contactSubmissions")
+      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .collect();
+
+    for (const sub of submissions) {
+      if (sub.status === "new") {
+        await ctx.db.patch(sub._id, { status: "read" });
+      }
+    }
+  },
+});
+
+/** Delete an entire conversation */
+export const deleteConversation = mutation({
+  args: { email: v.string() },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+
+    const submissions = await ctx.db
+      .query("contactSubmissions")
+      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .collect();
+
+    const replies = await ctx.db
+      .query("contactReplies")
+      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .collect();
+
+    for (const sub of submissions) {
+      await ctx.db.delete(sub._id);
+    }
+    for (const rep of replies) {
+      await ctx.db.delete(rep._id);
+    }
+  },
+});
+
 export const listContacts = query({
   args: {},
   handler: async (ctx) => {

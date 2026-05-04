@@ -1,0 +1,356 @@
+import { supabase } from "@/lib/supabase.ts";
+import { isMissingPgColumnError } from "./db-errors.ts";
+import { getRestaurantByLicense } from "./restaurant.ts";
+import {
+  menuCategoryFromRow,
+  menuItemFromRow,
+  menuFromRow,
+} from "./mappers.ts";
+
+function pgMissingColumnMessage(error: { message?: string }, column: string): boolean {
+  const m = String(error.message ?? "").toLowerCase();
+  const c = column.toLowerCase();
+  if (!m.includes(c)) return false;
+  return (
+    m.includes("does not exist") ||
+    m.includes("could not find") ||
+    m.includes("schema cache")
+  );
+}
+
+function isRlsViolation(error: { message?: string; code?: string }): boolean {
+  const m = String(error.message ?? "").toLowerCase();
+  return (
+    m.includes("row-level security") ||
+    m.includes("violates row-level security") ||
+    String(error.code ?? "") === "42501"
+  );
+}
+
+export async function getCategories(licenseKey: string) {
+  const r = await getRestaurantByLicense(licenseKey);
+  const { data, error } = await supabase
+    .from("menu_categories")
+    .select("*")
+    .eq("restaurant_id", r.id)
+    .eq("is_active", true)
+    .order("display_order", { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []).map((row) =>
+    menuCategoryFromRow(row as Parameters<typeof menuCategoryFromRow>[0]),
+  );
+}
+
+export async function getAllItems(licenseKey: string) {
+  const r = await getRestaurantByLicense(licenseKey);
+  const { data, error } = await supabase
+    .from("menu_items")
+    .select("*")
+    .eq("restaurant_id", r.id)
+    .order("display_order", { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []).map((row) =>
+    menuItemFromRow(row as Parameters<typeof menuItemFromRow>[0]),
+  );
+}
+
+export async function getMenus(licenseKey: string) {
+  const r = await getRestaurantByLicense(licenseKey);
+  const { data, error } = await supabase
+    .from("pos_menus")
+    .select("*")
+    .eq("restaurant_id", r.id)
+    .eq("is_active", true)
+    .order("display_order", { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []).map((row) =>
+    menuFromRow(row as Parameters<typeof menuFromRow>[0]),
+  );
+}
+
+export async function createCategory(args: {
+  licenseKey: string;
+  name: string;
+  color: string;
+  icon?: string;
+}) {
+  const r = await getRestaurantByLicense(args.licenseKey);
+  const { count } = await supabase
+    .from("menu_categories")
+    .select("*", { count: "exact", head: true })
+    .eq("restaurant_id", r.id);
+
+  const base = {
+    restaurant_id: r.id,
+    name: args.name.trim(),
+    color: args.color,
+    display_order: (count ?? 0) + 1,
+    is_active: true,
+  };
+  const withIcon =
+    args.icon !== undefined && String(args.icon).trim() !== ""
+      ? { ...base, icon: String(args.icon).trim() }
+      : base;
+
+  let { data, error } = await supabase
+    .from("menu_categories")
+    .insert(withIcon)
+    .select("id")
+    .single();
+
+  if (error && isMissingPgColumnError(error.message ?? "", "icon")) {
+    ({ data, error } = await supabase
+      .from("menu_categories")
+      .insert(base)
+      .select("id")
+      .single());
+  }
+
+  if (error) throw error;
+  return data!.id as string;
+}
+
+export async function updateCategory(args: {
+  licenseKey: string;
+  categoryId: string;
+  name: string;
+  color: string;
+  icon?: string;
+  isActive?: boolean;
+}) {
+  await getRestaurantByLicense(args.licenseKey);
+  const patch: Record<string, unknown> = {
+    name: args.name.trim(),
+    color: args.color,
+    is_active: args.isActive ?? true,
+  };
+  if (args.icon !== undefined) {
+    patch.icon = String(args.icon).trim() || null;
+  }
+
+  let { error } = await supabase
+    .from("menu_categories")
+    .update(patch)
+    .eq("id", args.categoryId);
+
+  if (error && isMissingPgColumnError(error.message ?? "", "icon")) {
+    delete patch.icon;
+    ({ error } = await supabase
+      .from("menu_categories")
+      .update(patch)
+      .eq("id", args.categoryId));
+  }
+
+  if (error) throw error;
+}
+
+export async function deleteCategory(args: {
+  licenseKey: string;
+  categoryId: string;
+}) {
+  await getRestaurantByLicense(args.licenseKey);
+  const { error } = await supabase
+    .from("menu_categories")
+    .delete()
+    .eq("id", args.categoryId);
+  if (error) throw error;
+}
+
+function assertMenuItemStation(
+  station: unknown,
+): asserts station is "kitchen" | "bar" {
+  if (station !== "kitchen" && station !== "bar") {
+    throw new Error(
+      "Station must be kitchen or bar. / Stacioni duhet të jetë kuzhinë ose bar.",
+    );
+  }
+}
+
+export async function createItem(args: Record<string, unknown>) {
+  const licenseKey = args.licenseKey as string;
+  const r = await getRestaurantByLicense(licenseKey);
+  assertMenuItemStation(args.station);
+
+  const { data: orderRow } = await supabase
+    .from("menu_items")
+    .select("display_order")
+    .eq("restaurant_id", r.id)
+    .order("display_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const displayOrderFallback =
+    (args.displayOrder as number) ??
+    (orderRow?.display_order != null ? Number(orderRow.display_order) + 1 : 0);
+
+  const payload: Record<string, unknown> = {
+    restaurant_id: r.id,
+    category_id: args.categoryId as string,
+    menu_id: (args.menuId as string) ?? null,
+    name: (args.name as string).trim(),
+    description: (args.description as string) ?? null,
+    price: args.price as number,
+    available: (args.available as boolean) ?? true,
+    display_order: displayOrderFallback,
+    station: args.station as string,
+    vat_rate: (args.vatRate as number) ?? 0.2,
+    is_favorite: (args.isFavorite as boolean) ?? false,
+    staff_meal_allowed: (args.staffMealAllowed as boolean) !== false,
+    track_stock: (args.trackStock as boolean) ?? false,
+    stock_unit: (args.stockUnit as string) ?? null,
+    current_stock: (args.currentStock as number) ?? null,
+    low_stock_threshold: (args.lowStockThreshold as number) ?? null,
+  };
+
+  let { data, error } = await supabase
+    .from("menu_items")
+    .insert(payload)
+    .select("id")
+    .single();
+
+  if (error && pgMissingColumnMessage(error, "staff_meal_allowed")) {
+    const { staff_meal_allowed: _s, ...withoutStaffMeal } = payload;
+    ({ data, error } = await supabase
+      .from("menu_items")
+      .insert(withoutStaffMeal)
+      .select("id")
+      .single());
+  }
+
+  if (error) {
+    if (isRlsViolation(error)) {
+      throw new Error(
+        "Supabase RLS bllokon insert te menu_items. Ekzekuto supabase/ensure_pos_menu_tables.sql (politikat pos_dev_menu_items). / Row-level security blocked saving the menu item.",
+      );
+    }
+    throw error;
+  }
+  return data!.id as string;
+}
+
+export async function updateItem(args: Record<string, unknown>) {
+  await getRestaurantByLicense(args.licenseKey as string);
+  assertMenuItemStation(args.station);
+
+  const patch: Record<string, unknown> = {
+    name: args.name,
+    description: args.description,
+    price: args.price,
+    available: args.available,
+    display_order: args.displayOrder,
+    station: args.station,
+    vat_rate: args.vatRate,
+    category_id: args.categoryId,
+    menu_id: args.menuId,
+    is_favorite: args.isFavorite,
+    staff_meal_allowed: args.staffMealAllowed,
+    track_stock: args.trackStock,
+    stock_unit: args.stockUnit,
+    current_stock: args.currentStock,
+    low_stock_threshold: args.lowStockThreshold,
+  };
+  Object.keys(patch).forEach((k) => {
+    if (patch[k] === undefined) delete patch[k];
+  });
+  let { error } = await supabase
+    .from("menu_items")
+    .update(patch)
+    .eq("id", args.itemId as string);
+
+  if (error && pgMissingColumnMessage(error, "staff_meal_allowed")) {
+    const { staff_meal_allowed: _s, ...rest } = patch;
+    ({ error } = await supabase
+      .from("menu_items")
+      .update(rest)
+      .eq("id", args.itemId as string));
+  }
+
+  if (error) {
+    if (isRlsViolation(error)) {
+      throw new Error(
+        "Supabase RLS bllokon përditësimin e menu_items. Ekzekuto supabase/ensure_pos_menu_tables.sql. / Row-level security blocked updating the menu item.",
+      );
+    }
+    throw error;
+  }
+}
+
+export async function deleteItem(args: {
+  licenseKey: string;
+  itemId: string;
+}) {
+  await getRestaurantByLicense(args.licenseKey);
+  const { error } = await supabase
+    .from("menu_items")
+    .delete()
+    .eq("id", args.itemId);
+  if (error) throw error;
+}
+
+export async function toggleItemAvailability(args: {
+  licenseKey: string;
+  itemId: string;
+}) {
+  await getRestaurantByLicense(args.licenseKey);
+  const { data: row } = await supabase
+    .from("menu_items")
+    .select("available")
+    .eq("id", args.itemId)
+    .single();
+  if (!row) return;
+  await supabase
+    .from("menu_items")
+    .update({ available: !row.available })
+    .eq("id", args.itemId);
+}
+
+export async function createMenu(args: { licenseKey: string; name: string }) {
+  const r = await getRestaurantByLicense(args.licenseKey);
+  const { count } = await supabase
+    .from("pos_menus")
+    .select("*", { count: "exact", head: true })
+    .eq("restaurant_id", r.id);
+  const { data, error } = await supabase
+    .from("pos_menus")
+    .insert({
+      restaurant_id: r.id,
+      name: args.name.trim(),
+      display_order: (count ?? 0) + 1,
+      is_active: true,
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data!.id as string;
+}
+
+export async function deleteMenu(args: {
+  licenseKey: string;
+  menuId: string;
+}) {
+  await getRestaurantByLicense(args.licenseKey);
+  const { error } = await supabase.from("pos_menus").delete().eq("id", args.menuId);
+  if (error) throw error;
+}
+
+export async function updateMenu(args: {
+  licenseKey: string;
+  menuId: string;
+  name: string;
+}) {
+  await getRestaurantByLicense(args.licenseKey);
+  const { error } = await supabase
+    .from("pos_menus")
+    .update({ name: args.name.trim() })
+    .eq("id", args.menuId);
+  if (error) throw error;
+}
+
+export async function generateUploadUrl(_args: Record<string, unknown>) {
+  throw new Error(
+    "Ngarkimi i fotove të menysë nuk është lidhur me Supabase Storage. Hiq foton dhe ruaj artikullin. / Menu photos are not configured; remove the image to save the item.",
+  );
+}

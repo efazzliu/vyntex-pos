@@ -1,4 +1,4 @@
-const CACHE_NAME = "vyntex-v2";
+const CACHE_NAME = "vyntex-v3";
 const urlsToCache = ["/pos", "/icon/icon-192.png", "/icon/icon-512.png", "/offline.html"];
 
 // Install event - cache core assets
@@ -18,17 +18,76 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // Skip Convex WebSocket and API requests — those are handled by the app layer
+  const url = new URL(event.request.url);
+  if (
+    url.hostname.includes("convex.cloud") ||
+    url.hostname.includes("convex.site") ||
+    url.pathname.startsWith("/api/")
+  ) {
+    return;
+  }
+
   // Handle navigation requests — serve /pos from cache when offline
   if (event.request.mode === "navigate") {
     event.respondWith(
-      fetch(event.request).catch(() =>
-        caches.match("/pos").then((cached) => cached || caches.match("/offline.html")),
-      ),
+      fetch(event.request)
+        .then((response) => {
+          // Cache the navigation response for offline use
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
+          return response;
+        })
+        .catch(() =>
+          caches.match("/pos").then((cached) => cached || caches.match("/offline.html")),
+        ),
     );
     return;
   }
 
-  // Network-first for other GET requests
+  // For JS, CSS, and image assets — cache first for speed, network fallback
+  const isAsset =
+    url.pathname.endsWith(".js") ||
+    url.pathname.endsWith(".css") ||
+    url.pathname.endsWith(".woff2") ||
+    url.pathname.endsWith(".woff") ||
+    url.pathname.endsWith(".png") ||
+    url.pathname.endsWith(".jpg") ||
+    url.pathname.endsWith(".svg") ||
+    url.pathname.startsWith("/assets/");
+
+  if (isAsset) {
+    event.respondWith(
+      caches.match(event.request).then((cached) => {
+        if (cached) {
+          // Return cached version immediately but update in background
+          fetch(event.request)
+            .then((response) => {
+              if (response.ok) {
+                caches.open(CACHE_NAME).then((cache) => cache.put(event.request, response));
+              }
+            })
+            .catch(() => {
+              // Ignore network errors for background update
+            });
+          return cached;
+        }
+
+        // Not cached yet — fetch and cache
+        return fetch(event.request)
+          .then((response) => {
+            if (!response.ok) return response;
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
+            return response;
+          })
+          .catch(() => new Response("", { status: 503, statusText: "Offline" }));
+      }),
+    );
+    return;
+  }
+
+  // Everything else — network first, cache fallback
   event.respondWith(
     fetch(event.request)
       .then((response) => {

@@ -7,8 +7,10 @@ import {
   LogOut,
 } from "lucide-react";
 import { clearActivation, type ActivationData } from "@/lib/local-db.ts";
+import { normalizePlan, planLabel } from "../_lib/plan-features.ts";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { usePosTheme } from "../_lib/use-pos-theme.ts";
 
 const LOGO_URL = "https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz";
 
@@ -17,21 +19,22 @@ type PosHomeProps = {
 };
 
 export default function PosHome({ activation }: PosHomeProps) {
+  const { theme: posTheme } = usePosTheme();
   const handleDeactivate = async () => {
     await clearActivation();
     toast.success("Device deactivated. Reloading...");
     setTimeout(() => window.location.reload(), 1000);
   };
 
-  const planLabel =
-    activation?.plan === "enterprise"
-      ? "Enterprise"
-      : activation?.plan === "professional"
-        ? "Professional"
-        : "Starter";
+  const displayPlan = activation?.plan
+    ? planLabel(normalizePlan(activation.plan))
+    : "Starter";
 
   return (
-    <div className="min-h-screen bg-[#0A0F1E] flex items-center justify-center p-4">
+    <div
+      data-pos-theme={posTheme}
+      className="min-h-screen bg-[#0A0F1E] flex items-center justify-center p-4"
+    >
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -40,9 +43,9 @@ export default function PosHome({ activation }: PosHomeProps) {
       >
         {/* Header */}
         <div className="flex flex-col items-center mb-8">
-          <img src={LOGO_URL} alt="VYNTEX" className="h-14 w-14 mb-3" />
+          <img src={LOGO_URL} alt="Vyntex POS" className="h-14 w-14 mb-3" />
           <h1 className="text-2xl font-bold bg-gradient-to-r from-[#0066FF] to-[#44CC00] bg-clip-text text-transparent">
-            {activation?.businessName ?? "VYNTEX POS"}
+            {activation?.businessName ?? "Vyntex POS"}
           </h1>
           <div className="flex items-center gap-2 mt-2">
             <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[#44CC00] bg-[#44CC00]/10 px-2.5 py-1 rounded-full">
@@ -50,7 +53,7 @@ export default function PosHome({ activation }: PosHomeProps) {
               Activated
             </span>
             <span className="text-xs text-[#8b93a7] bg-[#1e2a45] px-2.5 py-1 rounded-full">
-              {planLabel}
+              {displayPlan}
             </span>
           </div>
         </div>

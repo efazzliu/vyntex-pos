@@ -1,13 +1,17 @@
+import { useTranslation } from "react-i18next";
 import PageHeader from "@/components/page-header.tsx";
 import { Link } from "react-router-dom";
+import { SUPPORT_EMAIL, SUPPORT_MAILTO_HREF } from "@/lib/site-constants.ts";
 
 export default function PrivacyPage() {
+  const { t } = useTranslation("site");
+
   return (
     <>
       <PageHeader
-        badge="Legal"
-        title="Privacy Policy"
-        subtitle="Last updated: April 1, 2026"
+        badge={t("legal.badge")}
+        title={t("legal.privacyTitle")}
+        subtitle={t("legal.privacySubtitle")}
       />
 
       <section className="pb-24 bg-background">
@@ -131,7 +135,11 @@ export default function PrivacyPage() {
               <Link to="/contact" className="text-primary hover:underline">
                 contact us
               </Link>{" "}
-              or email privacy@vyntex.com.
+              or email{" "}
+              <a href={SUPPORT_MAILTO_HREF} className="text-primary hover:underline">
+                {SUPPORT_EMAIL}
+              </a>
+              .
             </p>
           </div>
         </div>

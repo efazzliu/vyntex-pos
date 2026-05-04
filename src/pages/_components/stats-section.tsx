@@ -1,12 +1,14 @@
 import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
-const stats = [
-  { value: 2500, suffix: "+", label: "Restaurants Served", decimals: 0 },
-  { value: 99.9, suffix: "%", label: "Uptime Guaranteed", decimals: 1 },
-  { value: 12, suffix: "M+", label: "Transactions Processed", decimals: 0 },
-  { value: 45, suffix: "+", label: "Countries Worldwide", decimals: 0 },
-];
+const STAT_KEYS = ["restaurants", "uptime", "transactions", "countries"] as const;
+const STAT_VALUES = [
+  { value: 2500, suffix: "+", decimals: 0 },
+  { value: 99.9, suffix: "%", decimals: 1 },
+  { value: 12, suffix: "M+", decimals: 0 },
+  { value: 45, suffix: "+", decimals: 0 },
+] as const;
 
 function AnimatedCounter({
   value,
@@ -39,14 +41,13 @@ function AnimatedCounter({
             if (cancelled) return;
             const elapsed = timestamp - startTime;
             const progress = Math.min(elapsed / duration, 1);
-            // Ease-out cubic
             const eased = 1 - Math.pow(1 - progress, 3);
             const current = eased * value;
 
             setDisplay(
               decimals > 0
                 ? current.toFixed(decimals)
-                : Math.floor(current).toLocaleString()
+                : Math.floor(current).toLocaleString(),
             );
 
             if (progress < 1) {
@@ -57,7 +58,7 @@ function AnimatedCounter({
           frameId = requestAnimationFrame(step);
         }
       },
-      { threshold: 0.3 }
+      { threshold: 0.3 },
     );
 
     observer.observe(el);
@@ -82,9 +83,10 @@ function AnimatedCounter({
 }
 
 export default function StatsSection() {
+  const { t } = useTranslation("site");
+
   return (
     <section className="relative py-24 overflow-hidden">
-      {/* Dark gradient background */}
       <div className="absolute inset-0 bg-gradient-to-r from-[#060B18] via-[#0A1628] to-[#060B18]" />
       <div
         className="absolute inset-0"
@@ -96,25 +98,28 @@ export default function StatsSection() {
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
-          {stats.map((stat, i) => (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.15, duration: 0.5 }}
-              className="text-center"
-            >
-              <AnimatedCounter
-                value={stat.value}
-                suffix={stat.suffix}
-                decimals={stat.decimals}
-              />
-              <div className="mt-2 text-sm sm:text-base text-white/50">
-                {stat.label}
-              </div>
-            </motion.div>
-          ))}
+          {STAT_KEYS.map((key, i) => {
+            const cfg = STAT_VALUES[i];
+            return (
+              <motion.div
+                key={key}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.15, duration: 0.5 }}
+                className="text-center"
+              >
+                <AnimatedCounter
+                  value={cfg.value}
+                  suffix={cfg.suffix}
+                  decimals={cfg.decimals}
+                />
+                <div className="mt-2 text-sm sm:text-base text-white/50">
+                  {t(`home.stats.${key}`)}
+                </div>
+              </motion.div>
+            );
+          })}
         </div>
       </div>
     </section>

@@ -1,9 +1,11 @@
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import type { ActivationData } from "@/lib/local-db.ts";
+import { useOnlineStatus } from "@/hooks/use-online-status.ts";
+import { useOfflineData } from "@/hooks/use-offline-data.ts";
+import type { Doc } from "@/convex/_generated/dataModel.d.ts";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { cn } from "@/lib/utils.ts";
-import { toast } from "sonner";
 import type { LucideIcon } from "lucide-react";
 import {
   UtensilsCrossed,
@@ -15,34 +17,53 @@ import {
   MapPinned,
 } from "lucide-react";
 import type { PosView, StaffRole } from "../_lib/types.ts";
+import { canAccessView } from "../_lib/plan-features.ts";
+import { posTablesIndexedDbKey } from "@/lib/supabase-pos/cache-keys.ts";
+import { usePosLocale } from "./pos-locale-provider.tsx";
 
 type PosHomeViewProps = {
   activation: ActivationData;
+  plan: string;
   onNavigate: (view: PosView) => void;
   staffRole: StaffRole;
 };
 
 export default function PosHomeView({
   activation,
+  plan,
   onNavigate,
   staffRole,
 }: PosHomeViewProps) {
-  const categories = useQuery(api.pos.menu.getCategories, {
+  const { t } = usePosLocale();
+  const isOnline = useOnlineStatus();
+  const categoriesQuery = useQuery('pos.menu.getCategories', {
     licenseKey: activation.licenseKey,
   });
-  const items = useQuery(api.pos.menu.getAllItems, {
+  const itemsQuery = useQuery('pos.menu.getAllItems', {
     licenseKey: activation.licenseKey,
   });
-  const tables = useQuery(api.pos.tables.getTables, {
+  const tablesQuery = useQuery('pos.tables.getTables', {
     licenseKey: activation.licenseKey,
   });
 
-  const isLoading =
-    categories === undefined || items === undefined || tables === undefined;
+  const { data: categoriesRaw, isHydrated: catH } = useOfflineData<
+    Doc<"menuCategories">[]
+  >(`categories:${activation.licenseKey}`, categoriesQuery, isOnline);
+  const { data: itemsRaw, isHydrated: itemsH } = useOfflineData<
+    Doc<"menuItems">[]
+  >(`menuItems:${activation.licenseKey}`, itemsQuery, isOnline);
+  const { data: tablesRaw, isHydrated: tablesH } = useOfflineData<
+    Doc<"tables">[]
+  >(posTablesIndexedDbKey(activation.licenseKey), tablesQuery, isOnline);
 
-  const availableTables =
-    tables?.filter((t) => t.status === "available").length ?? 0;
-  const availableItems = items?.filter((i) => i.available).length ?? 0;
+  const categories = categoriesRaw ?? [];
+  const items = itemsRaw ?? [];
+  const tables = tablesRaw ?? [];
+
+  const isLoading = !catH || !itemsH || !tablesH;
+
+  const availableTables = tables.filter((t) => t.status === "available").length;
+  const availableItems = items.filter((i) => i.available).length;
 
   return (
     <div className="p-6 lg:p-8 space-y-8">
@@ -51,7 +72,7 @@ export default function PosHomeView({
         <h1 className="text-2xl font-bold text-white">
           {activation.businessName}
         </h1>
-        <p className="text-[#8b93a7] text-sm mt-1">POS Dashboard</p>
+        <p className="text-[#8b93a7] text-sm mt-1">{t("home.subtitle")}</p>
       </div>
 
       {/* Stats */}
@@ -64,25 +85,25 @@ export default function PosHomeView({
           <>
             <StatCard
               icon={FolderOpen}
-              label="Categories"
-              value={categories?.length ?? 0}
+              label={t("home.categories")}
+              value={categories.length}
               color="#0066FF"
             />
             <StatCard
               icon={Package}
-              label="Menu Items"
+              label={t("home.menu_items")}
               value={availableItems}
               color="#44CC00"
             />
             <StatCard
               icon={LayoutGrid}
-              label="Total Tables"
-              value={tables?.length ?? 0}
+              label={t("home.total_tables")}
+              value={tables.length}
               color="#FF6B00"
             />
             <StatCard
               icon={Users}
-              label="Available"
+              label={t("home.available_tables")}
               value={availableTables}
               color="#00C2FF"
             />
@@ -93,70 +114,75 @@ export default function PosHomeView({
       {/* Quick Actions */}
       <div>
         <h2 className="text-lg font-semibold text-white mb-4">
-          Quick Actions
+          {t("home.quick_actions")}
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {staffRole === "admin" && (
+          {(staffRole === "admin" || staffRole === "manager") && (
             <>
-              <ActionCard
-                icon={MapPinned}
-                title="Floor Plan"
-                description="View and arrange your table layout"
-                color="#00C2FF"
-                onClick={() => onNavigate("floor")}
-              />
-              <ActionCard
-                icon={UtensilsCrossed}
-                title="Manage Menu"
-                description="Add or edit categories and items"
-                color="#0066FF"
-                onClick={() => onNavigate("menu")}
-              />
-              <ActionCard
-                icon={LayoutGrid}
-                title="Manage Tables"
-                description="Set up zones and table layout"
-                color="#44CC00"
-                onClick={() => onNavigate("tables")}
-              />
-              <ActionCard
-                icon={Users}
-                title="Manage Staff"
-                description="Add or edit team members"
-                color="#FF6B00"
-                onClick={() => onNavigate("staff")}
-              />
+              {canAccessView(plan, "floor") && (
+                <ActionCard
+                  icon={MapPinned}
+                  title={t("home.action_floor")}
+                  description={t("home.action_floor_desc")}
+                  color="#00C2FF"
+                  onClick={() => onNavigate("floor")}
+                />
+              )}
+              {canAccessView(plan, "menu") && (
+                <ActionCard
+                  icon={UtensilsCrossed}
+                  title={t("home.action_menu")}
+                  description={t("home.action_menu_desc")}
+                  color="#0066FF"
+                  onClick={() => onNavigate("menu")}
+                />
+              )}
+              {canAccessView(plan, "tables") && (
+                <ActionCard
+                  icon={LayoutGrid}
+                  title={t("home.action_tables")}
+                  description={t("home.action_tables_desc")}
+                  color="#44CC00"
+                  onClick={() => onNavigate("tables")}
+                />
+              )}
+              {canAccessView(plan, "staff") && (
+                <ActionCard
+                  icon={Users}
+                  title={t("home.action_staff")}
+                  description={t("home.action_staff_desc")}
+                  color="#FF6B00"
+                  onClick={() => onNavigate("staff")}
+                />
+              )}
             </>
           )}
-          {staffRole === "waiter" && (
+          {staffRole === "waiter" && canAccessView(plan, "floor") && (
             <ActionCard
               icon={MapPinned}
-              title="View Floor"
-              description="See table status and select a table"
+              title={t("home.action_floor_waiter")}
+              description={t("home.action_floor_waiter_desc")}
               color="#00C2FF"
               onClick={() => onNavigate("floor")}
             />
           )}
-          <ActionCard
-            icon={ShoppingCart}
-            title="Start Orders"
-            description="Coming soon in a future update"
-            color="#5a6580"
-            onClick={() =>
-              toast.info(
-                "Orders & checkout coming soon in a future milestone!"
-              )
-            }
-            disabled
-          />
+          {staffRole !== "inventory" && canAccessView(plan, "floor") && (
+            <ActionCard
+              icon={ShoppingCart}
+              title={t("home.action_orders")}
+              description={t("home.action_orders_desc")}
+              color="#FF6B00"
+              onClick={() => onNavigate("floor")}
+            />
+          )}
         </div>
       </div>
 
       {/* Tables overview */}
-      {!isLoading && tables && tables.length > 0 && (
+      {!isLoading && tables.length > 0 && (
         <div>
           <h2 className="text-lg font-semibold text-white mb-4">
-            Table Status
+            {t("home.table_status")}
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
             {tables.map((table) => (
@@ -175,7 +201,7 @@ export default function PosHomeView({
               >
                 <p className="text-white font-semibold text-lg">{table.name}</p>
                 <p className="text-[#8b93a7] text-xs mt-1">
-                  {table.seats} seats
+                  {t("home.seats", { count: table.seats })}
                 </p>
                 <span
                   className={cn(
@@ -189,7 +215,15 @@ export default function PosHomeView({
                           : "bg-amber-500/20 text-amber-400"
                   )}
                 >
-                  {table.status === "bill-printed" ? "Bill Printed" : table.status}
+                  {table.status === "available"
+                    ? t("floor.available")
+                    : table.status === "occupied"
+                      ? t("floor.occupied")
+                      : table.status === "bill-printed"
+                        ? t("floor.bill_printed")
+                        : table.status === "reserved"
+                          ? t("floor.reserved")
+                          : table.status}
                 </span>
               </div>
             ))}

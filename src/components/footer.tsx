@@ -1,55 +1,78 @@
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import { APP_VERSION_LABEL } from "@/lib/site-constants.ts";
 
 const LOGO_URL = "https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz";
 
-const footerLinks = {
-  Product: [
-    { label: "Features", href: "/" },
-    { label: "VYN Types", href: "/vyn-types" },
-    { label: "Pricing", href: "/pricing" },
-  ],
-  Company: [
-    { label: "About", href: "/about" },
-    { label: "Contact", href: "/contact" },
-  ],
-  Legal: [
-    { label: "Terms of Service", href: "/legal/terms" },
-    { label: "Privacy Policy", href: "/legal/privacy" },
-  ],
-};
-
 export default function Footer() {
+  const { t } = useTranslation("site");
+
+  const footerColumns: { categoryKey: string; links: { labelKey: string; href: string }[] }[] =
+    [
+      {
+        categoryKey: "footer.product",
+        links: [
+          { labelKey: "footer.features", href: "/" },
+          { labelKey: "nav.vynTypes", href: "/vyn-types" },
+          { labelKey: "nav.pricing", href: "/pricing" },
+        ],
+      },
+      {
+        categoryKey: "footer.company",
+        links: [
+          { labelKey: "footer.aboutLink", href: "/about" },
+          { labelKey: "footer.contactLink", href: "/contact" },
+          { labelKey: "Instagram", href: "https://instagram.com/vyntexpos" },
+        ],
+      },
+      {
+        categoryKey: "footer.legal",
+        links: [
+          { labelKey: "footer.terms", href: "/legal/terms" },
+          { labelKey: "footer.privacy", href: "/legal/privacy" },
+        ],
+      },
+    ];
+
   return (
     <footer className="bg-[#060B18] text-white/70 border-t border-white/5">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
           <div className="md:col-span-1">
             <Link to="/" className="flex items-center gap-2 mb-4">
-              <img src={LOGO_URL} alt="VYNTEX" className="w-8 h-8" />
+              <img src={LOGO_URL} alt="Vyntex POS" className="w-8 h-8" />
               <span className="text-lg font-bold bg-gradient-to-r from-[#0066FF] to-[#44CC00] bg-clip-text text-transparent">
-                VYNTEX
+                Vyntex POS
               </span>
             </Link>
-            <p className="text-sm text-white/40 leading-relaxed">
-              Enterprise-grade POS platform for modern restaurants. Streamline
-              your operations with elegance.
-            </p>
+            <p className="text-sm text-white/40 leading-relaxed">{t("footer.tagline")}</p>
           </div>
 
-          {Object.entries(footerLinks).map(([category, links]) => (
-            <div key={category}>
+          {footerColumns.map((col) => (
+            <div key={col.categoryKey}>
               <h4 className="text-sm font-semibold text-white/90 mb-4">
-                {category}
+                {t(col.categoryKey)}
               </h4>
               <ul className="space-y-2.5">
-                {links.map((link) => (
-                  <li key={link.label}>
-                    <Link
-                      to={link.href}
-                      className="text-sm text-white/40 hover:text-white/70 transition-colors"
-                    >
-                      {link.label}
-                    </Link>
+                {col.links.map((link) => (
+                  <li key={link.href + link.labelKey}>
+                    {link.href.startsWith("http") ? (
+                      <a
+                        href={link.href}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sm text-white/40 hover:text-white/70 transition-colors"
+                      >
+                        {link.labelKey}
+                      </a>
+                    ) : (
+                      <Link
+                        to={link.href}
+                        className="text-sm text-white/40 hover:text-white/70 transition-colors"
+                      >
+                        {t(link.labelKey)}
+                      </Link>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -59,13 +82,12 @@ export default function Footer() {
 
         <div className="mt-12 pt-8 border-t border-white/5 flex flex-col sm:flex-row justify-between items-center gap-4">
           <p className="text-xs text-white/30">
-            &copy; {new Date().getFullYear()} VYNTEX. All rights reserved.
+            &copy; {new Date().getFullYear()} Vyntex POS · {t("footer.version", { v: APP_VERSION_LABEL })}{" "}
+            {t("footer.rights")}
           </p>
           <div className="flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-[#44CC00]" />
-            <span className="text-xs text-white/30">
-              All systems operational
-            </span>
+            <span className="text-xs text-white/30">{t("footer.operational")}</span>
           </div>
         </div>
       </div>

@@ -52,8 +52,8 @@ export default function TableDialog({
   const [status, setStatus] = useState<TableStatus>("available");
   const [saving, setSaving] = useState(false);
 
-  const createTable = useMutation(api.pos.tables.createTable);
-  const updateTable = useMutation(api.pos.tables.updateTable);
+  const createTable = useMutation('pos.tables.createTable');
+  const updateTable = useMutation('pos.tables.updateTable');
 
   useEffect(() => {
     if (open) {
@@ -105,17 +105,11 @@ export default function TableDialog({
         });
         toast.success("Table updated");
       } else {
-        // Place new tables at a random-ish open position
-        const posX = 40 + Math.floor(Math.random() * 400);
-        const posY = 40 + Math.floor(Math.random() * 300);
-
         await createTable({
           licenseKey,
           name: name.trim(),
           seats: seatsNum,
           zone: finalZone,
-          posX,
-          posY,
           shape,
         });
         toast.success("Table added to floor plan");

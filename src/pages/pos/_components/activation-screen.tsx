@@ -1,7 +1,4 @@
-import { useState, useRef } from "react";
-import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
-import { ConvexError } from "convex/values";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
@@ -12,6 +9,9 @@ import {
   getOrCreateDeviceId,
   saveActivation,
 } from "@/lib/local-db.ts";
+import { activateLicense } from "@/lib/supabase-pos.ts";
+import { isSupabaseConfigured } from "@/lib/supabase.ts";
+import { usePosTheme } from "../_lib/use-pos-theme.ts";
 
 const LOGO_URL = "https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz";
 
@@ -20,18 +20,17 @@ type ActivationScreenProps = {
 };
 
 export default function ActivationScreen({ onActivated }: ActivationScreenProps) {
+  const { theme: posTheme } = usePosTheme();
   const [segments, setSegments] = useState(["", "", "", ""]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  const activateMutation = useMutation(api.licenseActivation.activate);
-
   // Load device ID on mount
-  useState(() => {
+  useEffect(() => {
     getOrCreateDeviceId().then(setDeviceId);
-  });
+  }, []);
 
   const handleSegmentChange = (index: number, value: string) => {
     // Only allow the unambiguous charset (A-Z except I,O + 2-9)
@@ -80,10 +79,7 @@ export default function ActivationScreen({ onActivated }: ActivationScreenProps)
     setError(null);
 
     try {
-      const result = await activateMutation({
-        licenseKey: fullKey,
-        deviceId,
-      });
+      const result = await activateLicense(fullKey, deviceId);
 
       // Save activation data locally
       await saveActivation({
@@ -98,19 +94,21 @@ export default function ActivationScreen({ onActivated }: ActivationScreenProps)
 
       onActivated();
     } catch (err) {
-      if (err instanceof ConvexError) {
-        const data = err.data as { message: string };
-        setError(data.message);
-      } else {
-        setError("An unexpected error occurred. Please try again.");
-      }
+      setError(
+        err instanceof Error
+          ? err.message
+          : "An unexpected error occurred. Please try again."
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0F1E] flex items-center justify-center p-4">
+    <div
+      data-pos-theme={posTheme}
+      className="min-h-screen bg-[#0A0F1E] flex items-center justify-center p-4"
+    >
       <motion.div
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
@@ -121,20 +119,38 @@ export default function ActivationScreen({ onActivated }: ActivationScreenProps)
         <div className="flex flex-col items-center mb-10">
           <motion.img
             src={LOGO_URL}
-            alt="VYNTEX"
+            alt="Vyntex POS"
             className="h-16 w-16 mb-4"
             initial={{ scale: 0.5, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.5, delay: 0.2 }}
           />
           <h1 className="text-2xl font-bold bg-gradient-to-r from-[#0066FF] to-[#44CC00] bg-clip-text text-transparent">
-            VYNTEX
+            Vyntex POS
           </h1>
           <p className="text-[#8b93a7] text-sm mt-1">Enterprise POS Platform</p>
         </div>
 
         {/* Activation Card */}
         <div className="bg-[#131A2E] border border-[#1e2a45] rounded-2xl p-6 space-y-6">
+          {!isSupabaseConfigured && (
+            <div className="flex items-start gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-left">
+              <AlertCircle className="size-4 text-amber-400 shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-100/95 leading-relaxed">
+                <span className="font-semibold text-amber-200">Server configuration missing.</span>{" "}
+                This .exe was built without Supabase settings. The owner must run{" "}
+                <code className="rounded bg-black/30 px-1">npm run dist:win</code> with{" "}
+                <code className="rounded bg-black/30 px-1">.env</code> containing{" "}
+                <code className="rounded bg-black/30 px-1">VITE_SUPABASE_URL</code> and{" "}
+                <code className="rounded bg-black/30 px-1">VITE_SUPABASE_ANON_KEY</code>, or give you the
+                installer from the web dashboard.
+                <span className="block mt-2 text-amber-200/80">
+                  Mungon konfigurimi i serverit — rikrijoni instaluesin me variablat e mësipërme ose shkarkoni nga
+                  dashboard-i.
+                </span>
+              </p>
+            </div>
+          )}
           <div className="text-center space-y-2">
             <div className="inline-flex items-center justify-center size-12 rounded-xl bg-[#0066FF]/10 mb-2">
               <KeyRound className="size-6 text-[#0066FF]" />
@@ -200,7 +216,9 @@ export default function ActivationScreen({ onActivated }: ActivationScreenProps)
           {/* Activate Button */}
           <Button
             onClick={handleActivate}
-            disabled={!isKeyComplete || loading || !deviceId}
+            disabled={
+              !isKeyComplete || loading || !deviceId || !isSupabaseConfigured
+            }
             className="w-full h-12 bg-gradient-to-r from-[#0066FF] to-[#0052cc] hover:from-[#0052cc] hover:to-[#003d99] text-white font-semibold text-base"
           >
             {loading ? (
@@ -217,7 +235,7 @@ export default function ActivationScreen({ onActivated }: ActivationScreenProps)
         {/* Footer hint */}
         <p className="text-center text-xs text-[#5a6580] mt-6">
           Find your license key in the{" "}
-          <span className="text-[#0066FF]">VYNTEX Web Dashboard</span>
+          <span className="text-[#0066FF]">Vyntex POS Web Dashboard</span>
         </p>
       </motion.div>
     </div>

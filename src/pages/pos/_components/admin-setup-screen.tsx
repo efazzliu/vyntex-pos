@@ -8,6 +8,14 @@ import { Spinner } from "@/components/ui/spinner.tsx";
 import { motion } from "motion/react";
 import { AlertCircle, Eye, EyeOff, ShieldCheck, UserPlus } from "lucide-react";
 import { saveLocalAdmin, hashString } from "@/lib/local-db.ts";
+import { toast } from "sonner";
+import {
+  STAFF_PIN_MAX_LEN,
+  STAFF_PIN_MIN_LEN,
+  isValidStaffPinLength,
+  sanitizeStaffPinInput,
+} from "../_lib/staff-pin.ts";
+import { usePosTheme } from "../_lib/use-pos-theme.ts";
 
 const LOGO_URL = "https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz";
 
@@ -22,7 +30,11 @@ export default function AdminSetupScreen({
   licenseKey,
   onComplete,
 }: AdminSetupScreenProps) {
-  const createStaff = useMutation(api.pos.staff.createStaff);
+  const { theme: posTheme } = usePosTheme();
+  const createStaff = useMutation("pos.staff.createStaff");
+  const syncDeviceClosePin = useMutation(
+    "pos.settings.syncDeviceClosePinHash",
+  );
 
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
@@ -33,8 +45,7 @@ export default function AdminSetupScreen({
   const [loading, setLoading] = useState(false);
 
   const handlePinChange = (value: string) => {
-    const cleaned = value.replace(/\D/g, "").slice(0, 4);
-    setPin(cleaned);
+    setPin(sanitizeStaffPinInput(value));
     setError(null);
   };
 
@@ -56,8 +67,10 @@ export default function AdminSetupScreen({
       return;
     }
 
-    if (pin.length !== 4) {
-      setError("Quick Login PIN must be exactly 4 digits.");
+    if (!isValidStaffPinLength(pin.length)) {
+      setError(
+        `Quick Login PIN must be between ${STAFF_PIN_MIN_LEN} and ${STAFF_PIN_MAX_LEN} characters (letters or numbers).`,
+      );
       return;
     }
 
@@ -67,14 +80,24 @@ export default function AdminSetupScreen({
       // Save local admin to IndexedDB for offline access
       await saveLocalAdmin(name.trim(), password, pin);
 
-      // Also create staff member in Convex so PIN login works
-      const pinHash = await hashString(pin);
-      await createStaff({
-        licenseKey,
-        name: name.trim(),
-        role: "admin",
-        pinHash,
-      });
+      // Best-effort cloud sync. Local admin is enough for device login/testing.
+      try {
+        const pinHash = await hashString(pin);
+        await createStaff({
+          licenseKey,
+          name: name.trim(),
+          role: "admin",
+          pinHash,
+        });
+        try {
+          await syncDeviceClosePin({ licenseKey, pinHash });
+        } catch {
+          // Column may be missing until SQL migration; close-day flow can sync later.
+        }
+      } catch (cloudErr) {
+        console.warn("[admin-setup] cloud sync failed; keeping local admin", cloudErr);
+        toast.warning("Admin created locally. Cloud sync failed, but you can continue.");
+      }
 
       onComplete();
     } catch {
@@ -85,7 +108,10 @@ export default function AdminSetupScreen({
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0F1E] flex items-center justify-center p-4">
+    <div
+      data-pos-theme={posTheme}
+      className="min-h-screen bg-[#0A0F1E] flex items-center justify-center p-4"
+    >
       <motion.div
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
@@ -96,7 +122,7 @@ export default function AdminSetupScreen({
         <div className="flex flex-col items-center mb-8">
           <motion.img
             src={LOGO_URL}
-            alt="VYNTEX"
+            alt="Vyntex POS"
             className="h-14 w-14 mb-3"
             initial={{ scale: 0.5, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -184,31 +210,23 @@ export default function AdminSetupScreen({
           {/* Quick Login PIN */}
           <div className="space-y-2">
             <Label className="text-[#8b93a7] text-xs uppercase tracking-wider">
-              Quick Login PIN (4 digits)
+              Quick Login PIN
             </Label>
             <p className="text-xs text-[#5a6580]">
-              Used for fast staff switching and opening tables
+              Used for fast staff switching and opening tables (letters or numbers)
             </p>
-            <div className="flex gap-3">
-              {[0, 1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="size-12 rounded-lg bg-[#0A0F1E] border border-[#1e2a45] flex items-center justify-center"
-                >
-                  <span className="text-xl font-mono text-white">
-                    {pin[i] ? "\u2022" : ""}
-                  </span>
-                </div>
-              ))}
-            </div>
             <Input
-              type="tel"
-              inputMode="numeric"
+              type="text"
+              inputMode="text"
+              autoComplete="off"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
               value={pin}
               onChange={(e) => handlePinChange(e.target.value)}
-              maxLength={4}
-              placeholder="Enter 4-digit PIN"
-              className="bg-[#0A0F1E] border-[#1e2a45] text-white placeholder:text-[#3a4560] h-11 font-mono tracking-[0.5em] text-center focus:border-[#44CC00] focus:ring-[#44CC00]/20"
+              maxLength={STAFF_PIN_MAX_LEN}
+              placeholder="Enter PIN"
+              className="bg-[#0A0F1E] border-[#1e2a45] text-white placeholder:text-[#3a4560] h-11 font-mono text-center focus:border-[#44CC00] focus:ring-[#44CC00]/20"
             />
           </div>
 

@@ -1,13 +1,18 @@
 /**
  * IndexedDB utilities for VYNTEX POS local storage.
- * Stores activation tokens, local admin credentials, and cached staff for offline access.
+ * Stores activation tokens, local admin credentials, cached staff,
+ * and offline data (menu, tables, orders, queue) for offline POS access.
  */
 
 const DB_NAME = "vyntex-local";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
+
+// Store names
 const CONFIG_STORE = "config";
 const ADMINS_STORE = "admins";
 const STAFF_STORE = "staff";
+const CACHE_STORE = "dataCache";
+const OFFLINE_QUEUE_STORE = "offlineQueue";
 
 // ── Types ─────────────────────────────────────────────
 
@@ -30,12 +35,23 @@ export type LocalAdmin = {
   createdAt: string;
 };
 
+import type { StaffRole } from "@/pages/pos/_lib/types.ts";
+
 export type LocalStaff = {
   convexId: string;
   name: string;
-  role: "admin" | "waiter" | "kitchen";
+  role: StaffRole;
   pinHash: string;
   isActive: boolean;
+};
+
+/** A queued mutation that will be replayed when back online */
+export type QueuedMutation = {
+  id: number;
+  functionPath: string;
+  args: Record<string, unknown>;
+  createdAt: string;
+  retries: number;
 };
 
 // ── Database ──────────────────────────────────────────
@@ -57,6 +73,17 @@ function openDB(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(STAFF_STORE)) {
         db.createObjectStore(STAFF_STORE, { keyPath: "convexId" });
+      }
+      // Key-value store for caching query results
+      if (!db.objectStoreNames.contains(CACHE_STORE)) {
+        db.createObjectStore(CACHE_STORE);
+      }
+      // Auto-increment queue for offline mutations
+      if (!db.objectStoreNames.contains(OFFLINE_QUEUE_STORE)) {
+        db.createObjectStore(OFFLINE_QUEUE_STORE, {
+          keyPath: "id",
+          autoIncrement: true,
+        });
       }
     };
 
@@ -117,6 +144,19 @@ function dbGetAll<T>(storeName: string): Promise<T[]> {
   );
 }
 
+function dbDelete(storeName: string, key: IDBValidKey): Promise<void> {
+  return openDB().then(
+    (db) =>
+      new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, "readwrite");
+        const store = tx.objectStore(storeName);
+        const request = store.delete(key);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      })
+  );
+}
+
 // ── Hashing ───────────────────────────────────────────
 
 export async function hashString(input: string): Promise<string> {
@@ -144,7 +184,6 @@ export async function generateActivationToken(
   licenseKey: string,
   deviceId: string
 ): Promise<string> {
-  // Create a hash of the license key + device ID to form a token
   return hashString(`vyntex:${licenseKey}:${deviceId}:activated`);
 }
 
@@ -216,44 +255,308 @@ export async function verifyPin(pin: string): Promise<LocalAdmin | null> {
 
 // ── Staff Cache (for offline PIN verification) ────────
 
-/**
- * Replace the entire local staff cache with fresh data from the server.
- */
 export async function saveStaffCache(staffList: LocalStaff[]): Promise<void> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STAFF_STORE, "readwrite");
     const store = tx.objectStore(STAFF_STORE);
-
-    // Clear existing cache
     store.clear();
-
-    // Add all staff
     for (const member of staffList) {
       store.put(member);
     }
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
 
+export async function getStaffCache(): Promise<LocalStaff[]> {
+  return dbGetAll<LocalStaff>(STAFF_STORE);
+}
+
+export async function verifyLocalStaffPin(
+  pinHash: string
+): Promise<{ convexId: string; name: string; role: StaffRole } | null> {
+  const staff = await getStaffCache();
+  const match = staff.find((s) => s.pinHash === pinHash && s.isActive);
+  if (!match) return null;
+  return { convexId: match.convexId, name: match.name, role: match.role };
+}
+
+// ── Data Cache (for offline query results) ────────────
+
+/**
+ * Save a query result to the local cache, keyed by a string identifier.
+ * The value is JSON-serialized.
+ */
+export async function saveDataCache(key: string, value: unknown): Promise<void> {
+  await dbPut(CACHE_STORE, key, {
+    data: value,
+    cachedAt: new Date().toISOString(),
+  });
+}
+
+/**
+ * Retrieve a cached query result from IndexedDB.
+ */
+export async function getDataCache<T>(key: string): Promise<T | undefined> {
+  const entry = await dbGet<{ data: T; cachedAt: string }>(CACHE_STORE, key);
+  return entry?.data;
+}
+
+// ── Local open shifts (Convex clockIn is stubbed; Supabase shift row may not exist) ──
+
+type OpenShiftsMap = Record<
+  string,
+  { clockIn: string; openingCash: number }
+>;
+
+function openShiftsCacheKey(licenseKey: string) {
+  return `openShifts:${licenseKey}`;
+}
+
+async function getOpenShiftsMap(licenseKey: string): Promise<OpenShiftsMap> {
+  return (
+    (await getDataCache<OpenShiftsMap>(openShiftsCacheKey(licenseKey))) ?? {}
+  );
+}
+
+/** Mark a waiter as having an active shift on this device (until closed in Z-report or close day). */
+export async function setStaffOpenShift(
+  licenseKey: string,
+  staffId: string,
+  openingCash: number,
+): Promise<void> {
+  const map = await getOpenShiftsMap(licenseKey);
+  map[staffId] = {
+    clockIn: new Date().toISOString(),
+    openingCash,
+  };
+  await saveDataCache(openShiftsCacheKey(licenseKey), map);
+}
+
+export async function hasStaffOpenShiftLocal(
+  licenseKey: string,
+  staffId: string,
+): Promise<boolean> {
+  const map = await getOpenShiftsMap(licenseKey);
+  return map[staffId] !== undefined;
+}
+
+export async function clearStaffOpenShiftLocal(
+  licenseKey: string,
+  staffId: string,
+): Promise<void> {
+  const map = await getOpenShiftsMap(licenseKey);
+  delete map[staffId];
+  await saveDataCache(openShiftsCacheKey(licenseKey), map);
+}
+
+export async function clearAllOpenShiftsLocal(licenseKey: string): Promise<void> {
+  await saveDataCache(openShiftsCacheKey(licenseKey), {});
+}
+
+// ── Offline Mutation Queue ────────────────────────────
+
+/**
+ * Add a mutation to the offline queue to be replayed when back online.
+ */
+export async function enqueueMutation(
+  functionPath: string,
+  args: Record<string, unknown>
+): Promise<number> {
+  return dbAdd(OFFLINE_QUEUE_STORE, {
+    functionPath,
+    args,
+    createdAt: new Date().toISOString(),
+    retries: 0,
+  });
+}
+
+/**
+ * Get all queued mutations in insertion order.
+ */
+export async function getQueuedMutations(): Promise<QueuedMutation[]> {
+  return dbGetAll<QueuedMutation>(OFFLINE_QUEUE_STORE);
+}
+
+/**
+ * Remove a successfully replayed mutation from the queue.
+ */
+export async function removeQueuedMutation(id: number): Promise<void> {
+  await dbDelete(OFFLINE_QUEUE_STORE, id);
+}
+
+/**
+ * Increment retry count for a failed mutation.
+ */
+export async function incrementMutationRetry(id: number): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(OFFLINE_QUEUE_STORE, "readwrite");
+    const store = tx.objectStore(OFFLINE_QUEUE_STORE);
+    const request = store.get(id);
+    request.onsuccess = () => {
+      const item = request.result as QueuedMutation | undefined;
+      if (item) {
+        store.put({ ...item, retries: item.retries + 1 });
+      }
+      resolve();
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+/**
+ * Clear all queued mutations (e.g. after successful sync or on user reset).
+ */
+export async function clearOfflineQueue(): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(OFFLINE_QUEUE_STORE, "readwrite");
+    const store = tx.objectStore(OFFLINE_QUEUE_STORE);
+    store.clear();
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
 }
 
 /**
- * Get all cached staff members from IndexedDB.
+ * Get the count of pending offline mutations.
  */
-export async function getStaffCache(): Promise<LocalStaff[]> {
-  return dbGetAll<LocalStaff>(STAFF_STORE);
+export async function getOfflineQueueCount(): Promise<number> {
+  const items = await getQueuedMutations();
+  return items.length;
 }
 
-/**
- * Verify a PIN hash against the local staff cache.
- * Used when offline and the Convex backend is unreachable.
- */
-export async function verifyLocalStaffPin(
-  pinHash: string
-): Promise<{ convexId: string; name: string; role: "admin" | "waiter" | "kitchen" } | null> {
-  const staff = await getStaffCache();
-  const match = staff.find((s) => s.pinHash === pinHash && s.isActive);
-  if (!match) return null;
-  return { convexId: match.convexId, name: match.name, role: match.role };
+// ── PIN login screen branding (per device, local only) ─────
+
+export type PinLoginPlacement =
+  | "top-center"
+  | "top-left"
+  | "top-right"
+  | "above-pin"
+  /** Logo + business name vertically centered with PIN block below */
+  | "center"
+  /** Logo + name above the footer strip (PIN stays in the middle column) */
+  | "bottom-center"
+  /** Free position: logo + PIN column use separate percent offsets (see `PinLoginBranding`) */
+  | "custom";
+
+export const PIN_LOGIN_PLACEMENTS: PinLoginPlacement[] = [
+  "top-center",
+  "top-left",
+  "top-right",
+  "above-pin",
+  "center",
+  "bottom-center",
+  "custom",
+];
+
+export type PinLoginBranding = {
+  /** Custom image; null keeps the default Vyntex mark */
+  logoDataUrl: string | null;
+  /** Logo height in CSS pixels (width follows aspect ratio) */
+  logoHeightPx: number;
+  placement: PinLoginPlacement;
+  /** 0 = left … 100 = right of the PIN screen (used when `placement === "custom"`) */
+  logoOffsetXPercent: number;
+  /** 0 = top … 100 = bottom of the PIN screen (used when `placement === "custom"`) */
+  logoOffsetYPercent: number;
+  /** 0 = left … 100 = right — anchor for the PIN column (wifi + field + keypad) when `placement === "custom"` */
+  pinBlockOffsetXPercent: number;
+  /** 0 = top … 100 = bottom — anchor for the PIN column when `placement === "custom"` */
+  pinBlockOffsetYPercent: number;
+};
+
+export const DEFAULT_PIN_LOGIN_BRANDING: PinLoginBranding = {
+  logoDataUrl: null,
+  logoHeightPx: 140,
+  placement: "top-center",
+  logoOffsetXPercent: 50,
+  logoOffsetYPercent: 22,
+  pinBlockOffsetXPercent: 50,
+  pinBlockOffsetYPercent: 56,
+};
+
+const LOGO_HEIGHT_MIN = 40;
+const LOGO_HEIGHT_MAX = 520;
+
+function normalizePinLoginBranding(
+  raw: Partial<PinLoginBranding> | null | undefined,
+): PinLoginBranding {
+  const merged: PinLoginBranding = {
+    ...DEFAULT_PIN_LOGIN_BRANDING,
+    ...(raw ?? {}),
+  };
+  merged.logoDataUrl =
+    raw?.logoDataUrl === undefined ? merged.logoDataUrl : raw.logoDataUrl ?? null;
+
+  const p = raw?.placement;
+  if (
+    typeof p === "string" &&
+    (PIN_LOGIN_PLACEMENTS as readonly string[]).includes(p)
+  ) {
+    merged.placement = p as PinLoginPlacement;
+  } else {
+    merged.placement = DEFAULT_PIN_LOGIN_BRANDING.placement;
+  }
+
+  const h = Number(raw?.logoHeightPx);
+  if (Number.isFinite(h)) {
+    merged.logoHeightPx = Math.round(
+      Math.min(LOGO_HEIGHT_MAX, Math.max(LOGO_HEIGHT_MIN, h)),
+    );
+  }
+
+  const ox = Number(raw?.logoOffsetXPercent);
+  merged.logoOffsetXPercent = Number.isFinite(ox)
+    ? Math.min(100, Math.max(0, Math.round(ox)))
+    : merged.logoOffsetXPercent;
+
+  const oy = Number(raw?.logoOffsetYPercent);
+  merged.logoOffsetYPercent = Number.isFinite(oy)
+    ? Math.min(100, Math.max(0, Math.round(oy)))
+    : merged.logoOffsetYPercent;
+
+  const px = Number(raw?.pinBlockOffsetXPercent);
+  merged.pinBlockOffsetXPercent = Number.isFinite(px)
+    ? Math.min(100, Math.max(0, Math.round(px)))
+    : merged.pinBlockOffsetXPercent;
+
+  const py = Number(raw?.pinBlockOffsetYPercent);
+  merged.pinBlockOffsetYPercent = Number.isFinite(py)
+    ? Math.min(100, Math.max(0, Math.round(py)))
+    : merged.pinBlockOffsetYPercent;
+
+  return merged;
+}
+
+function pinBrandingKey(licenseKey: string) {
+  return `pinBranding:${licenseKey}`;
+}
+
+export async function getPinLoginBranding(
+  licenseKey: string,
+): Promise<PinLoginBranding> {
+  const raw = await dbGet<Partial<PinLoginBranding>>(
+    CONFIG_STORE,
+    pinBrandingKey(licenseKey),
+  );
+  if (!raw) return { ...DEFAULT_PIN_LOGIN_BRANDING };
+  return normalizePinLoginBranding({
+    ...raw,
+    logoDataUrl:
+      raw.logoDataUrl === undefined ? null : raw.logoDataUrl,
+  });
+}
+
+export async function savePinLoginBranding(
+  licenseKey: string,
+  branding: PinLoginBranding,
+): Promise<void> {
+  await dbPut(
+    CONFIG_STORE,
+    pinBrandingKey(licenseKey),
+    normalizePinLoginBranding(branding),
+  );
 }

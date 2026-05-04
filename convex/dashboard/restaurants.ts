@@ -16,11 +16,11 @@ function generateLicenseKey(): string {
 }
 
 /**
- * Calculate license expiry based on plan.
+ * Every newly activated Restaurant POS license starts with a 30-day free trial.
  */
-function getLicenseExpiryDate(plan: "starter" | "professional" | "enterprise"): string {
+function getLicenseExpiryDate(_plan: "starter" | "professional" | "enterprise"): string {
   const now = new Date();
-  const days = plan === "starter" ? 30 : 365;
+  const days = 30;
   now.setUTCDate(now.getUTCDate() + days);
   return now.toISOString();
 }
@@ -70,6 +70,18 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const user = await getAuthUser(ctx);
+    if (args.type !== "restaurant") {
+      throw new ConvexError({
+        code: "INVALID_TYPE",
+        message: "Only Restaurant POS is available for activation.",
+      });
+    }
+    if (args.plan !== "professional") {
+      throw new ConvexError({
+        code: "INVALID_PLAN",
+        message: "Only Restaurant POS plan is available.",
+      });
+    }
     // Check if restaurant already exists
     const existing = await ctx.db
       .query("restaurants")

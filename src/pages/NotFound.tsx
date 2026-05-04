@@ -1,8 +1,10 @@
 import { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
 
 export default function NotFound() {
+  const { t } = useTranslation("site");
   const location = useLocation();
 
   useEffect(() => {
@@ -17,14 +19,12 @@ export default function NotFound() {
       <div className="text-center space-y-6">
         <div className="space-y-2">
           <h1 className="text-6xl font-bold text-muted-foreground">404</h1>
-          <h2 className="text-2xl font-semibold">Page Not Found</h2>
+          <h2 className="text-2xl font-semibold">{t("notFound.title")}</h2>
         </div>
-        <p className="text-lg text-muted-foreground max-w-md mx-auto">
-          This page does not exist.
-        </p>
+        <p className="text-lg text-muted-foreground max-w-md mx-auto">{t("notFound.body")}</p>
         <div className="pt-4">
           <Button asChild>
-            <Link to="/">Return to Home</Link>
+            <Link to="/">{t("notFound.home")}</Link>
           </Button>
         </div>
       </div>

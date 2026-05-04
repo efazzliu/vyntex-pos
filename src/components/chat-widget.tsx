@@ -1,96 +1,107 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { MessageCircle, X, Send } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { cn } from "@/lib/utils.ts";
 import { motion, AnimatePresence } from "motion/react";
-import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
 import { toast } from "sonner";
+import { getConversation, submitContactForm } from "@/lib/supabase-pos/contact-ops.ts";
 
 type ChatMessage = {
   id: string;
   text: string;
-  sender: "bot" | "user";
+  sender: "bot" | "user" | "team";
 };
 
-const WELCOME_MESSAGE: ChatMessage = {
-  id: "welcome",
-  text: "Hi! Welcome to VYNTEX support. Please enter your name and email to get started.",
-  sender: "bot",
-};
+const historyKey = (email: string) => ["site-chat-history", email.trim().toLowerCase()] as const;
 
 export default function ChatWidget() {
+  const { t } = useTranslation("site");
+  const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [hasInfo, setHasInfo] = useState(false);
+  const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const submitChat = useMutation(api.contact.submitForm);
+
+  const normalizedEmail = email.trim().toLowerCase();
+
+  const historyQuery = useQuery({
+    queryKey: historyKey(normalizedEmail || "—"),
+    queryFn: () => getConversation(normalizedEmail),
+    enabled: hasInfo && Boolean(normalizedEmail),
+  });
+
+  const serverMessages = useMemo((): ChatMessage[] => {
+    const timeline = historyQuery.data?.timeline ?? [];
+    const out: ChatMessage[] = [];
+    for (const item of timeline) {
+      if (item.kind === "reply") {
+        out.push({
+          id: `srv-reply-${item.id}`,
+          text: item.message,
+          sender: "team",
+        });
+      } else {
+        out.push({
+          id: `srv-msg-${item.id}`,
+          text: item.message,
+          sender: "user",
+        });
+      }
+    }
+    return out;
+  }, [historyQuery.data?.timeline]);
+
+  const displayMessages = useMemo(() => {
+    const out: ChatMessage[] = [{ id: "welcome", text: t("chat.welcome"), sender: "bot" }];
+    if (hasInfo) {
+      out.push({ id: "user-info", text: `${name} (${email})`, sender: "user" });
+      out.push({ id: "bot-ready", text: t("chat.thanks"), sender: "bot" });
+      out.push(...serverMessages);
+    }
+    return out;
+  }, [hasInfo, name, email, serverMessages, t]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [displayMessages.length, isOpen]);
 
   const handleSubmitInfo = () => {
     if (!name.trim() || !email.trim()) {
-      toast.error("Please enter your name and email");
+      toast.error(t("chat.toastNameEmail"));
       return;
     }
     setHasInfo(true);
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: `user-info-${Date.now()}`,
-        text: `${name} (${email})`,
-        sender: "user",
-      },
-      {
-        id: `bot-ready-${Date.now()}`,
-        text: "Thanks! How can we help you today?",
-        sender: "bot",
-      },
-    ]);
   };
 
   const handleSend = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || !normalizedEmail || !name.trim()) return;
     const userMessage = input.trim();
     setInput("");
-
-    setMessages((prev) => [
-      ...prev,
-      { id: `user-${Date.now()}`, text: userMessage, sender: "user" },
-    ]);
-
+    setSending(true);
     try {
-      await submitChat({
-        name,
-        email,
+      await submitContactForm({
+        name: name.trim(),
+        email: normalizedEmail,
         message: userMessage,
         type: "chat",
       });
-
-      setTimeout(() => {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `bot-reply-${Date.now()}`,
-            text: "Thanks for your message! Our team will review it and get back to you shortly.",
-            sender: "bot",
-          },
-        ]);
-      }, 1000);
-    } catch {
-      toast.error("Failed to send message. Please try again.");
+      await queryClient.invalidateQueries({ queryKey: historyKey(normalizedEmail) });
+      toast.success(t("chat.toastSaved"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("chat.toastError"));
+    } finally {
+      setSending(false);
     }
   };
 
   return (
     <>
-      {/* Floating chat button */}
       <AnimatePresence>
         {!isOpen && (
           <motion.button
@@ -105,7 +116,6 @@ export default function ChatWidget() {
         )}
       </AnimatePresence>
 
-      {/* Chat panel */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -114,50 +124,58 @@ export default function ChatWidget() {
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             className="fixed bottom-6 right-6 z-50 w-[340px] sm:w-[380px] rounded-2xl border border-border bg-card shadow-2xl flex flex-col overflow-hidden"
           >
-            {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-[#0066FF] to-[#00AACC] text-white">
               <div className="flex items-center gap-2">
                 <MessageCircle className="size-5" />
-                <span className="font-semibold text-sm">VYNTEX Support</span>
+                <span className="font-semibold text-sm">{t("chat.header")}</span>
               </div>
               <button
                 onClick={() => setIsOpen(false)}
                 className="cursor-pointer hover:bg-white/20 rounded p-1 transition-colors"
               >
-                <X className="size-4" />
+                <X className="size-5" />
               </button>
             </div>
 
-            {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[260px] max-h-[340px]">
-              {messages.map((msg) => (
+              {displayMessages.map((msg) => (
                 <div
                   key={msg.id}
                   className={cn(
                     "max-w-[80%] rounded-xl px-3 py-2 text-sm leading-relaxed",
-                    msg.sender === "bot"
-                      ? "bg-muted text-foreground"
-                      : "bg-gradient-to-r from-[#0066FF] to-[#00AACC] text-white ml-auto"
+                    msg.sender === "bot" && "bg-muted text-foreground",
+                    msg.sender === "team" &&
+                      "bg-slate-100 text-foreground border border-slate-200/80 dark:bg-slate-800 dark:border-slate-600",
+                    msg.sender === "user" &&
+                      "bg-gradient-to-r from-[#0066FF] to-[#00AACC] text-white ml-auto",
                   )}
                 >
-                  {msg.text}
+                  {msg.sender === "team" ? (
+                    <>
+                      <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        {t("chat.teamLabel")}
+                      </span>
+                      <span className="mt-0.5 block whitespace-pre-wrap">{msg.text}</span>
+                    </>
+                  ) : (
+                    msg.text
+                  )}
                 </div>
               ))}
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input area */}
             <div className="p-3 border-t border-border">
               {!hasInfo ? (
                 <div className="space-y-2">
                   <Input
-                    placeholder="Your name"
+                    placeholder={t("chat.namePh")}
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     className="text-sm"
                   />
                   <Input
-                    placeholder="Your email"
+                    placeholder={t("chat.emailPh")}
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -168,23 +186,25 @@ export default function ChatWidget() {
                     className="w-full bg-gradient-to-r from-[#0066FF] to-[#00AACC] text-white border-0"
                     onClick={handleSubmitInfo}
                   >
-                    Start Chat
+                    {t("chat.start")}
                   </Button>
                 </div>
               ) : (
                 <div className="flex gap-2">
                   <Input
-                    placeholder="Type a message..."
+                    placeholder={t("chat.typePh")}
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") handleSend();
+                      if (e.key === "Enter" && !e.shiftKey) void handleSend();
                     }}
+                    disabled={sending}
                     className="text-sm"
                   />
                   <Button
                     size="icon"
-                    onClick={handleSend}
+                    onClick={() => void handleSend()}
+                    disabled={sending || !input.trim()}
                     className="bg-gradient-to-r from-[#0066FF] to-[#00AACC] text-white border-0 shrink-0"
                   >
                     <Send className="size-4" />

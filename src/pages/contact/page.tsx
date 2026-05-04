@@ -1,45 +1,45 @@
 import { useState } from "react";
 import { motion } from "motion/react";
+import { useTranslation } from "react-i18next";
 import { Mail, MessageSquare, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import PageHeader from "@/components/page-header.tsx";
-import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
 import { toast } from "sonner";
+import { submitContactForm } from "@/lib/supabase-pos/contact-ops.ts";
+import { SUPPORT_EMAIL, SUPPORT_MAILTO_HREF } from "@/lib/site-constants.ts";
 
 export default function ContactPage() {
+  const { t } = useTranslation("site");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const submitForm = useMutation(api.contact.submitForm);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !email.trim() || !message.trim()) {
-      toast.error("Please fill in all required fields");
+      toast.error(t("contact.toastRequired"));
       return;
     }
     setIsSubmitting(true);
     try {
-      await submitForm({
+      await submitContactForm({
         name: name.trim(),
         email: email.trim(),
         subject: subject.trim() || undefined,
         message: message.trim(),
         type: "form",
       });
-      toast.success("Message sent! We'll get back to you soon.");
+      toast.success(t("contact.toastSuccess"));
       setName("");
       setEmail("");
       setSubject("");
       setMessage("");
-    } catch {
-      toast.error("Failed to send message. Please try again.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("contact.toastError"));
     } finally {
       setIsSubmitting(false);
     }
@@ -48,15 +48,14 @@ export default function ContactPage() {
   return (
     <>
       <PageHeader
-        badge="Contact"
-        title="Get in touch"
-        subtitle="Have a question or need help? Reach out and our team will respond within 24 hours."
+        badge={t("contact.badge")}
+        title={t("contact.title")}
+        subtitle={t("contact.subtitle")}
       />
 
       <section className="pb-24 bg-background">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-12">
-            {/* Form */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               whileInView={{ opacity: 1, x: 0 }}
@@ -67,21 +66,21 @@ export default function ContactPage() {
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="contact-name">Name *</Label>
+                    <Label htmlFor="contact-name">{t("contact.name")}</Label>
                     <Input
                       id="contact-name"
-                      placeholder="John Smith"
+                      placeholder={t("contact.phName")}
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       required
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="contact-email">Email *</Label>
+                    <Label htmlFor="contact-email">{t("contact.email")}</Label>
                     <Input
                       id="contact-email"
                       type="email"
-                      placeholder="john@restaurant.com"
+                      placeholder={t("contact.phEmail")}
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -89,19 +88,19 @@ export default function ContactPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="contact-subject">Subject</Label>
+                  <Label htmlFor="contact-subject">{t("contact.subject")}</Label>
                   <Input
                     id="contact-subject"
-                    placeholder="How can we help?"
+                    placeholder={t("contact.phSubject")}
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="contact-message">Message *</Label>
+                  <Label htmlFor="contact-message">{t("contact.message")}</Label>
                   <Textarea
                     id="contact-message"
-                    placeholder="Tell us about your needs..."
+                    placeholder={t("contact.phMessage")}
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     rows={6}
@@ -114,12 +113,11 @@ export default function ContactPage() {
                   disabled={isSubmitting}
                   className="bg-gradient-to-r from-[#0066FF] to-[#00AACC] hover:from-[#0055DD] hover:to-[#0099BB] text-white border-0"
                 >
-                  {isSubmitting ? "Sending..." : "Send Message"}
+                  {isSubmitting ? t("contact.sending") : t("contact.send")}
                 </Button>
               </form>
             </motion.div>
 
-            {/* Contact info cards */}
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               whileInView={{ opacity: 1, x: 0 }}
@@ -132,11 +130,14 @@ export default function ContactPage() {
                   <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#0066FF]/10 to-[#44CC00]/10 flex items-center justify-center">
                     <Mail className="size-5 text-primary" />
                   </div>
-                  <h3 className="font-semibold text-foreground">Email Us</h3>
+                  <h3 className="font-semibold text-foreground">{t("contact.emailUs")}</h3>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  support@vyntex.com
-                </p>
+                <a
+                  href={SUPPORT_MAILTO_HREF}
+                  className="text-sm text-primary font-medium hover:underline"
+                >
+                  {SUPPORT_EMAIL}
+                </a>
               </div>
 
               <div className="rounded-xl border border-border bg-card p-6">
@@ -144,12 +145,9 @@ export default function ContactPage() {
                   <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#0066FF]/10 to-[#44CC00]/10 flex items-center justify-center">
                     <MessageSquare className="size-5 text-primary" />
                   </div>
-                  <h3 className="font-semibold text-foreground">Live Chat</h3>
+                  <h3 className="font-semibold text-foreground">{t("contact.liveChat")}</h3>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Click the chat icon in the bottom-right corner for instant
-                  assistance from our support team.
-                </p>
+                <p className="text-sm text-muted-foreground">{t("contact.liveChatBody")}</p>
               </div>
 
               <div className="rounded-xl border border-border bg-card p-6">
@@ -157,14 +155,9 @@ export default function ContactPage() {
                   <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#0066FF]/10 to-[#44CC00]/10 flex items-center justify-center">
                     <Clock className="size-5 text-primary" />
                   </div>
-                  <h3 className="font-semibold text-foreground">
-                    Response Time
-                  </h3>
+                  <h3 className="font-semibold text-foreground">{t("contact.responseTime")}</h3>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  We typically respond within 24 hours on business days.
-                  Enterprise clients get priority support.
-                </p>
+                <p className="text-sm text-muted-foreground">{t("contact.responseBody")}</p>
               </div>
             </motion.div>
           </div>

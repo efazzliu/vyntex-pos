@@ -2,7 +2,8 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button.tsx";
 import { toast } from "sonner";
 import { ShieldAlert, Mail, CreditCard } from "lucide-react";
-import type { Doc } from "@/convex/_generated/dataModel.d.ts";
+import type { DashboardRestaurant } from "@/hooks/use-dashboard-restaurant.ts";
+import { SUPPORT_EMAIL, SUPPORT_MAILTO_HREF } from "@/lib/site-constants.ts";
 
 const VYN_TYPE_LABELS: Record<string, string> = {
   restaurant: "Restaurant POS",
@@ -23,11 +24,11 @@ function formatDate(iso: string) {
 export default function ExpiredLicense({
   restaurant,
 }: {
-  restaurant: Doc<"restaurants">;
+  restaurant: DashboardRestaurant;
 }) {
   const handleRenew = () => {
     toast.info(
-      "Payment integration is being set up. Please contact support to renew your license."
+      `Payment integration is being set up. Email ${SUPPORT_EMAIL} to renew your license.`,
     );
   };
 
@@ -54,7 +55,7 @@ export default function ExpiredLicense({
           .
         </p>
         <p className="text-muted-foreground mb-8">
-          Renew now to regain access to your VYNTEX POS software and dashboard
+          Renew now to regain access to your Vyntex POS software and dashboard
           settings.
         </p>
 
@@ -77,13 +78,21 @@ export default function ExpiredLicense({
         </Button>
 
         {/* Contact support */}
-        <Link
-          to="/contact"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <Mail className="size-4" />
-          Need help? Contact support
-        </Link>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-sm">
+          <a
+            href={SUPPORT_MAILTO_HREF}
+            className="inline-flex items-center gap-1.5 text-primary font-medium hover:underline"
+          >
+            <Mail className="size-4" />
+            {SUPPORT_EMAIL}
+          </a>
+          <Link
+            to="/contact"
+            className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Contact form
+          </Link>
+        </div>
       </div>
     </div>
   );

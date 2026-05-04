@@ -4,36 +4,25 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <title>VYNTEX POS</title>
-    <meta name="description" content="VYNTEX - Enterprise-grade POS platform for modern restaurants. Streamline orders, payments, and operations." />
+    <title>Vyntex POS</title>
+    <meta name="description" content="Manage your restaurant smarter, not harder. Vyntex POS: Speed, Security, and Seamless Fiscal Integration for modern hospitality." />
     <meta name="author" content="Hercules" />
-    <link rel="icon" href="https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz" />
-    <meta property="og:title" content="VYNTEX - Enterprise POS Platform" />
-    <meta
-      property="og:description"
-      content="Enterprise-grade POS platform for modern restaurants"
-    />
+    <link rel="icon" type="image/svg+xml" href="/vyntex-pos-logo.svg" />
+    <meta property="og:title" content="Vyntex POS" />
+    <meta property="og:description" content="Manage your restaurant smarter, not harder. Vyntex POS: Speed, Security, and Seamless Fiscal Integration for modern hospitality." />
     <meta property="og:type" content="website" />
     <meta
       property="og:image"
-      content="https://hercules.app/og/app/%VITE_HERCULES_WEBSITE_ID%.png"
+      content="/vyntex-pos-logo.svg"
     />
     <meta property="og:image:type" content="image/png" />
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta
       name="twitter:image"
-      content="https://hercules.app/og/app/%VITE_HERCULES_WEBSITE_ID%.png"
+      content="/vyntex-pos-logo.svg"
     />
     <meta name="twitter:site" content="@usehercules" />
-
-    <!-- PWA Configuration -->
-    <link rel="manifest" href="/site.webmanifest" />
-    <meta name="theme-color" content="#0A0F1E" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
-    <meta name="apple-mobile-web-app-title" content="VYNTEX" />
-    <link rel="apple-touch-icon" href="/icon/icon-192.png" />
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -43,15 +32,6 @@
       rel="stylesheet"
       crossorigin
     />
-
-    <!-- Capture PWA install prompt before React mounts so it is never lost -->
-    <script>
-      window.__pwaInstallPrompt = null;
-      window.addEventListener("beforeinstallprompt", function (e) {
-        e.preventDefault();
-        window.__pwaInstallPrompt = e;
-      });
-    </script>
 
     <!-- Detect dark mode preference and set the class before next-themes loads. This avoids a flash of unstyled content (FOUC) when the page loads. -->
     <script>
