@@ -6,6 +6,8 @@ import {
   menuItemFromRow,
   menuFromRow,
 } from "./mappers.ts";
+import { normalizeSupplyRecipeForDb } from "./supply-recipe-ops.ts";
+import { hasEnterpriseSupplyRecipe } from "@/pages/pos/_lib/plan-features.ts";
 
 function pgMissingColumnMessage(error: { message?: string }, column: string): boolean {
   const m = String(error.message ?? "").toLowerCase();
@@ -25,6 +27,54 @@ function isRlsViolation(error: { message?: string; code?: string }): boolean {
     m.includes("violates row-level security") ||
     String(error.code ?? "") === "42501"
   );
+}
+
+/** Same naming rules as Convex `ensureSupplyCategory` (menuItems require category_id). */
+const SUPPLY_CATEGORY_NAMES = new Set([
+  "furnizim",
+  "mall",
+  "mall kuzhine",
+  "mall kuzhinë",
+  "stok",
+  "stoku",
+  "inventory",
+]);
+
+function normalizeSupplyCategoryName(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+export async function ensureSupplyCategory(args: { licenseKey: string }) {
+  const r = await getRestaurantByLicense(args.licenseKey);
+  const { data, error } = await supabase
+    .from("menu_categories")
+    .select("id, name")
+    .eq("restaurant_id", r.id);
+
+  if (error) throw error;
+
+  for (const row of data ?? []) {
+    const rec = row as { id?: string; name?: string };
+    const n = rec.name;
+    if (
+      typeof n === "string" &&
+      typeof rec.id === "string" &&
+      SUPPLY_CATEGORY_NAMES.has(normalizeSupplyCategoryName(n))
+    ) {
+      return rec.id;
+    }
+  }
+
+  return createCategory({
+    licenseKey: args.licenseKey,
+    name: "Furnizim",
+    color: "#0d9488",
+    icon: "📦",
+  });
 }
 
 export async function getCategories(licenseKey: string) {
@@ -205,11 +255,29 @@ export async function createItem(args: Record<string, unknown>) {
     low_stock_threshold: (args.lowStockThreshold as number) ?? null,
   };
 
+  const recipeNorm = normalizeSupplyRecipeForDb(args.supplyRecipe);
+  if (
+    recipeNorm !== undefined &&
+    hasEnterpriseSupplyRecipe(r.plan) &&
+    recipeNorm.length > 0
+  ) {
+    payload.supply_recipe = recipeNorm;
+  }
+
   let { data, error } = await supabase
     .from("menu_items")
     .insert(payload)
     .select("id")
     .single();
+
+  if (error && pgMissingColumnMessage(error, "supply_recipe")) {
+    const { supply_recipe: _sr, ...withoutRecipe } = payload;
+    ({ data, error } = await supabase
+      .from("menu_items")
+      .insert(withoutRecipe)
+      .select("id")
+      .single());
+  }
 
   if (error && pgMissingColumnMessage(error, "staff_meal_allowed")) {
     const { staff_meal_allowed: _s, ...withoutStaffMeal } = payload;
@@ -232,7 +300,7 @@ export async function createItem(args: Record<string, unknown>) {
 }
 
 export async function updateItem(args: Record<string, unknown>) {
-  await getRestaurantByLicense(args.licenseKey as string);
+  const r = await getRestaurantByLicense(args.licenseKey as string);
   assertMenuItemStation(args.station);
 
   const patch: Record<string, unknown> = {
@@ -252,6 +320,14 @@ export async function updateItem(args: Record<string, unknown>) {
     current_stock: args.currentStock,
     low_stock_threshold: args.lowStockThreshold,
   };
+
+  const recipeNormUpdate = normalizeSupplyRecipeForDb(args.supplyRecipe);
+  if (recipeNormUpdate !== undefined) {
+    patch.supply_recipe = hasEnterpriseSupplyRecipe(r.plan)
+      ? recipeNormUpdate
+      : [];
+  }
+
   Object.keys(patch).forEach((k) => {
     if (patch[k] === undefined) delete patch[k];
   });
@@ -259,6 +335,14 @@ export async function updateItem(args: Record<string, unknown>) {
     .from("menu_items")
     .update(patch)
     .eq("id", args.itemId as string);
+
+  if (error && pgMissingColumnMessage(error, "supply_recipe")) {
+    const { supply_recipe: _sr, ...withoutRecipe } = patch;
+    ({ error } = await supabase
+      .from("menu_items")
+      .update(withoutRecipe)
+      .eq("id", args.itemId as string));
+  }
 
   if (error && pgMissingColumnMessage(error, "staff_meal_allowed")) {
     const { staff_meal_allowed: _s, ...rest } = patch;

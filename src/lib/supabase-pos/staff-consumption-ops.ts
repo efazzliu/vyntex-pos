@@ -6,6 +6,7 @@ import {
 import { getRestaurantByLicense } from "./restaurant.ts";
 import { insertAuditLog } from "./dashboard-ops.ts";
 import { uuidOrNull } from "./uuid.ts";
+import { applySupplyRecipeAfterSale } from "./supply-recipe-ops.ts";
 
 type ConsumptionLine = {
   menuItemId: string;
@@ -125,6 +126,20 @@ export async function addConsumption(args: Record<string, unknown>) {
     });
     assertNoPgError("Staff consumption stock log", logErr);
   }
+
+  const qtyByMenuItemId = new Map<string, number>();
+  for (const line of items) {
+    const itemId = uuidOrNull(String(line.menuItemId));
+    if (!itemId || line.quantity <= 0) continue;
+    qtyByMenuItemId.set(itemId, (qtyByMenuItemId.get(itemId) ?? 0) + line.quantity);
+  }
+  await applySupplyRecipeAfterSale({
+    restaurantId: r.id,
+    qtyByMenuItemId,
+    staffName: loggedByStaffName,
+    contextNote: `Staff meal: ${staffName}`,
+    licenseKey,
+  });
 
   const itemSummary = items.map((i) => `${i.quantity}x ${i.name}`).join(", ");
   const valueNote =

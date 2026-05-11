@@ -86,7 +86,25 @@ export function menuItemFromRow(r: {
   stock_unit: string | null;
   current_stock: number | string | null;
   low_stock_threshold: number | string | null;
+  supply_recipe?: unknown;
 }) {
+  const rawRecipe = r.supply_recipe;
+  let supplyRecipe:
+    | { supplyMenuItemId: string; qtyPerUnit: number }[]
+    | undefined;
+  if (Array.isArray(rawRecipe) && rawRecipe.length > 0) {
+    const lines: { supplyMenuItemId: string; qtyPerUnit: number }[] = [];
+    for (const row of rawRecipe as Record<string, unknown>[]) {
+      const sid = String(
+        row.supplyMenuItemId ?? row.supply_menu_item_id ?? "",
+      ).trim();
+      const q = Number(row.qtyPerUnit ?? row.qty_per_unit);
+      if (!sid || !Number.isFinite(q) || q <= 0) continue;
+      lines.push({ supplyMenuItemId: sid, qtyPerUnit: q });
+    }
+    if (lines.length > 0) supplyRecipe = lines;
+  }
+
   return {
     _id: r.id,
     _creationTime: new Date(r.created_at).getTime(),
@@ -112,6 +130,7 @@ export function menuItemFromRow(r: {
       r.low_stock_threshold != null
         ? Number(r.low_stock_threshold)
         : undefined,
+    supplyRecipe,
   };
 }
 

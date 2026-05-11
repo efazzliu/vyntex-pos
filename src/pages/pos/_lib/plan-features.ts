@@ -133,6 +133,8 @@ export const PLAN_FEATURE_DESCRIPTIONS: Record<
     posModules: [
       "Everything in Professional (same POS screens today)",
       "Full analytics dashboard & sales overview",
+      "Kitchen & bar supply (mall / furnizim) workflows in Menu and Stock",
+      "Optional supply recipe (ingredients per portion) with automatic stock deduction on sale",
     ],
     commercialAddOns: [
       "Highest terminal limits & rollout support",
@@ -143,6 +145,22 @@ export const PLAN_FEATURE_DESCRIPTIONS: Record<
 };
 
 export function hasEnterpriseExtras(plan: string): boolean {
+  return normalizePlan(plan) === "enterprise";
+}
+
+/**
+ * Enterprise-only: kitchen/bar mall (furnizim) in Menu, supply stock tabs + create flows in Stock,
+ * hiding supply categories from the product category strip, mall stock picker / adjust dialogs.
+ */
+export function hasEnterpriseSupplyMall(plan: string): boolean {
+  return normalizePlan(plan) === "enterprise";
+}
+
+/**
+ * Enterprise-only: optional supply recipe (BOM) on sellable menu items + automatic deduction on payment.
+ * Today matches {@link hasEnterpriseSupplyMall}; kept separate so tiers can diverge later.
+ */
+export function hasEnterpriseSupplyRecipe(plan: string): boolean {
   return normalizePlan(plan) === "enterprise";
 }
 

@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { query, mutation } from "../_generated/server";
 import { getRestaurantByLicense } from "./helpers.ts";
+import { applySupplyRecipeDeductions } from "./supplyRecipe";
 
 /** Log a staff consumption entry (items selected from menu) */
 export const addConsumption = mutation({
@@ -63,6 +64,17 @@ export const addConsumption = mutation({
           balanceAfter: newStock,
           note: `Staff: ${args.staffName}`,
           createdAt: now,
+        });
+      }
+
+      if (menuItem && restaurant.plan === "enterprise") {
+        await applySupplyRecipeDeductions(ctx, {
+          restaurantId: restaurant._id,
+          recipe: menuItem.supplyRecipe,
+          portionCount: line.quantity,
+          soldMenuItemName: line.name,
+          staffName: args.loggedByStaffName,
+          contextNote: `Staff meal: ${args.staffName}`,
         });
       }
     }

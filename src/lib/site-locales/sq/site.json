@@ -95,6 +95,7 @@
     "send": "Dërgo mesazhin",
     "sending": "Duke dërguar...",
     "emailUs": "Na shkruani me email",
+    "emailUnavailableBody": "Emaili i drejtpërdrejtë nuk është ende aktiv — po përfundojmë adresën zyrtare të biznesit. Përdorni formularin majtas dhe do t’ju përgjigjemi nga aty.",
     "liveChat": "Bisedë live",
     "liveChatBody": "Klikoni ikonën e bisedës në cepin e poshtëm djathtas për ndihmë të menjëhershme.",
     "responseTime": "Koha e përgjigjes",
@@ -156,6 +157,8 @@
     "mostPopular": "Më i popullarizuari",
     "getStarted": "Fillo tani",
     "mobileFeature": "Panel celular",
+    "checkoutPausedNotice": "Pagesa online është përkohësisht joaktive derisa të përfundojmë konfigurimin e pagesës. Mund të shihni planet dhe çmimet më poshtë.",
+    "checkoutDisabledHint": "Pagesa nuk është ende e aktivizuar — po përfundojmë integrimin",
     "tiers": {
       "starter": {
         "name": "Starter",
@@ -188,6 +191,8 @@
         "description": "I njëjti POS si Professional, për rritje dhe kufij më të lartë.",
         "features": [
           "Gjithçka në Professional",
+          "Furnizim kuzhinë & shank (mall) në menu dhe stok",
+          "Recetë furnizimi (përbërës për porcion) me zbritje automatike të stokut",
           "Kufij më të lartë terminalësh",
           "Mbështetje prioritare & e dedikuar",
           "Opsione SLA & onboarding",
@@ -547,7 +552,17 @@
     }
   },
   "auth": {
+    "topNav": {
+      "getStarted": "Fillo",
+      "profile": "Profili"
+    },
     "login": {
+      "heroBadge": "Platformë POS moderne",
+      "heroTitle": "Mirë se erdhe në Vyntex POS",
+      "heroBullet1": "Panel dhe raporte në kohë reale",
+      "heroBullet2": "Autentikim i sigurt në cloud",
+      "secureBadge": "Kyçje e sigurt",
+      "heading": "Identifikohu",
       "subtitle": "Menaxho lokalet e tua nga një vend",
       "emailLabel": "Email",
       "passwordLabel": "Fjalëkalimi",
@@ -569,6 +584,32 @@
       "sendingVerification": "Duke dërguar verifikimin…",
       "resendVerification": "Ridërgo email verifikimi",
       "verificationEmailSent": "Email-i i verifikimit u dërgua."
+    },
+    "register": {
+      "quickBadge": "Regjistrim i shpejtë",
+      "heading": "Krijo llogari",
+      "subtitle": "Regjistrohu me email, emër dhe fjalëkalim.",
+      "trialBold": "1 muaj falas",
+      "trialRest": "në Starter kur përfundon konfigurimin — akses i plotë POS, pa kartë për të filluar.",
+      "nameLabel": "Emri",
+      "namePlaceholder": "Emri yt",
+      "emailLabel": "Email",
+      "passwordLabel": "Fjalëkalimi",
+      "confirmPasswordLabel": "Konfirmo fjalëkalimin",
+      "submit": "Krijo llogarinë",
+      "submitLoading": "Duke krijuar…",
+      "resendingVerification": "Duke ridërguar verifikimin…",
+      "alreadyHaveAccount": "Ke tashmë llogari?",
+      "loginLink": "Kyçu",
+      "heroBadge": "Fillim i zgjuar",
+      "heroTitle": "Ndërto hapësirën POS në pak minuta",
+      "heroBullet1": "Konfigurim i udhëhequr për lokale dhe staf",
+      "heroBullet2": "Verifikim i sigurt me email",
+      "errorFillRequired": "Plotëso të gjitha fushat e detyrueshme.",
+      "errorPasswordMin": "Fjalëkalimi duhet të jetë të paktën 6 karaktere.",
+      "errorPasswordMismatch": "Fjalëkalimet nuk përputhen.",
+      "toastAlreadyRegistered": "Ky email është tashmë i regjistruar. Email-i i verifikimit u ridërgua.",
+      "toastSuccess": "Regjistrimi u krye. Verifiko fillimisht email-in."
     }
   }
 }

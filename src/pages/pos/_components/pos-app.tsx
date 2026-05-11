@@ -22,13 +22,17 @@ import OfflineSyncManager from "./offline-sync-manager.tsx";
 import OfflineBanner from "./offline-banner.tsx";
 import AdminDrawer from "./admin-drawer.tsx";
 import KitchenDisplayView from "./kitchen-display-view.tsx";
+import { PosViewErrorBoundary } from "./pos-view-error-boundary.tsx";
 import { usePosLocale } from "./pos-locale-provider.tsx";
+import { startPrintQueueRunner } from "@/lib/print-queue.ts";
 import { LogOut } from "lucide-react";
 import { toast } from "sonner";
 import {
   canAccessView,
   defaultAdminManagerLandingView,
   hasAdvancedAnalytics,
+  hasEnterpriseSupplyMall,
+  hasEnterpriseSupplyRecipe,
   kitchenDisplayNavState,
 } from "../_lib/plan-features.ts";
 
@@ -75,6 +79,11 @@ function PosAppInner({
 }: PosAppProps) {
   const { t } = usePosLocale();
   const { theme, setTheme } = usePosTheme();
+
+  // Retry locally queued print jobs when printers become available.
+  useEffect(() => {
+    startPrintQueueRunner();
+  }, []);
 
   // Fetch staff permissions for consumption access
   const staffList = useQuery('pos.staff.getStaff', { licenseKey: activation.licenseKey });
@@ -322,6 +331,7 @@ function PosAppInner({
           )}
 
           <div className="flex-1 min-h-0 overflow-auto">
+            <PosViewErrorBoundary key={activeView}>
             {/* Floor — same as waiter, logo opens drawer */}
             {activeView === "floor" && (
               <FloorPlan
@@ -389,7 +399,12 @@ function PosAppInner({
             {/* Menu management */}
             {gated("menu", (
               <div className="h-full overflow-auto">
-                <MenuManagement licenseKey={activation.licenseKey} />
+                <MenuManagement
+                  licenseKey={activation.licenseKey}
+                  stockActorName={activeStaff.name}
+                  enterpriseSupplyMall={hasEnterpriseSupplyMall(activation.plan)}
+                  enterpriseSupplyRecipe={hasEnterpriseSupplyRecipe(activation.plan)}
+                />
               </div>
             ))}
 
@@ -416,6 +431,7 @@ function PosAppInner({
                 <StockManagement
                   licenseKey={activation.licenseKey}
                   staffName={activeStaff.name}
+                  enterpriseSupplyMall={hasEnterpriseSupplyMall(activation.plan)}
                 />
               </div>
             ))}
@@ -472,6 +488,7 @@ function PosAppInner({
                 />
               </div>
             ))}
+            </PosViewErrorBoundary>
           </div>
 
           {/* Slide-out drawer */}
@@ -508,11 +525,13 @@ function PosAppInner({
           canViewAuditLog={canViewAuditLog}
         />
         <main className="flex-1 overflow-auto">
+          <PosViewErrorBoundary key={activeView}>
           {activeView === "stock" && canAccessView(activation.plan, "stock") && (
             <div className="h-full overflow-auto">
               <StockManagement
                 licenseKey={activation.licenseKey}
                 staffName={activeStaff.name}
+                enterpriseSupplyMall={hasEnterpriseSupplyMall(activation.plan)}
               />
             </div>
           )}
@@ -562,6 +581,7 @@ function PosAppInner({
                 <AuditLogView licenseKey={activation.licenseKey} />
               </div>
             )}
+          </PosViewErrorBoundary>
         </main>
       </div>
     </OfflineSyncManager>

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, type ReactNode } from "react";
 import { useQuery as useTanStackQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
 import type { Doc, Id } from "@/convex/_generated/dataModel.d.ts";
@@ -44,14 +44,19 @@ import {
   X,
   Clock,
   DollarSign,
+  ChefHat,
+  Wine,
 } from "lucide-react";
 import StockHistoryDialog from "./stock-history-dialog.tsx";
 import StockAllHistory from "./stock-all-history.tsx";
 import { usePosLocale } from "./pos-locale-provider.tsx";
+import ItemDialog from "./item-dialog.tsx";
 
 type StockManagementProps = {
   licenseKey: string;
   staffName: string;
+  /** Enterprise: split tabs (menu stock vs kitchen/bar supply) and create supply from Stock. */
+  enterpriseSupplyMall?: boolean;
 };
 
 type StockRow = Doc<"menuItems"> & {
@@ -61,12 +66,71 @@ type StockRow = Doc<"menuItems"> & {
   isOutOfStock: boolean;
 };
 
+/** Same normalized names as supply category detection elsewhere (e.g. `ensureSupplyCategory`). */
+const SUPPLY_STOCK_CATEGORY_KEYS = new Set([
+  "furnizim",
+  "mall",
+  "mall kuzhine",
+  "mall kuzhinë",
+  "stok",
+  "stoku",
+  "inventory",
+]);
+
+function normalizeStockCategoryName(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function stockRowIsSupplyCategory(item: StockRow): boolean {
+  return SUPPLY_STOCK_CATEGORY_KEYS.has(
+    normalizeStockCategoryName(item.categoryName ?? ""),
+  );
+}
+
+type StockScopeTab =
+  | "menu"
+  | "supply_kitchen"
+  | "supply_bar"
+  | "all"
+  | "kitchen"
+  | "bar";
+
 export default function StockManagement({
   licenseKey,
   staffName,
+  enterpriseSupplyMall = false,
 }: StockManagementProps) {
   const { t, formatPrice } = usePosLocale();
   const [showAllHistory, setShowAllHistory] = useState(false);
+  const [stockScope, setStockScope] = useState<StockScopeTab>(() =>
+    enterpriseSupplyMall ? "menu" : "all",
+  );
+
+  useEffect(() => {
+    if (enterpriseSupplyMall) {
+      setStockScope((s) =>
+        s === "all" || s === "kitchen" || s === "bar" ? "menu" : s,
+      );
+    } else {
+      setStockScope((s) =>
+        s === "menu" || s === "supply_kitchen" || s === "supply_bar"
+          ? "all"
+          : s,
+      );
+    }
+  }, [enterpriseSupplyMall]);
+
+  const [itemDialogOpen, setItemDialogOpen] = useState(false);
+
+  useEffect(() => {
+    if (!enterpriseSupplyMall) {
+      setItemDialogOpen(false);
+    }
+  }, [enterpriseSupplyMall]);
 
   const stockEnabled = Boolean(licenseKey?.trim());
 
@@ -100,7 +164,70 @@ export default function StockManagement({
   const removeStockMut = useMutation('pos.stock.removeStock');
   const setStock = useMutation('pos.stock.setStock');
 
+  const categoriesQuery = useTanStackQuery({
+    queryKey: posQueryKey("pos.menu.getCategories", { licenseKey }),
+    queryFn: async () =>
+      (await runPosQuery("pos.menu.getCategories", { licenseKey })) as Array<
+        Doc<"menuCategories">
+      >,
+    enabled: stockEnabled,
+    retry: 1,
+  });
+
+  const categoriesForDialog = (categoriesQuery.data ?? []).map((c) => ({
+    _id: c._id,
+    name: c.name,
+    color: c.color,
+    icon: c.icon,
+  }));
+
+  const canCreateSupply =
+    enterpriseSupplyMall &&
+    (stockScope === "supply_kitchen" || stockScope === "supply_bar");
+
   const [searchQuery, setSearchQuery] = useState("");
+
+  /** Enterprise: menu vs supply tabs; Starter/Pro: all / kitchen / bar by station. */
+  const tabFilteredStockItems = useMemo(() => {
+    if (!stockItems) return [];
+    if (!enterpriseSupplyMall) {
+      if (stockScope === "all") return stockItems;
+      return stockItems.filter((item) => item.station === stockScope);
+    }
+    if (stockScope === "menu") {
+      return stockItems.filter((item) => !stockRowIsSupplyCategory(item));
+    }
+    if (stockScope === "supply_kitchen") {
+      return stockItems.filter(
+        (item) => stockRowIsSupplyCategory(item) && item.station === "kitchen",
+      );
+    }
+    return stockItems.filter(
+      (item) => stockRowIsSupplyCategory(item) && item.station === "bar",
+    );
+  }, [stockItems, stockScope, enterpriseSupplyMall]);
+
+  const filteredItems = useMemo(() => {
+    if (!searchQuery.trim()) return tabFilteredStockItems;
+    const q = searchQuery.toLowerCase();
+    return tabFilteredStockItems.filter(
+      (item) =>
+        (item.name?.toLowerCase() ?? "").includes(q) ||
+        (item.categoryName?.toLowerCase() ?? "").includes(q),
+    );
+  }, [tabFilteredStockItems, searchQuery]);
+
+  // Summary stats (from tab-filtered list)
+  const stats = useMemo(() => {
+    const items = tabFilteredStockItems;
+    const tracked = items.length;
+    const lowStock = items.filter((i) => i.isLowStock || i.isOutOfStock).length;
+    const totalValue = items.reduce(
+      (sum, item) => sum + (item.currentStock ?? 0) * item.price,
+      0,
+    );
+    return { tracked, lowStock, totalValue };
+  }, [tabFilteredStockItems]);
 
   // Quick-add dialog state
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -140,32 +267,6 @@ export default function StockManagement({
   const [changeMode, setChangeMode] = useState<"add" | "remove">("add");
   const [changeQuantity, setChangeQuantity] = useState("");
   const [changeLoading, setChangeLoading] = useState(false);
-
-  // Filtered items based on search
-  const filteredItems = useMemo(() => {
-    if (!stockItems) return [];
-    if (!searchQuery.trim()) return stockItems;
-    const q = searchQuery.toLowerCase();
-    return stockItems.filter(
-      (item) =>
-        item.name.toLowerCase().includes(q) ||
-        item.categoryName.toLowerCase().includes(q),
-    );
-  }, [stockItems, searchQuery]);
-
-  // Summary stats (from full list, not filtered)
-  const stats = useMemo(() => {
-    if (!stockItems) return { tracked: 0, lowStock: 0, totalValue: 0 };
-    const tracked = stockItems.length;
-    const lowStock = stockItems.filter(
-      (i) => i.isLowStock || i.isOutOfStock,
-    ).length;
-    const totalValue = stockItems.reduce(
-      (sum, item) => sum + (item.currentStock ?? 0) * item.price,
-      0,
-    );
-    return { tracked, lowStock, totalValue };
-  }, [stockItems]);
 
   // Show full history view when toggled
   if (showAllHistory) {
@@ -244,7 +345,8 @@ export default function StockManagement({
     );
   }
 
-  const stockList = stockItems ?? [];
+  const hasAnyTrackedItems = (stockItems?.length ?? 0) > 0;
+  const stockList = tabFilteredStockItems;
 
   // ── Quick Add handlers ──────────────────────────────
 
@@ -258,8 +360,8 @@ export default function StockManagement({
 
   const handleAddStock = async () => {
     if (!addItemId) return;
-    const qty = parseInt(addQuantity);
-    if (isNaN(qty) || qty <= 0) {
+    const qty = parseFloat(addQuantity);
+    if (!Number.isFinite(qty) || qty <= 0) {
       toast.error(t("stock_page.qty_invalid"));
       return;
     }
@@ -299,8 +401,8 @@ export default function StockManagement({
 
   const handleRemoveStock = async () => {
     if (!removeItemId) return;
-    const qty = parseInt(removeQuantity);
-    if (isNaN(qty) || qty <= 0) {
+    const qty = parseFloat(removeQuantity);
+    if (!Number.isFinite(qty) || qty <= 0) {
       toast.error(t("stock_page.qty_invalid"));
       return;
     }
@@ -343,8 +445,8 @@ export default function StockManagement({
 
   const handleSetStock = async () => {
     if (!editItemId) return;
-    const val = parseInt(editStockValue, 10);
-    if (Number.isNaN(val)) {
+    const val = parseFloat(editStockValue);
+    if (!Number.isFinite(val)) {
       toast.error(t("stock_page.stock_invalid"));
       return;
     }
@@ -391,8 +493,8 @@ export default function StockManagement({
 
   const handleChangeStock = async () => {
     if (!changeItemId) return;
-    const qty = parseInt(changeQuantity);
-    if (isNaN(qty) || qty <= 0) {
+    const qty = parseFloat(changeQuantity);
+    if (!Number.isFinite(qty) || qty <= 0) {
       toast.error(t("stock_page.qty_invalid"));
       return;
     }
@@ -441,7 +543,64 @@ export default function StockManagement({
             <Package className="size-5 md:size-6" />
             {t("nav.stock")}
           </h1>
-          <p className="text-sm text-[#5a6580] mt-1">{t("stock_page.subtitle")}</p>
+          <p className="text-sm text-[#5a6580] mt-1">
+            {t(
+              enterpriseSupplyMall
+                ? "stock_page.subtitle"
+                : "stock_page.subtitle_all_tiers",
+            )}
+          </p>
+          <div className="flex items-center gap-2 mt-3 overflow-x-auto">
+            {enterpriseSupplyMall ? (
+              <>
+                <MallTab
+                  selected={stockScope === "menu"}
+                  icon={<Package className="size-4" />}
+                  onClick={() => setStockScope("menu")}
+                >
+                  {t("stock_page.tab_menu_stock")}
+                </MallTab>
+                <MallTab
+                  selected={stockScope === "supply_kitchen"}
+                  icon={<ChefHat className="size-4" />}
+                  onClick={() => setStockScope("supply_kitchen")}
+                >
+                  {t("stock_page.tab_supply_kitchen")}
+                </MallTab>
+                <MallTab
+                  selected={stockScope === "supply_bar"}
+                  icon={<Wine className="size-4" />}
+                  onClick={() => setStockScope("supply_bar")}
+                >
+                  {t("stock_page.tab_supply_bar")}
+                </MallTab>
+              </>
+            ) : (
+              <>
+                <MallTab
+                  selected={stockScope === "all"}
+                  icon={<Package className="size-4" />}
+                  onClick={() => setStockScope("all")}
+                >
+                  {t("menu_page.mall_all")}
+                </MallTab>
+                <MallTab
+                  selected={stockScope === "kitchen"}
+                  icon={<ChefHat className="size-4" />}
+                  onClick={() => setStockScope("kitchen")}
+                >
+                  {t("menu_page.mall_kitchen")}
+                </MallTab>
+                <MallTab
+                  selected={stockScope === "bar"}
+                  icon={<Wine className="size-4" />}
+                  onClick={() => setStockScope("bar")}
+                >
+                  {t("menu_page.mall_bar")}
+                </MallTab>
+              </>
+            )}
+          </div>
         </div>
         <Button
           size="sm"
@@ -520,7 +679,7 @@ export default function StockManagement({
       </div>
 
       {/* Items list */}
-      {stockList.length === 0 ? (
+      {!hasAnyTrackedItems ? (
         <div className="py-12">
           <Empty>
             <EmptyHeader>
@@ -528,6 +687,68 @@ export default function StockManagement({
               <EmptyTitle>{t("stock_page.empty_none")}</EmptyTitle>
               <EmptyDescription>{t("stock_page.empty_none_desc")}</EmptyDescription>
             </EmptyHeader>
+          </Empty>
+        </div>
+      ) : stockList.length === 0 ? (
+        <div className="py-12">
+          <Empty>
+            {enterpriseSupplyMall ? (
+              <>
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    {stockScope === "menu" ? (
+                      <Package />
+                    ) : stockScope === "supply_kitchen" ? (
+                      <ChefHat />
+                    ) : (
+                      <Wine />
+                    )}
+                  </EmptyMedia>
+                  <EmptyTitle>
+                    {stockScope === "menu"
+                      ? t("stock_page.empty_tab_menu_title")
+                      : stockScope === "supply_kitchen"
+                        ? t("stock_page.empty_tab_supply_kitchen_title")
+                        : t("stock_page.empty_tab_supply_bar_title")}
+                  </EmptyTitle>
+                  <EmptyDescription>
+                    {stockScope === "menu"
+                      ? t("stock_page.empty_tab_menu_desc")
+                      : stockScope === "supply_kitchen"
+                        ? t("stock_page.empty_tab_supply_kitchen_desc")
+                        : t("stock_page.empty_tab_supply_bar_desc")}
+                  </EmptyDescription>
+                </EmptyHeader>
+                {canCreateSupply ? (
+                  <div className="mt-4 text-center">
+                    <Button
+                      size="sm"
+                      className="bg-[#0066FF] hover:bg-[#0055dd] text-white font-semibold"
+                      onClick={() => setItemDialogOpen(true)}
+                    >
+                      <Plus className="size-4 mr-1.5" />
+                      {t("menu_page.add_mall_item")}
+                    </Button>
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  {stockScope === "kitchen" ? (
+                    <ChefHat />
+                  ) : stockScope === "bar" ? (
+                    <Wine />
+                  ) : (
+                    <Package />
+                  )}
+                </EmptyMedia>
+                <EmptyTitle>{t("stock_page.empty_filter_title")}</EmptyTitle>
+                <EmptyDescription>
+                  {t("stock_page.empty_filter_desc")}
+                </EmptyDescription>
+              </EmptyHeader>
+            )}
           </Empty>
         </div>
       ) : filteredItems.length === 0 ? (
@@ -540,6 +761,18 @@ export default function StockManagement({
                 {t("stock_page.empty_search_desc", { query: searchQuery })}
               </EmptyDescription>
             </EmptyHeader>
+            {canCreateSupply ? (
+              <div className="mt-4 text-center">
+                <Button
+                  size="sm"
+                  className="bg-[#0066FF] hover:bg-[#0055dd] text-white font-semibold"
+                  onClick={() => setItemDialogOpen(true)}
+                >
+                  <Plus className="size-4 mr-1.5" />
+                  {t("menu_page.add_mall_item")}
+                </Button>
+              </div>
+            ) : null}
           </Empty>
         </div>
       ) : (
@@ -587,6 +820,11 @@ export default function StockManagement({
                         <div className="size-2 rounded-full bg-emerald-400 shrink-0" />
                       )}
                       <span className="text-sm text-white font-medium truncate">
+                        {item.station === "kitchen" ? (
+                          <ChefHat className="size-4 text-orange-400 shrink-0 mr-2 inline" />
+                        ) : item.station === "bar" ? (
+                          <Wine className="size-4 text-purple-400 shrink-0 mr-2 inline" />
+                        ) : null}
                         {item.name}
                       </span>
                     </div>
@@ -701,6 +939,11 @@ export default function StockManagement({
                             <div className="size-2 rounded-full bg-emerald-400 shrink-0" />
                           )}
                           <span className="text-sm text-white font-medium truncate">
+                            {item.station === "kitchen" ? (
+                              <ChefHat className="size-4 text-orange-400 shrink-0 mr-2 inline" />
+                            ) : item.station === "bar" ? (
+                              <Wine className="size-4 text-purple-400 shrink-0 mr-2 inline" />
+                            ) : null}
                             {item.name}
                           </span>
                         </div>
@@ -771,7 +1014,8 @@ export default function StockManagement({
               </Label>
               <Input
                 type="number"
-                min="1"
+                min="0"
+                step="0.01"
                 placeholder={t("stock_page.ph_qty_300")}
                 value={addQuantity}
                 onChange={(e) => setAddQuantity(e.target.value)}
@@ -840,7 +1084,8 @@ export default function StockManagement({
               </Label>
               <Input
                 type="number"
-                min="1"
+                min="0"
+                step="0.01"
                 max={removeItemCurrent}
                 placeholder={t("stock_page.ph_qty_50")}
                 value={removeQuantity}
@@ -904,6 +1149,7 @@ export default function StockManagement({
               <Input
                 type="number"
                 min="0"
+                step="0.01"
                 value={editStockValue}
                 onChange={(e) => setEditStockValue(e.target.value)}
                 className="h-12 rounded-xl border-slate-300 bg-white text-lg text-slate-900 placeholder:text-slate-400 focus-visible:border-[#2a7fff] focus-visible:ring-2 focus-visible:ring-[#2a7fff]/45"
@@ -993,7 +1239,8 @@ export default function StockManagement({
               <Label className="text-[#8b93a7]">{t("stock_page.label_quantity")}</Label>
               <Input
                 type="number"
-                min="1"
+                min="0"
+                step="0.01"
                 max={changeMode === "remove" ? changeItemCurrent : undefined}
                 placeholder={t("stock_page.ph_qty_100")}
                 value={changeQuantity}
@@ -1043,6 +1290,71 @@ export default function StockManagement({
           itemName={historyItemName}
         />
       )}
+
+      {/* ── Create new supply item (for stock) ───────── */}
+      {itemDialogOpen && canCreateSupply && (
+        <ItemDialog
+          open={itemDialogOpen}
+          onOpenChange={setItemDialogOpen}
+          licenseKey={licenseKey}
+          categories={categoriesForDialog}
+          initialStation={
+            stockScope === "supply_kitchen"
+              ? "kitchen"
+              : stockScope === "supply_bar"
+                ? "bar"
+                : undefined
+          }
+          initialTrackStock={true}
+          initialAvailable={false}
+          initialStockUnit={
+            stockScope === "supply_kitchen"
+              ? "kg"
+              : stockScope === "supply_bar"
+                ? "lt"
+                : undefined
+          }
+          initialName={searchQuery.trim()}
+          dialogNewTitleOverride={
+            stockScope === "supply_kitchen"
+              ? "supply_kitchen"
+              : stockScope === "supply_bar"
+                ? "supply_bar"
+                : undefined
+          }
+          onSaved={() => {
+            void stockQuery.refetch();
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function MallTab({
+  selected,
+  onClick,
+  icon,
+  children,
+}: {
+  selected: boolean;
+  onClick: () => void;
+  icon: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0 border",
+        selected
+          ? "bg-[#0066FF]/20 border-[#0066FF]/50 text-white"
+          : "bg-[#131A2E] border-[#1e2a45] text-[#8b93a7] hover:bg-[#1e2a45] hover:text-white",
+      )}
+    >
+      {icon}
+      <span>{children}</span>
+    </button>
   );
 }

@@ -65,6 +65,8 @@ const ACTIVATION_PLAN_SLIDES = [
     label: "Enterprise plan",
     bullets: [
       "Everything in Professional",
+      "Kitchen & bar supply inventory (mall) in Menu & Stock",
+      "Supply recipe (ingredients per portion) with automatic stock deduction",
       "Higher terminal limits",
       "Priority & dedicated support",
       "SLA-style options & onboarding",

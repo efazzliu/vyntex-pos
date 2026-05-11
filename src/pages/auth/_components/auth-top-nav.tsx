@@ -31,7 +31,7 @@ export default function AuthTopNav() {
   const [isAuthed, setIsAuthed] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const ctaLabel = isAuthed ? "PROFILE" : "GET STARTED";
+  const ctaLabel = isAuthed ? t("auth.topNav.profile") : t("auth.topNav.getStarted");
   const ctaPath = isAuthed ? "/dashboard/restaurant-pos" : registerUrlWithFreeTrial();
 
   useEffect(() => {

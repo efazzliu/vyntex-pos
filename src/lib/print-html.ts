@@ -71,6 +71,23 @@ export function printHtmlDocument(htmlFullDocument: string): boolean {
 export type PrintHtmlAsyncOutcome = { ok: boolean; error?: string };
 
 /**
+ * Max wait for Electron silent-print IPC before treating as timeout.
+ * Must be ≥ main-process print cap (`SILENT_PRINT_JOB_MAX_MS` in `electron/main.cjs`) so the
+ * renderer does not abandon the invoke while a hidden print window is still open (Windows
+ * can show a blocking "Waiting for printer connection…" dialog until that job ends).
+ */
+export const DEFAULT_SILENT_PRINT_IPC_TIMEOUT_MS = 2200;
+
+/** Errors after which we keep HTML in the local print queue for retry (Electron / offline printer). */
+export function isSilentPrintQueueableError(error: string | undefined): boolean {
+  return (
+    error === "no-physical-printer" ||
+    error === "silent-timeout" ||
+    error === "timeout"
+  );
+}
+
+/**
  * Like {@link printHtmlDocumentAsync} but returns OS / IPC error codes (e.g. `no-physical-printer`).
  */
 export async function tryPrintHtmlDocumentAsync(
@@ -80,12 +97,18 @@ export async function tryPrintHtmlDocumentAsync(
     allowInteractiveFallback?: boolean;
     /** Windows: exact OS printer name (match Settings — use Address if set). */
     deviceName?: string;
+    /** Upper bound for Electron silent IPC. Helps avoid UI blocking when printer is offline. */
+    silentTimeoutMs?: number;
   },
 ): Promise<PrintHtmlAsyncOutcome> {
   const allowDialog = options?.allowInteractiveFallback !== false;
   const wantSilent = options?.silent === true;
   const silentApi = wantSilent ? getDesktopPrintSilent() : undefined;
   const deviceName = options?.deviceName?.trim();
+  const silentTimeoutMs =
+    typeof options?.silentTimeoutMs === "number"
+      ? options.silentTimeoutMs
+      : DEFAULT_SILENT_PRINT_IPC_TIMEOUT_MS;
 
   if (wantSilent && silentApi) {
     try {
@@ -93,7 +116,15 @@ export async function tryPrintHtmlDocumentAsync(
         deviceName && deviceName.length > 0
           ? { html: htmlFullDocument, deviceName }
           : htmlFullDocument;
-      const r = await silentApi(payload);
+      const r = await Promise.race([
+        silentApi(payload),
+        new Promise<PrintHtmlSilentResult>((resolve) =>
+          window.setTimeout(
+            () => resolve({ ok: false, error: "silent-timeout" }),
+            Math.max(0, silentTimeoutMs),
+          )
+        ),
+      ]);
       if (r.ok) return { ok: true };
       if (!allowDialog) {
         return { ok: false, error: r.error ?? "silent-failed" };

@@ -61,6 +61,7 @@ import {
   printSentOrderTicket,
   type PrintPosBillOptions,
 } from "@/lib/pos-print-sent-order.ts";
+import { isSilentPrintQueueableError } from "@/lib/print-html.ts";
 import { runPosQuery } from "@/lib/supabase-pos/pos-router.ts";
 import {
   STAFF_PIN_MAX_LEN,
@@ -641,13 +642,18 @@ export default function OrderScreen({
                 (window as Window & { desktop?: { isElectron?: boolean } })
                   .desktop?.isElectron,
             );
-            const msg =
-              electronApp && printErrorCode === "no-physical-printer"
-                ? t("order.print_no_physical_printer")
-                : electronApp
+
+            const queued =
+              electronApp && isSilentPrintQueueableError(printErrorCode);
+
+            // When queued locally, do not interrupt the waiter (no toast / no modal path).
+            if (!queued) {
+              toast.error(
+                electronApp
                   ? t("order.print_ticket_silent_failed")
-                  : t("order.print_popup_blocked");
-            toast.error(msg);
+                  : t("order.print_popup_blocked"),
+              );
+            }
           }
         } catch (printErr) {
           console.error("POS ticket print:", printErr);
@@ -847,11 +853,10 @@ export default function OrderScreen({
             (window as Window & { desktop?: { isElectron?: boolean } })
               .desktop?.isElectron,
         );
-        toast.error(
-          electronApp && billPr.error === "no-physical-printer"
-            ? t("order.print_no_physical_printer")
-            : t("order.bill_print_failed"),
-        );
+        const queued = electronApp && isSilentPrintQueueableError(billPr.error);
+        if (!queued) {
+          toast.error(t("order.bill_print_failed"));
+        }
         return;
       }
     } catch (e) {
@@ -1076,13 +1081,12 @@ export default function OrderScreen({
                 (window as Window & { desktop?: { isElectron?: boolean } })
                   .desktop?.isElectron,
             );
-            toast.error(
-              electronApp && pr.error === "no-physical-printer"
-                ? t("order.print_no_physical_printer")
-                : electronApp
-                  ? t("order.fiscal_print_failed")
-                  : t("order.print_popup_blocked"),
-            );
+            const queued = electronApp && isSilentPrintQueueableError(pr.error);
+            if (!queued) {
+              toast.error(
+                electronApp ? t("order.fiscal_print_failed") : t("order.print_popup_blocked"),
+              );
+            }
           }
         } catch (receiptPrintErr) {
           console.error("Receipt print:", receiptPrintErr);

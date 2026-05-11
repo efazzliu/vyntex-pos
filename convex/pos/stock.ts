@@ -118,7 +118,7 @@ export const addStock = mutation({
       });
     }
 
-    // Prevent rapid double-entries: reject if identical add within 3 seconds
+    // Reject only true double-submit (same add within a few hundred ms), not repeated +1 clicks.
     const recentLogs = await ctx.db
       .query("stockLogs")
       .withIndex("by_menuItem", (q) => q.eq("menuItemId", args.itemId))
@@ -130,7 +130,7 @@ export const addStock = mutation({
       const timeSinceLastMs =
         Date.now() - new Date(lastLog.createdAt).getTime();
       if (
-        timeSinceLastMs < 3000 &&
+        timeSinceLastMs < 200 &&
         lastLog.type === "manual_addition" &&
         lastLog.change === args.quantity
       ) {
@@ -224,7 +224,6 @@ export const removeStock = mutation({
       });
     }
 
-    // Prevent rapid double-entries
     const recentLogs = await ctx.db
       .query("stockLogs")
       .withIndex("by_menuItem", (q) => q.eq("menuItemId", args.itemId))
@@ -236,7 +235,7 @@ export const removeStock = mutation({
       const timeSinceLastMs =
         Date.now() - new Date(lastLog.createdAt).getTime();
       if (
-        timeSinceLastMs < 3000 &&
+        timeSinceLastMs < 200 &&
         lastLog.type === "adjustment" &&
         lastLog.change === -args.quantity
       ) {

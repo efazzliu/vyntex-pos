@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/VyntexPOSSetup.exe",
+      "destination": "/api/installer-x64"
+    },
+    {
+      "source": "/VyntexPOSSetup-arm64.exe",
+      "destination": "/api/installer-arm64"
+    }
+  ]
+}

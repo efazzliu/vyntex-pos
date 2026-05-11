@@ -2,6 +2,7 @@ import { query, mutation, type MutationCtx } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
 import type { Id } from "../_generated/dataModel.d.ts";
 import { getRestaurantByLicense } from "./helpers";
+import { applySupplyRecipeDeductions } from "./supplyRecipe";
 
 const ORDER_STATUS = v.union(
   v.literal("open"),
@@ -698,6 +699,17 @@ export async function completeOrderPaymentInCtx(
             balanceAfter: newStock,
             note: `Order #${order.orderNumber}`,
             createdAt: new Date().toISOString(),
+          });
+        }
+
+        if (restaurant.plan === "enterprise") {
+          await applySupplyRecipeDeductions(ctx, {
+            restaurantId: restaurant._id,
+            recipe: menuItem.supplyRecipe,
+            portionCount: item.quantity,
+            soldMenuItemName: menuItem.name,
+            staffName: args.staffName ?? "System",
+            contextNote: `Order #${order.orderNumber}`,
           });
         }
       }

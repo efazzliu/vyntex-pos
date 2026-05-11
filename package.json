@@ -1,7 +1,7 @@
 {
   "name": "vyntex-pos",
   "private": true,
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Vyntex POS — restaurant point of sale (web, desktop, and companion apps).",
   "author": "Vyntex",
   "type": "module",
@@ -12,6 +12,9 @@
     "dev:phone": "vite --host 0.0.0.0 --port 5173 --strictPort --open /phone.html",
     "electron": "wait-on http://127.0.0.1:5173 -t 120000 && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .",
     "dev:desktop": "concurrently -k \"npm:dev:web\" \"npm:electron\"",
+    "dev:restaurant": "npm run dev:desktop",
+    "dev:ios": "npm run dev:phone",
+    "dev:android": "npm run dev:phone",
     "start:desktop": "electron .",
     "preview": "vite preview",
     "prebuild:web": "node scripts/ensure-vite-supabase-env.mjs",

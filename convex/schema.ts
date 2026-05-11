@@ -107,6 +107,28 @@ export default defineSchema({
     initialStock: v.optional(v.number()),
     currentStock: v.optional(v.number()),
     lowStockThreshold: v.optional(v.number()),
+    /** Kitchen / bar supply metadata (optional). */
+    supplyVendor: v.optional(v.string()),
+    supplyLot: v.optional(v.string()),
+    /** ISO date YYYY-MM-DD */
+    supplyExpiryDate: v.optional(v.string()),
+    supplyStorage: v.optional(
+      v.union(
+        v.literal("fridge"),
+        v.literal("freezer"),
+        v.literal("dry"),
+        v.literal("ambient"),
+      ),
+    ),
+    /** Optional BOM: per 1 sold unit of this product, deduct `qtyPerUnit` from each tracked supply row. */
+    supplyRecipe: v.optional(
+      v.array(
+        v.object({
+          supplyMenuItemId: v.id("menuItems"),
+          qtyPerUnit: v.number(),
+        }),
+      ),
+    ),
   })
     .index("by_restaurant", ["restaurantId"])
     .index("by_category", ["categoryId"])
@@ -330,7 +352,8 @@ export default defineSchema({
       v.literal("sale"),
       v.literal("adjustment"),
       v.literal("reset"),
-      v.literal("staff_consumption")
+      v.literal("staff_consumption"),
+      v.literal("recipe_sale")
     ),
     change: v.number(),
     balanceAfter: v.number(),

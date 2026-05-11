@@ -12,6 +12,10 @@ import {
   dashboardTypeLabel,
 } from "@/lib/dashboard-i18n.ts";
 import {
+  windowsInstallerArm64Href,
+  windowsInstallerX64Href,
+} from "@/lib/installer-download-urls.ts";
+import {
   APP_VERSION_LABEL,
   formattedInstallerMtime,
 } from "@/lib/site-constants.ts";
@@ -42,12 +46,6 @@ function formatDate(iso: string, locale: string) {
 function daysUntil(iso: string) {
   const diff = new Date(iso).getTime() - Date.now();
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
-}
-
-function trimEnvUrl(v: unknown): string | undefined {
-  if (typeof v !== "string") return undefined;
-  const t = v.trim();
-  return t.length > 0 && !t.includes("...") ? t : undefined;
 }
 
 /** Full-width column; extra top padding clears floating header icons */
@@ -102,15 +100,8 @@ export default function DashboardOverviewModern() {
   const { restaurant } = useDashboardRestaurant();
   const { t, lang } = useDashboardLocale();
   const [copied, setCopied] = useState(false);
-  const legacySingleUrl = trimEnvUrl(import.meta.env.VITE_RESTAURANT_POS_EXE_URL);
-  const installerUrlX64 =
-    trimEnvUrl(import.meta.env.VITE_RESTAURANT_POS_EXE_URL_X64) ??
-    legacySingleUrl ??
-    "/VyntexPOSSetup.exe";
-  const arm64ExeInPublic = import.meta.env.VITE_ARM64_INSTALLER_AVAILABLE === "true";
-  const installerUrlArm64 =
-    trimEnvUrl(import.meta.env.VITE_RESTAURANT_POS_EXE_URL_ARM64) ??
-    (arm64ExeInPublic ? "/VyntexPOSSetup-arm64.exe" : undefined);
+  const installerUrlX64 = windowsInstallerX64Href();
+  const installerUrlArm64 = windowsInstallerArm64Href();
   const installerFileMtime = formattedInstallerMtime();
   const dateLocale = dashboardDateLocale(lang);
 

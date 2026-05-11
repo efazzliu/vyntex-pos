@@ -8,6 +8,12 @@ export const SUPPORT_EMAIL = raw && raw.includes("@") ? raw : "support@vyntexpos
 
 export const SUPPORT_MAILTO_HREF = `mailto:${SUPPORT_EMAIL}`;
 
+/**
+ * Marketing contact page: show the support address as a clickable `mailto` link.
+ * Set to `true` once the business inbox is live; while `false`, visitors use the form only.
+ */
+export const SUPPORT_BUSINESS_EMAIL_READY = false;
+
 /** Pre-filled subjects for Enterprise customers (POS Settings). */
 export function supportMailtoWithSubject(subject: string): string {
   return `${SUPPORT_MAILTO_HREF}?subject=${encodeURIComponent(subject)}`;

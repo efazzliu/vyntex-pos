@@ -9,7 +9,11 @@ import { Label } from "@/components/ui/label.tsx";
 import PageHeader from "@/components/page-header.tsx";
 import { toast } from "sonner";
 import { submitContactForm } from "@/lib/supabase-pos/contact-ops.ts";
-import { SUPPORT_EMAIL, SUPPORT_MAILTO_HREF } from "@/lib/site-constants.ts";
+import {
+  SUPPORT_BUSINESS_EMAIL_READY,
+  SUPPORT_EMAIL,
+  SUPPORT_MAILTO_HREF,
+} from "@/lib/site-constants.ts";
 
 export default function ContactPage() {
   const { t } = useTranslation("site");
@@ -127,17 +131,35 @@ export default function ContactPage() {
             >
               <div className="rounded-xl border border-border bg-card p-6">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#0066FF]/10 to-[#44CC00]/10 flex items-center justify-center">
-                    <Mail className="size-5 text-primary" />
+                  <div
+                    className={
+                      SUPPORT_BUSINESS_EMAIL_READY
+                        ? "w-10 h-10 rounded-lg bg-gradient-to-br from-[#0066FF]/10 to-[#44CC00]/10 flex items-center justify-center"
+                        : "w-10 h-10 rounded-lg bg-muted flex items-center justify-center"
+                    }
+                  >
+                    <Mail
+                      className={
+                        SUPPORT_BUSINESS_EMAIL_READY
+                          ? "size-5 text-primary"
+                          : "size-5 text-muted-foreground"
+                      }
+                    />
                   </div>
                   <h3 className="font-semibold text-foreground">{t("contact.emailUs")}</h3>
                 </div>
-                <a
-                  href={SUPPORT_MAILTO_HREF}
-                  className="text-sm text-primary font-medium hover:underline"
-                >
-                  {SUPPORT_EMAIL}
-                </a>
+                {SUPPORT_BUSINESS_EMAIL_READY ? (
+                  <a
+                    href={SUPPORT_MAILTO_HREF}
+                    className="text-sm text-primary font-medium hover:underline"
+                  >
+                    {SUPPORT_EMAIL}
+                  </a>
+                ) : (
+                  <p role="status" className="text-sm text-muted-foreground leading-relaxed">
+                    {t("contact.emailUnavailableBody")}
+                  </p>
+                )}
               </div>
 
               <div className="rounded-xl border border-border bg-card p-6">

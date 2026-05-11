@@ -6,10 +6,13 @@
 
 import { getPinLoginBranding } from "@/lib/local-db.ts";
 import {
+  DEFAULT_SILENT_PRINT_IPC_TIMEOUT_MS,
   hasElectronSilentPrintIpc,
+  isSilentPrintQueueableError,
   tryPrintHtmlDocumentAsync,
   type PrintHtmlAsyncOutcome,
 } from "@/lib/print-html.ts";
+import { enqueueHtmlPrintJob } from "@/lib/print-queue.ts";
 import { runPosQuery } from "@/lib/supabase-pos/pos-router.ts";
 
 export type FiscalReceiptStrings = {
@@ -411,11 +414,26 @@ async function printPosSalesReceipt(args: {
     pageTitle,
   });
 
-  return tryPrintHtmlDocumentAsync(html, {
+  const outcome = await tryPrintHtmlDocumentAsync(html, {
     silent: true,
     allowInteractiveFallback: !hasElectronSilentPrintIpc(),
     deviceName,
+    silentTimeoutMs: DEFAULT_SILENT_PRINT_IPC_TIMEOUT_MS,
   });
+
+  if (!outcome.ok && isSilentPrintQueueableError(outcome.error)) {
+    void enqueueHtmlPrintJob({
+      html,
+      deviceName,
+      silent: true,
+      allowInteractiveFallback: !hasElectronSilentPrintIpc(),
+      jobType: "receipt",
+      createdAt: new Date().toISOString(),
+      lastError: outcome.error,
+    }).catch(() => {});
+  }
+
+  return outcome;
 }
 
 /**

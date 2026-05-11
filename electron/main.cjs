@@ -26,6 +26,13 @@ function resolveWindowIconPath() {
 
 const MAX_SILENT_PRINT_HTML = 4 * 1024 * 1024;
 
+/**
+ * Max time for one silent print job (hidden window + OS print).
+ * Must be bounded: otherwise Windows may show "Waiting for printer connection…"
+ * and block the waiter while the renderer has already moved on.
+ */
+const SILENT_PRINT_JOB_MAX_MS = 2000;
+
 /** Drivers that open "Save as…" / file dialogs — never use these for POS silent print. */
 const VIRTUAL_PRINTER_RE =
   /print to pdf|save as pdf|save print|microsoft print to pdf|print to file|onenote|pdf writer|adobe pdf|pdfcreator|cutepdf|foxit|bullzip|nova pdf|fax|xps document|microsoft xps|document writer|freepdf|pdf24|export to pdf|wondershare|virtual pdf|redirected|paperless|\bpdf\s*printer\b/i;
@@ -177,7 +184,7 @@ function registerPrintHtmlSilentIpc() {
         if (settled) return;
         settled = true;
         try {
-          printWin.close();
+          printWin.destroy();
         } catch {
           /* ignore */
         }
@@ -186,7 +193,7 @@ function registerPrintHtmlSilentIpc() {
 
       const timeout = setTimeout(() => {
         finish(false, "timeout");
-      }, 45_000);
+      }, SILENT_PRINT_JOB_MAX_MS);
 
       const done = (ok, error) => {
         clearTimeout(timeout);

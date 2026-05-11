@@ -188,6 +188,10 @@ export async function runPosMutation(
       return menu.updateMenu(args as Parameters<typeof menu.updateMenu>[0]);
     case "pos.menu.generateUploadUrl":
       return menu.generateUploadUrl(args);
+    case "pos.menu.ensureSupplyCategory":
+      return menu.ensureSupplyCategory({
+        licenseKey: args.licenseKey as string,
+      });
     case "pos.orders.createOrder":
       return orders.createOrder(
         args as Parameters<typeof orders.createOrder>[0],

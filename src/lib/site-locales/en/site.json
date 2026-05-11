@@ -95,6 +95,7 @@
     "send": "Send Message",
     "sending": "Sending...",
     "emailUs": "Email Us",
+    "emailUnavailableBody": "Direct email is not available yet while we finish setting up our business inbox. Please use the form — we’ll reply from there.",
     "liveChat": "Live Chat",
     "liveChatBody": "Click the chat icon in the bottom-right corner for instant assistance from our support team.",
     "responseTime": "Response Time",
@@ -156,6 +157,8 @@
     "mostPopular": "Most Popular",
     "getStarted": "Get Started",
     "mobileFeature": "Mobile Dashboard",
+    "checkoutPausedNotice": "Online checkout is temporarily unavailable while we finish payment setup. You can still explore plans and pricing below.",
+    "checkoutDisabledHint": "Checkout is not available yet — payment setup in progress",
     "tiers": {
       "starter": {
         "name": "Starter",
@@ -188,6 +191,8 @@
         "description": "Same powerful POS as Professional, built to scale with your business.",
         "features": [
           "Everything in Professional",
+          "Kitchen & bar supply inventory (mall) in Menu & Stock",
+          "Supply recipe (ingredients per portion) with automatic stock deduction",
           "Higher terminal limits",
           "Priority & dedicated support",
           "SLA-style options & onboarding",
@@ -547,7 +552,17 @@
     }
   },
   "auth": {
+    "topNav": {
+      "getStarted": "Get started",
+      "profile": "Profile"
+    },
     "login": {
+      "heroBadge": "Modern POS platform",
+      "heroTitle": "Welcome back to Vyntex POS",
+      "heroBullet1": "Real-time dashboard and reports",
+      "heroBullet2": "Secure cloud authentication",
+      "secureBadge": "Secure login",
+      "heading": "Sign in",
       "subtitle": "Manage your venues from one place",
       "emailLabel": "Email",
       "passwordLabel": "Password",
@@ -569,6 +584,32 @@
       "sendingVerification": "Sending verification…",
       "resendVerification": "Resend verification email",
       "verificationEmailSent": "Verification email sent."
+    },
+    "register": {
+      "quickBadge": "Quick onboarding",
+      "heading": "Create account",
+      "subtitle": "Register with email, name, and password.",
+      "trialBold": "1 month free",
+      "trialRest": "on Starter when you finish setup — full POS access, no card required to start.",
+      "nameLabel": "Name",
+      "namePlaceholder": "Your name",
+      "emailLabel": "Email",
+      "passwordLabel": "Password",
+      "confirmPasswordLabel": "Confirm password",
+      "submit": "Create account",
+      "submitLoading": "Creating…",
+      "resendingVerification": "Resending verification…",
+      "alreadyHaveAccount": "Already have an account?",
+      "loginLink": "Log in",
+      "heroBadge": "Smart start",
+      "heroTitle": "Build your POS workspace in minutes",
+      "heroBullet1": "Guided setup for venues and staff",
+      "heroBullet2": "Secure email verification",
+      "errorFillRequired": "Please fill all required fields.",
+      "errorPasswordMin": "Password must be at least 6 characters.",
+      "errorPasswordMismatch": "Passwords do not match.",
+      "toastAlreadyRegistered": "This email is already registered. Verification email was sent again.",
+      "toastSuccess": "Registration successful. Please verify your email first."
     }
   }
 }

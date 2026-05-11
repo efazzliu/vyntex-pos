@@ -40,6 +40,7 @@ const TYPE_LABELS: Record<string, string> = {
   adjustment: "Removal",
   reset: "Reset",
   staff_consumption: "Staff meal",
+  recipe_sale: "Recipe use",
 };
 
 const TYPE_ICONS: Record<string, typeof Plus> = {
@@ -49,6 +50,7 @@ const TYPE_ICONS: Record<string, typeof Plus> = {
   adjustment: Minus,
   reset: Pencil,
   staff_consumption: TrendingDown,
+  recipe_sale: TrendingDown,
 };
 
 type ItemLogRow = {

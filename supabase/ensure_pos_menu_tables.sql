@@ -48,6 +48,9 @@ create table if not exists public.menu_items (
 alter table public.menu_items
   add column if not exists staff_meal_allowed boolean not null default true;
 
+alter table public.menu_items
+  add column if not exists supply_recipe jsonb not null default '[]'::jsonb;
+
 create table if not exists public.pos_stock_logs (
   id uuid primary key default gen_random_uuid(),
   restaurant_id uuid not null references public.restaurants(id) on delete cascade,

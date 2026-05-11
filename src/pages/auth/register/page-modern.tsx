@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { CheckCircle2, Lock, Mail, ShieldCheck, Sparkles, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -10,6 +11,7 @@ import AuthTopNav from "@/pages/auth/_components/auth-top-nav.tsx";
 import { FREE_TRIAL_QUERY_VALUE, USER_META_APP_TRIAL } from "@/lib/free-trial.ts";
 
 export default function RegisterPageModern() {
+  const { t } = useTranslation("site");
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const trialSignup = searchParams.get("trial") === FREE_TRIAL_QUERY_VALUE;
@@ -22,9 +24,10 @@ export default function RegisterPageModern() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !email.trim() || !password.trim()) return void toast.error("Please fill all required fields.");
-    if (password.length < 6) return void toast.error("Password must be at least 6 characters.");
-    if (password !== confirmPassword) return void toast.error("Passwords do not match.");
+    if (!name.trim() || !email.trim() || !password.trim())
+      return void toast.error(t("auth.register.errorFillRequired"));
+    if (password.length < 6) return void toast.error(t("auth.register.errorPasswordMin"));
+    if (password !== confirmPassword) return void toast.error(t("auth.register.errorPasswordMismatch"));
     setLoading(true);
     const userData: Record<string, string> = { full_name: name.trim() };
     if (trialSignup) userData[USER_META_APP_TRIAL] = FREE_TRIAL_QUERY_VALUE;
@@ -48,14 +51,14 @@ export default function RegisterPageModern() {
             options: { emailRedirectTo: `${window.location.origin}/login` },
           });
           if (resendError) return void toast.error(resendError.message);
-          return void toast.success("This email is already registered. Verification email was sent again.");
+          return void toast.success(t("auth.register.toastAlreadyRegistered"));
         } finally {
           setResendingVerification(false);
         }
       }
       return void toast.error(error.message);
     }
-    toast.success("Registration successful. Please verify your email first.");
+    toast.success(t("auth.register.toastSuccess"));
     const nextSearch = searchParams.toString();
     navigate(nextSearch ? `/login?${nextSearch}` : "/login");
   };
@@ -80,56 +83,98 @@ export default function RegisterPageModern() {
             <section className="bg-white/95 p-8 sm:p-10">
               <p className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
                 <ShieldCheck className="h-3.5 w-3.5" />
-                QUICK ONBOARDING
+                {t("auth.register.quickBadge")}
               </p>
-              <h1 className="mt-4 text-2xl font-bold text-slate-900">Create Account</h1>
-              <p className="mt-1 text-sm text-slate-500">Register with email, name, and password.</p>
+              <h1 className="mt-4 text-2xl font-bold text-slate-900">{t("auth.register.heading")}</h1>
+              <p className="mt-1 text-sm text-slate-500">{t("auth.register.subtitle")}</p>
               {trialSignup ? (
                 <div className="mt-4 rounded-xl border border-emerald-200/80 bg-emerald-50/90 px-3 py-2.5 text-sm text-emerald-900">
-                  <strong className="font-semibold">1 month free</strong> on Starter when you finish setup — full POS
-                  access, no card required to start.
+                  <strong className="font-semibold">{t("auth.register.trialBold")}</strong> {t("auth.register.trialRest")}
                 </div>
               ) : null}
               <form onSubmit={handleRegister} className="mt-6 space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Name</Label>
+                  <Label htmlFor="name" className="text-slate-800">
+                    {t("auth.register.nameLabel")}
+                  </Label>
                   <div className="relative">
                     <UserRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="h-11 rounded-xl border-slate-200 bg-slate-50/90 pl-10 shadow-sm focus-visible:ring-[#0066FF]/40" required />
+                    <Input
+                      id="name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder={t("auth.register.namePlaceholder")}
+                      className="h-11 rounded-xl border-slate-200 bg-white pl-10 text-slate-900 caret-slate-900 shadow-sm placeholder:text-slate-400 focus-visible:ring-[#0066FF]/40"
+                      required
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email" className="text-slate-800">
+                    {t("auth.register.emailLabel")}
+                  </Label>
                   <div className="relative">
                     <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="h-11 rounded-xl border-slate-200 bg-slate-50/90 pl-10 shadow-sm focus-visible:ring-[#0066FF]/40" required />
+                    <Input
+                      id="email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      className="h-11 rounded-xl border-slate-200 bg-white pl-10 text-slate-900 caret-slate-900 shadow-sm placeholder:text-slate-400 focus-visible:ring-[#0066FF]/40"
+                      required
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="password" className="text-slate-800">
+                    {t("auth.register.passwordLabel")}
+                  </Label>
                   <div className="relative">
                     <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="h-11 rounded-xl border-slate-200 bg-slate-50/90 pl-10 shadow-sm focus-visible:ring-[#0066FF]/40" required />
+                    <Input
+                      id="password"
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="h-11 rounded-xl border-slate-200 bg-white pl-10 text-slate-900 caret-slate-900 shadow-sm placeholder:text-slate-400 focus-visible:ring-[#0066FF]/40"
+                      required
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="confirm-password">Confirm Password</Label>
+                  <Label htmlFor="confirm-password" className="text-slate-800">
+                    {t("auth.register.confirmPasswordLabel")}
+                  </Label>
                   <div className="relative">
                     <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <Input id="confirm-password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="h-11 rounded-xl border-slate-200 bg-slate-50/90 pl-10 shadow-sm focus-visible:ring-[#0066FF]/40" required />
+                    <Input
+                      id="confirm-password"
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="h-11 rounded-xl border-slate-200 bg-white pl-10 text-slate-900 caret-slate-900 shadow-sm placeholder:text-slate-400 focus-visible:ring-[#0066FF]/40"
+                      required
+                    />
                   </div>
                 </div>
                 <Button type="submit" className="h-11 w-full rounded-xl bg-gradient-to-r from-[#0066FF] to-[#00AACC] text-white shadow-lg shadow-blue-500/30 transition hover:scale-[1.01] hover:from-[#0055DD] hover:to-[#0099BB]" disabled={loading || resendingVerification}>
-                  {loading ? "Creating..." : resendingVerification ? "Resending verification..." : "Create Account"}
+                  {loading
+                    ? t("auth.register.submitLoading")
+                    : resendingVerification
+                      ? t("auth.register.resendingVerification")
+                      : t("auth.register.submit")}
                 </Button>
               </form>
               <p className="mt-4 text-center text-sm text-slate-500">
-                Already have an account?{" "}
+                {t("auth.register.alreadyHaveAccount")}{" "}
                 <Link
                   to={searchParams.toString() ? `/login?${searchParams.toString()}` : "/login"}
                   className="font-medium text-[#0066FF] hover:underline"
                 >
-                  Login
+                  {t("auth.register.loginLink")}
                 </Link>
               </p>
             </section>
@@ -139,14 +184,18 @@ export default function RegisterPageModern() {
               <div className="relative">
                 <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold tracking-wide text-white/85">
                   <Sparkles className="h-3.5 w-3.5" />
-                  SMART START
+                  {t("auth.register.heroBadge")}
                 </p>
-                <h2 className="mt-5 text-4xl font-bold leading-tight text-white">
-                  Build your POS workspace in minutes
-                </h2>
+                <h2 className="mt-5 text-4xl font-bold leading-tight text-white">{t("auth.register.heroTitle")}</h2>
                 <ul className="mt-8 space-y-3 text-sm text-white/80">
-                  <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#66B3FF]" />Guided setup for venues and staff</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#66B3FF]" />Secure email verification</li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-[#66B3FF]" />
+                    {t("auth.register.heroBullet1")}
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-[#66B3FF]" />
+                    {t("auth.register.heroBullet2")}
+                  </li>
                 </ul>
               </div>
             </section>

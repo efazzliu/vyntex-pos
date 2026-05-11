@@ -1,6 +1,12 @@
 import { query, mutation } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
 import { getRestaurantByLicense } from "./helpers";
+import { assertAndNormalizeSupplyRecipe } from "./supplyRecipe";
+
+const supplyRecipeLineValidator = v.object({
+  supplyMenuItemId: v.id("menuItems"),
+  qtyPerUnit: v.number(),
+});
 
 // ── Category Queries ────────────────────────────────
 
@@ -96,6 +102,54 @@ export const createCategory = mutation({
       name: args.name,
       color: args.color,
       icon: args.icon,
+      displayOrder: maxOrder + 1,
+      isActive: true,
+    });
+  },
+});
+
+/** Default category for kitchen/bar supply rows (menuItems still require categoryId). */
+const SUPPLY_CATEGORY_NAMES = new Set([
+  "furnizim",
+  "mall",
+  "mall kuzhine",
+  "mall kuzhinë",
+  "stok",
+  "stoku",
+  "inventory",
+]);
+
+function normalizeCategoryName(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+export const ensureSupplyCategory = mutation({
+  args: { licenseKey: v.string() },
+  handler: async (ctx, args) => {
+    const restaurant = await getRestaurantByLicense(ctx, args.licenseKey);
+    const existing = await ctx.db
+      .query("menuCategories")
+      .withIndex("by_restaurant", (q) =>
+        q.eq("restaurantId", restaurant._id),
+      )
+      .collect();
+
+    for (const c of existing) {
+      if (SUPPLY_CATEGORY_NAMES.has(normalizeCategoryName(c.name))) {
+        return c._id;
+      }
+    }
+
+    const maxOrder = existing.reduce((m, c) => Math.max(m, c.displayOrder), -1);
+    return await ctx.db.insert("menuCategories", {
+      restaurantId: restaurant._id,
+      name: "Furnizim",
+      color: "#0d9488",
+      icon: "📦",
       displayOrder: maxOrder + 1,
       isActive: true,
     });
@@ -245,9 +299,33 @@ export const createItem = mutation({
     stockUnit: v.optional(v.union(v.literal("pc"), v.literal("lt"), v.literal("kg"), v.literal("g"), v.literal("ml"), v.literal("bottle"), v.literal("box"))),
     initialStock: v.optional(v.number()),
     lowStockThreshold: v.optional(v.number()),
+    supplyVendor: v.optional(v.string()),
+    supplyLot: v.optional(v.string()),
+    supplyExpiryDate: v.optional(v.string()),
+    supplyStorage: v.optional(
+      v.union(
+        v.literal("fridge"),
+        v.literal("freezer"),
+        v.literal("dry"),
+        v.literal("ambient"),
+      ),
+    ),
+    supplyRecipe: v.optional(v.array(supplyRecipeLineValidator)),
   },
   handler: async (ctx, args) => {
     const restaurant = await getRestaurantByLicense(ctx, args.licenseKey);
+
+    let normalizedRecipe:
+      | Awaited<ReturnType<typeof assertAndNormalizeSupplyRecipe>>
+      | undefined;
+    if (args.supplyRecipe !== undefined && restaurant.plan === "enterprise") {
+      normalizedRecipe = await assertAndNormalizeSupplyRecipe(
+        ctx,
+        restaurant._id,
+        args.supplyRecipe,
+        undefined,
+      );
+    }
 
     const existing = await ctx.db
       .query("menuItems")
@@ -279,6 +357,11 @@ export const createItem = mutation({
       initialStock: args.initialStock,
       currentStock: args.trackStock ? (args.initialStock ?? 0) : undefined,
       lowStockThreshold: args.lowStockThreshold,
+      supplyVendor: args.supplyVendor?.trim() || undefined,
+      supplyLot: args.supplyLot?.trim() || undefined,
+      supplyExpiryDate: args.supplyExpiryDate?.trim() || undefined,
+      supplyStorage: args.supplyStorage,
+      ...(normalizedRecipe !== undefined ? { supplyRecipe: normalizedRecipe } : {}),
     });
   },
 });
@@ -304,12 +387,39 @@ export const updateItem = mutation({
     initialStock: v.optional(v.number()),
     currentStock: v.optional(v.number()),
     lowStockThreshold: v.optional(v.number()),
+    supplyVendor: v.optional(v.string()),
+    supplyLot: v.optional(v.string()),
+    supplyExpiryDate: v.optional(v.string()),
+    supplyStorage: v.optional(
+      v.union(
+        v.literal("fridge"),
+        v.literal("freezer"),
+        v.literal("dry"),
+        v.literal("ambient"),
+      ),
+    ),
+    supplyRecipe: v.optional(v.array(supplyRecipeLineValidator)),
   },
   handler: async (ctx, args) => {
-    await getRestaurantByLicense(ctx, args.licenseKey);
+    const restaurant = await getRestaurantByLicense(ctx, args.licenseKey);
     const item = await ctx.db.get(args.itemId);
     if (!item) {
       throw new ConvexError({ message: "Item not found", code: "NOT_FOUND" });
+    }
+
+    let normalizedRecipe:
+      | Awaited<ReturnType<typeof assertAndNormalizeSupplyRecipe>>
+      | undefined;
+    if (args.supplyRecipe !== undefined) {
+      normalizedRecipe =
+        restaurant.plan === "enterprise"
+          ? await assertAndNormalizeSupplyRecipe(
+              ctx,
+              restaurant._id,
+              args.supplyRecipe,
+              args.itemId,
+            )
+          : [];
     }
 
     await ctx.db.patch(args.itemId, {
@@ -330,6 +440,11 @@ export const updateItem = mutation({
       initialStock: args.initialStock,
       currentStock: args.currentStock,
       lowStockThreshold: args.lowStockThreshold,
+      supplyVendor: args.supplyVendor?.trim() || undefined,
+      supplyLot: args.supplyLot?.trim() || undefined,
+      supplyExpiryDate: args.supplyExpiryDate?.trim() || undefined,
+      supplyStorage: args.supplyStorage,
+      ...(normalizedRecipe !== undefined ? { supplyRecipe: normalizedRecipe } : {}),
     });
   },
 });

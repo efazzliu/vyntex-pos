@@ -28,10 +28,13 @@ export type PrintSentOrderTicketOptions = {
 };
 
 import {
+  DEFAULT_SILENT_PRINT_IPC_TIMEOUT_MS,
   hasElectronSilentPrintIpc,
+  isSilentPrintQueueableError,
   tryPrintHtmlDocumentAsync,
   type PrintHtmlAsyncOutcome,
 } from "@/lib/print-html.ts";
+import { enqueueHtmlPrintJob } from "@/lib/print-queue.ts";
 
 function escapeHtml(s: string): string {
   return s
@@ -108,12 +111,28 @@ export async function printSentOrderTicket(
 </body>
 </html>`;
 
-  return tryPrintHtmlDocumentAsync(html, {
+  const outcome = await tryPrintHtmlDocumentAsync(html, {
     silent: true,
     // Browser / plain Vite: no IPC — must use the print dialog. Electron: silent only.
     allowInteractiveFallback: !hasElectronSilentPrintIpc(),
     deviceName: opts.deviceName,
+    silentTimeoutMs: DEFAULT_SILENT_PRINT_IPC_TIMEOUT_MS,
   });
+
+  if (!outcome.ok && isSilentPrintQueueableError(outcome.error)) {
+    // If the physical printer is missing/offline, keep the ticket locally and retry later.
+    void enqueueHtmlPrintJob({
+      html,
+      deviceName: opts.deviceName,
+      silent: true,
+      allowInteractiveFallback: !hasElectronSilentPrintIpc(),
+      jobType: "ticket",
+      createdAt: new Date().toISOString(),
+      lastError: outcome.error,
+    }).catch(() => {});
+  }
+
+  return outcome;
 }
 
 /** Customer account / pro forma bill before payment. */
@@ -285,10 +304,24 @@ export async function printPosBill(
 </body>
 </html>`;
 
-  return tryPrintHtmlDocumentAsync(html, {
+  const outcome = await tryPrintHtmlDocumentAsync(html, {
     silent: true,
     allowInteractiveFallback: !hasElectronSilentPrintIpc(),
+    silentTimeoutMs: DEFAULT_SILENT_PRINT_IPC_TIMEOUT_MS,
   });
+
+  if (!outcome.ok && isSilentPrintQueueableError(outcome.error)) {
+    void enqueueHtmlPrintJob({
+      html,
+      silent: true,
+      allowInteractiveFallback: !hasElectronSilentPrintIpc(),
+      jobType: "bill",
+      createdAt: new Date().toISOString(),
+      lastError: outcome.error,
+    }).catch(() => {});
+  }
+
+  return outcome;
 }
 
 /** Kitchen/bar tickets for staff meals (badge title e.g. STAFF). */

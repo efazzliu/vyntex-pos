@@ -3,6 +3,11 @@ Dashboard download links expect BOTH files under public/:
   public/VyntexPOSSetup.exe           (x64 — Intel / AMD)
   public/VyntexPOSSetup-arm64.exe     (ARM64)
 
+After `npm run dist:win` (or `npm run copy-installers`), the same canonical names are also
+copied into release/ next to the versioned NSIS files (VyntexPOSSetup-<version>-x64.exe).
+That script also removes older versioned artifacts from release/ and removes any
+versioned copies from public/ (only VyntexPOSSetup.exe / VyntexPOSSetup-arm64.exe remain there).
+
 Do not commit fake .exe text files — Windows will show "This app can't run on your PC".
 
 Desktop .exe must be built with Supabase env vars baked in (Vite), or end users cannot
@@ -53,6 +58,13 @@ Optional env vars (e.g. CDN URLs) in .env when building the web app:
   VITE_RESTAURANT_POS_EXE_URL         legacy: single x64 URL (overrides default x64 path)
   VITE_RESTAURANT_POS_EXE_URL_X64     explicit x64 URL
   VITE_RESTAURANT_POS_EXE_URL_ARM64   explicit ARM64 URL
+
+Vercel (no .exe in repo):
+  Upload the built .exe to public storage (Supabase bucket, S3, etc.) and set the same
+  VITE_* URLs in Vercel → Environment Variables for Production, then redeploy.
+  Root URLs https://<domain>/VyntexPOSSetup.exe and ...-arm64.exe are rewritten to
+  serverless handlers that 302-redirect to those env URLs (optional overrides:
+  INSTALLER_X64_REDIRECT_URL, INSTALLER_ARM64_REDIRECT_URL).
 
 If Windows says "This app can't run on your PC":
   - You likely ran the wrong architecture (use arm64 on ARM laptops, x64 on normal PCs).

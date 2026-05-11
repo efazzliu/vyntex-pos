@@ -94,7 +94,7 @@ export async function addStock(args: {
     const timeSinceLastMs =
       Date.now() - new Date(last.created_at as string).getTime();
     if (
-      timeSinceLastMs < 3000 &&
+      timeSinceLastMs < 200 &&
       last.type === "manual_addition" &&
       Number(last.change) === args.quantity
     ) {
@@ -147,7 +147,7 @@ export async function removeStock(args: {
     const timeSinceLastMs =
       Date.now() - new Date(last.created_at as string).getTime();
     if (
-      timeSinceLastMs < 3000 &&
+      timeSinceLastMs < 200 &&
       last.type === "adjustment" &&
       Number(last.change) === -args.quantity
     ) {

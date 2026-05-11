@@ -17,6 +17,12 @@ const TIER_ORDER = ["starter", "professional", "enterprise"] as const;
 type TierId = (typeof TIER_ORDER)[number];
 type BillingMode = "monthly" | "annual";
 
+/**
+ * Online checkout (Paddle). Set to `true` when billing is finished and tested.
+ * While `false`, pricing CTAs stay disabled and do not open checkout.
+ */
+const PRICING_CHECKOUT_ENABLED = false;
+
 /** Display prices (USD/mo) — align with admin catalog / Stripe when billing goes live */
 const TIER_PRICES: Record<TierId, { monthly: number; annual: number }> = {
   starter: { monthly: 49, annual: 39 },
@@ -192,6 +198,14 @@ export default function PricingPage() {
 
       <section className="pb-24 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {!PRICING_CHECKOUT_ENABLED && (
+            <div
+              role="status"
+              className="max-w-2xl mx-auto mb-8 rounded-xl border border-amber-500/35 bg-amber-500/10 px-4 py-3 text-sm text-center text-foreground/90"
+            >
+              {t("pricing.checkoutPausedNotice")}
+            </div>
+          )}
           <div className="flex flex-col items-center gap-6 mb-14">
             <div className="flex items-center gap-3">
               <span
@@ -283,6 +297,10 @@ export default function PricingPage() {
 
                   <Button
                     size="lg"
+                    disabled={!PRICING_CHECKOUT_ENABLED}
+                    title={
+                      PRICING_CHECKOUT_ENABLED ? undefined : t("pricing.checkoutDisabledHint")
+                    }
                     onClick={() => void handleCheckout(tier.id)}
                     className={cn(
                       "w-full mb-6 shrink-0",

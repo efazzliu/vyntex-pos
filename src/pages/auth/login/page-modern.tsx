@@ -120,12 +120,18 @@ export default function LoginPageModern({
                 <img src={LOGO_URL} alt="Vyntex POS" className="h-14 w-14 object-contain" />
                 <p className="mt-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white/85">
                   <Sparkles className="h-3.5 w-3.5" />
-                  MODERN POS PLATFORM
+                  {t("auth.login.heroBadge")}
                 </p>
-                <h2 className="mt-5 text-4xl font-bold leading-tight text-white">Welcome back to Vyntex POS</h2>
+                <h2 className="mt-5 text-4xl font-bold leading-tight text-white">{t("auth.login.heroTitle")}</h2>
                 <ul className="mt-8 space-y-3 text-sm text-white/80">
-                  <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#66B3FF]" />Real-time dashboard and reports</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#66B3FF]" />Secure cloud authentication</li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-[#66B3FF]" />
+                    {t("auth.login.heroBullet1")}
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-[#66B3FF]" />
+                    {t("auth.login.heroBullet2")}
+                  </li>
                 </ul>
               </div>
             </section>
@@ -136,16 +142,26 @@ export default function LoginPageModern({
                 </p>
               ) : null}
               <p className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-                <ShieldCheck className="h-3.5 w-3.5" />SECURE LOGIN
+                <ShieldCheck className="h-3.5 w-3.5" />
+                {t("auth.login.secureBadge")}
               </p>
-              <h1 className="mt-4 text-2xl font-bold text-slate-900">Sign in</h1>
+              <h1 className="mt-4 text-2xl font-bold text-slate-900">{t("auth.login.heading")}</h1>
               <p className="mt-1 text-sm text-slate-500">{t("auth.login.subtitle")}</p>
               <form onSubmit={handleLogin} className="mt-6 space-y-5">
                 <div className="space-y-2">
-                  <Label htmlFor="email">{t("auth.login.emailLabel")}</Label>
+                  <Label htmlFor="email" className="text-slate-800">
+                    {t("auth.login.emailLabel")}
+                  </Label>
                   <div className="relative">
                     <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="h-11 rounded-xl border-slate-200 bg-slate-50/90 pl-10 shadow-sm focus-visible:ring-[#0066FF]/40" />
+                    <Input
+                      id="email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      className="h-11 rounded-xl border-slate-200 bg-white pl-10 text-slate-900 caret-slate-900 shadow-sm placeholder:text-slate-400 focus-visible:ring-[#0066FF]/40"
+                    />
                   </div>
                   <div className="flex flex-wrap gap-3 text-xs">
                     <button
@@ -169,11 +185,24 @@ export default function LoginPageModern({
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="password">{t("auth.login.passwordLabel")}</Label>
+                  <Label htmlFor="password" className="text-slate-800">
+                    {t("auth.login.passwordLabel")}
+                  </Label>
                   <div className="relative">
                     <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <Input id="password" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} required className="h-11 rounded-xl border-slate-200 bg-slate-50/90 pl-10 pr-11 shadow-sm focus-visible:ring-[#0066FF]/40" />
-                    <button type="button" onClick={() => setShowPassword((v) => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5">
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      className="h-11 rounded-xl border-slate-200 bg-white pl-10 pr-11 text-slate-900 caret-slate-900 shadow-sm placeholder:text-slate-400 focus-visible:ring-[#0066FF]/40"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-500 hover:text-slate-800"
+                    >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>

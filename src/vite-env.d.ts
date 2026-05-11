@@ -32,6 +32,10 @@ declare module "*.sql?raw" {
 interface ImportMetaEnv {
   readonly VITE_SUPPORT_EMAIL?: string;
   readonly VITE_PLATFORM_ADMIN_EMAILS?: string;
+  /** Legacy: single Windows x64 installer URL (CDN / Supabase Storage). */
+  readonly VITE_RESTAURANT_POS_EXE_URL?: string;
+  readonly VITE_RESTAURANT_POS_EXE_URL_X64?: string;
+  readonly VITE_RESTAURANT_POS_EXE_URL_ARM64?: string;
   /** Injected from root `package.json` version (Vite `define`). */
   readonly VITE_APP_VERSION?: string;
   /** Set at build time: public/VyntexPOSSetup-arm64.exe exists and looks like a real installer. */

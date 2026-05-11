@@ -5,7 +5,7 @@
  */
 
 const DB_NAME = "vyntex-local";
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 // Store names
 const CONFIG_STORE = "config";
@@ -13,6 +13,7 @@ const ADMINS_STORE = "admins";
 const STAFF_STORE = "staff";
 const CACHE_STORE = "dataCache";
 const OFFLINE_QUEUE_STORE = "offlineQueue";
+const PRINT_QUEUE_STORE = "printQueue";
 
 // ── Types ─────────────────────────────────────────────
 
@@ -54,6 +55,21 @@ export type QueuedMutation = {
   retries: number;
 };
 
+export type QueuedPrintJob = {
+  id: number;
+  createdAt: string;
+  retries: number;
+  html: string;
+  /** Windows/Electron: exact OS printer name (match Settings — use Address if set). */
+  deviceName?: string;
+  /** We always enqueue for silent printing. */
+  silent: boolean;
+  /** Whether the caller allowed interactive fallback when silent failed. */
+  allowInteractiveFallback: boolean;
+  jobType: "ticket" | "bill" | "receipt" | "custom";
+  lastError?: string;
+};
+
 // ── Database ──────────────────────────────────────────
 
 function openDB(): Promise<IDBDatabase> {
@@ -81,6 +97,13 @@ function openDB(): Promise<IDBDatabase> {
       // Auto-increment queue for offline mutations
       if (!db.objectStoreNames.contains(OFFLINE_QUEUE_STORE)) {
         db.createObjectStore(OFFLINE_QUEUE_STORE, {
+          keyPath: "id",
+          autoIncrement: true,
+        });
+      }
+      // Auto-increment queue for failed/queued HTML prints
+      if (!db.objectStoreNames.contains(PRINT_QUEUE_STORE)) {
+        db.createObjectStore(PRINT_QUEUE_STORE, {
           keyPath: "id",
           autoIncrement: true,
         });
@@ -426,6 +449,65 @@ export async function clearOfflineQueue(): Promise<void> {
 export async function getOfflineQueueCount(): Promise<number> {
   const items = await getQueuedMutations();
   return items.length;
+}
+
+// ── Print Queue ────────────────────────────────────────────
+
+/**
+ * Enqueue a failed/queued HTML print so it can be retried when the printer is connected.
+ * Stored locally in IndexedDB for resilience across app reloads.
+ */
+export async function enqueuePrintJob(args: Omit<QueuedPrintJob, "id" | "retries">): Promise<number> {
+  return dbAdd(PRINT_QUEUE_STORE, {
+    ...args,
+    retries: 0,
+  });
+}
+
+/** Get all queued print jobs in insertion order. */
+export async function getQueuedPrintJobs(): Promise<QueuedPrintJob[]> {
+  return dbGetAll<QueuedPrintJob>(PRINT_QUEUE_STORE);
+}
+
+/** Remove a successfully replayed print job from the queue. */
+export async function removeQueuedPrintJob(id: number): Promise<void> {
+  await dbDelete(PRINT_QUEUE_STORE, id);
+}
+
+/** Increment retry count and optionally record last error. */
+export async function incrementPrintJobRetry(id: number, lastError?: string): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(PRINT_QUEUE_STORE, "readwrite");
+    const store = tx.objectStore(PRINT_QUEUE_STORE);
+    const request = store.get(id);
+    request.onsuccess = () => {
+      const item = request.result as QueuedPrintJob | undefined;
+      if (item) {
+        store.put({ ...item, retries: item.retries + 1, lastError: lastError ?? item.lastError });
+      }
+      resolve();
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+/** Get the count of queued print jobs. */
+export async function getPrintQueueCount(): Promise<number> {
+  const items = await getQueuedPrintJobs();
+  return items.length;
+}
+
+/** Clear all queued print jobs (e.g. debugging / user reset). */
+export async function clearPrintQueue(): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(PRINT_QUEUE_STORE, "readwrite");
+    const store = tx.objectStore(PRINT_QUEUE_STORE);
+    store.clear();
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
 }
 
 // ── PIN login screen branding (per device, local only) ─────

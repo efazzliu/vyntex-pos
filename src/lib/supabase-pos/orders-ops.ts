@@ -14,6 +14,7 @@ import {
   updateFloorTableStatusSafe,
 } from "./floor-sync.ts";
 import { isOpenSaleStatus, loadOpenSalesForTable } from "./tables-ops.ts";
+import { applySupplyRecipeAfterSale } from "./supply-recipe-ops.ts";
 
 function itemRowToDoc(r: {
   id: string;
@@ -75,6 +76,7 @@ async function applyStockSoldForSaleItemRows(
   staffName: string,
   orderLabel: string,
   menuIdBySnapshot: Map<string, string> | null,
+  licenseKey: string,
 ) {
   const qtyByMenuId = new Map<string, number>();
   for (const it of lines) {
@@ -145,6 +147,14 @@ async function applyStockSoldForSaleItemRows(
       .insert(stockLogRows);
     assertNoPgError("Log stock sale (partial split)", batchLogErr);
   }
+
+  await applySupplyRecipeAfterSale({
+    restaurantId,
+    qtyByMenuItemId: qtyByMenuId,
+    staffName,
+    contextNote: `Order ${orderLabel}`,
+    licenseKey,
+  });
 }
 
 type SaleItemInsertRow = {
@@ -1164,6 +1174,7 @@ export async function payOrder(args: Record<string, unknown>) {
         staffNameLog,
         order.order_number != null ? `#${order.order_number}` : String(orderId).slice(0, 8),
         menuIdBySnapshot,
+        licenseKey,
       );
 
       const { error: delErr } = await supabase
@@ -1406,6 +1417,7 @@ export async function payOrder(args: Record<string, unknown>) {
         ? `#${order.order_number}`
         : String(orderId).slice(0, 8),
       menuIdBySnapshotF,
+      licenseKey,
     );
     const { error: delErrF } = await supabase
       .from("sale_items")
@@ -1587,6 +1599,14 @@ export async function payOrder(args: Record<string, unknown>) {
         .insert(stockLogRows);
       assertNoPgError("Log stock sale (batch)", batchLogErr);
     }
+
+    await applySupplyRecipeAfterSale({
+      restaurantId: r.id,
+      qtyByMenuItemId,
+      staffName: staffNameLog,
+      contextNote: `Order ${orderLabel}`,
+      licenseKey,
+    });
   }
 
   const paidTableId = saleFloorTableId(order as Parameters<typeof saleFloorTableId>[0]);

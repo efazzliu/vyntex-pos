@@ -36,6 +36,7 @@ import {
   isValidStaffPinLength,
 } from "../_lib/staff-pin.ts";
 import { printStaffMealTickets } from "@/lib/pos-print-sent-order.ts";
+import { isSilentPrintQueueableError } from "@/lib/print-html.ts";
 import { errorMessageFromUnknown } from "@/lib/supabase-pos/db-errors.ts";
 
 type StaffPriceMode = "full" | "free" | "discount";
@@ -409,13 +410,14 @@ export default function StaffConsumptionDialog({
                 (window as Window & { desktop?: { isElectron?: boolean } })
                   .desktop?.isElectron,
             );
-            const msg =
-              electronApp && pr.error === "no-physical-printer"
-                ? t("order.print_no_physical_printer")
-                : electronApp
+            const queued = electronApp && isSilentPrintQueueableError(pr.error);
+            if (!queued) {
+              toast.error(
+                electronApp
                   ? t("order.print_ticket_silent_failed")
-                  : t("order.print_popup_blocked");
-            toast.error(msg);
+                  : t("order.print_popup_blocked"),
+              );
+            }
           }
         } catch (e) {
           console.error("Staff meal print:", e);

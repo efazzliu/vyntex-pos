@@ -1,6 +1,6 @@
 import { query, mutation } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import { getRestaurantByLicense } from "./helpers";
 
 // ── Dashboard Stats ─────────────────────────────────
@@ -263,6 +263,86 @@ function buildSalesChartBundle(paid: OrderForChart[], now: Date) {
 }
 
 /** Paid revenue per calendar day for the last 7 days (oldest → today). */
+type SupplyProfitMonthPoint = {
+  label: string;
+  revenue: number;
+  supplyIntake: number;
+  stockExpense: number;
+  estimatedProfit: number;
+};
+
+/** Last 6 calendar months: paid revenue vs stock-based intake & expense (price × qty, current item prices). */
+function buildSupplyProfitLast6Months(
+  now: Date,
+  paid: OrderForChart[],
+  stockLogs: Doc<"stockLogs">[],
+  menuItems: Doc<"menuItems">[],
+): SupplyProfitMonthPoint[] {
+  const priceByItem = new Map<string, number>(
+    menuItems.map((m) => [m._id as string, m.price]),
+  );
+  const curMonthStart = startLocalMonth(now);
+  const out: SupplyProfitMonthPoint[] = [];
+  for (let i = 5; i >= 0; i--) {
+    const monthStart = addLocalMonths(curMonthStart, -i);
+    const monthEnd = addLocalMonths(monthStart, 1);
+    const periodEnd = now < monthEnd ? now : monthEnd;
+    const startIso = monthStart.toISOString();
+    const endIso = periodEnd.toISOString();
+    if (periodEnd < monthStart) {
+      out.push({
+        label: monthStart.toLocaleDateString("en-US", {
+          month: "short",
+          year: "2-digit",
+        }),
+        revenue: 0,
+        supplyIntake: 0,
+        stockExpense: 0,
+        estimatedProfit: 0,
+      });
+      continue;
+    }
+    let revenue = 0;
+    for (const o of paid) {
+      if (o.createdAt >= startIso && o.createdAt < endIso) {
+        revenue += reportedOrderRevenue(o);
+      }
+    }
+    let supplyIntake = 0;
+    let stockExpense = 0;
+    for (const log of stockLogs) {
+      if (log.createdAt < startIso || log.createdAt >= endIso) continue;
+      const price = priceByItem.get(log.menuItemId as string) ?? 0;
+      if (log.type === "manual_addition" && log.change > 0) {
+        supplyIntake += log.change * price;
+      }
+      if (
+        (log.type === "sale" ||
+          log.type === "staff_consumption" ||
+          log.type === "recipe_sale" ||
+          log.type === "adjustment") &&
+        log.change < 0
+      ) {
+        stockExpense += Math.abs(log.change) * price;
+      }
+    }
+    revenue = round2(revenue);
+    supplyIntake = round2(supplyIntake);
+    stockExpense = round2(stockExpense);
+    out.push({
+      label: monthStart.toLocaleDateString("en-US", {
+        month: "short",
+        year: "2-digit",
+      }),
+      revenue,
+      supplyIntake,
+      stockExpense,
+      estimatedProfit: round2(revenue - stockExpense),
+    });
+  }
+  return out;
+}
+
 function buildLast7DaysPaidRevenueByDay(
   paid: OrderForChart[],
   now: Date,
@@ -455,6 +535,47 @@ export const getDashboardStats = query({
       now,
     );
 
+    const menuItems = await ctx.db
+      .query("menuItems")
+      .withIndex("by_restaurant", (q) =>
+        q.eq("restaurantId", restaurant._id),
+      )
+      .collect();
+
+    const stockLogs = await ctx.db
+      .query("stockLogs")
+      .withIndex("by_restaurant", (q) =>
+        q.eq("restaurantId", restaurant._id),
+      )
+      .collect();
+
+    const supplyProfitChart = buildSupplyProfitLast6Months(
+      now,
+      allPaidOrders as OrderForChart[],
+      stockLogs,
+      menuItems,
+    );
+
+    let inventoryTotal = 0;
+    let inventoryKitchen = 0;
+    let inventoryBar = 0;
+    let trackedItemCount = 0;
+    for (const m of menuItems) {
+      if (!m.trackStock || m.currentStock === undefined) continue;
+      trackedItemCount += 1;
+      const line = (m.currentStock ?? 0) * m.price;
+      inventoryTotal += line;
+      if (m.station === "bar") inventoryBar += line;
+      else inventoryKitchen += line;
+    }
+
+    const inventorySnapshot = {
+      totalValue: round2(inventoryTotal),
+      kitchenValue: round2(inventoryKitchen),
+      barValue: round2(inventoryBar),
+      trackedItemCount,
+    };
+
     return {
       periodSummaries,
       viewPeriod: detailPeriod,
@@ -473,6 +594,8 @@ export const getDashboardStats = query({
       fiscalSummary,
       salesChart,
       weekDayRevenue,
+      supplyProfitChart,
+      inventorySnapshot,
     };
   },
 });

@@ -8,6 +8,7 @@ import {
   Cell,
   ComposedChart,
   LabelList,
+  Legend,
   Line,
   ResponsiveContainer,
   Tooltip,
@@ -33,6 +34,7 @@ import {
   ReceiptText,
   UserCheck,
   Wallet,
+  Package,
   type LucideIcon,
 } from "lucide-react";
 
@@ -62,6 +64,14 @@ type ChartPoint = { label: string; revenue: number; orders: number };
 type VisitorHeatmap = { dayLabels: string[]; matrix24: number[][] };
 type FiscalTrendPoint = { label: string; fiscal: number; nonFiscal: number };
 
+type SupplyProfitPoint = {
+  label: string;
+  revenue: number;
+  supplyIntake: number;
+  stockExpense: number;
+  estimatedProfit: number;
+};
+
 type SalesChartSeries = { current: ChartPoint[]; previous: ChartPoint[] };
 
 const EMPTY_SALES_CHART: Record<SalesChartMode, SalesChartSeries> = {
@@ -70,6 +80,17 @@ const EMPTY_SALES_CHART: Record<SalesChartMode, SalesChartSeries> = {
   month: { current: [], previous: [] },
   all: { current: [], previous: [] },
 };
+
+const EMPTY_SUPPLY_PROFIT_CHART: SupplyProfitPoint[] = Array.from(
+  { length: 6 },
+  () => ({
+    label: "—",
+    revenue: 0,
+    supplyIntake: 0,
+    stockExpense: 0,
+    estimatedProfit: 0,
+  }),
+);
 
 const EMPTY_PERIOD_SUMMARY = {
   revenue: 0,
@@ -180,6 +201,13 @@ export default function PosDashboard({
           visitorBuckets: { h16: [], h24: [], peakHour24: 0, peakCount24: 0 },
           visitorHeatmap: { dayLabels: [], matrix24: [] },
           weekDayRevenue: [],
+          supplyProfitChart: EMPTY_SUPPLY_PROFIT_CHART,
+          inventorySnapshot: {
+            totalValue: 0,
+            kitchenValue: 0,
+            barValue: 0,
+            trackedItemCount: 0,
+          },
         };
 
   const salesChart = useMemo(() => {
@@ -224,6 +252,65 @@ export default function PosDashboard({
       out.push({ day, revenue: Number.isFinite(rev) ? rev : 0 });
     }
     return out;
+  }, [statsQuery]);
+
+  const supplyProfitChart = useMemo(() => {
+    const ok =
+      statsQuery &&
+      typeof statsQuery === "object" &&
+      !Array.isArray(statsQuery) &&
+      "todayRevenue" in statsQuery;
+    const raw = ok
+      ? (statsQuery as { supplyProfitChart?: unknown }).supplyProfitChart
+      : undefined;
+    if (!Array.isArray(raw)) return EMPTY_SUPPLY_PROFIT_CHART;
+    const out: SupplyProfitPoint[] = [];
+    for (const row of raw) {
+      if (!row || typeof row !== "object") continue;
+      const r = row as Record<string, unknown>;
+      const num = (k: string) => {
+        const v = r[k];
+        return typeof v === "number" && Number.isFinite(v) ? v : Number(v) || 0;
+      };
+      out.push({
+        label: typeof r.label === "string" ? r.label : "—",
+        revenue: num("revenue"),
+        supplyIntake: num("supplyIntake"),
+        stockExpense: num("stockExpense"),
+        estimatedProfit: num("estimatedProfit"),
+      });
+    }
+    return out.length > 0 ? out : EMPTY_SUPPLY_PROFIT_CHART;
+  }, [statsQuery]);
+
+  const inventorySnapshot = useMemo(() => {
+    const ok =
+      statsQuery &&
+      typeof statsQuery === "object" &&
+      !Array.isArray(statsQuery) &&
+      "todayRevenue" in statsQuery;
+    const raw = ok
+      ? (statsQuery as { inventorySnapshot?: unknown }).inventorySnapshot
+      : undefined;
+    if (!raw || typeof raw !== "object") {
+      return {
+        totalValue: 0,
+        kitchenValue: 0,
+        barValue: 0,
+        trackedItemCount: 0,
+      };
+    }
+    const r = raw as Record<string, unknown>;
+    const n = (k: string) => {
+      const v = r[k];
+      return typeof v === "number" && Number.isFinite(v) ? v : Number(v) || 0;
+    };
+    return {
+      totalValue: n("totalValue"),
+      kitchenValue: n("kitchenValue"),
+      barValue: n("barValue"),
+      trackedItemCount: Math.round(n("trackedItemCount")),
+    };
   }, [statsQuery]);
 
   const periodSummaries =
@@ -322,6 +409,13 @@ export default function PosDashboard({
             loading={statsQuery === undefined || Array.isArray(statsQuery)}
             onViewDetails={onOpenSalesDetail}
           />
+          <SupplyProfitChartSection
+            data={supplyProfitChart}
+            inventory={inventorySnapshot}
+            formatPrice={formatPrice}
+            t={t}
+            loading={statsQuery === undefined || Array.isArray(statsQuery)}
+          />
           <WeeklyActivityByDayCard
             weekDayRevenue={weekDayRevenue}
             formatPrice={formatPrice}
@@ -414,6 +508,140 @@ export default function PosDashboard({
             </SectionCard>
           </div>
         ) : null}
+      </div>
+    </div>
+  );
+}
+
+function SupplyProfitChartSection({
+  data,
+  inventory,
+  formatPrice,
+  t,
+  loading,
+}: {
+  data: SupplyProfitPoint[];
+  inventory: {
+    totalValue: number;
+    kitchenValue: number;
+    barValue: number;
+    trackedItemCount: number;
+  };
+  formatPrice: (n: number) => string;
+  t: (key: string, options?: Record<string, unknown>) => string;
+  loading: boolean;
+}) {
+  return (
+    <div className={dashPanel}>
+      <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="flex size-9 items-center justify-center rounded-xl bg-teal-500/15 text-teal-700 ring-1 ring-teal-500/20">
+              <Package className="size-4" />
+            </span>
+            <h3 className="text-base font-bold tracking-tight text-slate-900">
+              {t("dashboard.supply_chart_title")}
+            </h3>
+          </div>
+          <p className={`mt-2 max-w-3xl text-xs leading-relaxed ${dashMuted}`}>
+            {t("dashboard.supply_chart_sub")}
+          </p>
+        </div>
+      </div>
+
+      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className={`rounded-2xl border border-slate-200/60 bg-white/60 px-3 py-2.5 ${dashInnerWell} !p-3`}>
+          <p className={dashLabel}>{t("dashboard.inventory_total")}</p>
+          <p className="text-sm font-bold text-slate-900 tabular-nums">
+            {loading ? "…" : formatPrice(inventory.totalValue)}
+          </p>
+        </div>
+        <div className={`rounded-2xl border border-orange-200/50 bg-orange-50/40 px-3 py-2.5`}>
+          <p className={dashLabel}>{t("dashboard.inventory_kitchen")}</p>
+          <p className="text-sm font-bold text-slate-900 tabular-nums">
+            {loading ? "…" : formatPrice(inventory.kitchenValue)}
+          </p>
+        </div>
+        <div className={`rounded-2xl border border-violet-200/50 bg-violet-50/40 px-3 py-2.5`}>
+          <p className={dashLabel}>{t("dashboard.inventory_bar")}</p>
+          <p className="text-sm font-bold text-slate-900 tabular-nums">
+            {loading ? "…" : formatPrice(inventory.barValue)}
+          </p>
+        </div>
+        <div className={`rounded-2xl border border-slate-200/60 bg-white/60 px-3 py-2.5`}>
+          <p className={dashLabel}>{t("dashboard.inventory_count_label")}</p>
+          <p className="text-sm font-bold text-slate-900 tabular-nums">
+            {loading ? "…" : t("dashboard.inventory_items", { count: inventory.trackedItemCount })}
+          </p>
+        </div>
+      </div>
+
+      <div className={`${dashInnerWell} min-h-[300px] w-full`}>
+        {loading ? (
+          <div className="flex h-[300px] items-center justify-center text-sm text-slate-500">
+            …
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={300}>
+            <ComposedChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#64748b" }} axisLine={false} tickLine={false} />
+              <YAxis
+                tick={{ fontSize: 11, fill: "#64748b" }}
+                axisLine={false}
+                tickLine={false}
+                width={52}
+                tickFormatter={(v) => {
+                  if (Math.abs(v) >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+                  if (Math.abs(v) >= 1000) return `${(v / 1000).toFixed(1)}k`;
+                  return String(Math.round(v));
+                }}
+              />
+              <Tooltip
+                formatter={(value: number | string) =>
+                  formatPrice(typeof value === "number" ? value : Number(value))
+                }
+                labelStyle={{ color: "#0f172a", fontWeight: 600 }}
+                contentStyle={{
+                  borderRadius: "12px",
+                  border: "1px solid #e2e8f0",
+                  boxShadow: "0 10px 40px -12px rgba(15,23,42,0.2)",
+                }}
+              />
+              <Legend wrapperStyle={{ fontSize: "12px" }} />
+              <Bar
+                dataKey="revenue"
+                name={t("dashboard.supply_legend_revenue")}
+                fill="#3b82f6"
+                radius={[4, 4, 0, 0]}
+                maxBarSize={28}
+              />
+              <Bar
+                dataKey="supplyIntake"
+                name={t("dashboard.supply_legend_intake")}
+                fill="#14b8a6"
+                radius={[4, 4, 0, 0]}
+                maxBarSize={28}
+              />
+              <Bar
+                dataKey="stockExpense"
+                name={t("dashboard.supply_legend_expense")}
+                fill="#f97316"
+                radius={[4, 4, 0, 0]}
+                maxBarSize={28}
+              />
+              <Line
+                type="monotone"
+                dataKey="estimatedProfit"
+                name={t("dashboard.supply_legend_profit")}
+                stroke="#22c55e"
+                strokeWidth={2.5}
+                dot={{ r: 3, fill: "#22c55e", strokeWidth: 0 }}
+                activeDot={{ r: 5 }}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        )}
       </div>
     </div>
   );
