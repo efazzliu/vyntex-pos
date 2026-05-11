@@ -111,6 +111,7 @@ export default function MenuManagement({
   licenseKey,
   stockActorName = "",
   enterpriseSupplyMall = false,
+  enterpriseSupplyRecipe = false,
 }: MenuManagementProps) {
   const { t, formatPrice } = usePosLocale();
   const isOnline = useOnlineStatus();
