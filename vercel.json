@@ -1,14 +1,6 @@
 {
   "rewrites": [
     {
-      "source": "/RestaurantPOSSetup.exe",
-      "destination": "/api/installer-x64"
-    },
-    {
-      "source": "/RestaurantPOSSetup-arm64.exe",
-      "destination": "/api/installer-arm64"
-    },
-    {
       "source": "/VyntexPOSSetup.exe",
       "destination": "/api/installer-x64"
     },

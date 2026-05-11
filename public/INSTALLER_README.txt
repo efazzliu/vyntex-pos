@@ -60,13 +60,12 @@ Optional env vars (e.g. CDN URLs) in .env when building the web app:
   VITE_RESTAURANT_POS_EXE_URL_X64     explicit x64 URL
   VITE_RESTAURANT_POS_EXE_URL_ARM64   explicit ARM64 URL
 
-Vercel (no .exe in repo):
-  Upload the built .exe to public storage (e.g. Supabase bucket `restaurantpos` or any name) and set the same
-  VITE_* URLs in Vercel → Environment Variables for Production, then redeploy.
-  Root URLs https://<domain>/RestaurantPOSSetup.exe and ...-arm64.exe are rewritten to
-  serverless handlers that 302-redirect to those env URLs. Legacy /VyntexPOSSetup*.exe URLs
-  still rewrite to the same handlers (optional overrides: INSTALLER_X64_REDIRECT_URL,
-  INSTALLER_ARM64_REDIRECT_URL).
+Vercel:
+  If RestaurantPOSSetup*.exe is in public/ and deployed, /RestaurantPOSSetup.exe is served as a
+  static file (do not add vercel.json rewrites for those paths or the API would shadow the file).
+  Legacy /VyntexPOSSetup*.exe rewrites to /api/installer-* which 302s to env URLs if set, else
+  to /RestaurantPOSSetup*.exe on the same host. External-only hosting: set VITE_* installer URLs
+  in Vercel env (optional: INSTALLER_X64_REDIRECT_URL, INSTALLER_ARM64_REDIRECT_URL).
 
 If Windows says "This app can't run on your PC":
   - You likely ran the wrong architecture (use arm64 on ARM laptops, x64 on normal PCs).
