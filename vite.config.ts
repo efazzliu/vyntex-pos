@@ -20,11 +20,11 @@ function viteInstallerPlugin(): Plugin {
   };
 }
 
-const arm64InstallerPath = path.resolve(__dirname, "public/VyntexPOSSetup-arm64.exe");
+const arm64InstallerPath = path.resolve(__dirname, "public/RestaurantPOSSetup-arm64.exe");
 const arm64InstallerPresent =
   fs.existsSync(arm64InstallerPath) &&
   fs.statSync(arm64InstallerPath).size >= 50_000;
-const x64InstallerPath = path.resolve(__dirname, "public/VyntexPOSSetup.exe");
+const x64InstallerPath = path.resolve(__dirname, "public/RestaurantPOSSetup.exe");
 const installerUpdatedAt = fs.existsSync(x64InstallerPath)
   ? fs.statSync(x64InstallerPath).mtime.toISOString()
   : "";

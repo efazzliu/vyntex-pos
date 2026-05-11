@@ -31,11 +31,10 @@ tsconfig.tsbuildinfo
 !.env.example
 !.env.production.example
 
-# Real Windows installers (copy from release/ after npm run dist:win — see public/INSTALLER_README.txt)
+# Real Windows installers — legacy names stay ignored; Restaurant* can be committed so Vercel
+# serves public/RestaurantPOSSetup.exe while the GitHub repo stays private (see INSTALLER_README).
 public/VyntexPOSSetup.exe
 public/VyntexPOSSetup-arm64.exe
-public/RestaurantPOSSetup.exe
-public/RestaurantPOSSetup-arm64.exe
 
 # Alternate electron-builder output (npm run dist:win:fresh)
 release-eb-staging/

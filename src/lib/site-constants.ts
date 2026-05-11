@@ -57,7 +57,7 @@ function formatInstallerMtimeForUi(iso: string | undefined): string | null {
   });
 }
 
-/** Raw ISO mtime of `public/VyntexPOSSetup.exe` from Vite `define` (dev start / build). */
+/** Raw ISO mtime of `public/RestaurantPOSSetup.exe` from Vite `define` (dev start / build). */
 export function readInstallerUpdatedAtIso(): string | undefined {
   const a = typeof __INSTALLER_UPDATED_AT__ === "string" ? __INSTALLER_UPDATED_AT__.trim() : "";
   if (a) return a;
@@ -66,7 +66,7 @@ export function readInstallerUpdatedAtIso(): string | undefined {
   return undefined;
 }
 
-/** User-facing timestamp for the Windows x64 installer file in `public/`. */
+/** User-facing timestamp for the Windows x64 Restaurant installer in `public/`. */
 export function formattedInstallerMtime(): string | null {
   return formatInstallerMtimeForUi(readInstallerUpdatedAtIso());
 }

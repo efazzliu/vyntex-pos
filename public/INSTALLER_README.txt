@@ -1,12 +1,13 @@
 Dashboard download links expect BOTH files under public/:
 
-  public/VyntexPOSSetup.exe           (x64 — Intel / AMD)
-  public/VyntexPOSSetup-arm64.exe     (ARM64)
+  public/RestaurantPOSSetup.exe           (x64 — Intel / AMD, Restaurant POS line)
+  public/RestaurantPOSSetup-arm64.exe     (ARM64)
 
 After `npm run dist:win` (or `npm run copy-installers`), the same canonical names are also
-copied into release/ next to the versioned NSIS files (VyntexPOSSetup-<version>-x64.exe).
+copied into release/ next to the versioned NSIS files (RestaurantPOSSetup-<version>-x64.exe).
 That script also removes older versioned artifacts from release/ and removes any
-versioned copies from public/ (only VyntexPOSSetup.exe / VyntexPOSSetup-arm64.exe remain there).
+versioned copies from public/ (only RestaurantPOSSetup.exe / RestaurantPOSSetup-arm64.exe remain there).
+Legacy VyntexPOSSetup-* files in release/ are removed when you run copy-installers.
 
 Do not commit fake .exe text files — Windows will show "This app can't run on your PC".
 
@@ -48,8 +49,8 @@ If clean cannot delete the folder, it may rename it to win-unpacked.__trash_<tim
 delete that folder later in Explorer. `dist:win:skip-clean` is the same as `dist:win`.
 
 Outputs in release/ (before copy):
-  VyntexPOSSetup-<version>-x64.exe
-  VyntexPOSSetup-<version>-arm64.exe
+  RestaurantPOSSetup-<version>-x64.exe
+  RestaurantPOSSetup-<version>-arm64.exe
 
 If you already built but skipped copy:
   npm run copy-installers
@@ -60,11 +61,12 @@ Optional env vars (e.g. CDN URLs) in .env when building the web app:
   VITE_RESTAURANT_POS_EXE_URL_ARM64   explicit ARM64 URL
 
 Vercel (no .exe in repo):
-  Upload the built .exe to public storage (Supabase bucket, S3, etc.) and set the same
+  Upload the built .exe to public storage (e.g. Supabase bucket `restaurantpos` or any name) and set the same
   VITE_* URLs in Vercel → Environment Variables for Production, then redeploy.
-  Root URLs https://<domain>/VyntexPOSSetup.exe and ...-arm64.exe are rewritten to
-  serverless handlers that 302-redirect to those env URLs (optional overrides:
-  INSTALLER_X64_REDIRECT_URL, INSTALLER_ARM64_REDIRECT_URL).
+  Root URLs https://<domain>/RestaurantPOSSetup.exe and ...-arm64.exe are rewritten to
+  serverless handlers that 302-redirect to those env URLs. Legacy /VyntexPOSSetup*.exe URLs
+  still rewrite to the same handlers (optional overrides: INSTALLER_X64_REDIRECT_URL,
+  INSTALLER_ARM64_REDIRECT_URL).
 
 If Windows says "This app can't run on your PC":
   - You likely ran the wrong architecture (use arm64 on ARM laptops, x64 on normal PCs).
@@ -73,4 +75,5 @@ If Windows says "This app can't run on your PC":
 
 After replacing the file, restart the dev server.
 
-Legacy URLs /dev still serve old filenames if present; canonical installers are VyntexPOSSetup*.exe.
+Other product lines (e.g. Fitness POS) can use separate repos or separate artifact names
+when you add those apps; this repo uses RestaurantPOSSetup* for the Windows installer filenames.

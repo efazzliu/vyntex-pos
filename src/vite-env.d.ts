@@ -3,7 +3,7 @@
 /** Root `package.json` version — set in `vite.config.ts` via `define`. */
 declare const __APP_VERSION__: string | undefined;
 
-/** `public/VyntexPOSSetup.exe` mtime (ISO) when present — set in `vite.config.ts` via `define`. */
+/** `public/RestaurantPOSSetup.exe` mtime (ISO) when present — set in `vite.config.ts` via `define`. */
 declare const __INSTALLER_UPDATED_AT__: string | undefined;
 
 type PrintHtmlSilentPayload =
@@ -38,9 +38,9 @@ interface ImportMetaEnv {
   readonly VITE_RESTAURANT_POS_EXE_URL_ARM64?: string;
   /** Injected from root `package.json` version (Vite `define`). */
   readonly VITE_APP_VERSION?: string;
-  /** Set at build time: public/VyntexPOSSetup-arm64.exe exists and looks like a real installer. */
+  /** Set at build time: public/RestaurantPOSSetup-arm64.exe exists and looks like a real installer. */
   readonly VITE_ARM64_INSTALLER_AVAILABLE?: string;
-  /** Set at build time: last modified timestamp for public/VyntexPOSSetup.exe (ISO). */
+  /** Set at build time: last modified timestamp for public/RestaurantPOSSetup.exe (ISO). */
   readonly VITE_INSTALLER_UPDATED_AT?: string;
 }
 

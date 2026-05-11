@@ -10,9 +10,9 @@ type Next = (err?: unknown) => void;
 
 const MIN_REAL_INSTALLER_BYTES = 50_000;
 
-const CANONICAL_X64 = "/VyntexPOSSetup.exe";
-const CANONICAL_ARM64 = "/VyntexPOSSetup-arm64.exe";
-
+const CANONICAL_X64 = "/RestaurantPOSSetup.exe";
+const CANONICAL_ARM64 = "/RestaurantPOSSetup-arm64.exe";
+/** Legacy bookmarks / old links */
 function installerBody(canonicalName: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -32,7 +32,7 @@ a{color:#4d9fff}
 <p><strong>Fix:</strong> from the project folder run:</p>
 <pre style="background:#1e2636;padding:1rem;border-radius:8px;overflow:auto">npm run dist:win</pre>
 <p>That builds the real .exe and copies it into <code>public/</code>. Then restart <code>npm run dev</code>.</p>
-<p>Exact filename (note <strong>two S</strong> letters: POS<strong>S</strong>etup): <code>VyntexPOSSetup.exe</code></p>
+<p>Exact filename (note <strong>two S</strong> letters: POS<strong>S</strong>etup): <code>RestaurantPOSSetup.exe</code> (legacy <code>VyntexPOSSetup.exe</code> still works in dev if that file exists).</p>
 <p><a href="/">Back to site</a></p>
 </body>
 </html>`;

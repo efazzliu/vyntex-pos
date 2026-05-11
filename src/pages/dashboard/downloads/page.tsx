@@ -87,7 +87,7 @@ export default function DashboardDownloadsPage() {
                 <span className="text-white/25"> · </span>
                 <span className="text-white/40">Place </span>
                 <code className="rounded bg-black/25 px-1 py-0.5 text-[10px] text-white/55">
-                  public/VyntexPOSSetup.exe
+                  public/RestaurantPOSSetup.exe
                 </code>
                 <span className="text-white/40"> to show installer build time.</span>
               </>

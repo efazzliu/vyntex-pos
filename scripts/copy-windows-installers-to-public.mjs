@@ -1,7 +1,7 @@
 /**
  * After `npm run dist:win`, copy NSIS outputs into `public/` (for dev / static deploys)
- * and mirror canonical names into `release/` so Explorer shows `VyntexPOSSetup.exe`
- * next to the versioned `VyntexPOSSetup-<ver>-x64.exe` artifacts.
+ * and mirror canonical names into `release/` (Restaurant POS line; Fitness POS etc. can use
+ * their own artifact names in separate products later).
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -17,26 +17,29 @@ const releaseDir = path.join(
 );
 const publicDir = path.join(root, "public");
 
-/** `VyntexPOSSetup-1.2.3-x64.exe` or `...arm64.exe` / `.exe.blockmap` */
+/** Versioned NSIS outputs: RestaurantPOSSetup-1.2.3-x64.exe (legacy: VyntexPOSSetup-*). */
 const VERSIONED_INSTALLER_RE =
-  /^VyntexPOSSetup-(\d+\.\d+\.\d+)-(x64|arm64)\.exe(\.blockmap)?$/;
+  /^(RestaurantPOSSetup|VyntexPOSSetup)-(\d+\.\d+\.\d+)-(x64|arm64)\.exe(\.blockmap)?$/;
 
 /**
- * In `release/`, remove versioned installers + blockmaps for any version other than `keepVersion`
- * (electron-builder leaves older builds on disk).
+ * In `release/`, remove stale versioned installers + blockmaps (wrong semver or legacy Vyntex names).
  */
 function purgeStaleFromRelease(dir, keepVersion) {
   if (!fs.existsSync(dir)) return;
   for (const name of fs.readdirSync(dir)) {
     const m = name.match(VERSIONED_INSTALLER_RE);
-    if (!m || m[1] === keepVersion) continue;
+    if (!m) continue;
+    const prefix = m[1];
+    const ver = m[2];
+    const stale = ver !== keepVersion || prefix === "VyntexPOSSetup";
+    if (!stale) continue;
     const full = path.join(dir, name);
     fs.unlinkSync(full);
     console.log(`[copy-installers] Removed stale release artifact: ${path.relative(root, full)}`);
   }
 }
 
-/** In `public/`, remove all versioned copies; canonical `VyntexPOSSetup*.exe` stay. */
+/** In `public/`, remove all versioned copies; canonical `RestaurantPOSSetup*.exe` stay. */
 function purgeVersionedFromPublic(dir) {
   if (!fs.existsSync(dir)) return;
   for (const name of fs.readdirSync(dir)) {
@@ -47,26 +50,35 @@ function purgeVersionedFromPublic(dir) {
   }
 }
 
+function resolveBuiltExe(arch) {
+  const restaurant = path.join(releaseDir, `RestaurantPOSSetup-${version}-${arch}.exe`);
+  const vyntex = path.join(releaseDir, `VyntexPOSSetup-${version}-${arch}.exe`);
+  if (fs.existsSync(restaurant)) return restaurant;
+  if (fs.existsSync(vyntex)) return vyntex;
+  return restaurant;
+}
+
 purgeStaleFromRelease(releaseDir, version);
 purgeVersionedFromPublic(publicDir);
 
 const pairs = [
   {
-    from: path.join(releaseDir, `VyntexPOSSetup-${version}-x64.exe`),
-    toPublic: path.join(publicDir, "VyntexPOSSetup.exe"),
-    toRelease: path.join(releaseDir, "VyntexPOSSetup.exe"),
+    from: () => resolveBuiltExe("x64"),
+    toPublic: path.join(publicDir, "RestaurantPOSSetup.exe"),
+    toRelease: path.join(releaseDir, "RestaurantPOSSetup.exe"),
     label: "x64 (Intel/AMD)",
   },
   {
-    from: path.join(releaseDir, `VyntexPOSSetup-${version}-arm64.exe`),
-    toPublic: path.join(publicDir, "VyntexPOSSetup-arm64.exe"),
-    toRelease: path.join(releaseDir, "VyntexPOSSetup-arm64.exe"),
+    from: () => resolveBuiltExe("arm64"),
+    toPublic: path.join(publicDir, "RestaurantPOSSetup-arm64.exe"),
+    toRelease: path.join(releaseDir, "RestaurantPOSSetup-arm64.exe"),
     label: "ARM64",
   },
 ];
 
 let ok = 0;
-for (const { from, toPublic, toRelease, label } of pairs) {
+for (const { from: fromFn, toPublic, toRelease, label } of pairs) {
+  const from = fromFn();
   if (!fs.existsSync(from)) {
     console.warn(
       `[copy-installers] Skip ${label}: not found\n  ${from}\n  Run: npm run dist:win`,

@@ -160,7 +160,7 @@
           ]
         }
       ],
-      "artifactName": "VyntexPOSSetup-${version}-${arch}.${ext}"
+      "artifactName": "RestaurantPOSSetup-${version}-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,

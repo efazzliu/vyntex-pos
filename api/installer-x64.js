@@ -1,7 +1,7 @@
 /**
  * Vercel Serverless: redirect canonical Windows x64 installer path to a hosted .exe URL.
  * Set VITE_RESTAURANT_POS_EXE_URL_X64 (or legacy VITE_RESTAURANT_POS_EXE_URL) in the
- * Vercel project environment so https://your-domain/VyntexPOSSetup.exe works without
+ * Vercel project environment so https://your-domain/RestaurantPOSSetup.exe works without
  * committing the binary to git.
  */
 export default function handler(_req, res) {
@@ -13,7 +13,7 @@ export default function handler(_req, res) {
     res.status(404).setHeader("Content-Type", "text/plain; charset=utf-8");
     res.send(
       "Windows x64 installer is not configured. In Vercel → Settings → Environment Variables, " +
-        "set VITE_RESTAURANT_POS_EXE_URL_X64 to the public HTTPS URL of VyntexPOSSetup.exe " +
+        "set VITE_RESTAURANT_POS_EXE_URL_X64 to the public HTTPS URL of RestaurantPOSSetup.exe " +
         "(e.g. Supabase Storage). Optional override: INSTALLER_X64_REDIRECT_URL.",
     );
     return;

@@ -10,7 +10,7 @@ export function windowsInstallerX64Href(): string {
   return (
     trimInstallerEnvUrl(import.meta.env.VITE_RESTAURANT_POS_EXE_URL_X64) ??
     trimInstallerEnvUrl(import.meta.env.VITE_RESTAURANT_POS_EXE_URL) ??
-    "/VyntexPOSSetup.exe"
+    "/RestaurantPOSSetup.exe"
   );
 }
 
@@ -18,6 +18,6 @@ export function windowsInstallerArm64Href(): string | undefined {
   const arm64ExeInPublic = import.meta.env.VITE_ARM64_INSTALLER_AVAILABLE === "true";
   return (
     trimInstallerEnvUrl(import.meta.env.VITE_RESTAURANT_POS_EXE_URL_ARM64) ??
-    (arm64ExeInPublic ? "/VyntexPOSSetup-arm64.exe" : undefined)
+    (arm64ExeInPublic ? "/RestaurantPOSSetup-arm64.exe" : undefined)
   );
 }

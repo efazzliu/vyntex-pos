@@ -71,7 +71,7 @@ const DICT: Record<DashboardLang, Record<string, string>> = {
     "install.app_version": "App v{{version}}",
     "install.file_label": "Installer file",
     "install.file_hint":
-      "Add public/VyntexPOSSetup.exe to show the installer build time on this line.",
+      "Add public/RestaurantPOSSetup.exe to show the installer build time on this line.",
     "action.business": "Business settings",
     "action.business_desc": "Profile, billing and preferences",
     "action.support": "Support",
@@ -132,7 +132,7 @@ const DICT: Record<DashboardLang, Record<string, string>> = {
     "install.app_version": "Aplikacioni v{{version}}",
     "install.file_label": "Skedari i instaluesit",
     "install.file_hint":
-      "Shtoni public/VyntexPOSSetup.exe për të shfaqur kohën e build-it të instaluesit.",
+      "Shtoni public/RestaurantPOSSetup.exe për të shfaqur kohën e build-it të instaluesit.",
     "action.business": "Cilësimet e biznesit",
     "action.business_desc": "Profili, faturimi dhe preferencat",
     "action.support": "Suporti",
