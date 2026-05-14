@@ -1,4 +1,16 @@
 {
+  "buildCommand": "npm run build:web",
+  "headers": [
+    {
+      "source": "/build-meta.json",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    }
+  ],
   "rewrites": [
     {
       "source": "/VyntexPOSSetup.exe",
