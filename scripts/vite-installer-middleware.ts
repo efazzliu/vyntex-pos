@@ -66,8 +66,41 @@ function isRealInstaller(filePath: string): boolean {
 export function createInstallerMiddleware(
   publicDir: string,
 ): (req: IncomingMessage, res: ServerResponse, next: Next) => void {
+  const projectRoot = path.join(publicDir, "..");
+  const pkgPath = path.join(projectRoot, "package.json");
+  const x64Exe = path.join(publicDir, "RestaurantPOSSetup.exe");
+
   return (req, res, next) => {
     const raw = req.url?.split("?")[0] ?? "";
+    if (raw === "/__vyntex/build-meta.json" || raw.endsWith("/__vyntex/build-meta.json")) {
+      let appVersion = "0.0.0";
+      let installerUpdatedAt: string | null = null;
+      try {
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as { version?: string };
+        if (typeof pkg.version === "string" && pkg.version.trim()) {
+          appVersion = pkg.version.trim();
+        }
+      } catch {
+        /* ignore */
+      }
+      try {
+        if (fs.existsSync(x64Exe)) {
+          installerUpdatedAt = fs.statSync(x64Exe).mtime.toISOString();
+        }
+      } catch {
+        /* ignore */
+      }
+      res.setHeader("Content-Type", "application/json; charset=utf-8");
+      res.setHeader("Cache-Control", "no-store");
+      res.end(
+        JSON.stringify({
+          appVersion,
+          installerUpdatedAt,
+        }),
+      );
+      return;
+    }
+
     if (!/\.exe$/i.test(raw)) {
       next();
       return;

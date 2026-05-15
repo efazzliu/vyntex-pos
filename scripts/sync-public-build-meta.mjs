@@ -25,9 +25,12 @@ try {
 }
 
 let installerUpdatedAt = null;
+let installerSizeBytes = null;
 try {
   if (fs.existsSync(x64Exe)) {
-    installerUpdatedAt = fs.statSync(x64Exe).mtime.toISOString();
+    const stat = fs.statSync(x64Exe);
+    installerUpdatedAt = stat.mtime.toISOString();
+    installerSizeBytes = stat.size;
   }
 } catch {
   /* ignore */
@@ -36,9 +39,9 @@ try {
 fs.mkdirSync(publicDir, { recursive: true });
 fs.writeFileSync(
   outPath,
-  JSON.stringify({ appVersion, installerUpdatedAt }, null, 0) + "\n",
+  JSON.stringify({ appVersion, installerUpdatedAt, installerSizeBytes }, null, 0) + "\n",
   "utf8",
 );
 console.log(
-  `[sync-public-build-meta] Wrote ${path.relative(root, outPath)} (app ${appVersion}${installerUpdatedAt ? ", installer mtime ok" : ", no x64 exe"})`,
+  `[sync-public-build-meta] Wrote ${path.relative(root, outPath)} (app ${appVersion}${installerUpdatedAt ? `, installer ${installerSizeBytes} bytes` : ", no x64 exe"})`,
 );

@@ -16,8 +16,7 @@ import {
   sanitizeStaffPinInput,
 } from "../_lib/staff-pin.ts";
 import { usePosTheme } from "../_lib/use-pos-theme.ts";
-
-const LOGO_URL = "https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz";
+import { APP_VERSION_LABEL, VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 
 type AdminSetupScreenProps = {
   businessName: string;
@@ -121,7 +120,7 @@ export default function AdminSetupScreen({
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
           <motion.img
-            src={LOGO_URL}
+            src={VYNTEX_APP_LOGO_SRC}
             alt="Vyntex POS"
             className="h-14 w-14 mb-3"
             initial={{ scale: 0.5, opacity: 0 }}
@@ -266,6 +265,12 @@ export default function AdminSetupScreen({
             Credentials are encrypted and stored locally on this device
           </p>
         </div>
+        <p
+          className="text-center text-[10px] tabular-nums text-[#3a4560] mt-2"
+          aria-label={`Version ${APP_VERSION_LABEL}`}
+        >
+          v{APP_VERSION_LABEL}
+        </p>
       </motion.div>
     </div>
   );

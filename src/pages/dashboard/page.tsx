@@ -5,10 +5,13 @@ import { Button } from "@/components/ui/button.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { cn } from "@/lib/utils.ts";
 import { useDashboardRestaurant } from "@/hooks/use-dashboard-restaurant.ts";
+import { useLiveBuildMeta } from "@/hooks/use-live-build-meta.ts";
 import {
+  triggerInstallerDownload,
   windowsInstallerArm64Href,
   windowsInstallerX64Href,
 } from "@/lib/installer-download-urls.ts";
+import { APP_VERSION_LABEL } from "@/lib/site-constants.ts";
 import {
   ArrowRight,
   Calendar,
@@ -96,11 +99,14 @@ function StatCard({
 export default function DashboardOverview() {
   const { restaurant } = useDashboardRestaurant();
   const [copied, setCopied] = useState(false);
+  const live = useLiveBuildMeta();
+  const installerIso =
+    live?.installerUpdatedAt ??
+    (import.meta.env.VITE_INSTALLER_UPDATED_AT as string | undefined);
+  const installerUpdatedAt = formatInstallerUpdatedAt(installerIso);
+  const appVersionLabel = live?.appVersion ?? APP_VERSION_LABEL;
   const installerUrlX64 = windowsInstallerX64Href();
   const installerUrlArm64 = windowsInstallerArm64Href();
-  const installerUpdatedAt = formatInstallerUpdatedAt(
-    import.meta.env.VITE_INSTALLER_UPDATED_AT,
-  );
 
   if (restaurant === undefined) {
     return (
@@ -132,8 +138,11 @@ export default function DashboardOverview() {
     }
   };
 
-  const openInstallerDownload = (url: string) => {
-    window.open(url, "_blank", "noopener,noreferrer");
+  const openInstallerDownload = (
+    url: string,
+    arch: "x64" | "arm64",
+  ) => {
+    triggerInstallerDownload(url, arch, appVersionLabel);
     toast.success("Download started");
   };
 
@@ -227,7 +236,7 @@ export default function DashboardOverview() {
 
           <Button
             size="lg"
-            onClick={() => openInstallerDownload(installerUrlX64)}
+            onClick={() => openInstallerDownload(installerUrlX64, "x64")}
             className="h-auto w-full flex-col gap-1 rounded-xl border-0 bg-gradient-to-r from-blue-600 to-blue-500 py-3.5 text-white shadow-lg shadow-blue-950/50 transition hover:from-blue-500 hover:to-blue-400"
           >
             <span className="flex items-center gap-2">
@@ -241,7 +250,7 @@ export default function DashboardOverview() {
             <Button
               size="lg"
               variant="outline"
-              onClick={() => openInstallerDownload(installerUrlArm64)}
+              onClick={() => openInstallerDownload(installerUrlArm64, "arm64")}
               className="mt-3 h-auto w-full flex-col gap-1 rounded-xl border-zinc-700/90 bg-zinc-900/80 py-3 text-zinc-100 hover:bg-zinc-800/90"
             >
               <span className="flex items-center gap-2">
@@ -252,11 +261,16 @@ export default function DashboardOverview() {
             </Button>
           ) : null}
 
-          {installerUpdatedAt ? (
-            <p className="mt-4 text-xs text-zinc-500">
-              Latest build: <span className="font-medium text-zinc-400">{installerUpdatedAt}</span>
-            </p>
-          ) : null}
+          <p className="mt-4 text-xs text-zinc-500">
+            App v<span className="font-medium text-zinc-400">{appVersionLabel}</span>
+            {installerUpdatedAt ? (
+              <>
+                <span className="text-zinc-600"> · </span>
+                Latest build:{" "}
+                <span className="font-medium text-zinc-400">{installerUpdatedAt}</span>
+              </>
+            ) : null}
+          </p>
         </div>
       </section>
 

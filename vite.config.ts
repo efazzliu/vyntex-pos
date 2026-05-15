@@ -20,6 +20,45 @@ function viteInstallerPlugin(): Plugin {
   };
 }
 
+/** Static deploy: `fetch(build-meta.json)` matches dev live JSON from middleware. */
+function writeBuildMetaJsonPlugin(): Plugin {
+  let outDir = "dist";
+  return {
+    name: "vyntex-write-build-meta",
+    configResolved(c) {
+      outDir = c.build.outDir;
+    },
+    closeBundle() {
+      const pkgPath = path.resolve(__dirname, "package.json");
+      const exePath = path.resolve(__dirname, "public/RestaurantPOSSetup.exe");
+      let appVersion = "0.0.0";
+      let installerUpdatedAt: string | null = null;
+      try {
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as { version?: string };
+        if (typeof pkg.version === "string" && pkg.version.trim()) {
+          appVersion = pkg.version.trim();
+        }
+      } catch {
+        /* ignore */
+      }
+      try {
+        if (fs.existsSync(exePath)) {
+          installerUpdatedAt = fs.statSync(exePath).mtime.toISOString();
+        }
+      } catch {
+        /* ignore */
+      }
+      const outPath = path.resolve(__dirname, outDir, "build-meta.json");
+      fs.mkdirSync(path.dirname(outPath), { recursive: true });
+      fs.writeFileSync(
+        outPath,
+        JSON.stringify({ appVersion, installerUpdatedAt }, null, 0),
+        "utf8",
+      );
+    },
+  };
+}
+
 const arm64InstallerPath = path.resolve(__dirname, "public/RestaurantPOSSetup-arm64.exe");
 const arm64InstallerPresent =
   fs.existsSync(arm64InstallerPath) &&
@@ -59,7 +98,7 @@ export default defineConfig(() => {
         overlay: false,
       },
     },
-    plugins: [viteInstallerPlugin(), react(), tailwindcss(), hercules()],
+    plugins: [viteInstallerPlugin(), writeBuildMetaJsonPlugin(), react(), tailwindcss(), hercules()],
     resolve: {
       alias: {
         "convex/react": path.resolve(__dirname, "./src/lib/convex-react-supabase.tsx"),

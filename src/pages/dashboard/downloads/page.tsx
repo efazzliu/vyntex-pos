@@ -1,12 +1,15 @@
 import { Link } from "react-router-dom";
 import {
+  triggerInstallerDownload,
   windowsInstallerArm64Href,
   windowsInstallerX64Href,
 } from "@/lib/installer-download-urls.ts";
 import {
   APP_VERSION_LABEL,
   formattedInstallerMtime,
+  formatInstallerDisplayFromIso,
 } from "@/lib/site-constants.ts";
+import { useLiveBuildMeta } from "@/hooks/use-live-build-meta.ts";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button.tsx";
 import {
@@ -19,12 +22,20 @@ import {
 } from "lucide-react";
 
 export default function DashboardDownloadsPage() {
+  const live = useLiveBuildMeta();
+  const versionLabel = live?.appVersion ?? APP_VERSION_LABEL;
+  const installerFileMtime =
+    formatInstallerDisplayFromIso(live?.installerUpdatedAt) ??
+    formattedInstallerMtime();
+
   const installerUrlX64 = windowsInstallerX64Href();
   const installerUrlArm64 = windowsInstallerArm64Href();
-  const installerFileMtime = formattedInstallerMtime();
 
-  const openInstallerDownload = (url: string) => {
-    window.open(url, "_blank", "noopener,noreferrer");
+  const openInstallerDownload = (
+    url: string,
+    arch: "x64" | "arm64",
+  ) => {
+    triggerInstallerDownload(url, arch, versionLabel);
     toast.success("Download started");
   };
 
@@ -50,7 +61,7 @@ export default function DashboardDownloadsPage() {
 
           <Button
             size="lg"
-            onClick={() => openInstallerDownload(installerUrlX64)}
+            onClick={() => openInstallerDownload(installerUrlX64, "x64")}
             className="h-auto w-full flex-col gap-1 rounded-xl bg-gradient-to-r from-[#0066FF] to-[#00AACC] py-3 text-white shadow-lg shadow-blue-600/25 hover:from-[#0055DD] hover:to-[#0099BB]"
           >
             <span className="flex items-center gap-2">
@@ -64,7 +75,7 @@ export default function DashboardDownloadsPage() {
             <Button
               size="lg"
               variant="outline"
-              onClick={() => openInstallerDownload(installerUrlArm64)}
+              onClick={() => openInstallerDownload(installerUrlArm64!, "arm64")}
               className="mt-3 h-auto w-full flex-col gap-1 rounded-xl border-[#2c4673] bg-[#0b162b] py-3 text-white hover:bg-[#142646]"
             >
               <span className="flex items-center gap-2">
@@ -76,7 +87,7 @@ export default function DashboardDownloadsPage() {
           ) : null}
 
           <p className="mt-3 text-xs leading-relaxed text-[#95a8c6]">
-            <span className="font-medium tabular-nums text-[#b8c5dc]">App v{APP_VERSION_LABEL}</span>
+            <span className="font-medium tabular-nums text-[#b8c5dc]">App v{versionLabel}</span>
             {installerFileMtime ? (
               <>
                 <span className="text-white/25"> · </span>

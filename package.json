@@ -20,7 +20,7 @@
     "dev:android": "npm run dev:phone",
     "start:desktop": "electron .",
     "preview": "vite preview",
-    "prebuild:web": "node scripts/sync-public-build-meta.mjs && node scripts/ensure-vite-supabase-env.mjs",
+    "prebuild:web": "node scripts/sync-public-build-meta.mjs && node scripts/ensure-public-installer-sync.mjs && node scripts/ensure-vite-supabase-env.mjs",
     "build:web": "vite build",
     "build:phone:web": "cross-env VITE_PHONE_STORE_BUILD=true vite build && node scripts/prepare-capacitor-phone-web.mjs",
     "cap:copy": "npm run build:phone:web && npx cap copy",
@@ -38,8 +38,8 @@
     "dist:win:fresh": "npm run build:web && electron-builder --win nsis --config.directories.output=release-eb-staging && cross-env RELEASE_DIR=release-eb-staging node scripts/copy-windows-installers-to-public.mjs",
     "dist:win:full": "npm run clean:electron-release && npm run build:web && electron-builder --win nsis && node scripts/copy-windows-installers-to-public.mjs",
     "dist:win:skip-clean": "npm run dist:win",
-    "postdist:win": "node scripts/copy-windows-installers-to-public.mjs",
-    "copy-installers": "node scripts/copy-windows-installers-to-public.mjs",
+    "postdist:win": "node scripts/copy-windows-installers-to-public.mjs && node scripts/sync-public-build-meta.mjs",
+    "copy-installers": "node scripts/copy-windows-installers-to-public.mjs && node scripts/sync-public-build-meta.mjs",
     "lint": "eslint .",
     "prettier-fix": "prettier --write .",
     "prettier-check": "prettier --check ."
@@ -173,7 +173,9 @@
       "uninstallerIcon": "electron/icon.ico",
       "installerHeaderIcon": "electron/icon.ico",
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "shortcutName": "Vyntex POS ${version}",
+      "uninstallDisplayName": "${productName} ${version}"
     }
   }
 }

@@ -44,6 +44,23 @@ function resolveAppVersionLabel(): string {
  */
 export const APP_VERSION_LABEL = resolveAppVersionLabel();
 
+/**
+ * App mark for `<img src>`, PIN-screen fallback, navbar, etc.
+ * - Override with `VITE_APP_LOGO_URL`: full `https://…` URL or a path under `public/` (e.g. `vyntex-logo.png`).
+ * - Default: `public/vyntex-logo.png` (your PNG from `build/vyntex-logo.png` is copied there; replace to update).
+ */
+function resolveVyntexAppLogoSrc(): string {
+  const raw = (import.meta.env.VITE_APP_LOGO_URL as string | undefined)?.trim();
+  if (raw) {
+    if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
+    const path = raw.replace(/^\//, "");
+    return `${import.meta.env.BASE_URL}${path}`;
+  }
+  return `${import.meta.env.BASE_URL}vyntex-logo.png`;
+}
+
+export const VYNTEX_APP_LOGO_SRC = resolveVyntexAppLogoSrc();
+
 function formatInstallerMtimeForUi(iso: string | undefined): string | null {
   if (!iso || !String(iso).trim()) return null;
   const d = new Date(iso);
@@ -55,6 +72,13 @@ function formatInstallerMtimeForUi(iso: string | undefined): string | null {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+/** User-facing timestamp from an ISO string (e.g. installer mtime). */
+export function formatInstallerDisplayFromIso(
+  iso: string | null | undefined,
+): string | null {
+  return formatInstallerMtimeForUi(iso ?? undefined);
 }
 
 /** Raw ISO mtime of `public/RestaurantPOSSetup.exe` from Vite `define` (dev start / build). */

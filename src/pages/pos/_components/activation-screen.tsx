@@ -12,8 +12,7 @@ import {
 import { activateLicense } from "@/lib/supabase-pos.ts";
 import { isSupabaseConfigured } from "@/lib/supabase.ts";
 import { usePosTheme } from "../_lib/use-pos-theme.ts";
-
-const LOGO_URL = "https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz";
+import { APP_VERSION_LABEL, VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 
 type ActivationScreenProps = {
   onActivated: () => void;
@@ -118,7 +117,7 @@ export default function ActivationScreen({ onActivated }: ActivationScreenProps)
         {/* Logo */}
         <div className="flex flex-col items-center mb-10">
           <motion.img
-            src={LOGO_URL}
+            src={VYNTEX_APP_LOGO_SRC}
             alt="Vyntex POS"
             className="h-16 w-16 mb-4"
             initial={{ scale: 0.5, opacity: 0 }}
@@ -236,6 +235,12 @@ export default function ActivationScreen({ onActivated }: ActivationScreenProps)
         <p className="text-center text-xs text-[#5a6580] mt-6">
           Find your license key in the{" "}
           <span className="text-[#0066FF]">Vyntex POS Web Dashboard</span>
+        </p>
+        <p
+          className="text-center text-[10px] tabular-nums text-[#3a4560] mt-2"
+          aria-label={`Version ${APP_VERSION_LABEL}`}
+        >
+          v{APP_VERSION_LABEL}
         </p>
       </motion.div>
     </div>

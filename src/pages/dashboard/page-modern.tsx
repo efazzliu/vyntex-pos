@@ -12,13 +12,16 @@ import {
   dashboardTypeLabel,
 } from "@/lib/dashboard-i18n.ts";
 import {
+  triggerInstallerDownload,
   windowsInstallerArm64Href,
   windowsInstallerX64Href,
 } from "@/lib/installer-download-urls.ts";
 import {
   APP_VERSION_LABEL,
   formattedInstallerMtime,
+  formatInstallerDisplayFromIso,
 } from "@/lib/site-constants.ts";
+import { useLiveBuildMeta } from "@/hooks/use-live-build-meta.ts";
 import {
   ArrowRight,
   Calendar,
@@ -100,9 +103,13 @@ export default function DashboardOverviewModern() {
   const { restaurant } = useDashboardRestaurant();
   const { t, lang } = useDashboardLocale();
   const [copied, setCopied] = useState(false);
+  const live = useLiveBuildMeta();
+  const versionLabel = live?.appVersion ?? APP_VERSION_LABEL;
+  const installerFileMtime =
+    formatInstallerDisplayFromIso(live?.installerUpdatedAt) ??
+    formattedInstallerMtime();
   const installerUrlX64 = windowsInstallerX64Href();
   const installerUrlArm64 = windowsInstallerArm64Href();
-  const installerFileMtime = formattedInstallerMtime();
   const dateLocale = dashboardDateLocale(lang);
 
   if (restaurant === undefined) {
@@ -141,8 +148,11 @@ export default function DashboardOverviewModern() {
     }
   };
 
-  const openInstallerDownload = (url: string) => {
-    window.open(url, "_blank", "noopener,noreferrer");
+  const openInstallerDownload = (
+    url: string,
+    arch: "x64" | "arm64",
+  ) => {
+    triggerInstallerDownload(url, arch, versionLabel);
     toast.success(t("toast.download_started"));
   };
 
@@ -271,7 +281,7 @@ export default function DashboardOverviewModern() {
             <div className="flex flex-1 flex-col justify-center gap-3 py-8">
               <Button
                 type="button"
-                onClick={() => openInstallerDownload(installerUrlX64)}
+                onClick={() => openInstallerDownload(installerUrlX64, "x64")}
                 className="h-12 w-full rounded-full border-0 bg-white text-base font-semibold text-zinc-950 shadow-[0_0_40px_-4px_rgba(255,255,255,0.35)] transition hover:bg-sky-50"
               >
                 <span className="flex items-center justify-center gap-2">
@@ -285,7 +295,7 @@ export default function DashboardOverviewModern() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => openInstallerDownload(installerUrlArm64)}
+                  onClick={() => openInstallerDownload(installerUrlArm64, "arm64")}
                   className="h-11 w-full rounded-full border-white/20 bg-transparent text-sm text-white/90 hover:bg-white/10"
                 >
                   <span className="flex items-center justify-center gap-2">
@@ -301,7 +311,7 @@ export default function DashboardOverviewModern() {
 
             <p className="mt-auto border-t border-sky-500/15 pt-4 text-center text-[11px] text-white/40">
               <span className="font-mono text-white/55">
-                {t("install.app_version", { version: APP_VERSION_LABEL })}
+                {t("install.app_version", { version: versionLabel })}
               </span>
               {installerFileMtime ? (
                 <>

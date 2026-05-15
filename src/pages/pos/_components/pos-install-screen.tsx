@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button.tsx";
 import { Download, CheckCircle2, Monitor, Wifi } from "lucide-react";
 import { motion } from "motion/react";
+import { APP_VERSION_LABEL, VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -74,7 +75,7 @@ export default function PosInstallScreen() {
       >
         {/* Logo */}
         <motion.img
-          src="https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz"
+          src={VYNTEX_APP_LOGO_SRC}
           alt="VYNTEX"
           className="h-16 w-16 mx-auto mb-6"
           initial={{ scale: 0.8 }}
@@ -154,6 +155,13 @@ export default function PosInstallScreen() {
             </p>
           </motion.div>
         )}
+
+        <p
+          className="mt-8 text-[10px] tabular-nums text-gray-600"
+          aria-label={`Version ${APP_VERSION_LABEL}`}
+        >
+          v{APP_VERSION_LABEL}
+        </p>
       </motion.div>
     </div>
   );
