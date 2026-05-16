@@ -14,6 +14,10 @@ const dashboardPeriodValidator = v.union(
 
 type DashboardPeriod = "day" | "week" | "month" | "year";
 
+function chartLocaleTag(locale?: string): string {
+  return locale === "sq" ? "sq-AL" : "en-US";
+}
+
 function localPeriodStarts(now: Date): Record<DashboardPeriod, string> {
   const dayStart = new Date(
     now.getFullYear(),
@@ -109,6 +113,7 @@ function sumBucketPaid(
 function buildSalesChartDay(
   paid: OrderForChart[],
   now: Date,
+  lc: string,
 ): { current: ChartBucket[]; previous: ChartBucket[] } {
   const today = startLocalDay(now);
   const current: ChartBucket[] = [];
@@ -117,7 +122,7 @@ function buildSalesChartDay(
     const next = addLocalDays(day, 1);
     const s = sumBucketPaid(paid, day.toISOString(), next.toISOString());
     current.push({
-      label: day.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      label: day.toLocaleDateString(lc, { month: "short", day: "numeric" }),
       ...s,
     });
   }
@@ -127,7 +132,7 @@ function buildSalesChartDay(
     const next = addLocalDays(day, 1);
     const s = sumBucketPaid(paid, day.toISOString(), next.toISOString());
     previous.push({
-      label: day.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      label: day.toLocaleDateString(lc, { month: "short", day: "numeric" }),
       ...s,
     });
   }
@@ -137,6 +142,7 @@ function buildSalesChartDay(
 function buildSalesChartWeek(
   paid: OrderForChart[],
   now: Date,
+  lc: string,
 ): { current: ChartBucket[]; previous: ChartBucket[] } {
   const thisWeekStart = startLocalWeekMonday(now);
   const current: ChartBucket[] = [];
@@ -145,7 +151,7 @@ function buildSalesChartWeek(
     const weekEnd = addLocalDays(weekStart, 7);
     const s = sumBucketPaid(paid, weekStart.toISOString(), weekEnd.toISOString());
     current.push({
-      label: weekStart.toLocaleDateString("en-US", {
+      label: weekStart.toLocaleDateString(lc, {
         month: "short",
         day: "numeric",
       }),
@@ -158,7 +164,7 @@ function buildSalesChartWeek(
     const weekEnd = addLocalDays(weekStart, 7);
     const s = sumBucketPaid(paid, weekStart.toISOString(), weekEnd.toISOString());
     previous.push({
-      label: weekStart.toLocaleDateString("en-US", {
+      label: weekStart.toLocaleDateString(lc, {
         month: "short",
         day: "numeric",
       }),
@@ -171,6 +177,7 @@ function buildSalesChartWeek(
 function buildSalesChartMonth(
   paid: OrderForChart[],
   now: Date,
+  lc: string,
 ): { current: ChartBucket[]; previous: ChartBucket[] } {
   const curMonth = startLocalMonth(now);
   const current: ChartBucket[] = [];
@@ -179,7 +186,7 @@ function buildSalesChartMonth(
     const monthEnd = addLocalMonths(monthStart, 1);
     const s = sumBucketPaid(paid, monthStart.toISOString(), monthEnd.toISOString());
     current.push({
-      label: monthStart.toLocaleDateString("en-US", {
+      label: monthStart.toLocaleDateString(lc, {
         month: "short",
         year: "2-digit",
       }),
@@ -192,7 +199,7 @@ function buildSalesChartMonth(
     const monthEnd = addLocalMonths(monthStart, 1);
     const s = sumBucketPaid(paid, monthStart.toISOString(), monthEnd.toISOString());
     previous.push({
-      label: monthStart.toLocaleDateString("en-US", {
+      label: monthStart.toLocaleDateString(lc, {
         month: "short",
         year: "2-digit",
       }),
@@ -205,6 +212,7 @@ function buildSalesChartMonth(
 function buildSalesChartAllTime(
   paid: OrderForChart[],
   now: Date,
+  lc: string,
 ): { current: ChartBucket[]; previous: ChartBucket[] } {
   if (paid.length === 0) {
     return { current: [], previous: [] };
@@ -227,7 +235,7 @@ function buildSalesChartAllTime(
     const monthEnd = addLocalMonths(monthStart, 1);
     const s = sumBucketPaid(paid, monthStart.toISOString(), monthEnd.toISOString());
     return {
-      label: monthStart.toLocaleDateString("en-US", {
+      label: monthStart.toLocaleDateString(lc, {
         month: "short",
         year: "2-digit",
       }),
@@ -242,7 +250,7 @@ function buildSalesChartAllTime(
       const monthEnd = addLocalMonths(monthStart, 1);
       const s = sumBucketPaid(paid, monthStart.toISOString(), monthEnd.toISOString());
       previous.push({
-        label: monthStart.toLocaleDateString("en-US", {
+        label: monthStart.toLocaleDateString(lc, {
           month: "short",
           year: "2-digit",
         }),
@@ -253,12 +261,12 @@ function buildSalesChartAllTime(
   return { current, previous };
 }
 
-function buildSalesChartBundle(paid: OrderForChart[], now: Date) {
+function buildSalesChartBundle(paid: OrderForChart[], now: Date, lc: string) {
   return {
-    day: buildSalesChartDay(paid, now),
-    week: buildSalesChartWeek(paid, now),
-    month: buildSalesChartMonth(paid, now),
-    all: buildSalesChartAllTime(paid, now),
+    day: buildSalesChartDay(paid, now, lc),
+    week: buildSalesChartWeek(paid, now, lc),
+    month: buildSalesChartMonth(paid, now, lc),
+    all: buildSalesChartAllTime(paid, now, lc),
   };
 }
 
@@ -277,6 +285,7 @@ function buildSupplyProfitLast6Months(
   paid: OrderForChart[],
   stockLogs: Doc<"stockLogs">[],
   menuItems: Doc<"menuItems">[],
+  lc: string,
 ): SupplyProfitMonthPoint[] {
   const priceByItem = new Map<string, number>(
     menuItems.map((m) => [m._id as string, m.price]),
@@ -291,7 +300,7 @@ function buildSupplyProfitLast6Months(
     const endIso = periodEnd.toISOString();
     if (periodEnd < monthStart) {
       out.push({
-        label: monthStart.toLocaleDateString("en-US", {
+        label: monthStart.toLocaleDateString(lc, {
           month: "short",
           year: "2-digit",
         }),
@@ -330,7 +339,7 @@ function buildSupplyProfitLast6Months(
     supplyIntake = round2(supplyIntake);
     stockExpense = round2(stockExpense);
     out.push({
-      label: monthStart.toLocaleDateString("en-US", {
+      label: monthStart.toLocaleDateString(lc, {
         month: "short",
         year: "2-digit",
       }),
@@ -346,6 +355,7 @@ function buildSupplyProfitLast6Months(
 function buildLast7DaysPaidRevenueByDay(
   paid: OrderForChart[],
   now: Date,
+  lc: string,
 ): { day: string; revenue: number }[] {
   const today = startLocalDay(now);
   const out: { day: string; revenue: number }[] = [];
@@ -358,7 +368,7 @@ function buildLast7DaysPaidRevenueByDay(
       dayEnd.toISOString(),
     );
     out.push({
-      day: dayStart.toLocaleDateString("en-US", { weekday: "short" }),
+      day: dayStart.toLocaleDateString(lc, { weekday: "short" }),
       revenue: s.revenue,
     });
   }
@@ -370,6 +380,13 @@ export const getDashboardStats = query({
     licenseKey: v.string(),
     viewPeriod: v.optional(dashboardPeriodValidator),
     anchorDate: v.optional(v.string()),
+    locale: v.optional(v.union(v.literal("en"), v.literal("sq"))),
+    /** Inclusive start of filter window (ISO), from the client browser local midnight as UTC instant. */
+    rangeFromIso: v.optional(v.string()),
+    /** Exclusive end of filter window (ISO), start of day after last selected day. */
+    rangeToExclusiveIso: v.optional(v.string()),
+    /** Start of the last calendar day in the range (ISO), for open-order / status widgets. */
+    operationalDayStartIso: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const restaurant = await getRestaurantByLicense(ctx, args.licenseKey);
@@ -390,31 +407,69 @@ export const getDashboardStats = query({
     const starts = localPeriodStarts(now);
     const todayStart = starts.day;
 
-    const allPaidOrders = allOrders.filter((o) => o.status === "paid");
-    const salesChart = buildSalesChartBundle(
-      allPaidOrders as OrderForChart[],
-      now,
-    );
+    const rangeFromIso = String(args.rangeFromIso ?? "").trim();
+    const rangeToExclusiveIso = String(args.rangeToExclusiveIso ?? "").trim();
+    const operationalDayStartIso = String(args.operationalDayStartIso ?? "").trim();
+    const useRangeFilter =
+      rangeFromIso.length > 0 &&
+      rangeToExclusiveIso.length > 0 &&
+      rangeToExclusiveIso > rangeFromIso;
+
+    const paidInRange = (createdAt: string) =>
+      createdAt >= rangeFromIso && createdAt < rangeToExclusiveIso;
+
+    const lc = chartLocaleTag(args.locale);
+
+    const paidOrdersForCharts = (
+      useRangeFilter
+        ? allOrders.filter(
+            (o) => o.status === "paid" && paidInRange(o.createdAt),
+          )
+        : allOrders.filter((o) => o.status === "paid")
+    ) as OrderForChart[];
+
+    const salesChart = buildSalesChartBundle(paidOrdersForCharts, now, lc);
 
     const paidFrom = (startIso: string) =>
       allOrders.filter((o) => o.status === "paid" && o.createdAt >= startIso);
 
-    const periodSummaries = {
-      day: summarizePaidOrders(paidFrom(starts.day)),
-      week: summarizePaidOrders(paidFrom(starts.week)),
-      month: summarizePaidOrders(paidFrom(starts.month)),
-      year: summarizePaidOrders(paidFrom(starts.year)),
-    };
+    const periodSummaries = useRangeFilter
+      ? (() => {
+          const s = summarizePaidOrders(paidOrdersForCharts);
+          return {
+            day: s,
+            week: s,
+            month: s,
+            year: s,
+          };
+        })()
+      : {
+          day: summarizePaidOrders(paidFrom(starts.day)),
+          week: summarizePaidOrders(paidFrom(starts.week)),
+          month: summarizePaidOrders(paidFrom(starts.month)),
+          year: summarizePaidOrders(paidFrom(starts.year)),
+        };
 
     const detailPeriod: DashboardPeriod = args.viewPeriod ?? "day";
-    const detailPaid = paidFrom(starts[detailPeriod]);
+    const detailPaid = useRangeFilter
+      ? allOrders.filter(
+          (o) => o.status === "paid" && paidInRange(o.createdAt),
+        )
+      : paidFrom(starts[detailPeriod]);
 
     const todayRevenue = periodSummaries.day.revenue;
     const todayPaidCount = periodSummaries.day.paidCount;
     const avgOrderValue = periodSummaries.day.avgOrderValue;
 
-    // Filter today's orders (operational widgets)
-    const todayOrders = allOrders.filter((o) => o.createdAt >= todayStart);
+    // Filter today's orders (operational widgets) — last day of selected range, or real "today"
+    const todayOrders =
+      useRangeFilter && operationalDayStartIso.length > 0
+        ? allOrders.filter(
+            (o) =>
+              o.createdAt >= operationalDayStartIso &&
+              o.createdAt < rangeToExclusiveIso,
+          )
+        : allOrders.filter((o) => o.createdAt >= todayStart);
 
     // Revenue by payment type (selected period)
     const revenueByPaymentType: Record<string, { count: number; total: number }> = {};
@@ -531,8 +586,9 @@ export const getDashboardStats = query({
     };
 
     const weekDayRevenue = buildLast7DaysPaidRevenueByDay(
-      allPaidOrders as OrderForChart[],
+      paidOrdersForCharts,
       now,
+      lc,
     );
 
     const menuItems = await ctx.db
@@ -551,9 +607,10 @@ export const getDashboardStats = query({
 
     const supplyProfitChart = buildSupplyProfitLast6Months(
       now,
-      allPaidOrders as OrderForChart[],
+      paidOrdersForCharts,
       stockLogs,
       menuItems,
+      lc,
     );
 
     let inventoryTotal = 0;

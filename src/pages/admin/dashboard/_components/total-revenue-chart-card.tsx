@@ -103,7 +103,7 @@ export function TotalRevenueChartCard({ currentMrrEur, period }: TotalRevenueCha
         <div className="min-w-0 space-y-1">
           <h2 className="text-lg font-semibold tracking-tight text-foreground">Total Revenue</h2>
           <p className="text-xs text-muted-foreground sm:text-[13px]">
-            Paid subscription MRR — snapshot and trailing month-end trend (estimate).
+            Paddle cash collected per month — live MRR headline from active subscriptions.
           </p>
         </div>
 

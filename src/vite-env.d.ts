@@ -10,12 +10,20 @@ type PrintHtmlSilentPayload =
   | string
   | { html: string; deviceName?: string };
 
+type GetSystemPrintersIpcResult =
+  | {
+      ok: true;
+      printers: { deviceName: string; displayName: string; isDefault: boolean }[];
+    }
+  | { ok: false; error: string };
+
 interface VyntexDesktopApi {
   platform: string;
   isElectron: boolean;
   printHtmlSilent?: (
     payload: PrintHtmlSilentPayload,
   ) => Promise<{ ok: boolean; error?: string }>;
+  getSystemPrinters?: () => Promise<GetSystemPrintersIpcResult>;
 }
 
 declare global {

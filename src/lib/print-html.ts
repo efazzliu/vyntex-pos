@@ -166,3 +166,25 @@ export async function printHtmlDocumentAsync(
   const r = await tryPrintHtmlDocumentAsync(htmlFullDocument, options);
   return r.ok;
 }
+
+export type DesktopSystemPrinterInfo = {
+  deviceName: string;
+  displayName: string;
+  isDefault: boolean;
+};
+
+export type GetSystemPrintersResult =
+  | { ok: true; printers: DesktopSystemPrinterInfo[] }
+  | { ok: false; error: string };
+
+/** Electron only: lists physical OS print queues (excludes PDF/virtual). */
+export function getDesktopSystemPrintersInvoker():
+  | (() => Promise<GetSystemPrintersResult>)
+  | undefined {
+  if (typeof window === "undefined") return undefined;
+  const w = window as Window & {
+    desktop?: { getSystemPrinters?: () => Promise<GetSystemPrintersResult> };
+  };
+  const fn = w.desktop?.getSystemPrinters;
+  return typeof fn === "function" ? fn.bind(w.desktop) : undefined;
+}

@@ -48,7 +48,7 @@ export function PlanSplitChartCard({ period }: PlanSplitChartCardProps) {
           </p>
         ) : planTotal <= 0 ? (
           <p className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">
-            No licenses in selected range.
+            No Paddle payments in selected range.
           </p>
         ) : (
           <ResponsiveContainer width="100%" height="100%">

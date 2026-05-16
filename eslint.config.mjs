@@ -21,6 +21,8 @@ export default defineConfig([
       herculesPlugin.configs.recommended,
     ],
     rules: {
+      // Branded dashboard/POS screens intentionally override outline button colors.
+      "@usehercules/no-outline-button-color-override": "off",
       "@typescript-eslint/ban-ts-comment": [
         "error",
         { "ts-ignore": true, "ts-expect-error": true, "ts-nocheck": true },

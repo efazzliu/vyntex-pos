@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useQuery } from "convex/react";
+import { enUS, sq as sqDateLocale } from "date-fns/locale";
+import type { DateRange } from "react-day-picker";
 import {
   Area,
   Bar,
@@ -17,9 +19,18 @@ import {
 } from "recharts";
 import BulkFiscalizationSheet from "./bulk-fiscalization.tsx";
 import { usePosLocale } from "./pos-locale-provider.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Calendar as DayPickerCalendar } from "@/components/ui/calendar.tsx";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover.tsx";
 import {
   ArrowDownRight,
   ArrowUpRight,
+  CalendarDays,
+  ChevronDown,
   ChevronRight,
   ShoppingCart,
   TrendingUp,
@@ -133,6 +144,170 @@ const DONUT_PALETTE = [
   "#eab308",
 ];
 
+function parseYmdToLocalNoon(ymd: string): Date {
+  const parts = ymd.split("-").map((x) => Number(x));
+  const y = parts[0] ?? 1970;
+  const mo = parts[1] ?? 1;
+  const d = parts[2] ?? 1;
+  return new Date(y, mo - 1, d, 12, 0, 0, 0);
+}
+
+function compareYmd(a: string, b: string): number {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+}
+
+function normalizeRangeYmd(from: string, to: string): { from: string; to: string } {
+  return compareYmd(from, to) <= 0 ? { from, to } : { from: to, to: from };
+}
+
+function ymdParts(ymd: string): { y: number; m: number; d: number } {
+  const p = ymd.split("-").map(Number);
+  return { y: p[0] ?? 0, m: p[1] ?? 1, d: p[2] ?? 1 };
+}
+
+/** Local calendar bounds as ISO strings for Convex / Supabase filters. */
+function computeDashboardQueryBounds(fromYmd: string, toYmd: string) {
+  const { from: f, to: t } = normalizeRangeYmd(fromYmd, toYmd);
+  const a = ymdParts(f);
+  const b = ymdParts(t);
+  const rangeStart = new Date(a.y, a.m - 1, a.d, 0, 0, 0, 0);
+  const rangeToExclusive = new Date(b.y, b.m - 1, b.d + 1, 0, 0, 0, 0);
+  const anchorEnd = new Date(b.y, b.m - 1, b.d, 12, 0, 0, 0);
+  const operationalDayStart = new Date(b.y, b.m - 1, b.d, 0, 0, 0, 0);
+  return {
+    rangeFromIso: rangeStart.toISOString(),
+    rangeToExclusiveIso: rangeToExclusive.toISOString(),
+    anchorDate: anchorEnd.toISOString(),
+    operationalDayStartIso: operationalDayStart.toISOString(),
+  };
+}
+
+function startOfLocalTodayNoon(): Date {
+  const x = new Date();
+  x.setHours(12, 0, 0, 0);
+  return x;
+}
+
+function DashboardRangeCalendar({
+  fromYmd,
+  toYmd,
+  onRangeYmd,
+  language,
+  t,
+}: {
+  fromYmd: string;
+  toYmd: string;
+  onRangeYmd: (from: string, to: string) => void;
+  language: "en" | "sq";
+  t: (key: string, options?: Record<string, unknown>) => string;
+}) {
+  const [open, setOpen] = useState(false);
+  const displayLocaleTag = language === "sq" ? "sq-AL" : "en-GB";
+  const pickerLocale = language === "sq" ? sqDateLocale : enUS;
+  const selected: DateRange = useMemo(
+    () => ({
+      from: parseYmdToLocalNoon(fromYmd),
+      to: parseYmdToLocalNoon(toYmd),
+    }),
+    [fromYmd, toYmd],
+  );
+  const label = useMemo(() => {
+    const a = selected.from ?? parseYmdToLocalNoon(fromYmd);
+    const b = selected.to ?? selected.from ?? parseYmdToLocalNoon(toYmd);
+    const opts: Intl.DateTimeFormatOptions = {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    };
+    if (fromYmd === toYmd) {
+      return a.toLocaleDateString(displayLocaleTag, opts);
+    }
+    return `${a.toLocaleDateString(displayLocaleTag, { day: "numeric", month: "short" })} – ${b.toLocaleDateString(displayLocaleTag, opts)}`;
+  }, [displayLocaleTag, fromYmd, selected.from, selected.to, toYmd]);
+  const todayNoon = startOfLocalTodayNoon();
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="group inline-flex min-w-[220px] max-w-full shrink-0 items-center gap-3 rounded-2xl border border-white/70 bg-white/75 px-4 py-2.5 text-left shadow-[0_10px_28px_-12px_rgba(15,23,42,0.15),inset_0_1px_0_rgba(255,255,255,0.92)] backdrop-blur-xl outline-none transition hover:border-indigo-200/80 hover:bg-white/90 hover:shadow-[0_14px_36px_-12px_rgba(99,102,241,0.22)] focus-visible:ring-2 focus-visible:ring-indigo-400/50"
+        >
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500/15 to-violet-600/10 ring-1 ring-indigo-500/15">
+            <CalendarDays className="size-5 text-indigo-700" strokeWidth={2} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+              {t("dashboard.calendar_range_label")}
+            </span>
+            <span className="block truncate text-sm font-semibold tracking-tight text-slate-900">{label}</span>
+          </span>
+          <ChevronDown className={`size-4 shrink-0 text-slate-400 transition ${open ? "rotate-180" : ""}`} />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        sideOffset={10}
+        className="w-auto max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-white/80 bg-white/95 p-0 shadow-[0_24px_60px_-20px_rgba(15,23,42,0.28)] backdrop-blur-xl"
+      >
+        <div className="border-b border-slate-200/70 bg-gradient-to-r from-slate-50/90 to-indigo-50/40 px-4 py-3">
+          <p className="text-sm font-semibold text-slate-900">{t("dashboard.calendar_range_label")}</p>
+          <p className="mt-0.5 text-xs leading-relaxed text-slate-600">{t("dashboard.calendar_range_hint")}</p>
+        </div>
+        <div className="p-2">
+          <DayPickerCalendar
+            mode="range"
+            numberOfMonths={1}
+            selected={selected}
+            onSelect={(range) => {
+              if (!range?.from) return;
+              if (!range.to) {
+                onRangeYmd(formatLocalYmd(range.from), formatLocalYmd(range.from));
+                return;
+              }
+              let a = formatLocalYmd(range.from);
+              let b = formatLocalYmd(range.to);
+              if (compareYmd(a, b) > 0) {
+                const tmp = a;
+                a = b;
+                b = tmp;
+              }
+              onRangeYmd(a, b);
+              setOpen(false);
+            }}
+            locale={pickerLocale}
+            defaultMonth={selected.to ?? selected.from}
+            disabled={(date) => {
+              const c = new Date(date);
+              c.setHours(12, 0, 0, 0);
+              return c.getTime() > todayNoon.getTime();
+            }}
+            className="rounded-xl [--cell-size:2.25rem]"
+          />
+        </div>
+        <div className="flex justify-end gap-2 border-t border-slate-200/70 bg-slate-50/50 px-3 py-2.5">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="rounded-xl border-slate-200/80 bg-white/90 text-xs font-semibold"
+            onClick={() => {
+              const y = formatLocalYmd(new Date());
+              onRangeYmd(y, y);
+              setOpen(false);
+            }}
+          >
+            {t("dashboard.period_day")}
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function growthPercent(current: number, previous: number): number | null {
   if (!Number.isFinite(current) || !Number.isFinite(previous)) return null;
   if (previous === 0) {
@@ -151,20 +326,37 @@ export default function PosDashboard({
   showAdvancedAnalytics = true,
   onOpenSalesDetail,
 }: PosDashboardProps) {
-  const { t, formatPrice } = usePosLocale();
+  const { t, formatPrice, language } = usePosLocale();
+  const showStarterLayout = !showAdvancedAnalytics;
   const viewPeriod: DashboardPeriod = "day";
-  const [starterDate, setStarterDate] = useState(() => formatLocalYmd(new Date()));
+  const todayYmd = formatLocalYmd(new Date());
+  const [dashboardRangeFromYmd, setDashboardRangeFromYmd] = useState(todayYmd);
+  const [dashboardRangeToYmd, setDashboardRangeToYmd] = useState(todayYmd);
+  const setDashboardRangeYmd = useCallback((from: string, to: string) => {
+    const n = normalizeRangeYmd(from, to);
+    setDashboardRangeFromYmd(n.from);
+    setDashboardRangeToYmd(n.to);
+  }, []);
+  const dashboardQueryBounds = useMemo(
+    () => computeDashboardQueryBounds(dashboardRangeFromYmd, dashboardRangeToYmd),
+    [dashboardRangeFromYmd, dashboardRangeToYmd],
+  );
   const [ordersAnalyticsMode, setOrdersAnalyticsMode] = useState<SalesChartMode>("month");
-  const starterAnchorIso = `${starterDate}T12:00:00`;
   const statsQuery = useQuery("pos.dashboard.getDashboardStats", {
     licenseKey,
     viewPeriod,
-    anchorDate: showAdvancedAnalytics ? undefined : starterAnchorIso,
+    anchorDate: dashboardQueryBounds.anchorDate,
+    rangeFromIso: dashboardQueryBounds.rangeFromIso,
+    rangeToExclusiveIso: dashboardQueryBounds.rangeToExclusiveIso,
+    operationalDayStartIso: dashboardQueryBounds.operationalDayStartIso,
+    locale: language,
   });
-  const zReportToday = useQuery("pos.dashboard.getZReport", {
-    licenseKey,
-    date: showAdvancedAnalytics ? undefined : starterAnchorIso,
-  });
+  const zReportToday = useQuery(
+    showStarterLayout ? "pos.dashboard.getZReport" : undefined,
+    showStarterLayout
+      ? { licenseKey, date: dashboardQueryBounds.anchorDate }
+      : "skip",
+  );
   const stats =
     statsQuery &&
     typeof statsQuery === "object" &&
@@ -180,6 +372,7 @@ export default function PosDashboard({
           },
           viewPeriod: "day" as DashboardPeriod,
           todayRevenue: 0,
+          todayOrderCount: 0,
           todayPaidCount: 0,
           activeOrders: 0,
           avgOrderValue: 0,
@@ -337,177 +530,233 @@ export default function PosDashboard({
   const weekCurrentOrders = salesChart.week.current.reduce((s, p) => s + p.orders, 0);
   const weekPreviousOrders = salesChart.week.previous.reduce((s, p) => s + p.orders, 0);
 
-  if (!showAdvancedAnalytics) {
-    return (
-      <StarterOverview
-        stats={stats}
-        zReportToday={zReportToday}
-        formatPrice={formatPrice}
-        selectedDate={starterDate}
-        onDateChange={setStarterDate}
-      />
-    );
-  }
+  const loadingStats = statsQuery === undefined || Array.isArray(statsQuery);
+  const starterOrderCount = stats.todayOrderCount ?? stats.todayPaidCount;
+  const starterMetricFootnote = t("dashboard.starter_metric_context");
 
   return (
     <div className={`${dashCanvas} space-y-8`}>
-      {/* Header */}
-      <div className="relative">
-        <h1 className="bg-gradient-to-r from-slate-900 via-indigo-900 to-slate-900 bg-clip-text text-3xl font-bold tracking-tight text-transparent drop-shadow-[0_2px_12px_rgba(99,102,241,0.15)]">
-          Welcome Back, {staffName}
-        </h1>
+      <div className="relative flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h1 className="bg-gradient-to-r from-slate-900 via-indigo-900 to-slate-900 bg-clip-text text-3xl font-bold tracking-tight text-transparent drop-shadow-[0_2px_12px_rgba(99,102,241,0.15)]">
+            {String(t("dashboard.welcome_back", { name: staffName }))}
+          </h1>
+          {showStarterLayout ? (
+            <p className={`mt-1 text-sm ${dashMuted}`}>{t("starter_overview.subtitle")}</p>
+          ) : null}
+        </div>
+        <DashboardRangeCalendar
+          fromYmd={dashboardRangeFromYmd}
+          toYmd={dashboardRangeToYmd}
+          onRangeYmd={setDashboardRangeYmd}
+          language={language}
+          t={t}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 xl:items-stretch">
-        <MetricTrendCard
-          title="Total Revenue"
-          icon={Wallet}
-          value={formatPrice(periodSummaries.month.revenue)}
-          trend={growthPercent(monthCurrentRevenue, monthPreviousRevenue)}
-          trendLabel="this month"
-          accent="emerald"
-        />
-        <MetricTrendCard
-          title="Orders"
-          icon={ShoppingCart}
-          value={String(periodSummaries.month.paidCount)}
-          trend={growthPercent(monthCurrentOrders, monthPreviousOrders)}
-          trendLabel="this month"
-          accent="blue"
-        />
-        <MetricTrendCard
-          title="Average Order Value"
-          icon={TrendingUp}
-          value={formatPrice(periodSummaries.month.avgOrderValue)}
-          trend={growthPercent(monthCurrentAvg, monthPreviousAvg)}
-          trendLabel="this month"
-          accent="violet"
-        />
-        <MetricTrendCard
-          title="Active Orders"
-          icon={Clock}
-          value={String(stats.activeOrders)}
-          trend={growthPercent(weekCurrentOrders, weekPreviousOrders)}
-          trendLabel="this month"
-          accent="amber"
-        />
+        {showStarterLayout ? (
+          <>
+            <MetricTrendCard
+              title={t("starter_overview.today_total_sales")}
+              icon={Wallet}
+              value={formatPrice(stats.todayRevenue)}
+              trend={null}
+              trendLabel={starterMetricFootnote}
+              accent="emerald"
+            />
+            <MetricTrendCard
+              title={t("starter_overview.today_orders_count")}
+              icon={ShoppingCart}
+              value={String(starterOrderCount)}
+              trend={null}
+              trendLabel={starterMetricFootnote}
+              accent="blue"
+            />
+            <MetricTrendCard
+              title={t("starter_overview.today_avg_order_value")}
+              icon={TrendingUp}
+              value={formatPrice(stats.avgOrderValue)}
+              trend={null}
+              trendLabel={starterMetricFootnote}
+              accent="violet"
+            />
+            <MetricTrendCard
+              title={t("dashboard.exec_kpi_active_orders")}
+              icon={Clock}
+              value={String(stats.activeOrders)}
+              trend={null}
+              trendLabel={starterMetricFootnote}
+              accent="amber"
+            />
+          </>
+        ) : (
+          <>
+            <MetricTrendCard
+              title={t("dashboard.exec_kpi_total_revenue")}
+              icon={Wallet}
+              value={formatPrice(periodSummaries.month.revenue)}
+              trend={growthPercent(monthCurrentRevenue, monthPreviousRevenue)}
+              trendLabel={t("dashboard.metric_trend_this_month")}
+              accent="emerald"
+            />
+            <MetricTrendCard
+              title={t("dashboard.exec_kpi_orders")}
+              icon={ShoppingCart}
+              value={String(periodSummaries.month.paidCount)}
+              trend={growthPercent(monthCurrentOrders, monthPreviousOrders)}
+              trendLabel={t("dashboard.metric_trend_this_month")}
+              accent="blue"
+            />
+            <MetricTrendCard
+              title={t("dashboard.exec_kpi_avg_order_value")}
+              icon={TrendingUp}
+              value={formatPrice(periodSummaries.month.avgOrderValue)}
+              trend={growthPercent(monthCurrentAvg, monthPreviousAvg)}
+              trendLabel={t("dashboard.metric_trend_this_month")}
+              accent="violet"
+            />
+            <MetricTrendCard
+              title={t("dashboard.exec_kpi_active_orders")}
+              icon={Clock}
+              value={String(stats.activeOrders)}
+              trend={growthPercent(weekCurrentOrders, weekPreviousOrders)}
+              trendLabel={t("dashboard.metric_trend_this_month")}
+              accent="amber"
+            />
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-start">
         <div className="flex flex-col gap-4 lg:col-span-2">
-          <OrdersAnalyticsSection
-            salesChart={salesChart}
-            mode={ordersAnalyticsMode}
-            onModeChange={setOrdersAnalyticsMode}
-            formatPrice={formatPrice}
-            loading={statsQuery === undefined || Array.isArray(statsQuery)}
-          />
-          <SalesAnalyticsBarCard
-            monthlyCurrent={salesChart.month.current}
-            monthlyPrevious={salesChart.month.previous}
-            formatPrice={formatPrice}
-            loading={statsQuery === undefined || Array.isArray(statsQuery)}
-            onViewDetails={onOpenSalesDetail}
-          />
-          <SupplyProfitChartSection
-            data={supplyProfitChart}
-            inventory={inventorySnapshot}
-            formatPrice={formatPrice}
-            t={t}
-            loading={statsQuery === undefined || Array.isArray(statsQuery)}
-          />
-          <WeeklyActivityByDayCard
-            weekDayRevenue={weekDayRevenue}
-            formatPrice={formatPrice}
-            loading={statsQuery === undefined || Array.isArray(statsQuery)}
-          />
+          {showStarterLayout ? (
+            <StarterDashboardDetailColumn
+              stats={stats}
+              zReportToday={zReportToday}
+              formatPrice={formatPrice}
+              t={t}
+              loading={loadingStats}
+            />
+          ) : (
+            <>
+              <OrdersAnalyticsSection
+                salesChart={salesChart}
+                mode={ordersAnalyticsMode}
+                onModeChange={setOrdersAnalyticsMode}
+                formatPrice={formatPrice}
+                loading={loadingStats}
+              />
+              <SalesAnalyticsBarCard
+                monthlyCurrent={salesChart.month.current}
+                monthlyPrevious={salesChart.month.previous}
+                formatPrice={formatPrice}
+                loading={loadingStats}
+                onViewDetails={onOpenSalesDetail}
+              />
+              <SupplyProfitChartSection
+                data={supplyProfitChart}
+                inventory={inventorySnapshot}
+                formatPrice={formatPrice}
+                t={t}
+                loading={loadingStats}
+              />
+              <WeeklyActivityByDayCard
+                weekDayRevenue={weekDayRevenue}
+                formatPrice={formatPrice}
+                loading={loadingStats}
+              />
+            </>
+          )}
         </div>
 
-        {showAdvancedAnalytics ? (
-          <div className="flex flex-col gap-3">
-            <DashboardInsights
-              topItems={stats.topItems}
-              t={t}
-              loading={statsQuery === undefined || Array.isArray(statsQuery)}
-            />
-            <FiscalSystemSection
-              formatPrice={formatPrice}
-              fiscalTotal={stats.fiscalSummary.fiscalTotal}
-              nonFiscalTotal={stats.fiscalSummary.nonFiscalTotal}
-              licenseKey={licenseKey}
-              staffId={staffId}
-              staffName={staffName}
-              staffRole={staffRole}
-            />
-            <PopularTimesCard
-              heatmap={(stats.visitorHeatmap as VisitorHeatmap | undefined) ?? { dayLabels: [], matrix24: [] }}
-              loading={statsQuery === undefined || Array.isArray(statsQuery)}
-            />
-            <SectionCard title={t("dashboard.staff_performance")} icon={Users}>
-              {stats.staffPerformance.length === 0 ? (
-                <p className={`text-sm ${dashMuted} py-4`}>{t("dashboard.empty_staff")}</p>
-              ) : (
-                <div className="space-y-2">
-                  {stats.staffPerformance.map((s, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between border-b border-slate-200/45 py-1.5 last:border-0"
-                    >
-                      <div className="flex min-w-0 items-center gap-3">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-500/15 text-xs font-bold text-blue-400">
-                          {s.name
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")
-                            .slice(0, 2)
-                            .toUpperCase()}
+        <div className="flex flex-col gap-3">
+          {!showStarterLayout ? (
+            <DashboardInsights topItems={stats.topItems} t={t} loading={loadingStats} />
+          ) : null}
+          <FiscalSystemSection
+            formatPrice={formatPrice}
+            fiscalTotal={stats.fiscalSummary.fiscalTotal}
+            nonFiscalTotal={stats.fiscalSummary.nonFiscalTotal}
+            licenseKey={licenseKey}
+            staffId={staffId}
+            staffName={staffName}
+            staffRole={staffRole}
+          />
+          {!showStarterLayout ? (
+            <>
+              <PopularTimesCard
+                heatmap={(stats.visitorHeatmap as VisitorHeatmap | undefined) ?? { dayLabels: [], matrix24: [] }}
+                loading={loadingStats}
+              />
+              <SectionCard title={t("dashboard.staff_performance")} icon={Users}>
+                {stats.staffPerformance.length === 0 ? (
+                  <p className={`text-sm ${dashMuted} py-4`}>{t("dashboard.empty_staff")}</p>
+                ) : (
+                  <div className="space-y-2">
+                    {stats.staffPerformance.map((s, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between border-b border-slate-200/45 py-1.5 last:border-0"
+                      >
+                        <div className="flex min-w-0 items-center gap-3">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-500/15 text-xs font-bold text-blue-400">
+                            {s.name
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")
+                              .slice(0, 2)
+                              .toUpperCase()}
+                          </div>
+                          <span className="truncate text-sm text-slate-900">{s.name}</span>
                         </div>
-                        <span className="truncate text-sm text-slate-900">{s.name}</span>
+                        <div className="flex shrink-0 items-center gap-4">
+                          <span className={`text-xs ${dashMuted}`}>
+                            {t("dashboard.staff_orders", { count: s.orders })}
+                          </span>
+                          <span className="w-20 text-right text-sm font-semibold text-slate-900">
+                            {formatPrice(s.revenue)}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex shrink-0 items-center gap-4">
-                        <span className={`text-xs ${dashMuted}`}>
-                          {t("dashboard.staff_orders", { count: s.orders })}
-                        </span>
-                        <span className="w-20 text-right text-sm font-semibold text-slate-900">
-                          {formatPrice(s.revenue)}
-                        </span>
+                    ))}
+                  </div>
+                )}
+              </SectionCard>
+              <SectionCard title={t("dashboard.top_selling")} icon={UtensilsCrossed}>
+                {stats.topItems.length === 0 ? (
+                  <p className={`text-sm ${dashMuted} py-2`}>{t("dashboard.empty_sales")}</p>
+                ) : (
+                  <div className="divide-y divide-slate-200/40 rounded-2xl border border-white/60 bg-white/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] backdrop-blur-sm">
+                    {stats.topItems.map((item, idx) => (
+                      <div
+                        key={`${item.name}-${idx}`}
+                        className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm"
+                      >
+                        <div className="flex min-w-0 flex-1 items-center gap-3">
+                          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-xs font-bold text-slate-600 tabular-nums">
+                            {idx + 1}
+                          </span>
+                          <span className="truncate font-medium text-slate-900">{item.name}</span>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-3 sm:gap-5">
+                          <span className={`text-xs tabular-nums ${dashMuted}`}>
+                            {t("dashboard.top_item_qty", { count: item.quantity })}
+                          </span>
+                          <span className="w-[88px] text-right text-sm font-semibold text-slate-900 tabular-nums sm:w-28">
+                            {formatPrice(item.revenue)}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </SectionCard>
-            <SectionCard title={t("dashboard.top_selling")} icon={UtensilsCrossed}>
-              {stats.topItems.length === 0 ? (
-                <p className={`text-sm ${dashMuted} py-2`}>{t("dashboard.empty_sales")}</p>
-              ) : (
-                <div className="divide-y divide-slate-200/40 rounded-2xl border border-white/60 bg-white/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] backdrop-blur-sm">
-                  {stats.topItems.map((item, idx) => (
-                    <div
-                      key={`${item.name}-${idx}`}
-                      className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm"
-                    >
-                      <div className="flex min-w-0 flex-1 items-center gap-3">
-                        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-xs font-bold text-slate-600 tabular-nums">
-                          {idx + 1}
-                        </span>
-                        <span className="truncate font-medium text-slate-900">{item.name}</span>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-3 sm:gap-5">
-                        <span className={`text-xs tabular-nums ${dashMuted}`}>
-                          {t("dashboard.top_item_qty", { count: item.quantity })}
-                        </span>
-                        <span className="w-[88px] text-right text-sm font-semibold text-slate-900 tabular-nums sm:w-28">
-                          {formatPrice(item.revenue)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </SectionCard>
-          </div>
-        ) : null}
+                    ))}
+                  </div>
+                )}
+              </SectionCard>
+            </>
+          ) : (
+            <StarterDashboardStaffColumn zReportToday={zReportToday} stats={stats} formatPrice={formatPrice} />
+          )}
+        </div>
       </div>
     </div>
   );
@@ -720,156 +969,199 @@ function MetricTrendCard({
   );
 }
 
-function StarterOverview({
+type StarterDashStats = {
+  todayRevenue: number;
+  todayOrderCount?: number;
+  todayPaidCount: number;
+  avgOrderValue: number;
+  revenueByMethod: Record<string, { count: number; total: number }>;
+  activeTables: number;
+  activeOrders: number;
+  ordersByStatus: Record<string, number>;
+  staffPerformance: Array<{ name: string; orders: number; revenue: number }>;
+};
+
+type ZReportTodayShape = {
+  openingCash?: number;
+  totalToHandOver?: number;
+  staffBreakdown?: Array<{ staffName: string; revenue: number }>;
+  shiftDetails?: Array<{ staffName: string; clockOut?: string | null }>;
+};
+
+function parseZReportToday(raw: unknown): ZReportTodayShape | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  return raw as ZReportTodayShape;
+}
+
+function StarterDashboardDetailColumn({
   stats,
   zReportToday,
   formatPrice,
-  selectedDate,
-  onDateChange,
+  t,
+  loading,
 }: {
-  stats: {
-    todayRevenue: number;
-    todayOrderCount?: number;
-    todayPaidCount: number;
-    avgOrderValue: number;
-    revenueByMethod: Record<string, { count: number; total: number }>;
-    activeTables: number;
-    activeOrders: number;
-    ordersByStatus: Record<string, number>;
-    staffPerformance: Array<{ name: string; orders: number; revenue: number }>;
-  };
-  zReportToday:
-    | {
-        openingCash?: number;
-        totalToHandOver?: number;
-        staffBreakdown?: Array<{ staffName: string; revenue: number }>;
-        shiftDetails?: Array<{ staffName: string; clockOut?: string | null }>;
-      }
-    | undefined;
+  stats: StarterDashStats;
+  zReportToday: unknown;
   formatPrice: (n: number) => string;
-  selectedDate: string;
-  onDateChange: (date: string) => void;
+  t: (key: string, options?: Record<string, unknown>) => string;
+  loading: boolean;
 }) {
-  const { t } = usePosLocale();
+  const z = parseZReportToday(zReportToday);
   const cashToday = stats.revenueByMethod?.cash?.total ?? 0;
   const cardToday = stats.revenueByMethod?.card?.total ?? 0;
-  const openingCash = zReportToday?.openingCash ?? 0;
+  const openingCash = z?.openingCash ?? 0;
   const cashInDrawer = openingCash + cashToday;
-  const closingBalance = zReportToday?.totalToHandOver ?? cashInDrawer;
+  const closingBalance = z?.totalToHandOver ?? cashInDrawer;
   const pendingOrders = stats.activeOrders;
   const completedOrders = stats.todayPaidCount;
   const cancelledOrders = stats.ordersByStatus?.cancelled ?? 0;
-  // Current schema has no explicit takeaway flag yet.
   const takeawayOrders = 0;
 
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-4">
+        <div className={`${dashPanel} h-52 animate-pulse rounded-3xl bg-slate-200/40`} />
+        <div className={`${dashPanel} h-44 animate-pulse rounded-3xl bg-slate-200/40`} />
+        <div className={`${dashPanel} h-40 animate-pulse rounded-3xl bg-slate-200/40`} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <section className={`w-full min-w-0 ${dashPanel}`}>
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400/25 to-teal-700/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] ring-1 ring-white/55">
+              <BarChart2 className="size-5 text-emerald-700 drop-shadow-sm" strokeWidth={2} />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-lg font-semibold tracking-tight text-slate-900">
+                {t("dashboard.starter_payments_section")}
+              </h3>
+              <p className={`text-xs ${dashMuted}`}>{t("dashboard.starter_payments_sub")}</p>
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <KpiCard icon={Banknote} label={t("starter_overview.today_cash_payments")} value={formatPrice(cashToday)} color="#44CC00" />
+          <KpiCard icon={CreditCard} label={t("starter_overview.today_card_payments")} value={formatPrice(cardToday)} color="#0066FF" />
+          <KpiCard
+            icon={UtensilsCrossed}
+            label={t("starter_overview.today_active_tables")}
+            value={String(stats.activeTables)}
+            color="#a855f7"
+          />
+        </div>
+      </section>
+
+      <section className={`w-full min-w-0 ${dashPanel}`}>
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400/25 to-orange-700/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] ring-1 ring-white/55">
+              <Clock className="size-5 text-amber-700 drop-shadow-sm" strokeWidth={2} />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-lg font-semibold tracking-tight text-slate-900">{t("starter_overview.orders_section")}</h3>
+              <p className={`text-xs ${dashMuted}`}>{t("dashboard.starter_metric_context")}</p>
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <KpiCard icon={Clock} label={t("starter_overview.orders_pending")} value={String(pendingOrders)} color="#f59e0b" />
+          <KpiCard icon={FileCheck} label={t("starter_overview.orders_completed")} value={String(completedOrders)} color="#22c55e" />
+          <KpiCard icon={ShoppingCart} label={t("starter_overview.orders_takeaway")} value={String(takeawayOrders)} color="#0ea5e9" />
+          <KpiCard icon={FileWarning} label={t("starter_overview.orders_cancelled")} value={String(cancelledOrders)} color="#ef4444" />
+        </div>
+      </section>
+
+      <section className={`w-full min-w-0 ${dashPanel}`}>
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-400/25 to-sky-700/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] ring-1 ring-white/55">
+              <Banknote className="size-5 text-cyan-800 drop-shadow-sm" strokeWidth={2} />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-lg font-semibold tracking-tight text-slate-900">{t("starter_overview.cash_register_section")}</h3>
+              <p className={`text-xs ${dashMuted}`}>{t("dashboard.starter_metric_context")}</p>
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+          <KpiCard icon={Banknote} label={t("starter_overview.cash_opening")} value={formatPrice(openingCash)} color="#14b8a6" />
+          <KpiCard icon={Wallet} label={t("starter_overview.cash_in_drawer")} value={formatPrice(cashInDrawer)} color="#eab308" />
+          <KpiCard icon={ReceiptText} label={t("starter_overview.cash_closing_balance")} value={formatPrice(closingBalance)} color="#8b5cf6" />
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function StarterDashboardStaffColumn({
+  zReportToday,
+  stats,
+  formatPrice,
+}: {
+  zReportToday: unknown;
+  stats: StarterDashStats;
+  formatPrice: (n: number) => string;
+}) {
+  const { t } = usePosLocale();
+  const z = parseZReportToday(zReportToday);
   const loggedInStaff = Array.from(
     new Set(
-      (zReportToday?.shiftDetails ?? [])
+      (z?.shiftDetails ?? [])
         .filter((s) => !s.clockOut)
         .map((s) => s.staffName)
         .filter(Boolean),
     ),
   );
 
-  const staffSales = (zReportToday?.staffBreakdown ?? stats.staffPerformance ?? []).slice(0, 6);
+  const fromBreakdown = (z?.staffBreakdown ?? []).map((r) => ({
+    name: r.staffName,
+    revenue: r.revenue,
+  }));
+  const fromPerf = stats.staffPerformance.map((r) => ({ name: r.name, revenue: r.revenue }));
+  const staffSales = (fromBreakdown.length > 0 ? fromBreakdown : fromPerf).slice(0, 8);
+
   return (
-    <div className={`${dashCanvas} space-y-6`}>
-      <div>
-        <h1 className="bg-gradient-to-r from-slate-900 via-indigo-900 to-slate-900 bg-clip-text text-3xl font-bold tracking-tight text-transparent">
-          {t("starter_overview.title")}
-        </h1>
-        <p className={`mt-1 text-sm ${dashMuted}`}>{t("starter_overview.subtitle")}</p>
-        <div className="mt-4 inline-flex items-center gap-3 rounded-2xl border border-white/70 bg-white/70 px-4 py-2.5 shadow-[0_10px_28px_-12px_rgba(15,23,42,0.15),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-xl">
-          <label
-            htmlFor="starter-overview-date"
-            className="text-[11px] font-semibold uppercase tracking-wider text-slate-500"
-          >
-            {t("starter_overview.date_label")}
-          </label>
-          <input
-            id="starter-overview-date"
-            type="date"
-            value={selectedDate}
-            onChange={(e) => onDateChange(e.target.value)}
-            className="h-9 rounded-xl border border-white/60 bg-white/60 px-3 text-sm font-medium text-slate-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] backdrop-blur-sm outline-none transition focus:border-indigo-300/80 focus:bg-white/90"
-          />
-        </div>
-      </div>
-
-      <StarterSection title={t("starter_overview.today_section")} icon={TrendingUp}>
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-          <KpiCard icon={Wallet} label={t("starter_overview.today_total_sales")} value={formatPrice(stats.todayRevenue)} color={ACCENT} />
-          <KpiCard icon={ShoppingCart} label={t("starter_overview.today_orders_count")} value={String(stats.todayOrderCount ?? 0)} color={ORANGE_SERIES} />
-          <KpiCard icon={ReceiptText} label={t("starter_overview.today_avg_order_value")} value={formatPrice(stats.avgOrderValue)} color="#22d3ee" />
-          <KpiCard icon={Banknote} label={t("starter_overview.today_cash_payments")} value={formatPrice(cashToday)} color="#44CC00" />
-          <KpiCard icon={CreditCard} label={t("starter_overview.today_card_payments")} value={formatPrice(cardToday)} color="#0066FF" />
-          <KpiCard icon={UtensilsCrossed} label={t("starter_overview.today_active_tables")} value={String(stats.activeTables)} color="#a855f7" />
-        </div>
-      </StarterSection>
-
-      <StarterSection title={t("starter_overview.orders_section")} icon={Clock}>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <KpiCard icon={Clock} label={t("starter_overview.orders_pending")} value={String(pendingOrders)} color="#f59e0b" />
-          <KpiCard icon={FileCheck} label={t("starter_overview.orders_completed")} value={String(completedOrders)} color="#22c55e" />
-          <KpiCard icon={ShoppingCart} label={t("starter_overview.orders_takeaway")} value={String(takeawayOrders)} color="#0ea5e9" />
-          <KpiCard icon={FileWarning} label={t("starter_overview.orders_cancelled")} value={String(cancelledOrders)} color="#ef4444" />
-        </div>
-      </StarterSection>
-
-      <StarterSection title={t("starter_overview.cash_register_section")} icon={Banknote}>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-          <KpiCard icon={Banknote} label={t("starter_overview.cash_opening")} value={formatPrice(openingCash)} color="#14b8a6" />
-          <KpiCard icon={Wallet} label={t("starter_overview.cash_in_drawer")} value={formatPrice(cashInDrawer)} color="#eab308" />
-          <KpiCard icon={ReceiptText} label={t("starter_overview.cash_closing_balance")} value={formatPrice(closingBalance)} color="#8b5cf6" />
-        </div>
-      </StarterSection>
-
-      <StarterSection title={t("starter_overview.staff_section")} icon={Users}>
-        <div className="space-y-3">
-          <div className={`${dashCard} !p-3`}>
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("starter_overview.staff_logged_in")}</p>
-            {loggedInStaff.length === 0 ? (
-              <p className="text-sm text-slate-500">{t("starter_overview.staff_none_logged_in")}</p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {loggedInStaff.map((name) => (
-                  <span key={name} className="inline-flex items-center gap-1 rounded-full bg-blue-500/15 px-2.5 py-1 text-xs font-medium text-blue-300">
-                    <UserCheck className="size-3.5" />
-                    {name}
-                  </span>
-                ))}
-              </div>
-            )}
+    <div className="flex flex-col gap-3">
+      <SectionCard title={t("starter_overview.staff_logged_in")} icon={UserCheck}>
+        {loggedInStaff.length === 0 ? (
+          <p className={`text-sm ${dashMuted}`}>{t("starter_overview.staff_none_logged_in")}</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {loggedInStaff.map((name) => (
+              <span
+                key={name}
+                className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2.5 py-1 text-xs font-medium text-blue-800 ring-1 ring-blue-500/15"
+              >
+                <UserCheck className="size-3.5 shrink-0 text-blue-700" />
+                {name}
+              </span>
+            ))}
           </div>
-
-          <div className={`${dashCard} !p-3`}>
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("starter_overview.staff_sales_by_person")}</p>
-            {staffSales.length === 0 ? (
-              <p className="text-sm text-slate-500">{t("starter_overview.staff_no_sales_today")}</p>
-            ) : (
-              <div className="space-y-2">
-                {staffSales.map((s) => (
-                  <div key={s.name} className="flex items-center justify-between text-sm">
-                    <span className="text-slate-700">{s.name}</span>
-                    <span className="font-semibold text-slate-900">{formatPrice(s.revenue)}</span>
-                  </div>
-                ))}
+        )}
+      </SectionCard>
+      <SectionCard title={t("starter_overview.staff_sales_by_person")} icon={Users}>
+        {staffSales.length === 0 ? (
+          <p className={`text-sm ${dashMuted}`}>{t("starter_overview.staff_no_sales_today")}</p>
+        ) : (
+          <div className="space-y-2">
+            {staffSales.map((s, idx) => (
+              <div key={`${s.name}-${idx}`} className="flex items-center justify-between gap-2 text-sm">
+                <span className="min-w-0 truncate text-slate-700">{s.name}</span>
+                <span className="shrink-0 font-semibold tabular-nums text-slate-900">{formatPrice(s.revenue)}</span>
               </div>
-            )}
+            ))}
           </div>
-        </div>
-      </StarterSection>
+        )}
+      </SectionCard>
     </div>
   );
 }
 
 type TopItemRow = { name: string; quantity: number; revenue: number };
-const ORDERS_ANALYTICS_MODES: Array<{ value: SalesChartMode; label: string }> = [
-  { value: "month", label: "Monthly" },
-  { value: "week", label: "Weekly" },
-  { value: "day", label: "Daily" },
-  { value: "all", label: "All time" },
-];
 
 function formatHourSnapchat(h: number): string {
   if (h === 0) return "12a";
@@ -1142,6 +1434,21 @@ function OrdersAnalyticsSection({
   loading: boolean;
 }) {
   const { t } = usePosLocale();
+  const ordersAnalyticsModes = useMemo(
+    () =>
+      (["month", "week", "day", "all"] as const).map((value) => ({
+        value,
+        label:
+          value === "month"
+            ? t("dashboard.chart_month")
+            : value === "week"
+              ? t("dashboard.chart_week")
+              : value === "day"
+                ? t("dashboard.chart_day")
+                : t("dashboard.chart_all"),
+      })),
+    [t],
+  );
   const series = salesChart[mode];
   const data = useMemo(
     () =>
@@ -1216,7 +1523,7 @@ function OrdersAnalyticsSection({
             onChange={(e) => onModeChange(e.target.value as SalesChartMode)}
             className="h-9 shrink-0 rounded-xl border border-white/60 bg-white/55 px-3 text-sm font-medium text-slate-800 shadow-[0_2px_10px_-4px_rgba(15,23,42,0.12),inset_0_1px_0_rgba(255,255,255,0.85)] backdrop-blur-md outline-none transition hover:border-indigo-200/70 hover:bg-white/80"
           >
-            {ORDERS_ANALYTICS_MODES.map((item) => (
+            {ordersAnalyticsModes.map((item) => (
               <option key={item.value} value={item.value}>
                 {item.label}
               </option>
@@ -1606,8 +1913,8 @@ function DashboardInsights({
   return (
     <div className={dashCard}>
       <div className="mb-2">
-        <h2 className="text-sm font-semibold text-slate-900">Top 5 Products</h2>
-        <p className={`text-[11px] ${dashMuted} mt-0.5`}>Quantity split by top-selling products</p>
+        <h2 className="text-sm font-semibold text-slate-900">{t("dashboard.top5_products_title")}</h2>
+        <p className={`text-[11px] ${dashMuted} mt-0.5`}>{t("dashboard.top5_products_subtitle")}</p>
       </div>
       {loading ? (
         <div className="mx-auto h-[220px] w-[220px] rounded-full bg-gradient-to-br from-slate-200/60 to-indigo-100/40 shadow-[inset_0_4px_12px_rgba(15,23,42,0.08)] animate-pulse" />
@@ -1643,7 +1950,7 @@ function DashboardInsights({
                 dominantBaseline="middle"
                 className="fill-slate-500 text-[10px] font-medium"
               >
-                Total Qty
+                {t("dashboard.donut_total_qty_label")}
               </text>
               <text
                 x="110"
@@ -1666,7 +1973,9 @@ function DashboardInsights({
                   />
                   <span className="truncate">{row.name}</span>
                 </span>
-                <span className="shrink-0 text-xs font-semibold text-slate-900 tabular-nums">{row.value} qty</span>
+                <span className="shrink-0 text-xs font-semibold text-slate-900 tabular-nums">
+                  {t("dashboard.donut_row_qty", { count: row.value })}
+                </span>
               </div>
             ))}
           </div>
@@ -1693,35 +2002,36 @@ function FiscalSystemSection({
   staffName: string;
   staffRole: string;
 }) {
+  const { t } = usePosLocale();
   const hasData = fiscalTotal > 0 || nonFiscalTotal > 0;
   const todayData = useMemo(
-    () => [{ label: "Today", fiscal: fiscalTotal, nonFiscal: nonFiscalTotal }],
-    [fiscalTotal, nonFiscalTotal],
+    () => [{ label: t("dashboard.period_day"), fiscal: fiscalTotal, nonFiscal: nonFiscalTotal }],
+    [fiscalTotal, nonFiscalTotal, t],
   );
   return (
     <section className={`w-full min-w-0 ${dashPanel}`}>
       <div>
         <div className="mb-3 flex items-start justify-between gap-2">
           <div>
-            <h3 className="text-lg font-semibold text-slate-900">Fiscal system</h3>
-            <p className={`text-xs ${dashMuted}`}>Today snapshot</p>
+            <h3 className="text-lg font-semibold text-slate-900">{t("dashboard.fiscal_system_title")}</h3>
+            <p className={`text-xs ${dashMuted}`}>{t("dashboard.fiscal_system_subtitle")}</p>
           </div>
           <span className="rounded-full border border-white/60 bg-white/55 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-sm">
-            Today
+            {t("dashboard.today_badge")}
           </span>
         </div>
         {!hasData ? (
-          <p className="py-10 text-center text-sm text-slate-500">No fiscal data yet</p>
+          <p className="py-10 text-center text-sm text-slate-500">{t("dashboard.fiscal_empty")}</p>
         ) : (
           <div className={`w-full min-w-0 ${dashInnerWell}`}>
             <div className="mb-3 flex items-center gap-5 text-[11px]">
               <span className="inline-flex items-center gap-1.5 text-slate-600">
                 <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                Fiskal
+                {t("dashboard.fiscal_short")}
               </span>
               <span className="inline-flex items-center gap-1.5 text-slate-600">
                 <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-                Jo Fiskal
+                {t("dashboard.non_fiscal_short")}
               </span>
             </div>
             <div className="h-[180px]">
@@ -1730,7 +2040,7 @@ function FiscalSystemSection({
                   <CartesianGrid stroke="#e2e8f0" vertical={false} />
                   <XAxis dataKey="label" tick={{ fill: "#94a3b8", fontSize: 11 }} tickLine={false} axisLine={false} />
                   <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={(v) => formatPrice(Number(v))} />
-                  <Bar dataKey="fiscal" name="Fiskal" fill="#10b981" radius={[6, 6, 0, 0]} maxBarSize={20}>
+                  <Bar dataKey="fiscal" name={t("dashboard.fiscal_short")} fill="#10b981" radius={[6, 6, 0, 0]} maxBarSize={20}>
                     <LabelList
                       dataKey="fiscal"
                       position="bottom"
@@ -1740,7 +2050,7 @@ function FiscalSystemSection({
                       fontWeight={700}
                     />
                   </Bar>
-                  <Bar dataKey="nonFiscal" name="Jo Fiskal" fill="#f59e0b" radius={[6, 6, 0, 0]} maxBarSize={20}>
+                  <Bar dataKey="nonFiscal" name={t("dashboard.non_fiscal_short")} fill="#f59e0b" radius={[6, 6, 0, 0]} maxBarSize={20}>
                     <LabelList
                       dataKey="nonFiscal"
                       position="bottom"
@@ -1826,26 +2136,3 @@ function SectionCard({
     </div>
   );
 }
-
-function StarterSection({
-  title,
-  icon: Icon,
-  children,
-}: {
-  title: string;
-  icon: LucideIcon;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className={`${dashPanel}`}>
-      <div className="mb-4 flex items-center gap-2">
-        <span className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-slate-100 to-indigo-100/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] ring-1 ring-white/60">
-          <Icon className="size-4 text-slate-600 drop-shadow-sm" />
-        </span>
-        <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
-      </div>
-      {children}
-    </section>
-  );
-}
-

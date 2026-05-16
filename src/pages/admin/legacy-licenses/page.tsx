@@ -110,7 +110,11 @@ export default function AdminLegacyLicensesPage() {
             </Button>
           </div>
           <p className="mt-2 text-xs text-slate-500 dark:text-slate-300/70">
-            Key is unassigned; first signed-in user that activates it will become the owner.
+            Key starts unassigned. After the customer activates the Windows POS, they should log into this site with the
+            same email, open <span className="font-medium text-slate-700 dark:text-slate-200">Dashboard → Settings</span>,
+            and use <span className="font-medium text-slate-700 dark:text-slate-200">Link license to this account</span>{" "}
+            with this key so the venue appears on their account. (If they activate while already signed in to the web app
+            in the same browser, ownership may link automatically.)
           </p>
         </div>
 

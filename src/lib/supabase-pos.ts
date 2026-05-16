@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from "@/lib/supabase.ts";
 import { errorMessageFromUnknown } from "@/lib/supabase-pos/db-errors.ts";
 import { licenseKeyLookupVariants } from "@/lib/license-key-variants.ts";
+import { devPosPlanDisplayOverride } from "@/lib/dev-pos-plan-override.ts";
 import {
   maxEffectiveTerminalsForLicense,
   normalizePlan,
@@ -161,10 +162,15 @@ async function fetchRestaurantRowForActivation(licenseKey: string): Promise<{
 
 export async function verifyLicense(licenseKey: string, deviceId: string) {
   if (!isSupabaseConfigured) {
-    return { valid: false as const };
+    throw new Error("Supabase not configured");
   }
   const { row: data, error } = await fetchRestaurantRowForActivation(licenseKey);
-  if (error || !data) {
+  if (error) {
+    throw error instanceof Error
+      ? error
+      : new Error(errorMessageFromUnknown(error, "License verification failed"));
+  }
+  if (!data) {
     return { valid: false as const };
   }
 
@@ -173,13 +179,13 @@ export async function verifyLicense(licenseKey: string, deviceId: string) {
     !data.license_expiry ||
     new Date(data.license_expiry).getTime() > Date.now();
   const devices = parseRegisteredDevices(data.registered_devices, data.device_id as string | null);
-  const sameDevice =
-    devices.length === 0 ? !data.device_id || data.device_id === deviceId : devices.includes(deviceId);
+  /** Only devices listed on the license may stay signed in (after admin "reset terminals", list is empty → must re-enter key). */
+  const sameDevice = devices.includes(deviceId);
 
   const rawPlan = data.plan ?? "professional";
   return {
     valid: isActive && notExpired && sameDevice,
-    plan: normalizePlan(String(rawPlan)),
+    plan: devPosPlanDisplayOverride(normalizePlan(String(rawPlan))),
   };
 }
 
@@ -333,7 +339,7 @@ export async function activateLicense(
 
   return {
     licenseKey: normalizedKey,
-    plan: normalizePlan(String(row.plan ?? "professional")),
+    plan: devPosPlanDisplayOverride(normalizePlan(String(row.plan ?? "professional"))),
     businessName: row.name,
     businessType: row.type ?? "restaurant",
     expiresAt: expiresAt ?? new Date().toISOString(),

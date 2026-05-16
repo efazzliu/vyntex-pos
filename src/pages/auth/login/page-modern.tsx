@@ -9,8 +9,7 @@ import { isSupabaseConfigured, supabase } from "@/lib/supabase.ts";
 import { registerUrlWithFreeTrial } from "@/lib/free-trial.ts";
 import { toast } from "sonner";
 import AuthTopNav from "@/pages/auth/_components/auth-top-nav.tsx";
-
-const LOGO_URL = "https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz";
+import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 
 function safeReturnPath(from: unknown): string | null {
   if (typeof from !== "string" || !from.startsWith("/") || from.startsWith("//")) {
@@ -117,7 +116,7 @@ export default function LoginPageModern({
           <div className="grid md:grid-cols-[1.05fr_1fr]">
             <section className="relative hidden p-12 md:block">
               <div className="relative">
-                <img src={LOGO_URL} alt="Vyntex POS" className="h-14 w-14 object-contain" />
+                <img src={VYNTEX_APP_LOGO_SRC} alt="Vyntex POS" className="h-14 w-14 object-contain" />
                 <p className="mt-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white/85">
                   <Sparkles className="h-3.5 w-3.5" />
                   {t("auth.login.heroBadge")}

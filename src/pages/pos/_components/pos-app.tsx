@@ -35,8 +35,7 @@ import {
   hasEnterpriseSupplyRecipe,
   kitchenDisplayNavState,
 } from "../_lib/plan-features.ts";
-
-const LOGO_URL = "https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz";
+import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 
 type PosAppProps = {
   activation: ActivationData;
@@ -148,6 +147,45 @@ function PosAppInner({
     null,
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  useEffect(() => {
+    const onEscape = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+
+      if (drawerOpen) {
+        setDrawerOpen(false);
+        e.preventDefault();
+        return;
+      }
+
+      const ae = document.activeElement;
+      if (
+        ae instanceof HTMLInputElement ||
+        ae instanceof HTMLTextAreaElement ||
+        ae instanceof HTMLSelectElement
+      ) {
+        return;
+      }
+      if (ae instanceof HTMLElement && ae.isContentEditable) return;
+
+      if (
+        document.querySelector('[data-state="open"][data-slot="dialog-content"]') ||
+        document.querySelector('[data-state="open"][data-slot="sheet-content"]') ||
+        document.querySelector('[data-state="open"][data-slot="select-content"]') ||
+        document.querySelector('[data-state="open"][data-slot="dropdown-menu-content"]') ||
+        document.querySelector('[data-state="open"][data-slot="dropdown-menu-sub-content"]') ||
+        document.querySelector('[data-state="open"][data-slot="popover-content"]') ||
+        document.querySelector('[data-state="open"][role="alertdialog"]')
+      ) {
+        return;
+      }
+
+      e.preventDefault();
+      onLogout();
+    };
+    window.addEventListener("keydown", onEscape);
+    return () => window.removeEventListener("keydown", onEscape);
+  }, [drawerOpen, onLogout]);
 
   const setActiveViewForRole = useCallback(
     (view: PosView) => {
@@ -608,7 +646,7 @@ function AdminTopBar({
         onClick={onLogoClick}
         className="cursor-pointer shrink-0 hover:opacity-80 transition-opacity"
       >
-        <img src={LOGO_URL} alt="Vyntex POS" className="h-8 w-8" />
+        <img src={VYNTEX_APP_LOGO_SRC} alt="Vyntex POS" className="h-8 w-8" />
       </button>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-white truncate">

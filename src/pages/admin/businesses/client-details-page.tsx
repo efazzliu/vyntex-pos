@@ -27,8 +27,9 @@ import {
   updateLicenseStatus,
   type ClientAccountRow,
 } from "@/lib/supabase-pos/admin-ops.ts";
+import { normalizePlan, type PlanName } from "@/pages/pos/_lib/plan-features.ts";
 
-type PlanValue = "starter" | "professional" | "enterprise";
+type PlanValue = PlanName;
 type StatusValue = "active" | "expired" | "trial" | "suspended";
 type BillingCycle = "monthly" | "yearly";
 type PaymentMethod = "card" | "bank_transfer" | "paypal" | "other";
@@ -189,6 +190,53 @@ export default function AdminClientDetailsPage() {
                         Copy
                       </Button>
                     </div>
+                  </div>
+
+                  <div className="space-y-1 md:col-span-2">
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-300/70">Plan</p>
+                    <div className="flex flex-wrap items-end gap-2">
+                      <Select
+                        value={d.plan}
+                        onValueChange={(v) => patchDraft(license.id, { plan: v as PlanValue })}
+                      >
+                        <SelectTrigger
+                          size="sm"
+                          className="h-9 min-w-[200px] max-w-xs flex-1 rounded-lg border-slate-200/80 bg-white dark:border-slate-700/70 dark:bg-slate-900"
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="starter">Starter</SelectItem>
+                          <SelectItem value="professional">Professional</SelectItem>
+                          <SelectItem value="enterprise">Enterprise</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-9 rounded-lg px-3"
+                        disabled={
+                          busyKey === `${license.id}-plan` ||
+                          normalizePlan(String(license.plan ?? "")) === d.plan
+                        }
+                        onClick={() =>
+                          runAction(
+                            `${license.id}-plan`,
+                            () => updateLicensePlan(license.id, d.plan),
+                            "Plan updated",
+                          )
+                        }
+                      >
+                        Save plan
+                      </Button>
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                      Active in database:{" "}
+                      <span className="font-semibold text-slate-700 dark:text-slate-200">
+                        {planTierDisplayName(normalizePlan(String(license.plan ?? "")))}
+                      </span>
+                      . Changing tier may raise the minimum terminal count to match the plan.
+                    </p>
                   </div>
 
                   <div className="space-y-1">
@@ -406,7 +454,7 @@ export default function AdminClientDetailsPage() {
 }
 
 function createDraft(account: ClientAccountRow, license: ClientAccountRow["licenses"][number]): LicenseDraft {
-  const plan = normalizePlanValue(license.plan);
+  const plan = normalizePlan(String(license.plan ?? ""));
   const cycle = inferCycle(license.created_at, license.license_expiry);
   const basePrice = plan === "starter" ? 59 : plan === "professional" ? 99 : 189;
   return {
@@ -444,10 +492,10 @@ function normalizePosLabel(value: string): string {
   return value;
 }
 
-function normalizePlanValue(plan: string): PlanValue {
-  const v = plan.trim().toLowerCase();
-  if (v === "starter" || v === "professional" || v === "enterprise") return v;
-  return "starter";
+function planTierDisplayName(plan: PlanValue): string {
+  if (plan === "starter") return "Starter";
+  if (plan === "professional") return "Professional";
+  return "Enterprise";
 }
 
 function normalizeStatusValue(status: string): StatusValue {
@@ -456,12 +504,6 @@ function normalizeStatusValue(status: string): StatusValue {
     return v as StatusValue;
   }
   return "active";
-}
-
-function planLabel(plan: PlanValue): string {
-  if (plan === "starter") return "Starter";
-  if (plan === "professional") return "Pro";
-  return "Enterprise";
 }
 
 function statusLabel(status: StatusValue): string {

@@ -89,7 +89,7 @@ export function RecentTransactionsCard() {
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="text-base font-semibold text-foreground">Recent Transactions</h3>
-          <p className="text-xs text-muted-foreground">Latest subscription billing events across clients.</p>
+          <p className="text-xs text-muted-foreground">Latest charges recorded from Paddle webhooks.</p>
         </div>
         <Button asChild variant="outline" size="sm" className="rounded-full">
           <a href="/admin/invoices">View all</a>
@@ -152,7 +152,11 @@ export function RecentTransactionsCard() {
           ) : transactionsQuery.isError ? (
             <p className="px-4 py-6 text-sm text-destructive">Could not load recent transactions.</p>
           ) : rows.length === 0 ? (
-            <p className="px-4 py-6 text-sm text-muted-foreground">No transactions match current filters.</p>
+            <p className="px-4 py-6 text-sm text-muted-foreground">
+              {(transactionsQuery.data?.length ?? 0) === 0
+                ? "No Paddle transactions yet. Configure the Paddle webhook to populate this list."
+                : "No transactions match current filters."}
+            </p>
           ) : (
             rows.map((tx) => (
               <div

@@ -52,8 +52,7 @@ import { nextFloorTableSlot } from "@/lib/pos-floor-layout.ts";
 import ExpenseDialog from "./expense-dialog.tsx";
 import StaffConsumptionDialog from "./staff-consumption-dialog.tsx";
 import { usePosLocale } from "./pos-locale-provider.tsx";
-
-const LOGO_URL = "https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz";
+import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 
 type TableOrderSummary = {
   staffId: string;
@@ -1253,10 +1252,10 @@ function WaiterTopBar({ waiter }: { waiter: WaiterInfo }) {
 
   const logoElement = waiter.onLogoClick ? (
     <button onClick={waiter.onLogoClick} className="cursor-pointer shrink-0 hover:opacity-80 transition-opacity">
-      <img src={LOGO_URL} alt="Vyntex POS" className="h-8 w-8" />
+      <img src={VYNTEX_APP_LOGO_SRC} alt="Vyntex POS" className="h-8 w-8" />
     </button>
   ) : (
-    <img src={LOGO_URL} alt="Vyntex POS" className="h-8 w-8 shrink-0" />
+    <img src={VYNTEX_APP_LOGO_SRC} alt="Vyntex POS" className="h-8 w-8 shrink-0" />
   );
 
   return (

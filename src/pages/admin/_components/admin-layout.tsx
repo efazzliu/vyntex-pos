@@ -17,8 +17,7 @@ import {
 import { useEffect } from "react";
 import { canAccessAdminPath, canSeeAdminNavItem, type PlatformAdminRole } from "@/lib/platform-admin.ts";
 import { AdminPageHeader } from "@/pages/admin/_components/admin-page-header.tsx";
-
-const LOGO_URL = "https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz";
+import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 
 type SidebarItem = {
   label: string;
@@ -95,7 +94,7 @@ function AdminSidebar({
       {/* Header */}
       <div className="relative mx-3 mt-3 flex items-center justify-between rounded-xl border border-slate-200/80 bg-white px-3.5 py-3 dark:border-white/10 dark:bg-white/[0.02]">
         <Link to="/" className="flex items-center gap-2.5 min-w-0">
-          <img src={LOGO_URL} alt="Vyntex POS" className="h-7 w-7 shrink-0" />
+          <img src={VYNTEX_APP_LOGO_SRC} alt="Vyntex POS" className="h-7 w-7 shrink-0" />
           {!collapsed && (
             <span className="truncate bg-gradient-to-r from-[#0066FF] via-cyan-500 to-[#44CC00] bg-clip-text text-lg font-extrabold tracking-tight text-transparent">
               Vyntex POS
@@ -202,7 +201,7 @@ function AdminGate() {
     return (
       <div className="flex items-center justify-center h-dvh">
         <div className="flex flex-col items-center gap-4">
-          <img src={LOGO_URL} alt="Vyntex POS" className="h-12 w-12 animate-pulse" />
+          <img src={VYNTEX_APP_LOGO_SRC} alt="Vyntex POS" className="h-12 w-12 animate-pulse" />
           <Skeleton className="h-4 w-40" />
         </div>
       </div>
@@ -243,7 +242,7 @@ function AdminContent({ adminAccess }: { adminAccess: PlatformAdminRole | null }
         {/* Mobile header */}
         <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-background px-4 lg:hidden">
           <Link to="/" className="flex items-center gap-2 min-w-0">
-            <img src={LOGO_URL} alt="Vyntex POS" className="h-6 w-6" />
+            <img src={VYNTEX_APP_LOGO_SRC} alt="Vyntex POS" className="h-6 w-6" />
             <span className="text-base font-bold bg-gradient-to-r from-[#0066FF] to-[#44CC00] bg-clip-text text-transparent">
               Vyntex POS
             </span>

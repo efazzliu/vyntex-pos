@@ -11,8 +11,7 @@ import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import { setStaffOpenShift } from "@/lib/local-db.ts";
 import { Banknote, ArrowRight } from "lucide-react";
 import { usePosTheme } from "../_lib/use-pos-theme.ts";
-
-const LOGO_URL = "https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz";
+import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 
 type StartShiftScreenProps = {
   businessName: string;
@@ -98,7 +97,7 @@ export default function StartShiftScreen({
       >
         {/* Logo */}
         <motion.img
-          src={LOGO_URL}
+          src={VYNTEX_APP_LOGO_SRC}
           alt="Vyntex POS"
           className="h-14 w-14 mb-4"
           initial={{ scale: 0.8, opacity: 0 }}

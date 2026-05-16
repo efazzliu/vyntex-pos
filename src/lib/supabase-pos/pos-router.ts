@@ -65,6 +65,11 @@ export async function runPosQuery(
       return dashboard.getDashboardStats(
         args.licenseKey as string,
         args.viewPeriod as dashboard.DashboardViewPeriod | undefined,
+        args.locale as dashboard.DashboardLocaleOption | undefined,
+        args.anchorDate as string | undefined,
+        args.rangeFromIso as string | undefined,
+        args.rangeToExclusiveIso as string | undefined,
+        args.operationalDayStartIso as string | undefined,
       );
     case "pos.dashboard.getZReport":
       return dashboard.getZReport({

@@ -35,9 +35,11 @@ export default function DashboardLicensesPage() {
 
   if (restaurant === undefined) {
     return (
-      <div className="mx-auto w-full max-w-6xl space-y-6 p-6 lg:p-8">
-        <Skeleton className="h-36 rounded-2xl" />
-        <Skeleton className="h-56 rounded-2xl" />
+      <div className="min-h-full w-full bg-[#05070a]">
+        <div className="mx-auto w-full max-w-6xl space-y-6 p-6 pb-10 lg:p-8 lg:pb-12">
+          <Skeleton className="h-36 rounded-2xl bg-white/5" />
+          <Skeleton className="h-56 rounded-2xl bg-white/5" />
+        </div>
       </div>
     );
   }
@@ -63,7 +65,8 @@ export default function DashboardLicensesPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6 p-6 lg:p-8">
+    <div className="min-h-full w-full bg-[#05070a]">
+      <div className="mx-auto w-full max-w-6xl space-y-6 p-6 pb-10 lg:p-8 lg:pb-12">
       <section className="relative overflow-hidden rounded-2xl border border-[#315084] bg-gradient-to-br from-[#162746] via-[#10213f] to-[#0e1a31] p-6 lg:p-7">
         <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white/80">
           <Sparkles className="size-3.5" />
@@ -78,8 +81,9 @@ export default function DashboardLicensesPage() {
 
       {trialBanner ? (
         <div className="rounded-xl border border-emerald-400/35 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
-          <strong className="font-semibold text-emerald-50">Free month active</strong> — your Starter
-          trial runs until the expiry date below. Renew from Billing any time before it ends.
+          <strong className="font-semibold text-emerald-50">Free month active</strong> — your
+          Professional trial runs until the expiry date below. Renew from Billing any time before it
+          ends.
         </div>
       ) : null}
 
@@ -179,6 +183,7 @@ export default function DashboardLicensesPage() {
           </div>
         </div>
       </section>
+      </div>
     </div>
   );
 }

@@ -26,7 +26,7 @@
       "badge": "Restaurant POS — Now Available",
       "line1": "The Future of",
       "line2": "Point-of-Sale",
-      "subtitle": "Enterprise-grade POS for modern restaurants. Start with 1 month free on Starter — then streamline orders, payments, and operations in one place.",
+      "subtitle": "Enterprise-grade POS for modern restaurants. Start with 1 month free on Professional — then streamline orders, payments, and operations in one place.",
       "ctaPrimary": "Get Started Free",
       "ctaDemo": "Watch Demo",
       "demoToast": "Coming soon in a future milestone!",
@@ -76,8 +76,47 @@
       "titleBefore": "Ready to transform your",
       "titleHighlight": "restaurant operations",
       "titleAfter": "?",
-      "subtitle": "Join restaurants on Vyntex POS. Your first month on Starter is free — no credit card required to begin.",
+      "subtitle": "Join restaurants on Vyntex POS. Your first month on Professional is free — no credit card required to begin.",
       "button": "Start Free Trial"
+    },
+    "faq": {
+      "label": "FAQ",
+      "title": "Questions teams ask before switching",
+      "subtitle": "Clear answers about trials, devices, data, and day-to-day use of Vyntex POS.",
+      "items": {
+        "trial": {
+          "q": "What does the free trial include?",
+          "a": "You get full Restaurant POS on the Professional plan for one month at no charge, so you can run real service with menus, tables, orders, and staff workflows. After the trial you choose a paid plan that fits your business."
+        },
+        "credit_card": {
+          "q": "Do I need a credit card to get started?",
+          "a": "No. You can begin setup and use the free trial without entering card details. Billing only applies once you subscribe after the trial."
+        },
+        "devices": {
+          "q": "What hardware or devices can we use?",
+          "a": "Vyntex POS runs in the browser on modern Windows, macOS, and tablets—use the screens you already have at the host stand or service stations. Dedicated receipt printers and payment terminals can be added as your setup grows."
+        },
+        "offline": {
+          "q": "What happens if the internet drops?",
+          "a": "The product is built for cloud-first operation with reliable sync when you are online. For spotty connectivity, plan redundant access (backup link or mobile hotspot) for busy service—we publish clearer offline guidance as capabilities evolve."
+        },
+        "locations": {
+          "q": "Can we manage more than one restaurant?",
+          "a": "You manage each venue from your dashboard; multi-location rollups and centralized controls are on our roadmap for Enterprise-style operations. Contact us if you run several sites today so we can align on timing."
+        },
+        "data_security": {
+          "q": "How is our sales and customer data protected?",
+          "a": "Data lives in secure cloud infrastructure with industry-standard encryption in transit and at rest, role-based access for staff, and sign-in protections for owners and managers. You stay in control of who can see and change sensitive settings."
+        },
+        "payments": {
+          "q": "Which payment methods can we accept?",
+          "a": "The POS is designed for card, cash, split bills, and common digital flows at checkout. Exact payment processor options depend on your region and activation—we will keep pricing and checkout pages updated as integrations go live."
+        },
+        "support": {
+          "q": "How do we get help after we go live?",
+          "a": "Use the in-app chat on the marketing site, the contact form, or your plan’s support channel (Starter and up include help resources; Professional adds priority chat). We aim to respond within one business day, faster for priority tiers."
+        }
+      }
     }
   },
   "contact": {
@@ -590,7 +629,7 @@
       "heading": "Create account",
       "subtitle": "Register with email, name, and password.",
       "trialBold": "1 month free",
-      "trialRest": "on Starter when you finish setup — full POS access, no card required to start.",
+      "trialRest": "on Professional when you finish setup — full POS access, no card required to start.",
       "nameLabel": "Name",
       "namePlaceholder": "Your name",
       "emailLabel": "Email",

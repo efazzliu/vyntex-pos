@@ -10,6 +10,12 @@ import {
   runPosQuery,
   runPosMutation,
 } from "@/lib/supabase-pos/pos-router.ts";
+import { enqueueMutation } from "@/lib/local-db.ts";
+import posI18n from "@/pages/pos/_lib/pos-i18n.ts";
+import { toast } from "sonner";
+
+/** Mutations that cannot be replayed offline (need live URL or immediate network). */
+const OFFLINE_POS_MUTATION_DENYLIST = new Set<string>(["pos.menu.generateUploadUrl"]);
 
 export function ConvexProvider({ children }: { client?: unknown; children: ReactNode }) {
   return <>{children}</>;
@@ -400,6 +406,18 @@ export function useMutation(ref: unknown) {
   return useCallback(
     async (mutationArgs: Record<string, unknown>) => {
       if (!id) return null;
+
+      if (!navigator.onLine && id.startsWith("pos.")) {
+        if (OFFLINE_POS_MUTATION_DENYLIST.has(id)) {
+          const msg = posI18n.t("common.need_online_for_upload");
+          toast.error(msg);
+          throw new Error(msg);
+        }
+        await enqueueMutation(id, mutationArgs);
+        toast.info(posI18n.t("common.offline_action_queued"), { duration: 2500 });
+        return null;
+      }
+
       const out = await runPosMutation(id, mutationArgs);
 
       if (id === "pos.orders.submitCartOrder" && out && typeof out === "object") {

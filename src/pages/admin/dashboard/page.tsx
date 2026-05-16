@@ -77,13 +77,13 @@ export default function AdminDashboardPage() {
               icon={<Euro className="size-4 text-[#0066FF]" />}
               label="Lifetime revenue"
               value={eurFmt.format(kpiQuery.data.totalRevenueEst)}
-              hint="Estimated lifetime subscription revenue (list prices × tenure)."
+              hint="Total collected via Paddle (successful charges minus refunds)."
             />
             <KpiCard
               icon={<Repeat className="size-4 text-[#44CC00]" />}
               label="MRR"
               value={eurFmtDecimals.format(kpiQuery.data.mrr)}
-              hint="Monthly recurring revenue — estimated EUR/month from active, paying plans (MRR × 12 ≈ annual run rate)."
+              hint="Monthly recurring revenue from active Paddle subscriptions only (MRR × 12 ≈ annual run rate)."
             />
             <KpiCard
               icon={<Users className="size-4 text-[#0066FF]" />}

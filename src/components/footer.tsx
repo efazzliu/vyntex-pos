@@ -1,8 +1,6 @@
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { APP_VERSION_LABEL } from "@/lib/site-constants.ts";
-
-const LOGO_URL = "https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz";
+import { APP_VERSION_LABEL, VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 
 export default function Footer() {
   const { t } = useTranslation("site");
@@ -40,7 +38,7 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
           <div className="md:col-span-1">
             <Link to="/" className="flex items-center gap-2 mb-4">
-              <img src={LOGO_URL} alt="Vyntex POS" className="w-8 h-8" />
+              <img src={VYNTEX_APP_LOGO_SRC} alt="Vyntex POS" className="w-8 h-8" />
               <span className="text-lg font-bold bg-gradient-to-r from-[#0066FF] to-[#44CC00] bg-clip-text text-transparent">
                 Vyntex POS
               </span>

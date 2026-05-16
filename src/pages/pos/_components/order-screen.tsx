@@ -49,13 +49,13 @@ import { Input } from "@/components/ui/input.tsx";
 import { hashString } from "@/lib/local-db.ts";
 import { useOnlineStatus } from "@/hooks/use-online-status.ts";
 import { useOfflineData } from "@/hooks/use-offline-data.ts";
-import { useOfflineMutation } from "@/hooks/use-offline-mutation.ts";
 import { usePosLocale } from "./pos-locale-provider.tsx";
 import { verifyAdminPin } from "@/lib/supabase-pos.ts";
 import { errorMessageFromUnknown } from "@/lib/supabase-pos/db-errors.ts";
 import { emojiForCategoryName } from "@/lib/pos-category-icons.ts";
 import { uuidOrNull, staffIdsEqual } from "@/lib/supabase-pos/uuid.ts";
 import { posTablesIndexedDbKey } from "@/lib/supabase-pos/cache-keys.ts";
+import { displayOrderNumber } from "@/lib/supabase-pos/mappers.ts";
 import {
   printPosBill,
   printSentOrderTicket,
@@ -229,26 +229,10 @@ export default function OrderScreen({
     return (a || n) || undefined;
   }, [printersList]);
 
-  // Mutations with offline queue fallback
-  const submitCartOrderRaw = useMutation("pos.orders.submitCartOrder");
-  const payOrderRaw = useMutation("pos.orders.payOrder");
-
-  const submitCartOrder = useOfflineMutation(
-    submitCartOrderRaw,
-    "pos.orders.submitCartOrder",
-  );
-  const payOrder = useOfflineMutation(payOrderRaw, "pos.orders.payOrder");
-
-  const transferOrdersRaw = useMutation("pos.orders.transferOrdersToTable");
-  const mergeOrdersRaw = useMutation("pos.orders.mergeTableOrders");
-  const transferOrders = useOfflineMutation(
-    transferOrdersRaw,
-    "pos.orders.transferOrdersToTable",
-  );
-  const mergeOrders = useOfflineMutation(
-    mergeOrdersRaw,
-    "pos.orders.mergeTableOrders",
-  );
+  const submitCartOrder = useMutation("pos.orders.submitCartOrder");
+  const payOrder = useMutation("pos.orders.payOrder");
+  const transferOrders = useMutation("pos.orders.transferOrdersToTable");
+  const mergeOrders = useMutation("pos.orders.mergeTableOrders");
 
   const [activeCategory, setActiveCategory] =
     useState<Id<"menuCategories"> | "favorites" | null>(null);
@@ -389,22 +373,32 @@ export default function OrderScreen({
     setTableMoveBusy(true);
     try {
       if (tableMoveMode === "transfer") {
-        await transferOrders({
+        const tr = await transferOrders({
           licenseKey,
           fromTableId: String(tableId),
           toTableId: String(targetId),
           staffId,
           staffName,
         });
+        if (!tr) {
+          setTableMoveOpen(false);
+          onOrderMovedToTable?.(targetId);
+          return;
+        }
         toast.success(t("order.transfer_success", { name: targetName }));
       } else {
-        await mergeOrders({
+        const mr = await mergeOrders({
           licenseKey,
           fromTableId: String(tableId),
           toTableId: String(targetId),
           staffId,
           staffName,
         });
+        if (!mr) {
+          setTableMoveOpen(false);
+          onOrderMovedToTable?.(targetId);
+          return;
+        }
         toast.success(t("order.merge_success", { name: targetName }));
       }
       setTableMoveOpen(false);
@@ -662,7 +656,21 @@ export default function OrderScreen({
       })();
     };
 
+    const ticketRefForPrint = (
+      result: { ticketOrderRef?: string } | null | undefined,
+    ) => {
+      if (result?.ticketOrderRef) return result.ticketOrderRef;
+      if (existingOrder) {
+        return `#${displayOrderNumber(
+          String(existingOrder._id),
+          existingOrder.orderNumber,
+        )}`;
+      }
+      return `#${t("order.offline_ticket_ref_new")}`;
+    };
+
     if (!isOnline) {
+      sendOrderInFlightRef.current = true;
       setIsSubmitting(true);
       try {
         const result = await submitCartOrder({
@@ -674,18 +682,14 @@ export default function OrderScreen({
           lines,
         });
 
-        if (!result) {
-          setCart([]);
-          toast.info(t("order.offline_queue_info"));
-          onBack();
-          return;
-        }
-
+        // Queued offline (null) or immediate success — always print locally.
+        runTicketPrint(ticketRefForPrint(result));
         setCart([]);
-        runTicketPrint(result.ticketOrderRef);
+        onBack();
       } catch (error) {
         toast.error(errorMessageFromUnknown(error, t("order.err_send_order")));
       } finally {
+        sendOrderInFlightRef.current = false;
         setIsSubmitting(false);
       }
       return;
@@ -1057,48 +1061,53 @@ export default function OrderScreen({
         poweredBy: t("order.fiscal_powered_by"),
       };
 
-      if ((type === "fiscal" || type === "non_fiscal") && isOnline) {
-        try {
-          const pr =
-            type === "fiscal"
-              ? await printFiscalReceiptForPay({
-                  licenseKey,
-                  orderId: paidOrderId,
-                  formatPrice,
-                  strings: receiptPrintStrings,
-                  deviceName: receiptPrinterDeviceName,
-                })
-              : await printNonFiscalReceiptForPay({
-                  licenseKey,
-                  orderId: paidOrderId,
-                  formatPrice,
-                  strings: receiptPrintStrings,
-                  deviceName: receiptPrinterDeviceName,
-                });
-          if (!pr.ok) {
-            const electronApp = Boolean(
-              typeof window !== "undefined" &&
-                (window as Window & { desktop?: { isElectron?: boolean } })
-                  .desktop?.isElectron,
-            );
-            const queued = electronApp && isSilentPrintQueueableError(pr.error);
-            if (!queued) {
-              toast.error(
-                electronApp ? t("order.fiscal_print_failed") : t("order.print_popup_blocked"),
-              );
-            }
-          }
-        } catch (receiptPrintErr) {
-          console.error("Receipt print:", receiptPrintErr);
-          toast.error(t("order.fiscal_print_failed"));
-        }
-      }
-
       setPayDialogOpen(false);
       setPendingPayAmount(null);
       setPendingSettledSaleItemIds(null);
       setCashReceivedInput("");
       onBack();
+
+      // Receipt print runs in the background so payment UI does not wait on the printer
+      // (Electron silent print / OS dialogs). Failed silent jobs are queued and retry when
+      // the printer is available (`startPrintQueueRunner` in pos-app).
+      if ((type === "fiscal" || type === "non_fiscal") && isOnline) {
+        void (async () => {
+          try {
+            const pr =
+              type === "fiscal"
+                ? await printFiscalReceiptForPay({
+                    licenseKey,
+                    orderId: paidOrderId,
+                    formatPrice,
+                    strings: receiptPrintStrings,
+                    deviceName: receiptPrinterDeviceName,
+                  })
+                : await printNonFiscalReceiptForPay({
+                    licenseKey,
+                    orderId: paidOrderId,
+                    formatPrice,
+                    strings: receiptPrintStrings,
+                    deviceName: receiptPrinterDeviceName,
+                  });
+            if (!pr.ok) {
+              const electronApp = Boolean(
+                typeof window !== "undefined" &&
+                  (window as Window & { desktop?: { isElectron?: boolean } })
+                    .desktop?.isElectron,
+              );
+              const queued = electronApp && isSilentPrintQueueableError(pr.error);
+              if (!queued) {
+                toast.error(
+                  electronApp ? t("order.fiscal_print_failed") : t("order.print_popup_blocked"),
+                );
+              }
+            }
+          } catch (receiptPrintErr) {
+            console.error("Receipt print:", receiptPrintErr);
+            toast.error(t("order.fiscal_print_failed"));
+          }
+        })();
+      }
     } catch (e) {
       toast.error(errorMessageFromUnknown(e, t("order.err_payment_process")));
     } finally {

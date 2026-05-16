@@ -5,8 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
 import { toast } from "sonner";
 import { useMarketingPrimaryCtaHref } from "@/hooks/use-marketing-primary-cta-href.ts";
-
-const LOGO_URL = "https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz";
+import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 
 const MOCK_KEYS = [
   "mockOrders",
@@ -66,7 +65,7 @@ export default function HeroSection() {
           className="mb-8"
         >
           <img
-            src={LOGO_URL}
+            src={VYNTEX_APP_LOGO_SRC}
             alt="Vyntex POS"
             className="w-20 h-20 sm:w-24 sm:h-24 mx-auto drop-shadow-[0_0_40px_rgba(0,102,255,0.4)]"
           />

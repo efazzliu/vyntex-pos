@@ -11,8 +11,7 @@ import { normalizePlan, planLabel } from "../_lib/plan-features.ts";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { usePosTheme } from "../_lib/use-pos-theme.ts";
-
-const LOGO_URL = "https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz";
+import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 
 type PosHomeProps = {
   activation: ActivationData | null;
@@ -43,7 +42,7 @@ export default function PosHome({ activation }: PosHomeProps) {
       >
         {/* Header */}
         <div className="flex flex-col items-center mb-8">
-          <img src={LOGO_URL} alt="Vyntex POS" className="h-14 w-14 mb-3" />
+          <img src={VYNTEX_APP_LOGO_SRC} alt="Vyntex POS" className="h-14 w-14 mb-3" />
           <h1 className="text-2xl font-bold bg-gradient-to-r from-[#0066FF] to-[#44CC00] bg-clip-text text-transparent">
             {activation?.businessName ?? "Vyntex POS"}
           </h1>

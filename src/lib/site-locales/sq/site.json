@@ -26,7 +26,7 @@
       "badge": "Restaurant POS — Tani në dispozicion",
       "line1": "E ardhmja e",
       "line2": "pikës së shitjes",
-      "subtitle": "POS për restorante moderne. Filloni me 1 muaj falas në Starter — pastaj menaxhoni porositë, pagesat dhe operacionet në një vend.",
+      "subtitle": "POS për restorante moderne. Filloni me 1 muaj falas në Professional — pastaj menaxhoni porositë, pagesat dhe operacionet në një vend.",
       "ctaPrimary": "Fillo falas",
       "ctaDemo": "Shiko demo",
       "demoToast": "Së shpejti në një përditësim të ardhshëm!",
@@ -76,8 +76,47 @@
       "titleBefore": "Gati të transformoni",
       "titleHighlight": "operacionet e restorantit",
       "titleAfter": "?",
-      "subtitle": "Bashkohuni me restorante në Vyntex POS. Muaji i parë në Starter është falas — pa kartë krediti për të filluar.",
+      "subtitle": "Bashkohuni me restorante në Vyntex POS. Muaji i parë në Professional është falas — pa kartë krediti për të filluar.",
       "button": "Fillo provën falas"
+    },
+    "faq": {
+      "label": "Pyetje të shpeshta",
+      "title": "Pyetje që bëjnë ekipet para kalimit",
+      "subtitle": "Përgjigje të qarta për provën, pajisjet, të dhënat dhe përditshmërinë me Vyntex POS.",
+      "items": {
+        "trial": {
+          "q": "Çfarë përfshin prova falas?",
+          "a": "Merrni Restaurant POS të plotë në planin Professional për një muaj pa pagesë, që të punoni me menu, tavolina, porosi dhe rrjedhën e stafit në kushte reale. Pas provës zgjidhni një plan të paguar sipas nevojës."
+        },
+        "credit_card": {
+          "q": "A na duhet kartë krediti për të filluar?",
+          "a": "Jo. Mund të filloni konfigurimin dhe provën falas pa futur të dhëna karte. Faturimi fillon vetëm kur abonoheni pas përfundimit të provës."
+        },
+        "devices": {
+          "q": "Çfarë pajisjesh mund të përdorim?",
+          "a": "Vyntex POS funksionon në shfletues në Windows, macOS dhe tableta moderne — përdorni ekranet që keni te recepsioni ose stacionet e shërbimit. Printera faturash dhe terminale pagese shtohen sipas rritjes së setup-it."
+        },
+        "offline": {
+          "q": "Çfarë ndodh nëse bie interneti?",
+          "a": "Produkti është i ndërtuar për punë kryesisht në cloud me sinkronizim kur jeni online. Për lidhje të dobët, planifikoni akses rezervë (lidhje dytësore ose hotspot celular) në orët e ngarkuara — udhëzimet për modalitetin offline përditësohen me zhvillimin e veçorive."
+        },
+        "locations": {
+          "q": "A mund të menaxhojmë më shumë se një restorant?",
+          "a": "Çdo lokal menaxhohet nga paneli juaj; raportet e unifikuara për shumë lokacione janë në roadmap për operacione në stilin Enterprise. Na kontaktoni nëse keni disa lokacione që të përputhemi me afatet."
+        },
+        "data_security": {
+          "q": "Si mbrohen të dhënat e shitjeve dhe klientëve?",
+          "a": "Të dhënat ruhen në infrastrukturë cloud të sigurt me enkriptim standard në transmetim dhe në ruajtje, me qasje sipas roleve për stafin dhe mbrojtje për hyrjen e pronarëve dhe menaxherëve. Ju kontrolloni kush sheh dhe ndryshon cilësimet e ndjeshme."
+        },
+        "payments": {
+          "q": "Çfarë mënyrash pagese mund të pranojmë?",
+          "a": "POS-i mbështet kartë, para, ndarje faturash dhe rrjedha të zakonshme dixhitale në arkë. Opsionet e përpunuesit të pagesës varen nga rajoni dhe aktivizimi — faqet e çmimeve dhe checkout përditësohen me integrimet e reja."
+        },
+        "support": {
+          "q": "Si marrim ndihmë pasi të fillojmë?",
+          "a": "Përdorni chat-in në sajt, formularin e kontaktit ose kanalin e mbështetjes së planit (Starter dhe më lart përfshijnë burime ndihme; Professional shton chat prioritet). Synojmë përgjigje brenda një dite pune, më shpejt për nivelet prioritare."
+        }
+      }
     }
   },
   "contact": {
@@ -590,7 +629,7 @@
       "heading": "Krijo llogari",
       "subtitle": "Regjistrohu me email, emër dhe fjalëkalim.",
       "trialBold": "1 muaj falas",
-      "trialRest": "në Starter kur përfundon konfigurimin — akses i plotë POS, pa kartë për të filluar.",
+      "trialRest": "në Professional kur përfundon konfigurimin — akses i plotë POS, pa kartë për të filluar.",
       "nameLabel": "Emri",
       "namePlaceholder": "Emri yt",
       "emailLabel": "Email",

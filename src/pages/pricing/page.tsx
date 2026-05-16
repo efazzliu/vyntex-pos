@@ -35,10 +35,16 @@ type PaddleCheckoutItem = {
   quantity: number;
 };
 
+type PaddleCheckoutOpenOptions = {
+  items: PaddleCheckoutItem[];
+  customData?: Record<string, string>;
+  customer?: { email?: string };
+};
+
 type PaddleGlobal = {
   Initialize: (opts: { token: string }) => void;
   Checkout: {
-    open: (opts: { items: PaddleCheckoutItem[] }) => void;
+    open: (opts: PaddleCheckoutOpenOptions) => void;
   };
   Environment?: {
     set: (value: "sandbox" | "production") => void;
@@ -122,7 +128,10 @@ async function ensurePaddleLoaded() {
   return paddleScriptPromise;
 }
 
-async function openPaddleCheckout(items: PaddleCheckoutItem[]) {
+async function openPaddleCheckout(
+  items: PaddleCheckoutItem[],
+  opts?: { customData?: Record<string, string>; customerEmail?: string },
+) {
   if (!PADDLE_CLIENT_TOKEN) {
     throw new Error("Missing VITE_PADDLE_CLIENT_TOKEN.");
   }
@@ -138,7 +147,11 @@ async function openPaddleCheckout(items: PaddleCheckoutItem[]) {
     paddle.Initialize({ token: PADDLE_CLIENT_TOKEN });
     paddleInitialized = true;
   }
-  paddle.Checkout.open({ items });
+  paddle.Checkout.open({
+    items,
+    ...(opts?.customData ? { customData: opts.customData } : {}),
+    ...(opts?.customerEmail ? { customer: { email: opts.customerEmail } } : {}),
+  });
 }
 
 function tierFeaturesList(t: (key: string, opts?: object) => unknown, id: TierId): string[] {
@@ -150,7 +163,7 @@ export default function PricingPage() {
   const { t } = useTranslation("site");
   const [isAnnual, setIsAnnual] = useState(false);
   const [mobileAddon, setMobileAddon] = useState(false);
-  const { signinRedirect } = useAuth();
+  const { signinRedirect, user } = useAuth();
 
   const addonPrice = isAnnual ? MOBILE_ADDON_ANNUAL : MOBILE_ADDON_MONTHLY;
 
@@ -181,7 +194,13 @@ export default function PricingPage() {
     }
 
     try {
-      await openPaddleCheckout(items);
+      await openPaddleCheckout(items, {
+        customerEmail: user?.email ?? undefined,
+        customData: {
+          plan: tierId,
+          billing_cycle: mode,
+        },
+      });
     } catch {
       toast.error("Checkout is not ready yet. Please sign in and continue from billing.");
       await signinRedirect();

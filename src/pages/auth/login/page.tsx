@@ -1,4 +1,5 @@
 export { default } from "./page-modern.tsx";
+import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -10,7 +11,7 @@ import { supabase } from "@/lib/supabase.ts";
 import { toast } from "sonner";
 import AuthTopNav from "@/pages/auth/_components/auth-top-nav.tsx";
 
-const LOGO_URL = "https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz";
+const LOGO_URL = VYNTEX_APP_LOGO_SRC;
 
 function safeReturnPath(from: unknown): string | null {
   if (typeof from !== "string" || !from.startsWith("/") || from.startsWith("//")) {
@@ -263,7 +264,7 @@ import { cn } from "@/lib/utils.ts";
 import { toast } from "sonner";
 import AuthTopNav from "@/pages/auth/_components/auth-top-nav.tsx";
 
-const LOGO_URL = "https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz";
+const LOGO_URL = VYNTEX_APP_LOGO_SRC;
 
 function safeReturnPath(from: unknown): string | null {
   if (typeof from !== "string" || !from.startsWith("/") || from.startsWith("//")) {

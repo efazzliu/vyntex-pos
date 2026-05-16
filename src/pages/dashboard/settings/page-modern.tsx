@@ -39,6 +39,7 @@ import {
   User,
 } from "lucide-react";
 import { SUPPORT_EMAIL, SUPPORT_MAILTO_HREF } from "@/lib/site-constants.ts";
+import { claimUnassignedLicenseForDashboardAccount } from "@/lib/supabase-pos/claim-license-dashboard.ts";
 
 const currencies = [
   { value: "USD", label: "USD ($)" },
@@ -118,6 +119,8 @@ export default function DashboardSettingsModern() {
   const [personalEmail, setPersonalEmail] = useState("");
   const [personalLoading, setPersonalLoading] = useState(false);
   const [authLoaded, setAuthLoaded] = useState(false);
+  const [linkLicenseKey, setLinkLicenseKey] = useState("");
+  const [linkLicenseLoading, setLinkLicenseLoading] = useState(false);
 
   useEffect(() => {
     if (!restaurant) return;
@@ -383,6 +386,55 @@ export default function DashboardSettingsModern() {
               </div>
             ) : (
               <div className="space-y-4">
+                {!isAdmin ? (
+                  <div className="rounded-2xl border border-emerald-200/90 bg-emerald-50/60 p-4 dark:border-emerald-500/35 dark:bg-emerald-950/25">
+                    <p className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
+                      <KeyRound className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                      Link license to this account
+                    </p>
+                    <p className="mt-2 text-xs leading-relaxed text-slate-600 dark:text-slate-400">
+                      If you received a claimable license key from support (or you already activated the Windows POS with
+                      that key), paste it here while logged in with <span className="font-medium text-slate-800 dark:text-slate-200">this</span> email.
+                      The venue will attach to your dashboard and POS can keep using the same key.
+                    </p>
+                    <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                      <Input
+                        value={linkLicenseKey}
+                        onChange={(e) => setLinkLicenseKey(e.target.value.toUpperCase())}
+                        placeholder="XXXX-XXXX-XXXX-XXXX"
+                        autoComplete="off"
+                        spellCheck={false}
+                        className="h-11 flex-1 rounded-xl border-emerald-200/80 bg-white font-mono text-xs tracking-wider text-slate-900 dark:border-emerald-500/30 dark:bg-slate-950 dark:text-slate-100"
+                      />
+                      <Button
+                        type="button"
+                        disabled={
+                          linkLicenseLoading ||
+                          linkLicenseKey.replace(/[^A-Z0-9]/g, "").length < 16
+                        }
+                        className="h-11 shrink-0 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 px-5 text-white hover:from-emerald-700 hover:to-emerald-800 dark:from-emerald-600 dark:to-emerald-700"
+                        onClick={() => {
+                          void (async () => {
+                            setLinkLicenseLoading(true);
+                            try {
+                              await claimUnassignedLicenseForDashboardAccount(linkLicenseKey);
+                              toast.success("License linked to your account.");
+                              setLinkLicenseKey("");
+                              await refresh();
+                              navigate("/dashboard/restaurant-pos", { replace: true });
+                            } catch (err) {
+                              toast.error(err instanceof Error ? err.message : "Could not link license");
+                            } finally {
+                              setLinkLicenseLoading(false);
+                            }
+                          })();
+                        }}
+                      >
+                        {linkLicenseLoading ? "Linking…" : "Link license"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-600 dark:bg-slate-800/60">
                   <p className="flex items-center gap-2 text-sm font-medium text-slate-800 dark:text-slate-100">
                     <AlertCircle className="size-4 shrink-0 text-[#0066FF] dark:text-cyan-400" />
@@ -391,7 +443,7 @@ export default function DashboardSettingsModern() {
                   <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
                     {isAdmin
                       ? "You’re signed in as a platform administrator. Venue fields appear when this account also has an active POS license. Use Admin for day-to-day operations."
-                      : "Complete registration on the website and finish setup, then return here to edit venue details."}
+                      : "You can also complete a new venue from the website setup flow, then return here to edit details."}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">

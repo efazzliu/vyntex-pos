@@ -21,10 +21,9 @@ import {
   hasPrioritySupportChat,
   kitchenDisplayNavState,
 } from "../_lib/plan-features.ts";
+import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 import { usePosLocale } from "./pos-locale-provider.tsx";
 import PosPrioritySupportNav from "./pos-priority-support-nav.tsx";
-
-const LOGO_URL = "https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz";
 
 type PosSidebarProps = {
   activeView: PosView;
@@ -189,7 +188,7 @@ export default function PosSidebar({
     <div className="w-20 bg-[#0D1326] border-r border-[#1e2a45] flex flex-col items-center py-4 shrink-0">
       {/* Logo & business name */}
       <div className="mb-4 flex flex-col items-center">
-        <img src={LOGO_URL} alt="Vyntex POS" className="h-10 w-10" />
+        <img src={VYNTEX_APP_LOGO_SRC} alt="Vyntex POS" className="h-10 w-10" />
         <p className="text-[10px] text-[#5a6580] mt-2 text-center truncate max-w-full px-1">
           {businessName}
         </p>

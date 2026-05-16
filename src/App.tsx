@@ -1,5 +1,6 @@
-import { BrowserRouter, HashRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, HashRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { DefaultProviders } from "./components/providers/default.tsx";
+import { Toaster } from "./components/ui/sonner.tsx";
 import { RedirectIfAuthed } from "./components/redirect-if-authed.tsx";
 import { RequireSupabaseAuth } from "./components/require-supabase-auth.tsx";
 import AuthCallback from "./pages/auth/Callback.tsx";
@@ -58,6 +59,14 @@ function DesktopHomeRoute() {
   return <Index />;
 }
 
+/** POS shell: no on-screen toasts (Sonner). Web dashboard / auth keep toasts. */
+function AppToaster() {
+  const { pathname } = useLocation();
+  const isPos = pathname === "/pos" || pathname.startsWith("/pos/");
+  if (isPos) return null;
+  return <Toaster richColors position="top-right" />;
+}
+
 export default function App() {
   const isElectron =
     typeof window !== "undefined" &&
@@ -67,6 +76,7 @@ export default function App() {
   return (
     <DefaultProviders>
       <Router>
+        <AppToaster />
         <Routes>
           {isElectron ? (
             <>

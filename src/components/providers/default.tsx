@@ -3,7 +3,6 @@ import { QueryClientProvider } from "./query-client.tsx";
 import { SiteLocaleProvider } from "./site-locale-provider.tsx";
 import { SupabaseProvider } from "./supabase.tsx";
 import { ThemeProvider } from "./theme.tsx";
-import { Toaster } from "../ui/sonner.tsx";
 import { TooltipProvider } from "../ui/tooltip.tsx";
 
 export function DefaultProviders({ children }: { children: React.ReactNode }) {
@@ -13,10 +12,7 @@ export function DefaultProviders({ children }: { children: React.ReactNode }) {
         <QueryClientProvider>
           <SiteLocaleProvider>
             <TooltipProvider>
-              <ThemeProvider>
-                {children}
-                <Toaster richColors position="top-right" />
-              </ThemeProvider>
+              <ThemeProvider>{children}</ThemeProvider>
             </TooltipProvider>
           </SiteLocaleProvider>
         </QueryClientProvider>

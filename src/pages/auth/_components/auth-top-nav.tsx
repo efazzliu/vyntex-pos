@@ -13,9 +13,8 @@ import { useSiteLanguage } from "@/components/providers/site-locale-provider.tsx
 import { cn } from "@/lib/utils.ts";
 import { supabase } from "@/lib/supabase.ts";
 import { registerUrlWithFreeTrial } from "@/lib/free-trial.ts";
+import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 import { Languages } from "lucide-react";
-
-const LOGO_URL = "https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz";
 
 const navItems = [
   { key: "home", href: "/" },
@@ -59,7 +58,7 @@ export default function AuthTopNav() {
     <header className="fixed left-0 right-0 top-0 z-40 border-b border-white/10 bg-[#060B18]/70 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link to="/" className="flex items-center gap-2.5">
-          <img src={LOGO_URL} alt="Vyntex POS" className="h-8 w-8" />
+          <img src={VYNTEX_APP_LOGO_SRC} alt="Vyntex POS" className="h-8 w-8" />
           <span className="text-xl font-bold bg-gradient-to-r from-[#0066FF] to-[#44CC00] bg-clip-text text-transparent">
             Vyntex POS
           </span>

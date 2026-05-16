@@ -1,5 +1,11 @@
 const CACHE_NAME = "vyntex-v3";
-const urlsToCache = ["/pos", "/icon/icon-192.png", "/icon/icon-512.png", "/offline.html"];
+const urlsToCache = [
+  "/pos",
+  "./vyntex-logo.png",
+  "/icon/icon-192.png",
+  "/icon/icon-512.png",
+  "/offline.html",
+];
 
 // Install event - cache core assets
 self.addEventListener("install", (event) => {

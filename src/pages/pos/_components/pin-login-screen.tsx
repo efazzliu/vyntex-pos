@@ -23,13 +23,10 @@ import {
   isValidStaffPinLength,
   sanitizeStaffPinInput,
 } from "../_lib/staff-pin.ts";
-import { APP_VERSION_LABEL } from "@/lib/site-constants.ts";
+import { APP_VERSION_LABEL, VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 import { Wifi, WifiOff, Delete } from "lucide-react";
 import { usePosTheme } from "../_lib/use-pos-theme.ts";
 import posI18n from "../_lib/pos-i18n.ts";
-
-const DEFAULT_LOGO_URL =
-  "https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz";
 
 const NUMPAD_KEYS = [
   ["1", "2", "3"],
@@ -41,7 +38,7 @@ const NUMPAD_KEYS = [
 type PinLoginScreenProps = {
   businessName: string;
   licenseKey: string;
-  onLogin: (staff: ActiveStaff) => void;
+  onLogin: (staff: ActiveStaff) => void | Promise<void>;
 };
 
 function LogoAndName({
@@ -236,7 +233,7 @@ export default function PinLoginScreen({
           };
           logAdminPinLogin(adminStaff);
           setSuccess(adminStaff);
-          setTimeout(() => onLogin(adminStaff), 800);
+          setTimeout(() => void Promise.resolve(onLogin(adminStaff)), 800);
           return;
         }
 
@@ -257,7 +254,7 @@ export default function PinLoginScreen({
             };
             logAdminPinLogin(staff);
             setSuccess(staff);
-            setTimeout(() => onLogin(staff), 800);
+            setTimeout(() => void Promise.resolve(onLogin(staff)), 800);
             return;
           }
         } else {
@@ -270,7 +267,7 @@ export default function PinLoginScreen({
             };
             logAdminPinLogin(staff);
             setSuccess(staff);
-            setTimeout(() => onLogin(staff), 800);
+            setTimeout(() => void Promise.resolve(onLogin(staff)), 800);
             return;
           }
         }
@@ -361,7 +358,7 @@ export default function PinLoginScreen({
 
   const b = branding;
   const placement: PinLoginPlacement = b?.placement ?? "top-center";
-  const logoSrc = b?.logoDataUrl ?? DEFAULT_LOGO_URL;
+  const logoSrc = b?.logoDataUrl ?? VYNTEX_APP_LOGO_SRC;
   const logoHeight = b?.logoHeightPx ?? 140;
 
   const showCustomLogo = placement === "custom";

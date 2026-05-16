@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, ipcMain } = require("electron");
+const { app, BrowserWindow, shell, ipcMain, screen } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
@@ -267,13 +267,60 @@ function registerPrintHtmlSilentIpc() {
   });
 }
 
+function registerGetSystemPrintersIpc() {
+  ipcMain.removeHandler("get-system-printers");
+  ipcMain.handle("get-system-printers", async (event) => {
+    try {
+      const printers = await getPrintersForSilentPrint(event);
+      const physical = printers.filter((p) => !isVirtualPrinter(p));
+      return {
+        ok: true,
+        printers: physical.map((p) => ({
+          deviceName: p.name,
+          displayName: String(p.displayName ?? p.name ?? ""),
+          isDefault: Boolean(p.isDefault),
+        })),
+      };
+    } catch (err) {
+      return {
+        ok: false,
+        error: String(err?.message ?? err),
+      };
+    }
+  });
+}
+
 function createWindow() {
   const iconPath = resolveWindowIconPath();
+
+  /** Fit laptops, touch AIOs, and small tablets: never force a window larger than the work area. */
+  let winX;
+  let winY;
+  let winWidth = 1440;
+  let winHeight = 900;
+  let minWidth = 800;
+  let minHeight = 560;
+  try {
+    const primary = screen.getPrimaryDisplay();
+    const area = primary.workArea ?? { x: 0, y: 0, width: 1280, height: 800 };
+    const aw = Math.max(480, area.width);
+    const ah = Math.max(400, area.height);
+    minWidth = Math.min(800, Math.max(360, aw - 16));
+    minHeight = Math.min(560, Math.max(400, ah - 16));
+    winWidth = Math.min(1440, Math.max(minWidth, aw - 32));
+    winHeight = Math.min(900, Math.max(minHeight, ah - 32));
+    winX = Math.round(area.x + (aw - winWidth) / 2);
+    winY = Math.round(area.y + (ah - winHeight) / 2);
+  } catch {
+    /* fall back to defaults */
+  }
+
   const win = new BrowserWindow({
-    width: 1440,
-    height: 900,
-    minWidth: 1200,
-    minHeight: 760,
+    ...(typeof winX === "number" && typeof winY === "number" ? { x: winX, y: winY } : {}),
+    width: winWidth,
+    height: winHeight,
+    minWidth,
+    minHeight,
     backgroundColor: "#0A0F1E",
     autoHideMenuBar: true,
     icon: iconPath,
@@ -316,6 +363,7 @@ function createWindow() {
 
 app.whenReady().then(() => {
   registerPrintHtmlSilentIpc();
+  registerGetSystemPrintersIpc();
   createWindow();
 
   app.on("activate", () => {

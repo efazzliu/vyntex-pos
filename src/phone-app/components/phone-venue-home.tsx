@@ -16,8 +16,7 @@ import { getDashboardStats, getSoldItemsByDateTimeRange } from "@/lib/supabase-p
 import { getStockItems } from "@/lib/supabase-pos/stock-ops.ts";
 import { cn } from "@/lib/utils.ts";
 import { toast } from "sonner";
-
-const LOGO_URL = "https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz";
+import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 
 type StatsBundle = Awaited<ReturnType<typeof getDashboardStats>>;
 
@@ -156,7 +155,7 @@ export default function PhoneVenueHome() {
       >
         <div className="flex items-start gap-3 pt-2 sm:gap-4">
           <img
-            src={LOGO_URL}
+            src={VYNTEX_APP_LOGO_SRC}
             alt="Vyntex POS"
             className="h-16 w-16 shrink-0 object-contain drop-shadow-md sm:h-[4.5rem] sm:w-[4.5rem]"
             width={72}

@@ -18,10 +18,8 @@ import { setDashboardRestaurantId } from "@/hooks/use-dashboard-restaurant.ts";
 import { errorMessageFromUnknown } from "@/lib/supabase-pos/db-errors.ts";
 import { planTerminalFloor } from "@/pages/pos/_lib/plan-features.ts";
 import { defaultSelfServeTrialExpiry, FREE_TRIAL_QUERY_VALUE } from "@/lib/free-trial.ts";
-import { APP_VERSION_LABEL } from "@/lib/site-constants.ts";
+import { APP_VERSION_LABEL, VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 import { cn } from "@/lib/utils.ts";
-
-const LOGO_URL = "https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz";
 
 const currencies = [
   { value: "USD", label: "USD ($)" },
@@ -146,7 +144,7 @@ export default function SetupForm() {
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
   const [currency, setCurrency] = useState("USD");
-  const [plan] = useState<"starter">("starter");
+  const [plan] = useState<"professional">("professional");
 
   const generateLicenseKey = () => {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -269,7 +267,7 @@ export default function SetupForm() {
         <div className="relative z-10 flex flex-1 flex-col">
           <div className="mb-8 flex flex-col items-start gap-6 lg:mb-10">
             <img
-              src={LOGO_URL}
+              src={VYNTEX_APP_LOGO_SRC}
               alt="Vyntex POS"
               className="h-20 w-20 object-contain drop-shadow-[0_12px_40px_rgba(0,102,255,0.45)] sm:h-24 sm:w-24 lg:h-28 lg:w-28 xl:h-32 xl:w-32"
             />
@@ -281,8 +279,8 @@ export default function SetupForm() {
               </h1>
               <p className="mt-3 max-w-md text-sm leading-relaxed text-white/60 sm:text-base">
                 Cloud-native point of sale built for busy dining rooms. You are onboarding the{" "}
-                <span className="font-semibold text-white/85">Starter</span> workspace — full core
-                POS with a one-month trial license before renewal.
+                <span className="font-semibold text-white/85">Professional</span> workspace — full
+                Restaurant POS with a one-month trial license before renewal.
               </p>
             </div>
           </div>
@@ -298,8 +296,8 @@ export default function SetupForm() {
             </p>
             <p className="mt-2 max-w-md text-xs leading-relaxed text-white/60 sm:text-sm">
               Starter, Professional, and Enterprise below describe this product line — your trial
-              uses <span className="font-medium text-white/85">Starter</span> limits until you
-              upgrade.
+              runs on <span className="font-medium text-white/85">Professional</span> (full
+              feature access); you can move to another tier when you subscribe.
             </p>
           </div>
 
@@ -339,7 +337,7 @@ export default function SetupForm() {
                 </strong>
                 <span className="text-emerald-900/95 dark:text-emerald-100/90">
                   {" "}
-                  — completing this step activates your Starter trial (same offer as on the
+                  — completing this step activates your Professional trial (same offer as on the
                   website).
                 </span>
               </div>
@@ -352,7 +350,7 @@ export default function SetupForm() {
                 </Label>
                 <div className="rounded-xl border border-[#0066FF]/25 bg-[#0066FF]/[0.06] p-4 sm:p-5 dark:border-[#0066FF]/35 dark:bg-[#0066FF]/10">
                   <p className="text-lg font-semibold text-slate-900 dark:text-white">
-                    Starter plan
+                    Professional plan
                   </p>
                   <p className="mt-1 text-sm font-bold text-[#0066FF] dark:text-[#66B3FF] sm:text-base">
                     1 month free trial

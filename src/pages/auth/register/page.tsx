@@ -8,8 +8,7 @@ import { Label } from "@/components/ui/label.tsx";
 import { supabase } from "@/lib/supabase.ts";
 import { toast } from "sonner";
 import AuthTopNav from "@/pages/auth/_components/auth-top-nav.tsx";
-
-const LOGO_URL = "https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz";
+import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -79,7 +78,7 @@ export default function RegisterPage() {
           <div className="grid md:grid-cols-[1fr_1.05fr]">
             <section className="bg-white/95 p-7 sm:p-9">
               <div className="flex items-center gap-3">
-                <img src={LOGO_URL} alt="Vyntex POS" className="h-11 w-11 object-contain" />
+                <img src={VYNTEX_APP_LOGO_SRC} alt="Vyntex POS" className="h-11 w-11 object-contain" />
                 <div>
                   <h1 className="text-lg font-bold text-slate-900">Vyntex POS</h1>
                   <p className="text-xs text-slate-500">Create your account</p>

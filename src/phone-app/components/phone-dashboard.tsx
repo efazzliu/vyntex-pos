@@ -17,8 +17,7 @@ import {
 } from "@/lib/supabase-pos/phone-pos-session.ts";
 import { useUserRole } from "@/hooks/use-user-role.ts";
 import { cn } from "@/lib/utils.ts";
-
-const LOGO_URL = "https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz";
+import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 
 export default function PhoneDashboard() {
   const { t } = useTranslation("site");
@@ -120,7 +119,7 @@ export default function PhoneDashboard() {
         <div className="flex items-start justify-between gap-3 pt-2">
           <div className="flex min-w-0 items-center gap-3">
             <img
-              src={LOGO_URL}
+              src={VYNTEX_APP_LOGO_SRC}
               alt="Vyntex POS"
               className="h-14 w-14 shrink-0 object-contain sm:h-16 sm:w-16"
               width={64}

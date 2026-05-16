@@ -100,7 +100,7 @@ export default function AdminSubscriptionsPage() {
           icon={<RefreshCcw className="size-4" />}
           title="MRR"
           value={kpiQuery.isLoading ? "..." : eur2.format(kpiQuery.data?.mrr ?? 0)}
-          hint="Monthly recurring revenue"
+          hint="From active Paddle subscriptions"
           tone="blue"
           loading={kpiQuery.isLoading}
         />
@@ -116,7 +116,7 @@ export default function AdminSubscriptionsPage() {
           icon={<Euro className="size-4" />}
           title="Total Revenue"
           value={kpiQuery.isLoading ? "..." : eur0.format(kpiQuery.data?.totalRevenue ?? 0)}
-          hint="Estimated lifetime revenue"
+          hint="Paddle charges collected (minus refunds)"
           tone="violet"
           loading={kpiQuery.isLoading}
         />

@@ -31,8 +31,7 @@ import {
 } from "../_lib/plan-features.ts";
 import { usePosLocale } from "./pos-locale-provider.tsx";
 import PosPrioritySupportNav from "./pos-priority-support-nav.tsx";
-
-const LOGO_URL = "https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz";
+import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 
 type AdminDrawerProps = {
   open: boolean;
@@ -131,7 +130,7 @@ export default function AdminDrawer({
             onClick={handleLogoClick}
             className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
           >
-            <img src={LOGO_URL} alt="Vyntex POS" className="h-10 w-10 shrink-0" />
+            <img src={VYNTEX_APP_LOGO_SRC} alt="Vyntex POS" className="h-10 w-10 shrink-0" />
             <div className="min-w-0 text-left">
               <SheetTitle
                 className={cn("text-base truncate", light ? "text-slate-900" : "text-white")}

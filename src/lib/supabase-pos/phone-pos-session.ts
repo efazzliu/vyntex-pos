@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase.ts";
+import { devPosPlanDisplayOverride } from "@/lib/dev-pos-plan-override.ts";
 import {
   maxEffectiveTerminalsForLicense,
   normalizePlan,
@@ -498,7 +499,9 @@ export function buildActivationFromOwnedRestaurant(
   const licenseKey = r.license_key.trim().toUpperCase();
   return {
     licenseKey,
-    plan: String(normalizePlan(String(r.plan ?? "professional"))),
+    plan: String(
+      devPosPlanDisplayOverride(normalizePlan(String(r.plan ?? "professional"))),
+    ),
     businessName: r.name,
     businessType: r.type,
     expiresAt: r.license_expiry ?? new Date(Date.now() + 864e9 * 365).toISOString(),

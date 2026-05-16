@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { cn } from "@/lib/utils.ts";
 import { isPlatformAdminEmail } from "@/lib/platform-admin.ts";
 import SetupForm from "./setup-form.tsx";
-import ExpiredLicense from "./expired-license.tsx";
+import { DashboardLicenseExpiredBanner } from "./expired-license.tsx";
 import { DashboardLocaleProvider, useDashboardLocale } from "./dashboard-locale-context.tsx";
 import { useDashboardRestaurant } from "@/hooks/use-dashboard-restaurant.ts";
 import { dashboardTypeLabel } from "@/lib/dashboard-i18n.ts";
@@ -37,8 +37,7 @@ import {
   Languages,
 } from "lucide-react";
 import { toast } from "sonner";
-
-const LOGO_URL = "https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz";
+import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 
 const sidebarLinkDefs = [
   { i18nKey: "nav.restaurant_pos", href: "/dashboard/restaurant-pos", icon: LayoutDashboard },
@@ -105,7 +104,7 @@ function DashboardSidebar({
       {/* Header */}
       <div className="relative z-10 flex items-center justify-between border-b border-sky-500/15 bg-black/20 p-4 backdrop-blur-sm">
         <Link to="/" className="flex items-center gap-2.5 min-w-0">
-          <img src={LOGO_URL} alt={t("layout.brand")} className="h-7 w-7 shrink-0" />
+          <img src={VYNTEX_APP_LOGO_SRC} alt={t("layout.brand")} className="h-7 w-7 shrink-0" />
           {!collapsed && (
             <span className="text-lg font-bold bg-gradient-to-r from-[#0066FF] to-[#44CC00] bg-clip-text text-transparent truncate">
               {t("layout.brand")}
@@ -300,7 +299,7 @@ function DashboardContent() {
       <div className="flex h-dvh items-center justify-center bg-[#02040a]">
         <div className="flex flex-col items-center gap-4">
           <img
-            src={LOGO_URL}
+            src={VYNTEX_APP_LOGO_SRC}
             alt={t("layout.brand")}
             className="h-12 w-12 animate-pulse"
           />
@@ -317,7 +316,7 @@ function DashboardContent() {
         <div className="flex h-dvh items-center justify-center bg-[#02040a]">
           <div className="flex flex-col items-center gap-4">
             <img
-              src={LOGO_URL}
+              src={VYNTEX_APP_LOGO_SRC}
               alt={t("layout.brand")}
               className="h-12 w-12 animate-pulse"
             />
@@ -506,7 +505,7 @@ function DashboardContent() {
               <Menu className="size-5" />
             </button>
             <Link to="/" className={cn(iconBtn, "p-0")} title={t("layout.brand")} aria-label={t("layout.brand")}>
-              <img src={LOGO_URL} alt="" className="h-7 w-7 rounded-lg" />
+              <img src={VYNTEX_APP_LOGO_SRC} alt="" className="h-7 w-7 rounded-lg" />
             </Link>
           </div>
           <div className="pointer-events-auto flex items-center gap-0.5">
@@ -538,7 +537,10 @@ function DashboardContent() {
         </div>
 
         <main className="relative min-h-0 min-w-0 w-full flex-1 overflow-y-auto bg-transparent">
-          {expired ? <ExpiredLicense restaurant={restaurant} /> : <Outlet />}
+          {expired ? (
+            <DashboardLicenseExpiredBanner licenseExpiry={restaurant.licenseExpiry} />
+          ) : null}
+          <Outlet />
         </main>
       </div>
     </div>

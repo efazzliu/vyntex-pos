@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { motion } from "motion/react";
 import {
+  clearActivation,
   getActivation,
   getLocalAdmins,
   generateActivationToken,
@@ -27,7 +28,9 @@ import {
 } from "@/lib/supabase-pos/phone-pos-session.ts";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button.tsx";
+import { toast } from "sonner";
 import { usePosTheme } from "./_lib/use-pos-theme.ts";
+import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 
 type LaunchStep =
   | "loading"
@@ -64,8 +67,47 @@ export default function PosLauncher({ accountAuthMode = false }: PosLauncherProp
       return;
     }
     checkLocalState();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountAuthMode]);
+
+  /** After admin resets terminals, re-check while POS is open (not only on cold start). */
+  useEffect(() => {
+    if (accountAuthMode) return;
+    const watchSteps: LaunchStep[] = ["pin-login", "shift-check", "start-shift", "ready"];
+    if (!activation || !watchSteps.includes(step)) return;
+
+    const reverify = () => {
+      if (document.visibilityState !== "visible") return;
+      void (async () => {
+        try {
+          const stored = await getActivation();
+          if (!stored) return;
+          const v = await verifyLicense(stored.licenseKey, stored.deviceId);
+          if (!v.valid) {
+            await clearActivation();
+            setActiveStaff(null);
+            setActivation(null);
+            toast.info(
+              "Licenca u rivendos nga paneli. Fut përsëri çelësin. / License was reset — enter your license key again.",
+            );
+            setStep("activation");
+          }
+        } catch {
+          /* offline — keep session */
+        }
+      })();
+    };
+
+    document.addEventListener("visibilitychange", reverify);
+    window.addEventListener("focus", reverify);
+    const intervalId = window.setInterval(reverify, 45_000);
+    void reverify();
+
+    return () => {
+      document.removeEventListener("visibilitychange", reverify);
+      window.removeEventListener("focus", reverify);
+      window.clearInterval(intervalId);
+    };
+  }, [step, activation, accountAuthMode]);
 
   async function checkAccountAuthState() {
     try {
@@ -123,7 +165,16 @@ export default function PosLauncher({ accountAuthMode = false }: PosLauncherProp
           stored.licenseKey,
           stored.deviceId,
         );
-        if (verification.valid && verification.plan && verification.plan !== stored.plan) {
+        if (!verification.valid) {
+          await clearActivation();
+          setActivation(null);
+          toast.info(
+            "Licenca u rivendos nga paneli. Fut përsëri çelësin. / License was reset — enter your license key again.",
+          );
+          setStep("activation");
+          return;
+        }
+        if (verification.plan && verification.plan !== stored.plan) {
           const updated = { ...stored, plan: verification.plan };
           // Re-save with updated plan (saveActivation regenerates the token)
           await saveActivation({
@@ -140,7 +191,7 @@ export default function PosLauncher({ accountAuthMode = false }: PosLauncherProp
           setActivation(stored);
         }
       } catch {
-        // Offline or error — use cached data
+        // Offline, misconfiguration, or fetch error — use cached data
         setActivation(stored);
       }
 
@@ -162,7 +213,8 @@ export default function PosLauncher({ accountAuthMode = false }: PosLauncherProp
     if (stored) {
       setActivation(stored);
     }
-    setStep("admin-setup");
+    const admins = await getLocalAdmins();
+    setStep(admins.length === 0 ? "admin-setup" : "pin-login");
   };
 
   const handleAdminCreated = () => {
@@ -170,15 +222,33 @@ export default function PosLauncher({ accountAuthMode = false }: PosLauncherProp
     setStep("pin-login");
   };
 
-  const handlePinLogin = (staff: ActiveStaff) => {
+  const handlePinLogin = useCallback(async (staff: ActiveStaff) => {
+    const stored = await getActivation();
+    if (!stored) {
+      setStep("activation");
+      return;
+    }
+    try {
+      const v = await verifyLicense(stored.licenseKey, stored.deviceId);
+      if (!v.valid) {
+        await clearActivation();
+        setActivation(null);
+        toast.info(
+          "Licenca u rivendos nga paneli. Fut përsëri çelësin. / License was reset — enter your license key again.",
+        );
+        setStep("activation");
+        return;
+      }
+    } catch {
+      /* offline — allow PIN session */
+    }
     setActiveStaff(staff);
-    // Only waiters go through shift check / opening cash screen
     if (staff.role === "waiter") {
       setStep("shift-check");
     } else {
       setStep("ready");
     }
-  };
+  }, []);
 
   const handleLogout = () => {
     setActiveStaff(null);
@@ -261,7 +331,7 @@ export default function PosLauncher({ accountAuthMode = false }: PosLauncherProp
           className="flex flex-col items-center gap-4"
         >
           <img
-            src="https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz"
+            src={VYNTEX_APP_LOGO_SRC}
             alt="Vyntex POS"
             className="h-12 w-12 animate-pulse"
           />
@@ -428,7 +498,7 @@ function ShiftCheckGate({
         className="flex flex-col items-center gap-4"
       >
         <img
-          src="https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz"
+          src={VYNTEX_APP_LOGO_SRC}
           alt="Vyntex POS"
           className="h-12 w-12 animate-pulse"
         />

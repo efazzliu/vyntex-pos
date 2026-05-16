@@ -14,6 +14,22 @@ import {
 import { supabase } from "@/lib/supabase.ts";
 import { clearRestaurantCache } from "@/lib/supabase-pos/restaurant.ts";
 import { isMissingPgColumnError } from "./db-errors.ts";
+import type {
+  AdminMrrTrendPoint,
+  AdminPayingByPlanPoint,
+  AdminPlanDistribution,
+  AdminPlanDistributionRange,
+  AdminRecentTransaction,
+} from "./admin-revenue-types.ts";
+import {
+  getPaddleActiveMrrEur,
+  getPaddleLifetimeRevenueEur,
+  getPaddleMrrTrendEur,
+  getPaddleMrrTrendEurByRange,
+  getPaddlePlanDistribution,
+  getPaddleRecentTransactions,
+  isPlatformBillingAvailable,
+} from "./platform-billing.ts";
 
 /** Default list prices (EUR / month) for MRR estimates — adjust if your catalog differs. */
 const PLAN_MONTHLY_EUR: Record<PlanName, number> = {
@@ -284,48 +300,17 @@ function wasPayingAtMonthEnd(row: AdminLicenseRow, monthEndMs: number): boolean 
   return Number.isFinite(ex) && ex > monthEndMs;
 }
 
-/** Sum of estimated monthly EUR for paying subscriptions (active, not in initial trial-only window). */
+/** MRR (EUR/month) from confirmed Paddle payments only. */
 export async function getAdminActiveMrrEur(): Promise<number> {
-  const rows = await listLicensesForAdmin();
-  let sum = 0;
-  for (const r of rows) {
-    if (!countsAsPaidSubscriptionNow(r)) continue;
-    sum += planMonthlyEur(r.plan);
-  }
-  return Math.round(sum * 100) / 100;
+  return getPaddleActiveMrrEur();
 }
 
 const AVG_MONTH_MS = 30.44 * 24 * 60 * 60 * 1000;
 
-/**
- * Rough lifetime subscription revenue (EUR): plan list price × months from signup
- * to min(now, expiry) for licenses that moved past the initial free-trial-only window.
- * Not invoice-grade; useful for admin overview until billing export exists.
- */
+/** Lifetime subscription revenue (EUR) — sum of successful Paddle charges minus refunds. */
 export async function getAdminEstimatedLifetimeSubscriptionRevenueEur(): Promise<number> {
-  const rows = await listLicensesForAdmin();
-  let sum = 0;
-  const now = Date.now();
-  for (const r of rows) {
-    if (isInitialFreeTrialOnly(r)) continue;
-    const raw = r.created_at;
-    if (!raw) continue;
-    const start = new Date(raw).getTime();
-    const end = Math.min(now, new Date(r.license_expiry).getTime());
-    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) continue;
-    sum += planMonthlyEur(r.plan) * ((end - start) / AVG_MONTH_MS);
-  }
-  return Math.round(sum * 100) / 100;
+  return getPaddleLifetimeRevenueEur();
 }
-
-export type AdminPayingByPlanPoint = {
-  label: string;
-  /** Full month label for charts, e.g. "January 2026". */
-  monthTitle: string;
-  starter: number;
-  professional: number;
-  enterprise: number;
-};
 
 /**
  * Per calendar month: count of paying licenses at month-end, split by plan tier.
@@ -367,177 +352,43 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-export type AdminMrrTrendPoint = {
-  label: string;
-  monthTitle: string;
-  mrrEur: number;
-};
+export type {
+  AdminMrrTrendPoint,
+  AdminPayingByPlanPoint,
+  AdminPlanDistribution,
+  AdminPlanDistributionRange,
+  AdminRecentTransaction,
+  AdminTransactionCategory,
+  AdminTransactionCycle,
+  AdminTransactionMethod,
+  AdminTransactionStatus,
+} from "./admin-revenue-types.ts";
 
-export type AdminPlanDistributionRange =
-  | "this_month"
-  | "last_month"
-  | "last_6_months"
-  | "last_12_months"
-  | "all_time";
-
-export type AdminPlanDistribution = {
-  starter: number;
-  professional: number;
-  enterprise: number;
-  total: number;
-};
-
-export type AdminTransactionCategory = "restaurant_pos";
-
-export type AdminTransactionCycle = "monthly" | "yearly";
-
-export type AdminTransactionStatus = "paid" | "pending" | "failed" | "refunded";
-
-export type AdminTransactionMethod = "card" | "bank_transfer" | "paypal";
-
-export type AdminRecentTransaction = {
-  id: string;
-  customerName: string;
-  customerEmail: string;
-  category: AdminTransactionCategory;
-  plan: PlanName;
-  cycle: AdminTransactionCycle;
-  amountEur: number;
-  status: AdminTransactionStatus;
-  method: AdminTransactionMethod;
-  createdAt: string;
-};
-
-/** Month-end estimated MRR (EUR) from paying license counts × list prices. */
+/** Monthly Paddle cash collected (EUR) per calendar month. */
 export async function getAdminPayingMrrTrendEur(monthCount = 12): Promise<AdminMrrTrendPoint[]> {
-  const pts = await getAdminPayingLicensesByPlanTrend(monthCount);
-  return pts.map((p) => ({
-    label: p.label,
-    monthTitle: p.monthTitle,
-    mrrEur: round2(
-      p.starter * planMonthlyEur("starter") +
-        p.professional * planMonthlyEur("professional") +
-        p.enterprise * planMonthlyEur("enterprise"),
-    ),
-  }));
+  return getPaddleMrrTrendEur(monthCount);
 }
 
-/** MRR trend buckets aligned with {@link getAdminPlanDistribution} date windows. */
+/** Revenue trend buckets aligned with {@link getAdminPlanDistribution} date windows (Paddle only). */
 export async function getAdminPayingMrrTrendEurByRange(
   range: AdminPlanDistributionRange,
 ): Promise<AdminMrrTrendPoint[]> {
-  if (range === "last_6_months") return getAdminPayingMrrTrendEur(6);
-  if (range === "last_12_months") return getAdminPayingMrrTrendEur(12);
-  if (range === "this_month") return getAdminPayingMrrTrendEur(1);
-  if (range === "last_month") {
-    const two = await getAdminPayingMrrTrendEur(2);
-    return two.length >= 1 ? [two[0]!] : [];
-  }
-  if (range === "all_time") {
-    const rows = await listLicensesForAdmin();
-    const now = new Date();
-    let oldestMs = now.getTime();
-    for (const r of rows) {
-      const t = r.created_at ? new Date(r.created_at).getTime() : Number.NaN;
-      if (Number.isFinite(t) && t < oldestMs) oldestMs = t;
-    }
-    const oldest = new Date(oldestMs);
-    const span =
-      differenceInCalendarMonths(startOfMonth(now), startOfMonth(oldest)) + 1;
-    const n = Math.min(Math.max(span, 1), 240);
-    return getAdminPayingMrrTrendEur(n);
-  }
-  return getAdminPayingMrrTrendEur(12);
+  return getPaddleMrrTrendEurByRange(range);
 }
 
-/**
- * License plan distribution by signup date window.
- * Useful for "which plan sold more" snapshots in admin charts.
- */
+/** Paying plan mix from Paddle subscriptions in the selected period. */
 export async function getAdminPlanDistribution(
   range: AdminPlanDistributionRange,
 ): Promise<AdminPlanDistribution> {
-  const rows = await listLicensesForAdmin();
-  const now = new Date();
-
-  let startMs = Number.NEGATIVE_INFINITY;
-  let endMs = now.getTime();
-
-  if (range === "this_month") {
-    startMs = startOfMonth(now).getTime();
-  } else if (range === "last_month") {
-    const lastMonth = subMonths(now, 1);
-    startMs = startOfMonth(lastMonth).getTime();
-    endMs = endOfMonth(lastMonth).getTime();
-  } else if (range === "last_6_months") {
-    startMs = startOfMonth(subMonths(now, 5)).getTime();
-  } else if (range === "last_12_months") {
-    startMs = startOfMonth(subMonths(now, 11)).getTime();
-  }
-
-  const counts: Record<PlanName, number> = {
-    starter: 0,
-    professional: 0,
-    enterprise: 0,
-  };
-
-  for (const row of rows) {
-    const t = row.created_at ? new Date(row.created_at).getTime() : Number.NaN;
-    if (!Number.isFinite(t)) continue;
-    if (t < startMs || t > endMs) continue;
-    counts[normalizePlan(row.plan)]++;
-  }
-
-  return {
-    starter: counts.starter,
-    professional: counts.professional,
-    enterprise: counts.enterprise,
-    total: counts.starter + counts.professional + counts.enterprise,
-  };
+  return getPaddlePlanDistribution(range);
 }
 
-/**
- * Dashboard-only snapshot list for recent billing activity.
- * Keep this query boundary stable and swap internals with real invoice/payment rows later.
- */
+/** Recent Paddle subscription charges (empty until webhooks are configured). */
 export async function getAdminRecentTransactions(limit = 8): Promise<AdminRecentTransaction[]> {
-  const rows = await listLicensesForAdmin();
-
-  const tx = rows
-    .filter((row) => countsAsPaidSubscriptionNow(row))
-    .map<AdminRecentTransaction>((row) => {
-      const createdAt = row.created_at ?? new Date().toISOString();
-      const createdMs = new Date(createdAt).getTime();
-      const expiryMs = new Date(row.license_expiry).getTime();
-      const days = Number.isFinite(createdMs) && Number.isFinite(expiryMs)
-        ? (expiryMs - createdMs) / (24 * 60 * 60 * 1000)
-        : 0;
-      const cycle: AdminTransactionCycle = days >= 330 ? "yearly" : "monthly";
-      const plan = normalizePlan(row.plan);
-      const amountEur = cycle === "yearly" ? planMonthlyEur(plan) * 12 : planMonthlyEur(plan);
-      const labelId = row.license_key?.trim() || row.id;
-      const customerName = row.owner_name?.trim() || row.name || "Unknown client";
-      const customerEmail = row.owner_email?.trim() || "(no email on file)";
-      const method: AdminTransactionMethod =
-        row.type?.toLowerCase().includes("bank") ? "bank_transfer" : "card";
-      return {
-        id: labelId,
-        customerName,
-        customerEmail,
-        category: "restaurant_pos",
-        plan,
-        cycle,
-        amountEur,
-        status: "paid",
-        method,
-        createdAt,
-      };
-    });
-
-  return tx
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, Math.max(1, limit));
+  return getPaddleRecentTransactions(limit);
 }
+
+export { isPlatformBillingAvailable };
 
 export type ClientAccountRow = {
   owner_email: string;

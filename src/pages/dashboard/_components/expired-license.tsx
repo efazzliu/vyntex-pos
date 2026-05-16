@@ -1,96 +1,55 @@
 import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button.tsx";
-import { toast } from "sonner";
-import { ShieldAlert, Mail, CreditCard } from "lucide-react";
-import type { DashboardRestaurant } from "@/hooks/use-dashboard-restaurant.ts";
-import { SUPPORT_EMAIL, SUPPORT_MAILTO_HREF } from "@/lib/site-constants.ts";
+import { ShieldAlert, CreditCard, KeyRound } from "lucide-react";
+import { useDashboardLocale } from "./dashboard-locale-context.tsx";
 
-const VYN_TYPE_LABELS: Record<string, string> = {
-  restaurant: "Restaurant POS",
-  cafe: "Coffee POS",
-  bar: "Bar POS",
-  hotel: "Hotel POS",
-  fitness: "Fitness POS",
-};
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-}
-
-export default function ExpiredLicense({
-  restaurant,
+/**
+ * Non-blocking notice when the restaurant license is past expiry (or suspended).
+ * The web dashboard stays usable for renewal and account management; the Windows
+ * POS app enforces the license separately.
+ */
+export function DashboardLicenseExpiredBanner({
+  licenseExpiry,
 }: {
-  restaurant: DashboardRestaurant;
+  licenseExpiry: string;
 }) {
-  const handleRenew = () => {
-    toast.info(
-      `Payment integration is being set up. Email ${SUPPORT_EMAIL} to renew your license.`,
-    );
-  };
+  const { t, lang } = useDashboardLocale();
+  const dateStr = new Date(licenseExpiry).toLocaleDateString(
+    lang === "sq" ? "sq-AL" : "en-US",
+    { year: "numeric", month: "long", day: "numeric" },
+  );
 
   return (
-    <div className="flex items-center justify-center min-h-[calc(100dvh-3.5rem)] lg:min-h-dvh p-4">
-      <div className="max-w-lg w-full text-center">
-        {/* Warning icon */}
-        <div className="w-20 h-20 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center mx-auto mb-6">
-          <ShieldAlert className="size-10 text-red-500" />
+    <div
+      className="sticky top-0 z-30 border-b border-red-500/35 bg-red-950/80 px-4 py-3 text-left shadow-[0_8px_24px_-12px_rgba(0,0,0,0.5)] backdrop-blur-md sm:px-6"
+      role="status"
+    >
+      <div className="mx-auto flex max-w-4xl flex-col gap-2 sm:flex-row sm:items-start sm:gap-4">
+        <div className="flex shrink-0 gap-2 text-red-100">
+          <ShieldAlert className="mt-0.5 size-5 shrink-0 text-red-400" aria-hidden />
+          <div>
+            <p className="text-sm font-semibold text-red-50">{t("license_expired.banner_title")}</p>
+            <p className="mt-1 text-xs leading-relaxed text-red-100/85 sm:text-sm">
+              {t("license_expired.banner_line1", { date: dateStr })}
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-red-100/80 sm:text-sm">
+              {t("license_expired.banner_line2")}
+            </p>
+          </div>
         </div>
-
-        <h1 className="text-2xl font-bold text-foreground mb-2">
-          Your License Has Expired
-        </h1>
-        <p className="text-muted-foreground mb-1">
-          Your{" "}
-          <span className="font-semibold text-foreground">
-            {VYN_TYPE_LABELS[restaurant.type] ?? restaurant.type}
-          </span>{" "}
-          license expired on{" "}
-          <span className="font-semibold text-foreground">
-            {formatDate(restaurant.licenseExpiry)}
-          </span>
-          .
-        </p>
-        <p className="text-muted-foreground mb-8">
-          Renew now to regain access to your Vyntex POS software and dashboard
-          settings.
-        </p>
-
-        {/* License key reminder */}
-        <div className="rounded-xl border border-border bg-card p-4 mb-6 text-left">
-          <p className="text-xs text-muted-foreground mb-1">License Key</p>
-          <p className="font-mono text-base tracking-widest text-foreground">
-            {restaurant.licenseKey}
-          </p>
-        </div>
-
-        {/* Renew button */}
-        <Button
-          size="lg"
-          className="w-full mb-4 bg-gradient-to-r from-[#0066FF] to-[#0055DD] hover:from-[#0055DD] hover:to-[#0044CC] text-white h-12 text-base"
-          onClick={handleRenew}
-        >
-          <CreditCard className="size-5 mr-2" />
-          Renew Now
-        </Button>
-
-        {/* Contact support */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-sm">
-          <a
-            href={SUPPORT_MAILTO_HREF}
-            className="inline-flex items-center gap-1.5 text-primary font-medium hover:underline"
-          >
-            <Mail className="size-4" />
-            {SUPPORT_EMAIL}
-          </a>
+        <div className="flex shrink-0 flex-wrap gap-2 sm:ml-auto sm:pt-0.5">
           <Link
-            to="/contact"
-            className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
+            to="/dashboard/billing"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-medium text-white ring-1 ring-inset ring-white/15 transition hover:bg-white/15"
           >
-            Contact form
+            <CreditCard className="size-3.5" aria-hidden />
+            {t("license_expired.link_billing")}
+          </Link>
+          <Link
+            to="/dashboard/licenses"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-medium text-white ring-1 ring-inset ring-white/15 transition hover:bg-white/15"
+          >
+            <KeyRound className="size-3.5" aria-hidden />
+            {t("license_expired.link_licenses")}
           </Link>
         </div>
       </div>

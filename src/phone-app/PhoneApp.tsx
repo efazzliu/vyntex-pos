@@ -1,5 +1,6 @@
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import { DefaultProviders } from "@/components/providers/default.tsx";
+import { Toaster } from "@/components/ui/sonner.tsx";
 import { RedirectIfAuthed } from "@/components/redirect-if-authed.tsx";
 import { RequireSupabaseAuth } from "@/components/require-supabase-auth.tsx";
 import AuthCallback from "@/pages/auth/Callback.tsx";
@@ -32,6 +33,7 @@ export default function PhoneApp() {
   return (
     <DefaultProviders>
       <HashRouter>
+        <Toaster richColors position="top-right" />
         <PhoneAuthUrlGate>
           <Routes>
           <Route path="/" element={<Navigate to="/login" replace />} />

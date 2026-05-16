@@ -3,7 +3,11 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import type { Doc } from "@/convex/_generated/dataModel.d.ts";
 import { cn } from "@/lib/utils.ts";
-import { printHtmlDocument } from "@/lib/print-html.ts";
+import {
+  printHtmlDocument,
+  getDesktopSystemPrintersInvoker,
+  type DesktopSystemPrinterInfo,
+} from "@/lib/print-html.ts";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button.tsx";
 import {
@@ -73,9 +77,9 @@ import {
   planLabel,
   planTerminalFloor,
 } from "../_lib/plan-features.ts";
+import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 
-const DEFAULT_PIN_LOGO_PREVIEW =
-  "https://hercules-cdn.com/file_80VAi8Tu1pNV5onr3HBvq7tz";
+const DEFAULT_PIN_LOGO_PREVIEW = VYNTEX_APP_LOGO_SRC;
 
 /** Days until license end + date; null if no valid expiry. */
 function licenseExpirySubline(
@@ -555,6 +559,8 @@ export default function PosSettings({
   const updateCompanyProfile = useMutation('pos.settings.updateCompanyProfile');
 
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [systemPrinterDialogOpen, setSystemPrinterDialogOpen] =
+    useState(false);
   const [scanning, setScanning] = useState(false);
   const [activeTab, setActiveTab] = useState<"general" | "templates">("general");
   const [savingLocale, setSavingLocale] = useState(false);
@@ -565,6 +571,15 @@ export default function PosSettings({
   const [savingCompany, setSavingCompany] = useState(false);
 
   const printers = Array.isArray(printersQuery) ? printersQuery : [];
+  const invokeSystemPrinters = useMemo(
+    () => getDesktopSystemPrintersInvoker(),
+    [],
+  );
+  /** Web Bluetooth is not exposed in Electron; desktop BT printers use Windows pairing + USB/System. */
+  const webBluetoothSupported = useMemo(
+    () => typeof navigator !== "undefined" && "bluetooth" in navigator,
+    [],
+  );
   const company =
     companyQuery &&
     typeof companyQuery === "object" &&
@@ -676,18 +691,22 @@ export default function PosSettings({
         optionalServices: ["battery_service"],
       });
 
-      if (device.name) {
-        await addPrinter({
-          licenseKey,
-          name: device.name || `BT-${device.id.slice(0, 8)}`,
-          type: "bluetooth",
-          address: device.id,
-          role: "receipt",
-        });
-        toast.success(t("settings.printer_added") + `: ${device.name}`);
-      }
+      const label =
+        (device.name ?? "").trim() || `BT-${device.id.slice(0, 8)}`;
+      await addPrinter({
+        licenseKey,
+        name: label,
+        type: "bluetooth",
+        address: device.id,
+        role: "receipt",
+      });
+      toast.success(`${t("settings.printer_added")}: ${label}`);
     } catch (err) {
       if (err instanceof Error && err.name === "NotFoundError") return;
+      if (err instanceof Error && err.name === "SecurityError") {
+        toast.error(t("msg.bluetooth_permission_denied"));
+        return;
+      }
       toast.error(t("msg.bluetooth_unavailable"));
     } finally {
       setScanning(false);
@@ -1119,17 +1138,30 @@ export default function PosSettings({
                 {t("settings.printers")}
               </h2>
 
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={handleBluetoothScan}
-                  disabled={scanning}
-                  className="bg-[#1e2a45] border-[#2a3a5c] text-white hover:bg-[#2a3a5c]"
-                >
-                  <Bluetooth className="size-4 mr-1.5" />
-                  {scanning ? t("settings.scanning") : t("settings.scan_bluetooth")}
-                </Button>
+              <div className="flex items-center gap-2 flex-wrap">
+                {invokeSystemPrinters ? (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setSystemPrinterDialogOpen(true)}
+                    className="bg-[#1e2a45] border-[#2a3a5c] text-white hover:bg-[#2a3a5c]"
+                  >
+                    <Usb className="size-4 mr-1.5" />
+                    {t("settings.add_usb_printer")}
+                  </Button>
+                ) : null}
+                {webBluetoothSupported ? (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={handleBluetoothScan}
+                    disabled={scanning}
+                    className="bg-[#1e2a45] border-[#2a3a5c] text-white hover:bg-[#2a3a5c]"
+                  >
+                    <Bluetooth className="size-4 mr-1.5" />
+                    {scanning ? t("settings.scanning") : t("settings.scan_bluetooth")}
+                  </Button>
+                ) : null}
                 <Button size="sm" onClick={() => setAddDialogOpen(true)}>
                   <Plus className="size-4 mr-1.5" />
                   {t("settings.add_ip_printer")}
@@ -1140,6 +1172,16 @@ export default function PosSettings({
             <p className="text-xs text-[#5a6580]">
               {t("settings.printers_desc")}
             </p>
+
+            <AddSystemPrinterDialog
+              open={systemPrinterDialogOpen}
+              onOpenChange={setSystemPrinterDialogOpen}
+              licenseKey={licenseKey}
+              addPrinter={addPrinter}
+              existingDeviceNames={printers.map((p) =>
+                (p.address ?? "").trim().toLowerCase(),
+              )}
+            />
 
             {printers.length === 0 ? (
               <Empty>
@@ -1328,6 +1370,231 @@ function PrinterCard({
         </Button>
       </div>
     </div>
+  );
+}
+
+// ── Add USB / Windows print queue (desktop only) ─────────
+
+function AddSystemPrinterDialog({
+  open,
+  onOpenChange,
+  licenseKey,
+  addPrinter,
+  existingDeviceNames,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  licenseKey: string;
+  addPrinter: (args: {
+    licenseKey: string;
+    name: string;
+    type: "bluetooth" | "network" | "usb";
+    address: string;
+    role: "receipt" | "kitchen" | "bar";
+  }) => Promise<unknown>;
+  existingDeviceNames: string[];
+}) {
+  const { t } = usePosLocale();
+  const [loading, setLoading] = useState(false);
+  const [list, setList] = useState<DesktopSystemPrinterInfo[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [deviceName, setDeviceName] = useState("");
+  const [friendlyName, setFriendlyName] = useState("");
+  const [role, setRole] = useState<"receipt" | "kitchen" | "bar">("receipt");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const inv = getDesktopSystemPrintersInvoker();
+    let cancelled = false;
+    setLoading(true);
+    setLoadError(null);
+    setList([]);
+    setDeviceName("");
+    setFriendlyName("");
+    setRole("receipt");
+    if (!inv) {
+      setLoading(false);
+      setLoadError("no-desktop");
+      return;
+    }
+    void inv().then((r) => {
+      if (cancelled) return;
+      setLoading(false);
+      if (!r.ok) {
+        setLoadError(r.error);
+        return;
+      }
+      const printers = [...r.printers].sort((a, b) => {
+        if (a.isDefault !== b.isDefault) return a.isDefault ? -1 : 1;
+        return a.displayName.localeCompare(b.displayName, undefined, {
+          sensitivity: "base",
+        });
+      });
+      setList(printers);
+      const first = printers.find((p) => p.isDefault) ?? printers[0];
+      if (first) {
+        setDeviceName(first.deviceName);
+        setFriendlyName(first.displayName);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  const isDuplicate =
+    deviceName.trim().length > 0 &&
+    existingDeviceNames.includes(deviceName.trim().toLowerCase());
+
+  const handleSelectDevice = (dn: string) => {
+    setDeviceName(dn);
+    const p = list.find((x) => x.deviceName === dn);
+    if (p) setFriendlyName(p.displayName);
+  };
+
+  const handleSubmit = async () => {
+    if (!deviceName.trim()) {
+      toast.error(t("settings.usb_printer_pick_required"));
+      return;
+    }
+    if (isDuplicate) {
+      toast.error(t("settings.usb_printer_already_added"));
+      return;
+    }
+    setSaving(true);
+    try {
+      await addPrinter({
+        licenseKey,
+        name: friendlyName.trim() || deviceName.trim(),
+        type: "usb",
+        address: deviceName.trim(),
+        role,
+      });
+      toast.success(t("settings.printer_added"));
+      onOpenChange(false);
+    } catch (err) {
+      const msg = errorMessageFromUnknown(err, t("settings.save_failed"));
+      if (isMissingSupabaseTableError(msg, "pos_printers")) {
+        toast.error(t("settings.printer_table_missing_title"), {
+          description: t("settings.printer_table_missing_steps"),
+          duration: 25_000,
+          action: {
+            label: t("settings.printer_copy_sql"),
+            onClick: () => {
+              void navigator.clipboard.writeText(ensurePosPrintersSql).then(
+                () => toast.success(t("settings.printer_sql_copied")),
+                () => toast.error(t("settings.printer_sql_copy_failed")),
+              );
+            },
+          },
+        });
+      } else {
+        toast.error(msg);
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="bg-[#0D1326] border-[#1e2a45] text-white max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Usb className="size-5 text-[#0066FF]" />
+            {t("settings.usb_printer_dialog_title")}
+          </DialogTitle>
+          <DialogDescription className="text-[#8b93a7]">
+            {t("settings.usb_printer_dialog_desc")}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 pt-2">
+          {loading ? (
+            <p className="text-sm text-[#8b93a7]">{t("common.loading")}</p>
+          ) : loadError ? (
+            <p className="text-sm text-red-400/90">
+              {loadError === "no-desktop"
+                ? t("settings.usb_printer_desktop_only")
+                : `${t("settings.usb_printer_load_failed")}: ${loadError}`}
+            </p>
+          ) : list.length === 0 ? (
+            <p className="text-sm text-[#8b93a7]">{t("settings.usb_printer_empty")}</p>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <Label className="text-[#8b93a7]">
+                  {t("settings.usb_printer_windows_queue")}
+                </Label>
+                <Select
+                  value={deviceName}
+                  onValueChange={handleSelectDevice}
+                >
+                  <SelectTrigger className="bg-[#131A2E] border-[#1e2a45] text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#131A2E] border-[#1e2a45] max-h-64">
+                    {list.map((p) => (
+                      <SelectItem key={p.deviceName} value={p.deviceName}>
+                        {p.displayName}
+                        {p.isDefault ? ` (${t("settings.usb_printer_default_badge")})` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-[#8b93a7]">
+                  {t("settings.printer_name")}
+                </Label>
+                <Input
+                  value={friendlyName}
+                  onChange={(e) => setFriendlyName(e.target.value)}
+                  placeholder={deviceName}
+                  className="bg-[#131A2E] border-[#1e2a45] text-white"
+                />
+                <p className="text-[10px] text-[#5a6580]">
+                  {t("settings.usb_printer_label_hint")}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-[#8b93a7]">{t("settings.assign_role")}</Label>
+                <Select
+                  value={role}
+                  onValueChange={(v) => setRole(v as "receipt" | "kitchen" | "bar")}
+                >
+                  <SelectTrigger className="bg-[#131A2E] border-[#1e2a45] text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#131A2E] border-[#1e2a45]">
+                    <SelectItem value="receipt">{t("settings.receipt_printer")}</SelectItem>
+                    <SelectItem value="kitchen">{t("settings.kitchen_printer")}</SelectItem>
+                    <SelectItem value="bar">{t("settings.bar_printer")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {isDuplicate ? (
+                <p className="text-xs text-amber-400/90">
+                  {t("settings.usb_printer_already_added")}
+                </p>
+              ) : null}
+
+              <Button
+                className="w-full"
+                onClick={() => void handleSubmit()}
+                disabled={saving || !deviceName.trim() || isDuplicate}
+              >
+                {saving ? t("common.loading") : t("settings.add_printer")}
+              </Button>
+            </>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
