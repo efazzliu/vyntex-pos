@@ -28,8 +28,8 @@ export default function DashboardDownloadsPage() {
     formatInstallerDisplayFromIso(live?.installerUpdatedAt) ??
     formattedInstallerMtime();
 
-  const installerUrlX64 = windowsInstallerX64Href();
-  const installerUrlArm64 = windowsInstallerArm64Href();
+  const installerUrlX64 = windowsInstallerX64Href(versionLabel);
+  const installerUrlArm64 = windowsInstallerArm64Href(versionLabel);
 
   const openInstallerDownload = (
     url: string,

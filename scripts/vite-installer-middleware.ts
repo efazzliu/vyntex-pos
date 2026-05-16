@@ -38,18 +38,34 @@ a{color:#4d9fff}
 </html>`;
 }
 
-function mapRequestToCanonical(basenameLower: string): string | null {
-  if (
-    basenameLower === "vyntexpossetup.exe" ||
-    basenameLower === "restaurantpossetup.exe"
-  ) {
-    return CANONICAL_X64;
+const VERSIONED_INSTALLER_RE =
+  /^restaurantpossetup-(\d+\.\d+\.\d+)-(x64|arm64)\.exe$/;
+
+function parseInstallerRequest(
+  rawPath: string,
+): { canonical: string; dispositionFilename: string } | null {
+  let basename: string;
+  try {
+    basename = path.basename(decodeURIComponent(rawPath));
+  } catch {
+    return null;
   }
-  if (
-    basenameLower === "vyntexpossetup-arm64.exe" ||
-    basenameLower === "restaurantpossetup-arm64.exe"
-  ) {
-    return CANONICAL_ARM64;
+  const lower = basename.toLowerCase();
+
+  const versioned = lower.match(VERSIONED_INSTALLER_RE);
+  if (versioned) {
+    const arch = versioned[2];
+    return {
+      canonical: arch === "arm64" ? CANONICAL_ARM64 : CANONICAL_X64,
+      dispositionFilename: basename,
+    };
+  }
+
+  if (lower === "vyntexpossetup.exe" || lower === "restaurantpossetup.exe") {
+    return { canonical: CANONICAL_X64, dispositionFilename: basename };
+  }
+  if (lower === "vyntexpossetup-arm64.exe" || lower === "restaurantpossetup-arm64.exe") {
+    return { canonical: CANONICAL_ARM64, dispositionFilename: basename };
   }
   return null;
 }
@@ -106,26 +122,19 @@ export function createInstallerMiddleware(
       return;
     }
 
-    let basename: string;
-    try {
-      basename = path.basename(decodeURIComponent(raw)).toLowerCase();
-    } catch {
+    const parsed = parseInstallerRequest(raw);
+    if (!parsed) {
       next();
       return;
     }
 
-    const canonical = mapRequestToCanonical(basename);
-    if (!canonical) {
-      next();
-      return;
-    }
-
+    const { canonical, dispositionFilename } = parsed;
     const diskPath = path.join(publicDir, path.basename(canonical));
     if (isRealInstaller(diskPath)) {
       res.setHeader("Content-Type", "application/octet-stream");
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename="${path.basename(canonical)}"`,
+        `attachment; filename="${dispositionFilename}"`,
       );
       fs.createReadStream(diskPath).pipe(res);
       return;

@@ -108,8 +108,8 @@ export default function DashboardOverviewModern() {
   const installerFileMtime =
     formatInstallerDisplayFromIso(live?.installerUpdatedAt) ??
     formattedInstallerMtime();
-  const installerUrlX64 = windowsInstallerX64Href();
-  const installerUrlArm64 = windowsInstallerArm64Href();
+  const installerUrlX64 = windowsInstallerX64Href(versionLabel);
+  const installerUrlArm64 = windowsInstallerArm64Href(versionLabel);
   const dateLocale = dashboardDateLocale(lang);
 
   if (restaurant === undefined) {

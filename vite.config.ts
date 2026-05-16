@@ -20,6 +20,47 @@ function viteInstallerPlugin(): Plugin {
   };
 }
 
+/** Vercel/dist: duplicate installer under a versioned filename (no extra git blob). */
+function copyVersionedInstallerToDistPlugin(): Plugin {
+  let outDir = "dist";
+  let appVersion = "0.0.0";
+  return {
+    name: "vyntex-copy-versioned-installer",
+    configResolved(c) {
+      outDir = c.build.outDir;
+      try {
+        const pkg = JSON.parse(
+          fs.readFileSync(path.resolve(__dirname, "package.json"), "utf8"),
+        ) as { version?: string };
+        if (typeof pkg.version === "string" && pkg.version.trim()) {
+          appVersion = pkg.version.trim();
+        }
+      } catch {
+        /* ignore */
+      }
+    },
+    closeBundle() {
+      const pairs = [
+        {
+          src: path.resolve(__dirname, "public/RestaurantPOSSetup.exe"),
+          dest: `RestaurantPOSSetup-${appVersion}-x64.exe`,
+        },
+        {
+          src: path.resolve(__dirname, "public/RestaurantPOSSetup-arm64.exe"),
+          dest: `RestaurantPOSSetup-${appVersion}-arm64.exe`,
+        },
+      ];
+      for (const { src, dest } of pairs) {
+        if (!fs.existsSync(src) || fs.statSync(src).size < 50_000) continue;
+        const outPath = path.resolve(__dirname, outDir, dest);
+        fs.mkdirSync(path.dirname(outPath), { recursive: true });
+        fs.copyFileSync(src, outPath);
+        console.log(`[vyntex] Copied installer -> ${path.relative(__dirname, outPath)}`);
+      }
+    },
+  };
+}
+
 /** Static deploy: `fetch(build-meta.json)` matches dev live JSON from middleware. */
 function writeBuildMetaJsonPlugin(): Plugin {
   let outDir = "dist";
@@ -98,7 +139,14 @@ export default defineConfig(() => {
         overlay: false,
       },
     },
-    plugins: [viteInstallerPlugin(), writeBuildMetaJsonPlugin(), react(), tailwindcss(), hercules()],
+    plugins: [
+      viteInstallerPlugin(),
+      writeBuildMetaJsonPlugin(),
+      copyVersionedInstallerToDistPlugin(),
+      react(),
+      tailwindcss(),
+      hercules(),
+    ],
     resolve: {
       alias: {
         "convex/react": path.resolve(__dirname, "./src/lib/convex-react-supabase.tsx"),

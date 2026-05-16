@@ -105,8 +105,8 @@ export default function DashboardOverview() {
     (import.meta.env.VITE_INSTALLER_UPDATED_AT as string | undefined);
   const installerUpdatedAt = formatInstallerUpdatedAt(installerIso);
   const appVersionLabel = live?.appVersion ?? APP_VERSION_LABEL;
-  const installerUrlX64 = windowsInstallerX64Href();
-  const installerUrlArm64 = windowsInstallerArm64Href();
+  const installerUrlX64 = windowsInstallerX64Href(appVersionLabel);
+  const installerUrlArm64 = windowsInstallerArm64Href(appVersionLabel);
 
   if (restaurant === undefined) {
     return (
