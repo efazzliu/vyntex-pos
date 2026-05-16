@@ -39,11 +39,11 @@ export default function AdminUsersHubPage() {
         />
         <div className="relative">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-300/70">
-            Users Hub
+            Internal
           </p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Users</h1>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Team</h1>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-300/80">
-            Ketu shfaqet vetem team-i i programit: platform adminat (jo klientat).
+            Operatorët e platformës (admin access) — jo përdoruesit që regjistrohen në site.
           </p>
         </div>
       </div>

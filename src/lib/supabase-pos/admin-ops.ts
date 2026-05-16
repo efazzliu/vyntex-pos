@@ -390,6 +390,59 @@ export async function getAdminRecentTransactions(limit = 8): Promise<AdminRecent
 
 export { isPlatformBillingAvailable };
 
+export type SiteUserRow = {
+  userId: string;
+  email: string;
+  fullName: string | null;
+  registeredAt: string;
+  lastSignInAt: string | null;
+  venueCount: number;
+  activeLicenseCount: number;
+};
+
+function isMissingSiteUsersRpcError(err: { message?: string }): boolean {
+  const m = String(err.message ?? "").toLowerCase();
+  return (
+    m.includes("could not find the function") ||
+    m.includes("vyntex_list_site_users") ||
+    (m.includes("schema cache") && m.includes("function"))
+  );
+}
+
+/** Supabase Auth accounts (site sign-ups). Requires migration 023 + platform_admin_emails. */
+export async function listSiteUsers(): Promise<SiteUserRow[]> {
+  const { data, error } = await supabase.rpc("vyntex_list_site_users");
+
+  if (error) {
+    if (isMissingSiteUsersRpcError(error)) {
+      throw new Error(
+        "The site users function is not installed. Run migration 023_vyntex_list_site_users.sql in Supabase, then try again.",
+      );
+    }
+    const msg = String(error.message ?? "");
+    if (msg.toLowerCase().includes("not authorized")) {
+      throw new Error(
+        "Your account cannot list site users. Add your email to platform_admin_emails in Supabase.",
+      );
+    }
+    throw new Error(msg);
+  }
+
+  const rows = Array.isArray(data) ? data : [];
+  return rows.map((raw) => {
+    const r = raw as Record<string, unknown>;
+    return {
+      userId: String(r.user_id ?? ""),
+      email: String(r.email ?? "").trim().toLowerCase(),
+      fullName: r.full_name ? String(r.full_name).trim() : null,
+      registeredAt: String(r.registered_at ?? ""),
+      lastSignInAt: r.last_sign_in_at ? String(r.last_sign_in_at) : null,
+      venueCount: Math.max(0, Number(r.venue_count) || 0),
+      activeLicenseCount: Math.max(0, Number(r.active_license_count) || 0),
+    };
+  });
+}
+
 export type ClientAccountRow = {
   owner_email: string;
   owner_name: string | null;

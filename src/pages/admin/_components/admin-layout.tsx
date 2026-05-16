@@ -10,7 +10,8 @@ import {
   KeyRound,
   BarChart3,
   LifeBuoy,
-  Users,
+  UserRound,
+  UsersRound,
   Settings,
   ChevronLeft,
 } from "lucide-react";
@@ -45,7 +46,8 @@ const sidebarSections: SidebarSection[] = [
       { label: "Licenses", href: "/admin/licenses", icon: KeyRound },
       { label: "Analytics", href: "/admin/reports", icon: BarChart3 },
       { label: "Support", href: "/admin/support", icon: LifeBuoy },
-      { label: "Team", href: "/admin/users", icon: Users },
+      { label: "Users", href: "/admin/users", icon: UserRound },
+      { label: "Team", href: "/admin/team", icon: UsersRound },
       { label: "Settings", href: "/admin/settings", icon: Settings },
     ],
   },
@@ -83,8 +85,8 @@ function AdminSidebar({
   return (
     <aside
       className={cn(
-        "relative flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white text-slate-900 shadow-[0_20px_48px_-34px_rgba(2,6,23,0.35)] transition-all duration-300 dark:border-slate-800 dark:bg-[#070d1f] dark:text-white dark:shadow-[0_24px_52px_-30px_rgba(0,0,0,0.75)]",
-        collapsed ? "w-20" : "w-[276px]"
+        "relative flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200/60 bg-slate-50/80 text-slate-900 shadow-[0_1px_3px_rgba(15,23,42,0.06),0_8px_24px_-8px_rgba(15,23,42,0.12)] backdrop-blur-sm transition-[width] duration-300 ease-out dark:border-slate-800/80 dark:bg-[#0a1020] dark:text-slate-100 dark:shadow-[0_1px_2px_rgba(0,0,0,0.4),0_12px_32px_-12px_rgba(0,0,0,0.55)]",
+        collapsed ? "w-[72px]" : "w-[260px]"
       )}
     >
       <div
@@ -114,62 +116,73 @@ function AdminSidebar({
         </button>
       </div>
 
-      <nav className="relative flex-1 space-y-4 overflow-y-auto px-3 pb-4 pt-5">
+      <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
         {sections.map((section) => (
-          <div key={section.title} className="space-y-1.5">
+          <div key={section.title} className="space-y-1">
             {!collapsed && (
-              <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 dark:text-white/35">
+              <p className="mb-2 px-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">
                 {section.title}
               </p>
             )}
 
-            {section.items.map((item) => {
-              const parentActive = isActive(item.href) || (item.children?.some((child) => isActive(child.href)) ?? false);
-              return (
-                <div key={item.label} className="space-y-1">
-                  <Link
-                    to={item.href}
-                    className={cn(
-                      "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                      parentActive
-                        ? "border border-[#2f6ebf]/40 bg-[#0066FF]/10 text-[#0c234f] dark:border-[#2f6ebf]/55 dark:bg-[#0066FF]/18 dark:text-white"
-                        : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-white/70 dark:hover:bg-white/6 dark:hover:text-white",
-                      collapsed && "justify-center px-0"
-                    )}
-                    title={collapsed ? item.label : undefined}
-                  >
-                    <item.icon
+            <div className="space-y-0.5">
+              {section.items.map((item) => {
+                const parentActive =
+                  isActive(item.href) ||
+                  (item.children?.some((child) => isActive(child.href)) ?? false);
+                return (
+                  <div key={item.label} className="space-y-0.5">
+                    <Link
+                      to={item.href}
                       className={cn(
-                        "size-5 shrink-0 transition-colors",
+                        "group relative flex items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] transition-colors duration-150",
                         parentActive
-                          ? "text-[#0f4cb8] dark:text-white"
-                          : "text-slate-500 group-hover:text-slate-800 dark:text-white/75 dark:group-hover:text-white",
+                          ? "bg-[#0066FF]/[0.09] font-semibold text-[#0c3d8f] dark:bg-[#0066FF]/15 dark:text-[#7eb8ff]"
+                          : "font-medium text-slate-600 hover:bg-slate-200/50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/[0.06] dark:hover:text-slate-100",
+                        collapsed && "justify-center px-2"
                       )}
-                    />
-                    {!collapsed && item.label}
-                  </Link>
+                      title={collapsed ? item.label : undefined}
+                    >
+                      {parentActive && !collapsed && (
+                        <span
+                          className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-[#0066FF] dark:bg-[#3d8bff]"
+                          aria-hidden
+                        />
+                      )}
+                      <item.icon
+                        strokeWidth={parentActive ? 2.25 : 1.75}
+                        className={cn(
+                          "size-[18px] shrink-0 transition-colors",
+                          parentActive
+                            ? "text-[#0066FF] dark:text-[#5b9dff]"
+                            : "text-slate-500 group-hover:text-slate-700 dark:text-slate-500 dark:group-hover:text-slate-300"
+                        )}
+                      />
+                      {!collapsed && <span className="truncate">{item.label}</span>}
+                    </Link>
 
-                  {!collapsed && item.children?.length ? (
-                    <div className="ml-6 space-y-0.5 border-l border-slate-200/80 pl-3 dark:border-white/12">
-                      {item.children.map((child) => (
-                        <Link
-                          key={`${item.label}-${child.label}`}
-                          to={child.href}
-                          className={cn(
-                            "block rounded-lg px-2 py-1.5 text-xs font-medium transition-colors",
-                            isActive(child.href)
-                              ? "bg-[#0066FF]/12 text-[#0f4cb8] dark:bg-[#0066FF]/20 dark:text-white"
-                              : "text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-white/60 dark:hover:bg-white/7 dark:hover:text-white",
-                          )}
-                        >
-                          {child.label}
-                        </Link>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
+                    {!collapsed && item.children?.length ? (
+                      <div className="ml-7 space-y-0.5 border-l border-slate-200/80 pl-3 dark:border-slate-700/80">
+                        {item.children.map((child) => (
+                          <Link
+                            key={`${item.label}-${child.label}`}
+                            to={child.href}
+                            className={cn(
+                              "block rounded-md px-2 py-1.5 text-xs font-medium transition-colors",
+                              isActive(child.href)
+                                ? "bg-[#0066FF]/10 font-semibold text-[#0066FF] dark:bg-[#0066FF]/18 dark:text-[#7eb8ff]"
+                                : "text-slate-500 hover:bg-slate-200/50 hover:text-slate-800 dark:text-slate-500 dark:hover:bg-white/[0.05] dark:hover:text-slate-200"
+                            )}
+                          >
+                            {child.label}
+                          </Link>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         ))}
       </nav>
@@ -222,7 +235,8 @@ function AdminContent({ adminAccess }: { adminAccess: PlatformAdminRole | null }
     { href: "/admin/licenses", label: "Licenses" },
     { href: "/admin/reports", label: "Analytics" },
     { href: "/admin/support", label: "Support" },
-    { href: "/admin/users", label: "Team" },
+    { href: "/admin/users", label: "Users" },
+    { href: "/admin/team", label: "Team" },
     { href: "/admin/settings", label: "Settings" },
   ].filter((x) => canSeeAdminNavItem(x.href, adminAccess));
 

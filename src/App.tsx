@@ -34,7 +34,8 @@ import AdminBranches from "./pages/admin/branches/page.tsx";
 import AdminSubscriptions from "./pages/admin/subscriptions/page.tsx";
 import AdminInvoices from "./pages/admin/invoices/page.tsx";
 import AdminLicenses from "./pages/admin/legacy-licenses/page.tsx";
-import AdminUsers from "./pages/admin/users-hub/page.tsx";
+import AdminSiteUsers from "./pages/admin/site-users/page.tsx";
+import AdminTeam from "./pages/admin/users-hub/page.tsx";
 import AdminStaffRoles from "./pages/admin/staff-roles/page.tsx";
 import AdminModules from "./pages/admin/modules/page.tsx";
 import AdminBookings from "./pages/admin/bookings/page.tsx";
@@ -125,7 +126,8 @@ export default function App() {
               <Route path="licenses" element={<AdminLicenses />} />
               <Route path="licenses/:ownerEmail" element={<AdminClientDetails />} />
               <Route path="licenses/:ownerEmail/*" element={<Navigate to="/admin/licenses" replace />} />
-              <Route path="users" element={<AdminUsers />} />
+              <Route path="users" element={<AdminSiteUsers />} />
+              <Route path="team" element={<AdminTeam />} />
               <Route path="staff-roles" element={<AdminStaffRoles />} />
               <Route path="modules" element={<AdminModules />} />
               <Route path="bookings" element={<AdminBookings />} />

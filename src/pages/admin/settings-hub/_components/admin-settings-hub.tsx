@@ -40,9 +40,16 @@ type HubTile = {
 const TILES: HubTile[] = [
   {
     href: "/admin/users",
-    title: "Team & access",
-    description: "Platform operators, invites, and who can sign in.",
+    title: "Users",
+    description: "Everyone who registered on the site (Supabase Auth).",
     icon: Users,
+    accent: "from-blue-500/25 to-cyan-500/10",
+  },
+  {
+    href: "/admin/team",
+    title: "Team & access",
+    description: "Platform operators and admin roles.",
+    icon: Shield,
     accent: "from-violet-500/25 to-fuchsia-500/10",
   },
   {
