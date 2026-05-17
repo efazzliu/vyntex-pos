@@ -73,10 +73,12 @@ export default function App() {
     typeof window !== "undefined" &&
     Boolean((window as Window & { desktop?: { isElectron?: boolean } }).desktop?.isElectron);
   const Router = isElectron ? HashRouter : BrowserRouter;
+  const routerBasename =
+    typeof import.meta.env.BASE_URL === "string" ? import.meta.env.BASE_URL : "/";
 
   return (
     <DefaultProviders>
-      <Router>
+      <Router basename={isElectron ? undefined : routerBasename}>
         <AppToaster />
         <Routes>
           {isElectron ? (

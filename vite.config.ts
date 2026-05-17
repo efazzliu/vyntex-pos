@@ -40,20 +40,31 @@ function copyVersionedInstallerToDistPlugin(): Plugin {
       }
     },
     closeBundle() {
+      // Installer copies to dist/ run after update:*-pos (purge-published-installers).
+      // Web-only `vite build` without a fresh .exe skips dist installer copies.
+      const x64 = path.resolve(__dirname, "public/RestaurantPOSSetup.exe");
+      if (!fs.existsSync(x64) || fs.statSync(x64).size < 50_000) return;
+      const distDir = path.resolve(__dirname, outDir);
+      for (const name of fs.readdirSync(distDir)) {
+        if (/^(Restaurant|Vyntex|Fitness|Bar|Hotel)POSSetup.*\.exe$/i.test(name)) {
+          fs.unlinkSync(path.join(distDir, name));
+        }
+      }
       const pairs = [
-        {
-          src: path.resolve(__dirname, "public/RestaurantPOSSetup.exe"),
-          dest: `RestaurantPOSSetup-${appVersion}-x64.exe`,
-        },
+        { src: x64, dest: "RestaurantPOSSetup.exe" },
+        { src: x64, dest: `RestaurantPOSSetup-${appVersion}-x64.exe` },
         {
           src: path.resolve(__dirname, "public/RestaurantPOSSetup-arm64.exe"),
           dest: `RestaurantPOSSetup-${appVersion}-arm64.exe`,
         },
+        {
+          src: path.resolve(__dirname, "public/RestaurantPOSSetup-arm64.exe"),
+          dest: "RestaurantPOSSetup-arm64.exe",
+        },
       ];
       for (const { src, dest } of pairs) {
         if (!fs.existsSync(src) || fs.statSync(src).size < 50_000) continue;
-        const outPath = path.resolve(__dirname, outDir, dest);
-        fs.mkdirSync(path.dirname(outPath), { recursive: true });
+        const outPath = path.join(distDir, dest);
         fs.copyFileSync(src, outPath);
         console.log(`[vyntex] Copied installer -> ${path.relative(__dirname, outPath)}`);
       }
@@ -116,6 +127,10 @@ const appVersion = JSON.parse(
 // https://vite.dev/config/
 export default defineConfig(() => {
   const phoneStoreBuild = process.env.VITE_PHONE_STORE_BUILD === "true";
+  /** Web (Vercel): `/` so refresh on /admin/settings loads /assets/* not /admin/assets/*. */
+  const relativeBase =
+    phoneStoreBuild || process.env.VITE_RELATIVE_BASE === "true";
+  const base = relativeBase ? "./" : "/";
   return {
     define: {
       /** Reliable at dev + build time (some setups do not surface `import.meta.env.VITE_*` from `define`). */
@@ -130,7 +145,7 @@ export default defineConfig(() => {
         phoneStoreBuild ? "true" : "false",
       ),
     },
-    base: "./",
+    base,
     server: {
       host: "0.0.0.0",
       port: 5173,

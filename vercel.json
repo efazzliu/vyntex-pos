@@ -11,6 +11,18 @@
       ]
     }
   ],
+  "redirects": [
+    {
+      "source": "/dashboard/restaurant_pos",
+      "destination": "/dashboard/restaurant-pos",
+      "permanent": true
+    },
+    {
+      "source": "/dashboard/restaurant_pos/:path*",
+      "destination": "/dashboard/restaurant-pos/:path*",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
       "source": "/RestaurantPOSSetup-:version-x64.exe",
@@ -27,6 +39,10 @@
     {
       "source": "/VyntexPOSSetup-arm64.exe",
       "destination": "/api/installer-arm64"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
