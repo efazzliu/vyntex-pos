@@ -1,7 +1,7 @@
 {
   "name": "vyntex-pos",
   "private": true,
-  "version": "1.0.82",
+  "version": "1.0.83",
   "description": "Vyntex POS — restaurant point of sale (web, desktop, companion apps). Windows installer targets laptops, touch PCs, Intel x64 and ARM64.",
   "author": "Vyntex",
   "type": "module",

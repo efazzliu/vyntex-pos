@@ -24,7 +24,7 @@ import AdminDrawer from "./admin-drawer.tsx";
 import KitchenDisplayView from "./kitchen-display-view.tsx";
 import { PosViewErrorBoundary } from "./pos-view-error-boundary.tsx";
 import { usePosLocale } from "./pos-locale-provider.tsx";
-import { startPrintQueueRunner } from "@/lib/print-queue.ts";
+import { initPrintQueueOnStartup } from "@/lib/print-queue.ts";
 import { LogOut } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -79,9 +79,9 @@ function PosAppInner({
   const { t } = usePosLocale();
   const { theme, setTheme } = usePosTheme();
 
-  // Retry locally queued print jobs when printers become available.
+  // Drop stale offline print queue on open; no background OS print polling (Windows dialogs).
   useEffect(() => {
-    startPrintQueueRunner();
+    void initPrintQueueOnStartup();
   }, []);
 
   // Fetch staff permissions for consumption access

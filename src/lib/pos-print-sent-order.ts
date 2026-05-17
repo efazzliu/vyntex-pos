@@ -34,7 +34,7 @@ import {
   tryPrintHtmlDocumentAsync,
   type PrintHtmlAsyncOutcome,
 } from "@/lib/print-html.ts";
-import { enqueueHtmlPrintJob } from "@/lib/print-queue.ts";
+import { enqueueHtmlPrintJob, flushPrintQueueNow } from "@/lib/print-queue.ts";
 
 function escapeHtml(s: string): string {
   return s
@@ -119,8 +119,10 @@ export async function printSentOrderTicket(
     silentTimeoutMs: DEFAULT_SILENT_PRINT_IPC_TIMEOUT_MS,
   });
 
-  if (!outcome.ok && isSilentPrintQueueableError(outcome.error)) {
-    // If the physical printer is missing/offline, keep the ticket locally and retry later.
+  if (outcome.ok) {
+    void flushPrintQueueNow().catch(() => {});
+  } else if (isSilentPrintQueueableError(outcome.error)) {
+    // Keep locally; no background OS retry (see initPrintQueueOnStartup).
     void enqueueHtmlPrintJob({
       html,
       deviceName: opts.deviceName,
@@ -310,7 +312,9 @@ export async function printPosBill(
     silentTimeoutMs: DEFAULT_SILENT_PRINT_IPC_TIMEOUT_MS,
   });
 
-  if (!outcome.ok && isSilentPrintQueueableError(outcome.error)) {
+  if (outcome.ok) {
+    void flushPrintQueueNow().catch(() => {});
+  } else if (isSilentPrintQueueableError(outcome.error)) {
     void enqueueHtmlPrintJob({
       html,
       silent: true,

@@ -28,6 +28,22 @@ export function hasElectronSilentPrintIpc(): boolean {
   return typeof getDesktopPrintSilent() === "function";
 }
 
+/** Electron: physical OS printers available (excludes PDF/virtual). */
+export async function getPhysicalPrinterCount(): Promise<number | null> {
+  const inv = getDesktopSystemPrintersInvoker();
+  if (!inv) return null;
+  const r = await inv();
+  if (!r.ok) return 0;
+  return r.printers.length;
+}
+
+/** Skip silent IPC when there is no real printer — avoids Windows blocking dialogs. */
+export async function canAttemptSilentPrint(): Promise<boolean> {
+  if (!hasElectronSilentPrintIpc()) return true;
+  const count = await getPhysicalPrinterCount();
+  return count === null ? true : count > 0;
+}
+
 /** Interactive print (browser/Electron print dialog). */
 export function printHtmlDocument(htmlFullDocument: string): boolean {
   const iframe = document.createElement("iframe");
@@ -112,6 +128,9 @@ export async function tryPrintHtmlDocumentAsync(
       : DEFAULT_SILENT_PRINT_IPC_TIMEOUT_MS;
 
   if (wantSilent && silentApi) {
+    if (!(await canAttemptSilentPrint())) {
+      return { ok: false, error: "no-physical-printer" };
+    }
     try {
       const payload: PrintHtmlSilentPayload =
         deviceName && deviceName.length > 0

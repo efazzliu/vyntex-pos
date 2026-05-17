@@ -1,27 +1,25 @@
 import {
   DEFAULT_SILENT_PRINT_IPC_TIMEOUT_MS,
+  canAttemptSilentPrint,
+  hasElectronSilentPrintIpc,
   isSilentPrintQueueableError,
   tryPrintHtmlDocumentAsync,
 } from "@/lib/print-html.ts";
 import {
+  clearPrintQueue,
   enqueuePrintJob,
+  getPrintQueueCount,
   getQueuedPrintJobs,
   incrementPrintJobRetry,
   removeQueuedPrintJob,
   type QueuedPrintJob,
 } from "@/lib/local-db.ts";
 
-/** Background poll when the queue has healthy jobs. */
-const DEFAULT_INTERVAL_MS = 2500;
-/** Min gap between retries when the printer is missing/offline (avoids Windows blocking dialogs). */
-const QUEUEABLE_RETRY_MIN_MS = 12_000;
 const MAX_PRINT_RETRIES = 200;
-const MAX_JOBS_PER_TICK = 10;
+const MAX_JOBS_PER_FLUSH = 10;
 
 let runnerStarted = false;
 let isProcessing = false;
-let intervalId: ReturnType<typeof setInterval> | null = null;
-let lastQueueableFailureAt = 0;
 
 function getPrintableError(job: QueuedPrintJob, err: unknown): string | undefined {
   if (typeof err === "string") return err;
@@ -29,28 +27,28 @@ function getPrintableError(job: QueuedPrintJob, err: unknown): string | undefine
   return job.lastError;
 }
 
-function shouldDeferQueueableRetry(jobs: QueuedPrintJob[]): boolean {
-  if (jobs.length === 0) return false;
-  const hasQueueable = jobs.some((j) => isSilentPrintQueueableError(j.lastError));
-  if (!hasQueueable) return false;
-  return Date.now() - lastQueueableFailureAt < QUEUEABLE_RETRY_MIN_MS;
-}
-
 export async function enqueueHtmlPrintJob(args: Omit<QueuedPrintJob, "id" | "retries">): Promise<number> {
   return enqueuePrintJob(args);
 }
 
-async function processOnePrintJob(): Promise<void> {
-  if (isProcessing) return;
+/**
+ * Process queued HTML prints once (manual or after a successful on-demand print).
+ * Does not run on a timer — background retries were opening Windows
+ * "Waiting for printer connection…" every few seconds when the printer was offline.
+ */
+export async function flushPrintQueueNow(): Promise<{ sent: number; failed: number }> {
+  if (isProcessing) return { sent: 0, failed: 0 };
+  if (!(await canAttemptSilentPrint())) {
+    return { sent: 0, failed: 0 };
+  }
+
   isProcessing = true;
+  let sent = 0;
+  let failed = 0;
   try {
     const jobs = await getQueuedPrintJobs();
-    if (jobs.length === 0) return;
-    if (shouldDeferQueueableRetry(jobs)) return;
-
-    for (const job of jobs.slice(0, MAX_JOBS_PER_TICK)) {
+    for (const job of jobs.slice(0, MAX_JOBS_PER_FLUSH)) {
       if (job.retries >= MAX_PRINT_RETRIES) {
-        console.warn("[POS] print queue: dropping job after max retries", { id: job.id, lastError: job.lastError });
         await removeQueuedPrintJob(job.id);
         continue;
       }
@@ -64,29 +62,25 @@ async function processOnePrintJob(): Promise<void> {
 
       if (outcome.ok) {
         await removeQueuedPrintJob(job.id);
+        sent += 1;
         continue;
       }
 
       await incrementPrintJobRetry(job.id, outcome.error);
+      failed += 1;
 
-      // If the printer is still offline, don't hammer: retry later.
       if (
         isSilentPrintQueueableError(outcome.error) ||
         outcome.error === "no-silent-ipc"
       ) {
-        lastQueueableFailureAt = Date.now();
         break;
       }
     }
   } catch (e) {
-    // Don't crash the runner; retry later.
     try {
       const jobs = await getQueuedPrintJobs();
       if (jobs.length > 0) {
         await incrementPrintJobRetry(jobs[0].id, getPrintableError(jobs[0], e));
-        if (isSilentPrintQueueableError(jobs[0].lastError)) {
-          lastQueueableFailureAt = Date.now();
-        }
       }
     } catch {
       /* ignore */
@@ -94,21 +88,26 @@ async function processOnePrintJob(): Promise<void> {
   } finally {
     isProcessing = false;
   }
+
+  return { sent, failed };
 }
 
 /**
- * Starts a background runner that periodically retries queued HTML prints.
- * Call once from `PosApp` on client startup.
+ * Call once from `PosApp` on startup. Does not poll the OS printer in the background.
  */
-export function startPrintQueueRunner(opts?: { intervalMs?: number }): void {
+export async function initPrintQueueOnStartup(): Promise<void> {
   if (runnerStarted) return;
   runnerStarted = true;
 
-  const interval = opts?.intervalMs ?? DEFAULT_INTERVAL_MS;
-  intervalId = setInterval(() => {
-    void processOnePrintJob();
-  }, interval);
+  if (!hasElectronSilentPrintIpc()) return;
 
-  // Kick immediately.
-  void processOnePrintJob();
+  const pending = await getPrintQueueCount();
+  if (pending > 0) {
+    await clearPrintQueue();
+  }
+}
+
+/** @deprecated Use initPrintQueueOnStartup — no background interval anymore. */
+export function startPrintQueueRunner(): void {
+  void initPrintQueueOnStartup();
 }

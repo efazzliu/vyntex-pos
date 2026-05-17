@@ -12,7 +12,7 @@ import {
   tryPrintHtmlDocumentAsync,
   type PrintHtmlAsyncOutcome,
 } from "@/lib/print-html.ts";
-import { enqueueHtmlPrintJob } from "@/lib/print-queue.ts";
+import { enqueueHtmlPrintJob, flushPrintQueueNow } from "@/lib/print-queue.ts";
 import { runPosQuery } from "@/lib/supabase-pos/pos-router.ts";
 
 export type FiscalReceiptStrings = {
@@ -421,7 +421,9 @@ async function printPosSalesReceipt(args: {
     silentTimeoutMs: DEFAULT_SILENT_PRINT_IPC_TIMEOUT_MS,
   });
 
-  if (!outcome.ok && isSilentPrintQueueableError(outcome.error)) {
+  if (outcome.ok) {
+    void flushPrintQueueNow().catch(() => {});
+  } else if (isSilentPrintQueueableError(outcome.error)) {
     void enqueueHtmlPrintJob({
       html,
       deviceName,

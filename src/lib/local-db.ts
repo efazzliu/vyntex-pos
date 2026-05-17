@@ -210,7 +210,41 @@ export async function generateActivationToken(
   return hashString(`vyntex:${licenseKey}:${deviceId}:activated`);
 }
 
+function normalizeLicenseKey(key: string): string {
+  return key.trim().toUpperCase().replace(/\s+/g, "");
+}
+
+/**
+ * Clears per-license local session data (admin PIN, staff cache, queues).
+ * Keeps deviceId and activation until those are updated/cleared separately.
+ */
+export async function clearLocalPosSessionData(): Promise<void> {
+  const db = await openDB();
+  const stores = [
+    ADMINS_STORE,
+    STAFF_STORE,
+    CACHE_STORE,
+    OFFLINE_QUEUE_STORE,
+    PRINT_QUEUE_STORE,
+  ];
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(stores, "readwrite");
+    for (const name of stores) {
+      tx.objectStore(name).clear();
+    }
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
 export async function saveActivation(data: Omit<ActivationData, "token">): Promise<void> {
+  const previous = await getActivation();
+  if (
+    previous &&
+    normalizeLicenseKey(previous.licenseKey) !== normalizeLicenseKey(data.licenseKey)
+  ) {
+    await clearLocalPosSessionData();
+  }
   const token = await generateActivationToken(data.licenseKey, data.deviceId);
   await dbPut(CONFIG_STORE, "activation", { ...data, token });
 }
@@ -220,6 +254,7 @@ export async function getActivation(): Promise<ActivationData | undefined> {
 }
 
 export async function clearActivation(): Promise<void> {
+  await clearLocalPosSessionData();
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(CONFIG_STORE, "readwrite");
