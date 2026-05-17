@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { AlertTriangle, ChevronLeft, PackageX, Shield } from "lucide-react";
 import { Switch } from "@/components/ui/switch.tsx";
 import { useDashboardRestaurant } from "@/hooks/use-dashboard-restaurant.ts";
-import { usePlatformAdmin } from "@/hooks/use-platform-admin.ts";
+import { usePhoneManagerSession } from "@/lib/supabase-pos/phone-manager-session.ts";
 import { getStockItems } from "@/lib/supabase-pos/stock-ops.ts";
 import { usePhoneAdminLoginNotifications } from "@/phone-app/hooks/use-phone-admin-login-notifications-context.tsx";
 import { cn } from "@/lib/utils.ts";
@@ -14,10 +14,7 @@ const LOW_STOCK_NOTIFICATIONS_KEY = "vyntex_phone_low_stock_notifications";
 export default function PhoneNotificationsPage() {
   const { t, i18n } = useTranslation("site");
   const { restaurant } = useDashboardRestaurant();
-  const { session } = usePlatformAdmin();
-  const isPhoneManager =
-    (session?.user?.user_metadata as { vyntex_phone_manager?: boolean } | undefined)
-      ?.vyntex_phone_manager === true;
+  const isPhoneManager = usePhoneManagerSession() === true;
   const {
     events,
     ownedRestaurantCount,

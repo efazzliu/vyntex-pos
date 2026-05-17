@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { supabase } from "@/lib/supabase.ts";
+import { isEmailBanned } from "@/lib/supabase-pos/admin-ops.ts";
 import { toast } from "sonner";
 import AuthTopNav from "@/pages/auth/_components/auth-top-nav.tsx";
 import { FREE_TRIAL_QUERY_VALUE, USER_META_APP_TRIAL } from "@/lib/free-trial.ts";
@@ -28,6 +29,17 @@ export default function RegisterPageModern() {
       return void toast.error(t("auth.register.errorFillRequired"));
     if (password.length < 6) return void toast.error(t("auth.register.errorPasswordMin"));
     if (password !== confirmPassword) return void toast.error(t("auth.register.errorPasswordMismatch"));
+
+    try {
+      if (await isEmailBanned(email.trim())) {
+        return void toast.error(
+          "Ky email është i bllokuar dhe nuk mund të regjistrohet në site.",
+        );
+      }
+    } catch {
+      /* ban check unavailable — allow sign-up */
+    }
+
     setLoading(true);
     const userData: Record<string, string> = { full_name: name.trim() };
     if (trialSignup) userData[USER_META_APP_TRIAL] = FREE_TRIAL_QUERY_VALUE;

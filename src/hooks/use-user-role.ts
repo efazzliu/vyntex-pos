@@ -17,7 +17,7 @@ export function useUserRole() {
     isAdmin: isPlatformAdmin,
     adminAccess: platformAdminRole,
     isFullAdmin: platformAdminRole === "full",
-    isLimitedAdmin: platformAdminRole === "limited",
+    isLimitedAdmin: platformAdminRole !== null && platformAdminRole !== "full",
     isUser: Boolean(u) && !isPlatformAdmin,
     loading,
   };

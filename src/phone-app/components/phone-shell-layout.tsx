@@ -4,11 +4,16 @@ import { useTranslation } from "react-i18next";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase.ts";
-import { clearDashboardRestaurantId } from "@/hooks/use-dashboard-restaurant.ts";
-import { phoneManagerAccessStillValid } from "@/lib/supabase-pos/phone-manager-invite-ops.ts";
+import {
+  clearDashboardRestaurantId,
+  setDashboardRestaurantId,
+} from "@/hooks/use-dashboard-restaurant.ts";
+import { fetchPhoneManagerRestaurantId } from "@/lib/supabase-pos/phone-manager-session.ts";
 import { cn } from "@/lib/utils.ts";
 import { PhoneBottomNav } from "./phone-bottom-nav.tsx";
 import { PhoneNotificationProvider } from "./phone-notification-provider.tsx";
+
+const DASHBOARD_RESTAURANT_ID_KEY = "vyntex.dashboard.restaurantId";
 
 function PhoneManagerAccessGuard() {
   const navigate = useNavigate();
@@ -22,20 +27,33 @@ function PhoneManagerAccessGuard() {
         data: { user },
       } = await supabase.auth.getUser();
       if (cancelled || !user) return;
-      const meta = user.user_metadata as { vyntex_phone_manager?: boolean };
-      if (meta?.vyntex_phone_manager !== true) return;
 
-      const valid = await phoneManagerAccessStillValid();
-      if (cancelled || valid !== false || dismissRef.current) return;
+      const managerVenueId = await fetchPhoneManagerRestaurantId();
+      if (managerVenueId) {
+        setDashboardRestaurantId(managerVenueId);
+        return;
+      }
+
+      const stored = localStorage.getItem(DASHBOARD_RESTAURANT_ID_KEY)?.trim();
+      if (!stored) return;
+
+      const { data: venue } = await supabase
+        .from("restaurants")
+        .select("owner_user_id, owner_email")
+        .eq("id", stored)
+        .maybeSingle();
+
+      const email = user.email?.trim().toLowerCase() ?? "";
+      const isOwner =
+        venue?.owner_user_id === user.id ||
+        (email.length > 0 &&
+          (venue?.owner_email ?? "").trim().toLowerCase() === email);
+
+      if (isOwner) return;
+
+      if (cancelled || dismissRef.current) return;
       dismissRef.current = true;
 
-      await supabase.auth.updateUser({
-        data: {
-          vyntex_restaurant_id: null,
-          vyntex_license_key: null,
-          vyntex_phone_manager: null,
-        },
-      });
       clearDashboardRestaurantId();
       toast.error(t("phone.team.accessRevoked"));
       navigate("/app/profile", { replace: true });

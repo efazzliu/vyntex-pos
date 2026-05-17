@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase.ts";
+import { fetchPhoneManagerRestaurantId } from "@/lib/supabase-pos/phone-manager-session.ts";
 
 const RESTAURANT_ID_KEY = "vyntex.dashboard.restaurantId";
 
@@ -66,10 +67,9 @@ export function useDashboardRestaurant(): UseDashboardRestaurantResult {
   const refresh = useCallback(async () => {
     let restaurantId = localStorage.getItem(RESTAURANT_ID_KEY);
     if (!restaurantId) {
-      const { data: auth } = await supabase.auth.getUser();
-      const fromMeta = auth.user?.user_metadata?.vyntex_restaurant_id;
-      if (typeof fromMeta === "string" && fromMeta.trim().length > 0) {
-        restaurantId = fromMeta.trim();
+      const fromManager = await fetchPhoneManagerRestaurantId();
+      if (fromManager) {
+        restaurantId = fromManager;
         localStorage.setItem(RESTAURANT_ID_KEY, restaurantId);
       }
     }

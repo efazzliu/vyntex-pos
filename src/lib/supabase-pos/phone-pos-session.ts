@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase.ts";
 import { devPosPlanDisplayOverride } from "@/lib/dev-pos-plan-override.ts";
+import { fetchPhoneManagerRestaurantId } from "@/lib/supabase-pos/phone-manager-session.ts";
 import {
   maxEffectiveTerminalsForLicense,
   normalizePlan,
@@ -144,79 +145,21 @@ export async function fetchRestaurantOwnedBySession(): Promise<OwnedRestaurantRo
     return rowToOwned({ ...(rpcRow as Record<string, unknown>), id: rpcIdStr });
   }
 
-  const meta = user.user_metadata as {
-    vyntex_restaurant_id?: string;
-    vyntex_license_key?: string;
-    vyntex_phone_manager?: boolean;
-  };
-
-  if (meta?.vyntex_restaurant_id) {
-    const { data: metaRow, error: metaErr } = await supabase
+  const managerVenueId = await fetchPhoneManagerRestaurantId();
+  if (managerVenueId) {
+    const { data: managerRow, error: managerErr } = await supabase
       .from("restaurants")
       .select(RESTAURANT_SELECT)
-      .eq("id", meta.vyntex_restaurant_id)
+      .eq("id", managerVenueId)
       .maybeSingle();
-
-    if (!metaErr && metaRow) {
-      const r = metaRow as Record<string, unknown>;
-      const rowLicense = String(r.license_key ?? "");
-      const metaLicense = meta.vyntex_license_key
-        ? String(meta.vyntex_license_key)
-        : "";
-      const licenseOk =
-        !metaLicense ||
-        normalizeLicenseKeyForCompare(rowLicense) ===
-          normalizeLicenseKeyForCompare(metaLicense);
-
-      if (licenseOk) {
-        /** Linked via phone invite — read-only venue access, do not claim ownership. */
-        if (meta.vyntex_phone_manager === true) {
-          return rowToOwned(r);
-        }
-        if (r.owner_user_id === user.id) {
-          return rowToOwned(r);
-        }
-        if (user.email && emailsMatch(r.owner_email as string, user.email)) {
-          const ownerNorm =
-            normalizeEmail(user.email) ?? user.email.trim().toLowerCase();
-          await supabase
-            .from("restaurants")
-            .update({
-              owner_user_id: user.id,
-              owner_email: ownerNorm,
-            })
-            .eq("id", r.id as string);
-          return rowToOwned({
-            ...r,
-            owner_user_id: user.id,
-            owner_email: ownerNorm,
-          });
-        }
-        if (
-          r.owner_user_id == null &&
-          user.email &&
-          metaLicense &&
-          normalizeLicenseKeyForCompare(rowLicense) ===
-            normalizeLicenseKeyForCompare(metaLicense)
-        ) {
-          const ownerNorm =
-            normalizeEmail(user.email) ?? user.email.trim().toLowerCase();
-          await supabase
-            .from("restaurants")
-            .update({
-              owner_user_id: user.id,
-              owner_email: ownerNorm,
-            })
-            .eq("id", r.id as string);
-          return rowToOwned({
-            ...r,
-            owner_user_id: user.id,
-            owner_email: ownerNorm,
-          });
-        }
-      }
+    if (!managerErr && managerRow) {
+      return rowToOwned(managerRow as Record<string, unknown>);
     }
   }
+
+  const meta = user.user_metadata as {
+    vyntex_license_key?: string;
+  };
 
   const metaLic = meta?.vyntex_license_key?.trim();
   if (metaLic) {

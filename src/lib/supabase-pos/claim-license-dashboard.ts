@@ -44,16 +44,6 @@ export async function claimUnassignedLicenseForDashboardAccount(
   const licenseKey = String(row.license_key).trim().toUpperCase();
   const id = String(row.id);
 
-  const { error: metaError } = await supabase.auth.updateUser({
-    data: {
-      vyntex_restaurant_id: id,
-      vyntex_license_key: licenseKey,
-    },
-  });
-  if (metaError) {
-    console.warn("[claimUnassignedLicenseForDashboardAccount] updateUser metadata:", metaError);
-  }
-
   setDashboardRestaurantId(id);
 
   return { id, licenseKey };

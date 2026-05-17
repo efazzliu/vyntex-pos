@@ -23,6 +23,7 @@ import { APP_VERSION_LABEL, supportMailtoWithSubject } from "@/lib/site-constant
 import { supabase } from "@/lib/supabase.ts";
 import { cn } from "@/lib/utils.ts";
 import { clearDashboardRestaurantId } from "@/hooks/use-dashboard-restaurant.ts";
+import { usePhoneManagerSession } from "@/lib/supabase-pos/phone-manager-session.ts";
 import { fetchAllRestaurantsOwnedBySession } from "@/lib/supabase-pos/phone-pos-session.ts";
 import { usePhoneAdminLoginNotifications } from "@/phone-app/hooks/use-phone-admin-login-notifications-context.tsx";
 
@@ -119,9 +120,7 @@ export default function PhoneProfilePage() {
     user?.name?.trim() ||
     session?.user?.email?.split("@")[0] ||
     t("phone.profile.fallbackName");
-  const isPhoneManager =
-    (session?.user?.user_metadata as { vyntex_phone_manager?: boolean } | undefined)
-      ?.vyntex_phone_manager === true;
+  const isPhoneManager = usePhoneManagerSession() === true;
 
   const email = user?.email ?? session?.user?.email ?? "";
   const phone =

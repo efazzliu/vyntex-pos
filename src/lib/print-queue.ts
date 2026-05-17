@@ -11,19 +11,29 @@ import {
   type QueuedPrintJob,
 } from "@/lib/local-db.ts";
 
-/** How often to retry queued prints (~0.1s). */
-const DEFAULT_INTERVAL_MS = 100;
+/** Background poll when the queue has healthy jobs. */
+const DEFAULT_INTERVAL_MS = 2500;
+/** Min gap between retries when the printer is missing/offline (avoids Windows blocking dialogs). */
+const QUEUEABLE_RETRY_MIN_MS = 12_000;
 const MAX_PRINT_RETRIES = 200;
 const MAX_JOBS_PER_TICK = 10;
 
 let runnerStarted = false;
 let isProcessing = false;
 let intervalId: ReturnType<typeof setInterval> | null = null;
+let lastQueueableFailureAt = 0;
 
 function getPrintableError(job: QueuedPrintJob, err: unknown): string | undefined {
   if (typeof err === "string") return err;
   if (err instanceof Error) return err.message;
   return job.lastError;
+}
+
+function shouldDeferQueueableRetry(jobs: QueuedPrintJob[]): boolean {
+  if (jobs.length === 0) return false;
+  const hasQueueable = jobs.some((j) => isSilentPrintQueueableError(j.lastError));
+  if (!hasQueueable) return false;
+  return Date.now() - lastQueueableFailureAt < QUEUEABLE_RETRY_MIN_MS;
 }
 
 export async function enqueueHtmlPrintJob(args: Omit<QueuedPrintJob, "id" | "retries">): Promise<number> {
@@ -36,6 +46,7 @@ async function processOnePrintJob(): Promise<void> {
   try {
     const jobs = await getQueuedPrintJobs();
     if (jobs.length === 0) return;
+    if (shouldDeferQueueableRetry(jobs)) return;
 
     for (const job of jobs.slice(0, MAX_JOBS_PER_TICK)) {
       if (job.retries >= MAX_PRINT_RETRIES) {
@@ -63,6 +74,7 @@ async function processOnePrintJob(): Promise<void> {
         isSilentPrintQueueableError(outcome.error) ||
         outcome.error === "no-silent-ipc"
       ) {
+        lastQueueableFailureAt = Date.now();
         break;
       }
     }
@@ -72,6 +84,9 @@ async function processOnePrintJob(): Promise<void> {
       const jobs = await getQueuedPrintJobs();
       if (jobs.length > 0) {
         await incrementPrintJobRetry(jobs[0].id, getPrintableError(jobs[0], e));
+        if (isSilentPrintQueueableError(jobs[0].lastError)) {
+          lastQueueableFailureAt = Date.now();
+        }
       }
     } catch {
       /* ignore */
@@ -97,4 +112,3 @@ export function startPrintQueueRunner(opts?: { intervalMs?: number }): void {
   // Kick immediately.
   void processOnePrintJob();
 }
-

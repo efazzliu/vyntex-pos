@@ -99,6 +99,31 @@ async function getPrintersForSilentPrint(event) {
   return [];
 }
 
+/** Skip silent print when the OS reports the queue offline (avoids Windows "Waiting for printer connection…"). */
+function isPrinterOffline(p) {
+  if (!p) return false;
+  // Chromium: 2 = stopped / error
+  if (p.status === 2) return true;
+  const blob = [
+    p.description,
+    p.options?.["printer-state"],
+    p.options?.["printer-state-reasons"],
+    p.options?.status,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return /offline|unavailable|error|stopped|paused|not\s+ready|no\s+paper/i.test(blob);
+}
+
+function findPhysicalPrinter(printers, deviceName) {
+  const physical = printers.filter((p) => !isVirtualPrinter(p));
+  for (const p of physical) {
+    if (p.name === deviceName) return p;
+  }
+  return undefined;
+}
+
 function matchPhysicalPrinterName(printers, requested) {
   const q = String(requested ?? "").trim();
   if (!q) return undefined;
@@ -166,6 +191,12 @@ function registerPrintHtmlSilentIpc() {
       return { ok: false, error: "no-physical-printer" };
     }
 
+    const printersForJob = await getPrintersForSilentPrint(event);
+    const targetPrinter = findPhysicalPrinter(printersForJob, deviceNameFromMain);
+    if (targetPrinter && isPrinterOffline(targetPrinter)) {
+      return { ok: false, error: "printer-offline" };
+    }
+
     return await new Promise((resolve) => {
       const printWin = new BrowserWindow({
         show: false,
@@ -179,24 +210,32 @@ function registerPrintHtmlSilentIpc() {
       });
 
       let settled = false;
+      let timeoutId = null;
+
+      const canUsePrintWindow = () =>
+        !settled &&
+        printWin &&
+        !printWin.isDestroyed() &&
+        printWin.webContents &&
+        !printWin.webContents.isDestroyed();
 
       const finish = (ok, error) => {
         if (settled) return;
         settled = true;
+        if (timeoutId) clearTimeout(timeoutId);
         try {
-          printWin.destroy();
+          if (printWin && !printWin.isDestroyed()) printWin.destroy();
         } catch {
           /* ignore */
         }
         resolve({ ok, error });
       };
 
-      const timeout = setTimeout(() => {
+      timeoutId = setTimeout(() => {
         finish(false, "timeout");
       }, SILENT_PRINT_JOB_MAX_MS);
 
       const done = (ok, error) => {
-        clearTimeout(timeout);
         finish(ok, error);
       };
 
@@ -205,22 +244,30 @@ function registerPrintHtmlSilentIpc() {
       });
 
       const runPrint = (opts, cb) => {
-        printWin.webContents.print(opts, cb);
+        if (!canUsePrintWindow()) {
+          cb(false, "destroyed");
+          return;
+        }
+        try {
+          printWin.webContents.print(opts, (success, failureReason) => {
+            if (settled) return;
+            cb(success, failureReason);
+          });
+        } catch (err) {
+          cb(false, String(err?.message ?? err));
+        }
       };
 
       printWin.webContents.once("did-finish-load", () => {
         setTimeout(() => {
+          if (!canUsePrintWindow()) return;
+
           const name = deviceNameFromMain;
           const win32 = process.platform === "win32";
-          // Never omit deviceName: implicit "default" is often Print to PDF → Save dialog.
+          // One attempt per job: retries belong in the renderer queue with backoff.
           const attempts = win32
-            ? [
-                {},
-                { scaleFactor: 0.99 },
-                { printBackground: true },
-                { printBackground: true, scaleFactor: 0.99 },
-              ]
-            : [{}, { printBackground: true }];
+            ? [{ printBackground: true }]
+            : [{ printBackground: true }];
 
           const normalize = (list) =>
             list.map((ex) => {
@@ -231,6 +278,7 @@ function registerPrintHtmlSilentIpc() {
           const normalized = normalize(attempts);
 
           const runChain = (i, lastReason) => {
+            if (!canUsePrintWindow()) return;
             if (i >= normalized.length) {
               done(false, String(lastReason ?? "print-failed"));
               return;
@@ -243,6 +291,7 @@ function registerPrintHtmlSilentIpc() {
               ...ex,
             };
             runPrint(opts, (success, failureReason) => {
+              if (settled) return;
               if (success) {
                 done(true);
                 return;

@@ -180,9 +180,6 @@ export default function PhoneRedeemCodePage() {
         password,
         data: {
           full_name: fullName,
-          vyntex_restaurant_id: result.restaurantId,
-          vyntex_license_key: result.licenseKey.trim().toUpperCase(),
-          vyntex_phone_manager: true,
         },
       });
       if (upErr) {

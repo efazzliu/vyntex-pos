@@ -49,23 +49,9 @@ export default function PhoneDashboard() {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      await supabase.auth.refreshSession();
-      const {
-        data: { user: u },
-      } = await supabase.auth.getUser();
-      if (!u || cancelled) return;
-      const meta = u.user_metadata as { vyntex_restaurant_id?: string };
-      if (meta?.vyntex_restaurant_id) return;
       const all = await fetchAllRestaurantsOwnedBySession();
       if (cancelled || all.length !== 1) return;
-      const row = all[0];
-      if (!row?.license_key) return;
-      await supabase.auth.updateUser({
-        data: {
-          vyntex_restaurant_id: row.id,
-          vyntex_license_key: row.license_key.trim().toUpperCase(),
-        },
-      });
+      setDashboardRestaurantId(all[0].id);
     })();
     return () => {
       cancelled = true;
@@ -87,12 +73,6 @@ export default function PhoneDashboard() {
       setOpeningId(row.id);
       try {
         setDashboardRestaurantId(row.id);
-        await supabase.auth.updateUser({
-          data: {
-            vyntex_restaurant_id: row.id,
-            vyntex_license_key: row.license_key.trim().toUpperCase(),
-          },
-        });
         navigate("/app/venue");
       } finally {
         setOpeningId(null);

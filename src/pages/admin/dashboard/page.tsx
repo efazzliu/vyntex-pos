@@ -12,6 +12,8 @@ import {
 import { PlanSplitChartCard } from "./_components/plan-split-chart-card.tsx";
 import { RecentTransactionsCard } from "./_components/recent-transactions-card.tsx";
 import { TotalRevenueChartCard } from "./_components/total-revenue-chart-card.tsx";
+import { AdminKpiCard } from "@/pages/admin/_components/admin-card.tsx";
+import { adminCardClass, adminPageSectionClass } from "@/pages/admin/_lib/admin-ui.ts";
 
 const DASHBOARD_PERIOD_OPTIONS: { value: AdminPlanDistributionRange; label: string }[] = [
   { value: "this_month", label: "This month" },
@@ -51,14 +53,14 @@ export default function AdminDashboardPage() {
   });
 
   return (
-    <section className="space-y-4 px-6 pb-6 pt-0 lg:px-8 lg:pb-8">
+    <section className={adminPageSectionClass}>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {kpiQuery.isLoading ? (
           <>
             {[0, 1, 2, 3].map((i) => (
               <div
                 key={i}
-                className="rounded-2xl border border-border bg-card p-5 shadow-[0_8px_20px_-16px_rgba(2,6,23,0.12)] dark:shadow-none"
+                className={cn(adminCardClass, "p-5")}
               >
                 <Skeleton className="mb-3 h-9 w-9 rounded-full" />
                 <Skeleton className="h-3 w-24" />
@@ -68,7 +70,7 @@ export default function AdminDashboardPage() {
             ))}
           </>
         ) : kpiQuery.isError ? (
-          <div className="col-span-full rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          <div className={cn(adminCardClass, "col-span-full border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive")}>
             Could not load KPIs. Check your connection and try refreshing the page.
           </div>
         ) : kpiQuery.data ? (
@@ -147,13 +149,13 @@ function KpiCard({
   hint: string;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-5 shadow-[0_8px_20px_-16px_rgba(2,6,23,0.12)] transition-shadow hover:shadow-[0_12px_28px_-18px_rgba(2,6,23,0.18)] dark:border-slate-700/80 dark:bg-card dark:shadow-none dark:hover:shadow-none">
-      <div className="mb-3 inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200/80 bg-slate-50/90 dark:border-slate-600/80 dark:bg-slate-900/60">
+    <AdminKpiCard>
+      <div className="mb-3 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900">
         {icon}
       </div>
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className="mt-1.5 text-2xl font-semibold tracking-tight text-foreground">{value}</p>
       <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{hint}</p>
-    </div>
+    </AdminKpiCard>
   );
 }

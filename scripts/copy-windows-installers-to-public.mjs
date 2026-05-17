@@ -6,10 +6,15 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { POS_PRODUCTS, resolvePosProductId } from "./pos-products.mjs";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
 const version = String(pkg.version ?? "0.0.0");
+const productId =
+  resolvePosProductId(process.env.POS_PRODUCT ?? process.env.VYNTEPOS_PRODUCT) ?? "restaurant";
+const product = POS_PRODUCTS[productId] ?? POS_PRODUCTS.restaurant;
+const artifactPrefix = product.artifactPrefix;
 /** Override when using e.g. `dist:win:fresh` (alternate electron-builder output dir). */
 const releaseDir = path.join(
   root,
@@ -18,8 +23,10 @@ const releaseDir = path.join(
 const publicDir = path.join(root, "public");
 
 /** Versioned NSIS outputs: RestaurantPOSSetup-1.2.3-x64.exe (legacy: VyntexPOSSetup-*). */
-const VERSIONED_INSTALLER_RE =
-  /^(RestaurantPOSSetup|VyntexPOSSetup)-(\d+\.\d+\.\d+)-(x64|arm64)\.exe(\.blockmap)?$/;
+const allPrefixes = [...new Set(Object.values(POS_PRODUCTS).map((p) => p.artifactPrefix))];
+const VERSIONED_INSTALLER_RE = new RegExp(
+  `^(${[...allPrefixes, "VyntexPOSSetup"].join("|")})-(\\d+\\.\\d+\\.\\d+)-(x64|arm64)\\.exe(\\.blockmap)?$`,
+);
 
 /**
  * In `release/`, remove stale versioned installers + blockmaps (wrong semver or legacy Vyntex names).
@@ -51,11 +58,13 @@ function purgeVersionedFromPublic(dir) {
 }
 
 function resolveBuiltExe(arch) {
-  const restaurant = path.join(releaseDir, `RestaurantPOSSetup-${version}-${arch}.exe`);
+  const primary = path.join(releaseDir, `${artifactPrefix}-${version}-${arch}.exe`);
+  const legacyRestaurant = path.join(releaseDir, `RestaurantPOSSetup-${version}-${arch}.exe`);
   const vyntex = path.join(releaseDir, `VyntexPOSSetup-${version}-${arch}.exe`);
-  if (fs.existsSync(restaurant)) return restaurant;
+  if (fs.existsSync(primary)) return primary;
+  if (fs.existsSync(legacyRestaurant)) return legacyRestaurant;
   if (fs.existsSync(vyntex)) return vyntex;
-  return restaurant;
+  return primary;
 }
 
 purgeStaleFromRelease(releaseDir, version);
@@ -64,15 +73,15 @@ purgeVersionedFromPublic(publicDir);
 const pairs = [
   {
     from: () => resolveBuiltExe("x64"),
-    toPublic: path.join(publicDir, "RestaurantPOSSetup.exe"),
-    toRelease: path.join(releaseDir, "RestaurantPOSSetup.exe"),
-    label: "x64 (Intel/AMD)",
+    toPublic: path.join(publicDir, product.publicExe),
+    toRelease: path.join(releaseDir, product.publicExe),
+    label: `${product.label} x64 (Intel/AMD)`,
   },
   {
     from: () => resolveBuiltExe("arm64"),
-    toPublic: path.join(publicDir, "RestaurantPOSSetup-arm64.exe"),
-    toRelease: path.join(releaseDir, "RestaurantPOSSetup-arm64.exe"),
-    label: "ARM64",
+    toPublic: path.join(publicDir, product.publicExeArm64),
+    toRelease: path.join(releaseDir, product.publicExeArm64),
+    label: `${product.label} ARM64`,
   },
 ];
 
@@ -81,7 +90,7 @@ for (const { from: fromFn, toPublic, toRelease, label } of pairs) {
   const from = fromFn();
   if (!fs.existsSync(from)) {
     console.warn(
-      `[copy-installers] Skip ${label}: not found\n  ${from}\n  Run: npm run dist:win`,
+      `[copy-installers] Skip ${label}: not found\n  ${from}\n  Run: npm run update:${productId}-pos`,
     );
     continue;
   }
@@ -97,7 +106,10 @@ for (const { from: fromFn, toPublic, toRelease, label } of pairs) {
 
 if (ok === 0) {
   console.error(
-    "\n[copy-installers] No installers copied. Build Windows installers first:\n  npm run dist:win\n",
+    `\n[copy-installers] No installers copied. Build Windows installers first:\n  npm run update:${productId}-pos\n`,
   );
   process.exit(1);
 }
+
+const { purgePublishedInstallers } = await import("./purge-published-installers.mjs");
+purgePublishedInstallers({ productId, version });

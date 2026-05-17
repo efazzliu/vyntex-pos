@@ -20,6 +20,7 @@ import {
   type AdminTransactionMethod,
   type AdminTransactionStatus,
 } from "@/lib/supabase-pos/admin-ops.ts";
+import { adminCardClass, adminTableShellClass } from "@/pages/admin/_lib/admin-ui.ts";
 import { cn } from "@/lib/utils.ts";
 
 const amountFmt = new Intl.NumberFormat("en-EU", {
@@ -85,7 +86,7 @@ export function RecentTransactionsCard() {
   }, [transactionsQuery.data, search, statusFilter, cycleFilter]);
 
   return (
-    <div className="rounded-3xl border border-border/70 bg-gradient-to-b from-card via-card to-muted/25 p-5 shadow-[0_24px_56px_-28px_rgba(0,102,255,0.18)] dark:border-slate-700/70 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900/50 dark:shadow-[0_24px_56px_-32px_rgba(0,0,0,0.65)]">
+    <div className={cn(adminCardClass, "p-5")}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="text-base font-semibold text-foreground">Recent Transactions</h3>
@@ -130,7 +131,7 @@ export function RecentTransactionsCard() {
         </Select>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-border/70">
+      <div className={adminTableShellClass}>
         <div className="grid grid-cols-[0.8fr_1.5fr_1.05fr_0.8fr_0.85fr_0.75fr_0.85fr_0.9fr] gap-2 border-b border-border/70 bg-muted/35 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           <span>ID</span>
           <span>Customer</span>

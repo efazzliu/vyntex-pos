@@ -1,0 +1,34 @@
+# Vercel CLI upload — exclude anything >100 MB (Hobby per-file limit).
+# Vercel runs `npm run build:web` on their servers (installs node_modules there).
+
+.git
+**/.git/**
+
+node_modules
+**/node_modules/**
+
+release
+release/**
+release-eb-staging
+release-eb-staging/**
+
+dist
+dist-phone
+dist-ssr
+.vercel
+
+android
+ios
+electron
+phone-app
+supabase/.temp
+
+# Unpacked desktop app is 200+ MB — never upload
+**/win-unpacked/**
+**/*unpacked*/**
+
+# Dev / build tooling binaries
+**/electron.exe
+**/*.pack
+
+*.log

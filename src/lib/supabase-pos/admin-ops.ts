@@ -398,7 +398,10 @@ export type SiteUserRow = {
   lastSignInAt: string | null;
   venueCount: number;
   activeLicenseCount: number;
+  isBanned: boolean;
 };
+
+export type SiteUserModerationAction = "delete" | "ban";
 
 function isMissingSiteUsersRpcError(err: { message?: string }): boolean {
   const m = String(err.message ?? "").toLowerCase();
@@ -416,7 +419,7 @@ export async function listSiteUsers(): Promise<SiteUserRow[]> {
   if (error) {
     if (isMissingSiteUsersRpcError(error)) {
       throw new Error(
-        "The site users function is not installed. Run migration 023_vyntex_list_site_users.sql in Supabase, then try again.",
+        "The site users function is not installed. Run supabase/migrations/023_vyntex_list_site_users.sql in Supabase SQL Editor, add your email to platform_admin_emails, then refresh.",
       );
     }
     const msg = String(error.message ?? "");
@@ -439,8 +442,72 @@ export async function listSiteUsers(): Promise<SiteUserRow[]> {
       lastSignInAt: r.last_sign_in_at ? String(r.last_sign_in_at) : null,
       venueCount: Math.max(0, Number(r.venue_count) || 0),
       activeLicenseCount: Math.max(0, Number(r.active_license_count) || 0),
+      isBanned: Boolean(r.is_banned),
     };
   });
+}
+
+/** Check if email is on the site ban list (migration 024). */
+export async function isEmailBanned(email: string): Promise<boolean> {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return false;
+
+  const { data, error } = await supabase.rpc("vyntex_is_email_banned", {
+    p_email: normalized,
+  });
+
+  if (error) {
+    const m = String(error.message ?? "").toLowerCase();
+    if (m.includes("vyntex_is_email_banned") || m.includes("could not find the function")) {
+      return false;
+    }
+    throw new Error(error.message);
+  }
+
+  return Boolean(data);
+}
+
+function isMissingModerateSiteUserRpc(err: { message?: string }): boolean {
+  const m = String(err.message ?? "").toLowerCase();
+  return (
+    m.includes("vyntex_admin_moderate_site_user") ||
+    (m.includes("could not find the function") && m.includes("moderate"))
+  );
+}
+
+/** Delete or ban a site user (migration 025 RPC). */
+export async function moderateSiteUser(
+  userId: string,
+  action: SiteUserModerationAction,
+): Promise<{ venuesDeleted: number; email: string }> {
+  const { data, error } = await supabase.rpc("vyntex_admin_moderate_site_user", {
+    p_user_id: userId,
+    p_action: action,
+  });
+
+  if (error) {
+    if (isMissingModerateSiteUserRpc(error)) {
+      throw new Error(
+        "Funksioni vyntex_admin_moderate_site_user nuk është instaluar. Ekzekuto migrimin 025_vyntex_admin_moderate_site_user.sql në Supabase SQL Editor.",
+      );
+    }
+    throw new Error(error.message || "Moderation failed");
+  }
+
+  const payload = data as {
+    ok?: boolean;
+    email?: string;
+    venues_deleted?: number;
+  } | null;
+
+  if (!payload?.ok) {
+    throw new Error("Moderation failed");
+  }
+
+  return {
+    email: String(payload.email ?? ""),
+    venuesDeleted: Math.max(0, Number(payload.venues_deleted) || 0),
+  };
 }
 
 export type ClientAccountRow = {
@@ -504,14 +571,45 @@ function bumpLicenseCache() {
 
 export async function updateLicenseStatus(
   licenseId: string,
-  status: "active" | "expired" | "suspended",
+  status: "active" | "expired" | "suspended" | "trial",
 ): Promise<void> {
+  const dbStatus = status === "trial" ? "active" : status;
   const { error } = await supabase
     .from("restaurants")
-    .update({ license_status: status })
+    .update({ license_status: dbStatus })
     .eq("id", licenseId);
   if (error) throw new Error(error.message);
   bumpLicenseCache();
+}
+
+export async function updateLicenseVenueName(licenseId: string, name: string): Promise<void> {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("Business name is required");
+  const { error } = await supabase
+    .from("restaurants")
+    .update({ name: trimmed })
+    .eq("id", licenseId);
+  if (error) throw new Error(error.message);
+  bumpLicenseCache();
+}
+
+/** Assign a new unique license key (client must re-activate devices with the new key). */
+export async function regenerateLicenseKey(licenseId: string): Promise<string> {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const licenseKey = randomLicenseKey();
+    const { error } = await supabase
+      .from("restaurants")
+      .update({ license_key: licenseKey })
+      .eq("id", licenseId);
+    if (!error) {
+      bumpLicenseCache();
+      return licenseKey;
+    }
+    if (!isDuplicateKeyError(error.message)) {
+      throw new Error(error.message);
+    }
+  }
+  throw new Error("Failed to generate a unique license key. Please try again.");
 }
 
 export async function extendLicenseDays(licenseId: string, days: number): Promise<void> {

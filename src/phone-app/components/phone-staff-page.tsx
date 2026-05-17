@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Pencil, Plus, Trash2, UserRound, Users } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { useDashboardRestaurant } from "@/hooks/use-dashboard-restaurant.ts";
-import { usePlatformAdmin } from "@/hooks/use-platform-admin.ts";
+import { usePhoneManagerSession } from "@/lib/supabase-pos/phone-manager-session.ts";
 import { clearRestaurantCache } from "@/lib/supabase-pos/restaurant.ts";
 import { fetchPhoneStaffBundle } from "@/lib/supabase-pos/phone-staff-ops.ts";
 import { deleteStaff } from "@/lib/supabase-pos/staff-ops.ts";
@@ -27,10 +27,7 @@ const ROLE_COLORS: Record<string, string> = {
 export default function PhoneStaffPage() {
   const { t } = useTranslation("site");
   const { restaurant, refresh: refreshRestaurant } = useDashboardRestaurant();
-  const { session } = usePlatformAdmin();
-  const isPhoneManager =
-    (session?.user?.user_metadata as { vyntex_phone_manager?: boolean } | undefined)
-      ?.vyntex_phone_manager === true;
+  const isPhoneManager = usePhoneManagerSession() === true;
   const [staff, setStaff] = useState<StaffDoc[]>([]);
   const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);

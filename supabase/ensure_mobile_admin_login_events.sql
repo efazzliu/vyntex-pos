@@ -40,11 +40,8 @@ create policy "mobile_admin_login_events_select_owner" on public.mobile_admin_lo
           r.owner_user_id = (select auth.uid())
           or (
             length(trim(coalesce(r.owner_email, ''))) > 0
-            and lower(trim(r.owner_email)) = lower(trim(coalesce(
-              (select auth.jwt() ->> 'email'),
-              (select auth.jwt() -> 'user_metadata' ->> 'email'),
-              ''
-            )))
+            and lower(trim(r.owner_email)) = public.vyntex_auth_email()
+            and public.vyntex_auth_email() <> ''
           )
         )
     )

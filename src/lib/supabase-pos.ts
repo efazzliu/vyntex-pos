@@ -299,14 +299,6 @@ export async function activateLicense(
     data: { user: authUser },
   } = await supabase.auth.getUser();
   if (authUser?.id && authUser.email) {
-    const keyForMeta = String(row.license_key ?? normalizedKey);
-    await supabase.auth.updateUser({
-      data: {
-        vyntex_restaurant_id: row.id,
-        vyntex_license_key: keyForMeta,
-      },
-    });
-
     const { data: ownRow } = await supabase
       .from("restaurants")
       .select("owner_user_id, owner_email")

@@ -199,16 +199,6 @@ export default function SetupForm() {
 
       setDashboardRestaurantId(data.id);
 
-      const { error: userMetaError } = await supabase.auth.updateUser({
-        data: {
-          vyntex_restaurant_id: data.id,
-          vyntex_license_key: newLicenseKey.trim().toUpperCase(),
-        },
-      });
-      if (userMetaError) {
-        console.warn("[setup-form] updateUser metadata failed", userMetaError);
-      }
-
       const { error: planSyncError } = await supabase
         .from("restaurants")
         .update({

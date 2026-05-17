@@ -6,6 +6,8 @@ import {
   getAdminPlanDistribution,
   type AdminPlanDistributionRange,
 } from "@/lib/supabase-pos/admin-ops.ts";
+import { adminCardClass } from "@/pages/admin/_lib/admin-ui.ts";
+import { cn } from "@/lib/utils.ts";
 
 type PlanSplitChartCardProps = {
   period: AdminPlanDistributionRange;
@@ -34,7 +36,7 @@ export function PlanSplitChartCard({ period }: PlanSplitChartCardProps) {
   }, [planData]);
 
   return (
-    <div className="rounded-3xl border border-border/70 bg-gradient-to-b from-card via-card to-muted/25 p-4 shadow-[0_24px_56px_-28px_rgba(0,102,255,0.18)] dark:border-slate-700/70 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900/50 dark:shadow-[0_24px_56px_-32px_rgba(0,0,0,0.65)]">
+    <div className={cn(adminCardClass, "p-4")}>
       <div className="mb-3">
         <h3 className="text-sm font-semibold text-foreground">Plan Split</h3>
       </div>

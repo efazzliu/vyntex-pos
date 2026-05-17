@@ -16,6 +16,7 @@ import {
   fetchAllRestaurantsOwnedBySession,
   type OwnedRestaurantRow,
 } from "@/lib/supabase-pos/phone-pos-session.ts";
+import { isPhoneManagerSession } from "@/lib/supabase-pos/phone-manager-session.ts";
 import {
   createPhoneManagerInvite,
   listPhoneManagersForRestaurant,
@@ -36,11 +37,7 @@ export default function PhoneTeamPage() {
   const [removingId, setRemovingId] = useState<string | null>(null);
 
   useEffect(() => {
-    void supabase.auth.getUser().then(({ data: { user: u } }) => {
-      setIsPhoneManagerOnly(
-        (u?.user_metadata as { vyntex_phone_manager?: boolean })?.vyntex_phone_manager === true,
-      );
-    });
+    void isPhoneManagerSession().then(setIsPhoneManagerOnly);
   }, []);
 
   useEffect(() => {

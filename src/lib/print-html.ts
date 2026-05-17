@@ -82,6 +82,7 @@ export const DEFAULT_SILENT_PRINT_IPC_TIMEOUT_MS = 2200;
 export function isSilentPrintQueueableError(error: string | undefined): boolean {
   return (
     error === "no-physical-printer" ||
+    error === "printer-offline" ||
     error === "silent-timeout" ||
     error === "timeout"
   );

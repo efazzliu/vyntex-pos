@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { supabase } from "@/lib/supabase.ts";
+import { isPhoneManagerSession } from "@/lib/supabase-pos/phone-manager-session.ts";
 import { SUPPORT_EMAIL, SUPPORT_MAILTO_HREF } from "@/lib/site-constants.ts";
 import { cn } from "@/lib/utils.ts";
 
@@ -34,10 +35,7 @@ export default function PhoneProfilePersonalPage() {
         setFullName((meta?.full_name ?? "").trim());
         const existingEmail = (u.email ?? "").trim();
         setEmail(existingEmail);
-        setIsPhoneManager(
-          (u.user_metadata as { vyntex_phone_manager?: boolean } | undefined)
-            ?.vyntex_phone_manager === true,
-        );
+        setIsPhoneManager(await isPhoneManagerSession());
         setCanSetCredentials(!existingEmail);
       }
       setLoading(false);

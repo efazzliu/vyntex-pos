@@ -97,7 +97,7 @@ export function AdminPageHeader() {
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild className="cursor-pointer rounded-lg">
-                <Link to="/admin/settings#account" className="flex items-center gap-2">
+                <Link to="/admin/settings?tab=account" className="flex items-center gap-2">
                   <UserRound className="size-4" />
                   Profile & account
                 </Link>

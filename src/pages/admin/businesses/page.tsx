@@ -7,6 +7,9 @@ import { Input } from "@/components/ui/input.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { getAdminStats, listClientAccounts } from "@/lib/supabase-pos/admin-ops.ts";
+import { AdminCard, AdminHero, AdminKpiCard } from "@/pages/admin/_components/admin-card.tsx";
+import { adminInputClass, adminPageSectionClass, adminTableShellClass } from "@/pages/admin/_lib/admin-ui.ts";
+import { cn } from "@/lib/utils.ts";
 
 export default function AdminBusinessesPage() {
   const [search, setSearch] = useState("");
@@ -31,22 +34,16 @@ export default function AdminBusinessesPage() {
   }, [clientsQuery.data, search]);
 
   return (
-    <section className="space-y-5 p-6 lg:p-8">
-      <div className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-[linear-gradient(135deg,#ffffff_0%,#f4f9ff_55%,#f4fff6_100%)] p-6 shadow-[0_26px_60px_-40px_rgba(2,6,23,0.35)] dark:border-slate-700/70 dark:bg-[linear-gradient(135deg,#070d1f_0%,#08122a_55%,#0a1620_100%)]">
-        <div
-          className="pointer-events-none absolute -right-14 -top-14 h-44 w-44 rounded-full bg-[#0066FF]/20 blur-3xl dark:bg-[#0066FF]/28"
-          aria-hidden
-        />
-        <div className="relative">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-300/70">
-            Clients Command
-          </p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Clients</h1>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300/80">
-            Te gjitha account-et e klienteve me licenses, ownership dhe overview te shpejte.
-          </p>
-        </div>
-      </div>
+    <section className={cn(adminPageSectionClass, "space-y-5 pt-4")}>
+      <AdminHero>
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+          Clients Command
+        </p>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Clients</h1>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+          Te gjitha account-et e klienteve me licenses, ownership dhe overview te shpejte.
+        </p>
+      </AdminHero>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
@@ -79,7 +76,7 @@ export default function AdminBusinessesPage() {
         />
       </div>
 
-      <div className="rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-[0_18px_46px_-38px_rgba(2,6,23,0.38)] dark:border-slate-700/70 dark:bg-slate-900/80">
+      <AdminCard className="p-4">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Client Accounts</h3>
@@ -93,12 +90,12 @@ export default function AdminBusinessesPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search clients..."
-              className="h-9 rounded-full border-slate-200/80 pl-8 text-xs dark:border-slate-700/70"
+              className={cn(adminInputClass, "pl-8")}
             />
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-xl border border-slate-200/80 dark:border-slate-700/70">
+        <div className={adminTableShellClass}>
           <div className="grid grid-cols-[1.2fr_0.65fr_1.1fr_1.4fr_0.9fr] gap-2 bg-slate-100/80 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-800/70 dark:text-slate-300/80">
             <span>Owner</span>
             <span className="text-center">Licenses</span>
@@ -167,7 +164,7 @@ export default function AdminBusinessesPage() {
             )}
           </div>
         </div>
-      </div>
+      </AdminCard>
     </section>
   );
 }
@@ -203,22 +200,17 @@ function MetricCard({
   loading: boolean;
 }) {
   return (
-    <div className="group relative [transform-style:preserve-3d] [transform:perspective(1000px)_rotateX(0deg)_translateY(0)] transition-transform duration-300 hover:[transform:perspective(1000px)_rotateX(5deg)_translateY(-4px)]">
-      <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[#0066FF]/10 to-[#44CC00]/10 blur-xl" aria-hidden />
-      <div className="relative rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-[0_16px_36px_-30px_rgba(2,6,23,0.35)] dark:border-slate-700/70 dark:bg-slate-900/80">
-        <div className="mb-2 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200/80 bg-white text-slate-600 dark:border-slate-600/80 dark:bg-slate-800 dark:text-slate-200">
-          {icon}
-        </div>
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-300/70">
-          {title}
-        </p>
-        {loading ? (
-          <Skeleton className="mt-2 h-8 w-20 rounded-lg" />
-        ) : (
-          <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">{value}</p>
-        )}
-        <p className="mt-1 text-xs text-slate-500 dark:text-slate-300/70">{hint}</p>
+    <AdminKpiCard>
+      <div className="mb-2 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+        {icon}
       </div>
-    </div>
+      <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">{title}</p>
+      {loading ? (
+        <Skeleton className="mt-2 h-8 w-20 rounded-lg" />
+      ) : (
+        <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">{value}</p>
+      )}
+      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{hint}</p>
+    </AdminKpiCard>
   );
 }

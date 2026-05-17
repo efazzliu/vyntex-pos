@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase.ts";
 import { clearDashboardRestaurantId } from "@/hooks/use-dashboard-restaurant.ts";
+import { isPhoneManagerSession } from "@/lib/supabase-pos/phone-manager-session.ts";
 import { fetchRestaurantOwnedBySession } from "@/lib/supabase-pos/phone-pos-session.ts";
 import { isMissingPgColumnError } from "@/lib/supabase-pos/db-errors.ts";
 
@@ -73,12 +74,8 @@ export default function PhoneMobileAccessGate() {
         } = await supabase.auth.getUser();
         if (!user || cancelled) return;
 
-        const meta = user.user_metadata as {
-          vyntex_phone_manager?: boolean;
-        };
-
         let canUsePhone = true;
-        if (meta?.vyntex_phone_manager === true) {
+        if (await isPhoneManagerSession()) {
           const row = await fetchRestaurantOwnedBySession();
           canUsePhone = row ? await isMobileAccessEnabledForRestaurantId(row.id) : true;
         } else {

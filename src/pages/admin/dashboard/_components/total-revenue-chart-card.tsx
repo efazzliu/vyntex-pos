@@ -12,6 +12,7 @@ import {
 import { TrendingDown, TrendingUp } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { cn } from "@/lib/utils.ts";
+import { adminCardClass } from "@/pages/admin/_lib/admin-ui.ts";
 import {
   getAdminPayingMrrTrendEurByRange,
   type AdminMrrTrendPoint,
@@ -94,7 +95,7 @@ export function TotalRevenueChartCard({ currentMrrEur, period }: TotalRevenueCha
   }, [trendQuery.data, currentMrrEur]);
 
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-border/70 bg-gradient-to-b from-card via-card to-muted/25 shadow-[0_24px_56px_-28px_rgba(0,102,255,0.18)] dark:border-slate-700/70 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900/50 dark:shadow-[0_24px_56px_-32px_rgba(0,0,0,0.65)]">
+    <div className={cn(adminCardClass, "relative overflow-hidden")}>
       <div
         className="pointer-events-none absolute -right-24 -top-24 size-[320px] rounded-full bg-[#0066FF]/[0.07] blur-3xl dark:bg-[#0066FF]/10"
         aria-hidden

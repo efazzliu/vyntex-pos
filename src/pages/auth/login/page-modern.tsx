@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase.ts";
+import { isEmailBanned } from "@/lib/supabase-pos/admin-ops.ts";
 import { registerUrlWithFreeTrial } from "@/lib/free-trial.ts";
 import { toast } from "sonner";
 import AuthTopNav from "@/pages/auth/_components/auth-top-nav.tsx";
@@ -41,6 +42,14 @@ export default function LoginPageModern({
     if (!isSupabaseConfigured) {
       return void toast.error(t("auth.login.supabaseNotConfigured"));
     }
+    try {
+      if (await isEmailBanned(email.trim())) {
+        return void toast.error("Ky llogari është e bllokuar. Kontaktoni mbështetjen.");
+      }
+    } catch {
+      /* ban check unavailable */
+    }
+
     setLoading(true);
     const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     setLoading(false);

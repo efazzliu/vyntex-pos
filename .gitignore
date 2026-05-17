@@ -26,6 +26,9 @@ tsconfig.tsbuildinfo
 *.sln
 *.sw?
 
+# Supabase CLI cache (login, project ref)
+supabase/.temp/
+
 # Environment variables
 .env*
 !.env.example

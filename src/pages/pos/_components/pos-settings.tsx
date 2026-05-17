@@ -4,8 +4,9 @@ import { api } from "@/convex/_generated/api.js";
 import type { Doc } from "@/convex/_generated/dataModel.d.ts";
 import { cn } from "@/lib/utils.ts";
 import {
-  printHtmlDocument,
   getDesktopSystemPrintersInvoker,
+  hasElectronSilentPrintIpc,
+  tryPrintHtmlDocumentAsync,
   type DesktopSystemPrinterInfo,
 } from "@/lib/print-html.ts";
 import { toast } from "sonner";
@@ -715,7 +716,7 @@ export default function PosSettings({
 
   // ── Test print ──────────────────────────────────────────
 
-  const handleTestPrint = useCallback((printer: Doc<"printers">) => {
+  const handleTestPrint = useCallback(async (printer: Doc<"printers">) => {
     const html = `
       <html>
       <head><title>Test Print</title>
@@ -741,8 +742,14 @@ export default function PosSettings({
       </body>
       </html>
     `;
-    if (!printHtmlDocument(html)) {
-      toast.error(t("msg.popup_blocked"));
+    const deviceName = printer.address?.trim() || printer.name?.trim();
+    const outcome = await tryPrintHtmlDocumentAsync(html, {
+      silent: hasElectronSilentPrintIpc(),
+      allowInteractiveFallback: false,
+      deviceName: deviceName || undefined,
+    });
+    if (!outcome.ok) {
+      toast.error(t("order.print_ticket_silent_failed"));
       return;
     }
     toast.success("Test print sent");
