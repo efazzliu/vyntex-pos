@@ -15,7 +15,6 @@ import { cn } from "@/lib/utils.ts";
 import { supabase } from "@/lib/supabase.ts";
 import { registerUrlWithFreeTrial } from "@/lib/free-trial.ts";
 import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
-import { Languages } from "lucide-react";
 
 const navItems = [
   { key: "home", href: "/" },
@@ -94,18 +93,21 @@ export default function AuthTopNav() {
               if (value === "en" || value === "sq") setLanguage(value);
             }}
           >
-            <SelectTrigger className="h-8 min-w-42 border-white/20 bg-white/5 text-xs font-semibold text-white/90">
-              <span className="inline-flex items-center gap-2">
-                <Languages className="size-3.5 text-white/70" />
-                <SelectValue />
-              </span>
+            <SelectTrigger className="h-8 min-w-[8.5rem] border-white/20 bg-white/5 text-xs font-semibold text-white/90">
+              <SelectValue />
             </SelectTrigger>
-            <SelectContent className="min-w-42">
+            <SelectContent className="min-w-[8.5rem]">
               <SelectItem value="en">
-                <FlagUS /> English
+                <span className="inline-flex items-center gap-2">
+                  <FlagUS />
+                  English
+                </span>
               </SelectItem>
               <SelectItem value="sq">
-                <FlagAL /> Albanian
+                <span className="inline-flex items-center gap-2">
+                  <FlagAL />
+                  Albanian
+                </span>
               </SelectItem>
             </SelectContent>
           </Select>

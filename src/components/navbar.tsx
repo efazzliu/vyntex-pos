@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select.tsx";
 import { cn } from "@/lib/utils.ts";
-import { Languages, Menu, Moon, Sun, X } from "lucide-react";
+import { Menu, Moon, Sun, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useTheme } from "next-themes";
 import { useSiteLanguage } from "@/components/providers/site-locale-provider.tsx";
@@ -160,23 +160,21 @@ export default function Navbar() {
                 if (value === "en" || value === "sq") setLanguage(value);
               }}
             >
-              <SelectTrigger className={cn("h-10 min-w-42 text-sm font-semibold", langSelectClass)}>
-                <span className="inline-flex items-center gap-2">
-                  <Languages
-                    className={cn(
-                      "size-4",
-                      isTransparent ? "text-white/70" : "text-muted-foreground",
-                    )}
-                  />
-                  <SelectValue />
-                </span>
+              <SelectTrigger className={cn("h-10 min-w-[8.5rem] text-sm font-semibold", langSelectClass)}>
+                <SelectValue />
               </SelectTrigger>
-              <SelectContent className="min-w-42">
+              <SelectContent className="min-w-[8.5rem]">
                 <SelectItem value="en">
-                  <FlagUS /> English
+                  <span className="inline-flex items-center gap-2">
+                    <FlagUS />
+                    English
+                  </span>
                 </SelectItem>
                 <SelectItem value="sq">
-                  <FlagAL /> Albanian
+                  <span className="inline-flex items-center gap-2">
+                    <FlagAL />
+                    Albanian
+                  </span>
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -235,17 +233,20 @@ export default function Navbar() {
                   }}
                 >
                   <SelectTrigger className="h-9 w-full text-xs font-semibold">
-                    <span className="inline-flex items-center gap-2">
-                      <Languages className="size-3.5 text-muted-foreground" />
-                      <SelectValue />
-                    </span>
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="en">
-                      <FlagUS /> English
+                      <span className="inline-flex items-center gap-2">
+                        <FlagUS />
+                        English
+                      </span>
                     </SelectItem>
                     <SelectItem value="sq">
-                      <FlagAL /> Albanian
+                      <span className="inline-flex items-center gap-2">
+                        <FlagAL />
+                        Albanian
+                      </span>
                     </SelectItem>
                   </SelectContent>
                 </Select>
