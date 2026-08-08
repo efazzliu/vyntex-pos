@@ -14,6 +14,7 @@ import { Languages, Menu, Moon, Sun, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useTheme } from "next-themes";
 import { useSiteLanguage } from "@/components/providers/site-locale-provider.tsx";
+import { FlagAL, FlagUS } from "@/components/flag-icons.tsx";
 import { supabase } from "@/lib/supabase.ts";
 import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 
@@ -171,8 +172,12 @@ export default function Navbar() {
                 </span>
               </SelectTrigger>
               <SelectContent className="min-w-42">
-                <SelectItem value="en">🇺🇸 English</SelectItem>
-                <SelectItem value="sq">🇦🇱 Albanian</SelectItem>
+                <SelectItem value="en">
+                  <FlagUS /> English
+                </SelectItem>
+                <SelectItem value="sq">
+                  <FlagAL /> Albanian
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -236,8 +241,12 @@ export default function Navbar() {
                     </span>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="en">🇺🇸 English</SelectItem>
-                    <SelectItem value="sq">🇦🇱 Albanian</SelectItem>
+                    <SelectItem value="en">
+                      <FlagUS /> English
+                    </SelectItem>
+                    <SelectItem value="sq">
+                      <FlagAL /> Albanian
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>

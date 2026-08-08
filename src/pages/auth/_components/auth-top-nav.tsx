@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select.tsx";
 import { useSiteLanguage } from "@/components/providers/site-locale-provider.tsx";
+import { FlagAL, FlagUS } from "@/components/flag-icons.tsx";
 import { cn } from "@/lib/utils.ts";
 import { supabase } from "@/lib/supabase.ts";
 import { registerUrlWithFreeTrial } from "@/lib/free-trial.ts";
@@ -100,8 +101,12 @@ export default function AuthTopNav() {
               </span>
             </SelectTrigger>
             <SelectContent className="min-w-42">
-              <SelectItem value="en">🇺🇸 English</SelectItem>
-              <SelectItem value="sq">🇦🇱 Albanian</SelectItem>
+              <SelectItem value="en">
+                <FlagUS /> English
+              </SelectItem>
+              <SelectItem value="sq">
+                <FlagAL /> Albanian
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>

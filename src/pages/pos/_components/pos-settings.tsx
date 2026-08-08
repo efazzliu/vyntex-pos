@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import type { Doc } from "@/convex/_generated/dataModel.d.ts";
 import { cn } from "@/lib/utils.ts";
+import { FlagAL, FlagUS } from "@/components/flag-icons.tsx";
 import {
   getDesktopSystemPrintersInvoker,
   hasElectronSilentPrintIpc,
@@ -967,9 +968,7 @@ export default function PosSettings({
                         : "bg-[#131A2E] text-[#5a6580] hover:text-white",
                     )}
                   >
-                    <span className="text-sm leading-none" aria-hidden="true">
-                      🇺🇸
-                    </span>
+                    <FlagUS className="h-3 w-4" />
                     English
                   </button>
                   <button
@@ -983,9 +982,7 @@ export default function PosSettings({
                         : "bg-[#131A2E] text-[#5a6580] hover:text-white",
                     )}
                   >
-                    <span className="text-sm leading-none" aria-hidden="true">
-                      🇦🇱
-                    </span>
+                    <FlagAL className="h-3 w-4" />
                     Albanian
                   </button>
                 </div>
