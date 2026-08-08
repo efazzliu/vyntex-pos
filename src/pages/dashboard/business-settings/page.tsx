@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   BadgeCheck,
   Building2,
   Check,
+  KeyRound,
   Loader2,
   MapPin,
   ReceiptText,
@@ -24,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select.tsx";
 import { useDashboardRestaurant } from "@/hooks/use-dashboard-restaurant.ts";
+import { useDashboardLocale } from "@/pages/dashboard/_components/dashboard-locale-context.tsx";
 import {
   fetchDashboardBusinessProfile,
   saveDashboardBusinessProfile,
@@ -36,6 +39,7 @@ type ReceiptTemplate = Awaited<ReturnType<typeof listTemplates>>[number];
 
 export default function DashboardBusinessSettingsPage() {
   const { restaurant, refresh } = useDashboardRestaurant();
+  const { lang } = useDashboardLocale();
   const [profile, setProfile] = useState<DashboardBusinessProfile | null>(null);
   const [initialProfile, setInitialProfile] =
     useState<DashboardBusinessProfile | null>(null);
@@ -173,9 +177,35 @@ export default function DashboardBusinessSettingsPage() {
   }
 
   if (!restaurant) {
+    const isSq = lang === "sq";
     return (
-      <div className="flex min-h-full items-center justify-center p-8 text-sm text-slate-500">
-        Link a license before editing business information.
+      <div className="flex min-h-full items-center justify-center bg-slate-50 px-4 py-16 dark:bg-[#02040a]">
+        <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-700/80 dark:bg-slate-900/90">
+          <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-sky-50 text-sky-600 dark:bg-sky-500/10 dark:text-sky-300">
+            <Building2 className="size-7" />
+          </div>
+          <h1 className="text-lg font-semibold text-slate-900 dark:text-white">
+            {isSq ? "Nuk ka biznes të lidhur ende" : "No business linked yet"}
+          </h1>
+          <p className="mt-2 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+            {isSq
+              ? "Aktivizo ose lidh një licencë POS me këtë llogari, pastaj këtu do të shfaqen të dhënat e biznesit, adresa dhe faturat."
+              : "Activate or link a POS license to this account first. Then you can edit venue details, address, and receipt information here."}
+          </p>
+          <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
+            <Button asChild className="rounded-xl bg-gradient-to-r from-[#0066FF] to-[#00AACC] text-white">
+              <Link to="/dashboard/get-started">
+                <KeyRound className="size-4" />
+                {isSq ? "Aktivizo licencën" : "Activate license"}
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="rounded-xl">
+              <Link to="/dashboard/licenses">
+                {isSq ? "Shiko licencat" : "View licenses"}
+              </Link>
+            </Button>
+          </div>
+        </div>
       </div>
     );
   }
