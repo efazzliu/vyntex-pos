@@ -43,8 +43,11 @@ import {
   MessageCircle,
   Activity,
   House,
+  Moon,
   Settings,
+  Sun,
 } from "lucide-react";
+import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 
@@ -326,8 +329,13 @@ function DashboardHeaderToolbar({
   profileTargetPath: string;
   onSignOut: () => void;
 }) {
+  const { resolvedTheme, setTheme } = useTheme();
+  const [themeMounted, setThemeMounted] = useState(false);
+  useEffect(() => setThemeMounted(true), []);
+
   const profileInitial = profileName.charAt(0).toUpperCase();
   const shortName = profileShortLabel(profileName);
+  const isDark = themeMounted && resolvedTheme === "dark";
 
   return (
     <div
@@ -352,6 +360,18 @@ function DashboardHeaderToolbar({
           </button>
         ))}
       </div>
+
+      <span className="mx-1 h-4 w-px shrink-0 bg-slate-200 dark:bg-white/10" aria-hidden />
+
+      <button
+        type="button"
+        onClick={() => setTheme(isDark ? "light" : "dark")}
+        aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+        title={isDark ? "Light mode" : "Dark mode"}
+        className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/35 dark:text-sky-200/70 dark:hover:bg-white/[0.05] dark:hover:text-white"
+      >
+        {isDark ? <Sun className="size-3.5" strokeWidth={2} /> : <Moon className="size-3.5" strokeWidth={2} />}
+      </button>
 
       <span className="mx-1 h-4 w-px shrink-0 bg-slate-200 dark:bg-white/10" aria-hidden />
 
