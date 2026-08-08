@@ -21,7 +21,7 @@ export default function HeroSection() {
   const primaryCtaHref = useMarketingPrimaryCtaHref();
 
   return (
-    <section className="relative flex min-h-[640px] items-start justify-center overflow-hidden bg-[#060B18]">
+    <section className="relative flex min-h-svh items-center justify-center overflow-hidden bg-[#060B18]">
       <div className="absolute inset-0">
         <div className="absolute inset-0 bg-gradient-to-b from-[#060B18] via-[#0A1628] to-[#060B18]" />
         <div
@@ -57,7 +57,7 @@ export default function HeroSection() {
         />
       </div>
 
-      <div className="relative z-10 mx-auto max-w-5xl px-4 pb-8 pt-20 text-center sm:px-6">
+      <div className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-12 pt-24 text-center sm:px-6">
         <motion.div
           initial={{ opacity: 0, scale: 0.5 }}
           animate={{ opacity: 1, scale: 1 }}
