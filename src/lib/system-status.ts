@@ -54,6 +54,31 @@ async function checkUrl(
   return response.ok || (allowOpaque && response.type === "opaque");
 }
 
+/**
+ * Probe PostgREST with the same public/publishable key the app uses.
+ * Do not hit `/rest/v1/` root — with sb_publishable_* keys that endpoint
+ * requires a secret key and falsely reports "Service disruption".
+ */
+async function checkSupabaseRestApi(
+  supabaseUrl: string,
+  supabaseKey: string,
+): Promise<boolean> {
+  if (!supabaseUrl || !supabaseKey) return false;
+  const response = await fetch(
+    `${supabaseUrl}/rest/v1/restaurants?select=id&limit=1`,
+    {
+      method: "HEAD",
+      cache: "no-store",
+      headers: {
+        apikey: supabaseKey,
+        Authorization: `Bearer ${supabaseKey}`,
+        Accept: "application/json",
+      },
+    },
+  );
+  return response.ok;
+}
+
 export async function checkVyntexServices(): Promise<ServiceHealth[]> {
   const supabaseUrl = String(import.meta.env.VITE_SUPABASE_URL ?? "").replace(/\/$/, "");
   const supabaseKey = String(import.meta.env.VITE_SUPABASE_ANON_KEY ?? "");
@@ -83,9 +108,7 @@ export async function checkVyntexServices(): Promise<ServiceHealth[]> {
       name: "API",
       run: () =>
         isSupabaseConfigured
-          ? checkUrl(`${supabaseUrl}/rest/v1/`, {
-              headers: { apikey: supabaseKey },
-            })
+          ? checkSupabaseRestApi(supabaseUrl, supabaseKey)
           : Promise.resolve(false),
     },
     {
