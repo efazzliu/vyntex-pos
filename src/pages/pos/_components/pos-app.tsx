@@ -25,6 +25,7 @@ import KitchenDisplayView from "./kitchen-display-view.tsx";
 import { PosViewErrorBoundary } from "./pos-view-error-boundary.tsx";
 import { usePosLocale } from "./pos-locale-provider.tsx";
 import { initPrintQueueOnStartup } from "@/lib/print-queue.ts";
+import { persistPosTheme } from "@/lib/supabase-pos/license-sync.ts";
 import { LogOut } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -78,6 +79,14 @@ function PosAppInner({
 }: PosAppProps) {
   const { t } = usePosLocale();
   const { theme, setTheme } = usePosTheme();
+
+  const handleThemeChange = useCallback(
+    (next: "dark" | "light") => {
+      setTheme(next);
+      void persistPosTheme(activation.licenseKey, next);
+    },
+    [activation.licenseKey, setTheme],
+  );
 
   // Drop stale offline print queue on open; no background OS print polling (Windows dialogs).
   useEffect(() => {
@@ -522,7 +531,7 @@ function PosAppInner({
                   licenseKey={activation.licenseKey}
                   plan={activation.plan}
                   theme={theme}
-                  onThemeChange={setTheme}
+                  onThemeChange={handleThemeChange}
                 />
               </div>
             ))}

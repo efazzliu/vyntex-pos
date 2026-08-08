@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase.ts";
 import { fetchPhoneManagerRestaurantId } from "@/lib/supabase-pos/phone-manager-session.ts";
+import { fetchRestaurantOwnedBySession } from "@/lib/supabase-pos/phone-pos-session.ts";
+import {
+  effectiveMaxTerminals,
+  parseRegisteredDeviceIds,
+} from "@/lib/dashboard-overview-data.ts";
 
 const RESTAURANT_ID_KEY = "vyntex.dashboard.restaurantId";
 
@@ -16,6 +21,9 @@ export type DashboardRestaurant = {
   licenseExpiry: string;
   licenseStatus: string;
   deviceId?: string | null;
+  registeredDeviceIds: string[];
+  maxTerminals: number;
+  lastPosSyncAt: string | null;
 };
 
 type UseDashboardRestaurantResult = {
@@ -35,7 +43,14 @@ function mapRow(row: {
   license_expiry: string;
   license_status: string;
   device_id: string | null;
+  registered_devices?: unknown;
+  max_terminals?: number | null;
+  last_pos_sync_at?: string | null;
 }): DashboardRestaurant {
+  const registeredDeviceIds = parseRegisteredDeviceIds(
+    row.registered_devices,
+    row.device_id,
+  );
   return {
     id: row.id,
     name: row.name,
@@ -48,6 +63,9 @@ function mapRow(row: {
     licenseExpiry: row.license_expiry,
     licenseStatus: row.license_status,
     deviceId: row.device_id,
+    registeredDeviceIds,
+    maxTerminals: effectiveMaxTerminals(row.plan, row.max_terminals),
+    lastPosSyncAt: row.last_pos_sync_at ?? null,
   };
 }
 
@@ -65,6 +83,32 @@ export function useDashboardRestaurant(): UseDashboardRestaurantResult {
   );
 
   const refresh = useCallback(async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (user) {
+      const owned = await fetchRestaurantOwnedBySession();
+      if (owned) {
+        const storedId = localStorage.getItem(RESTAURANT_ID_KEY);
+        if (storedId && storedId !== owned.id) {
+          clearDashboardRestaurantId();
+        }
+        setDashboardRestaurantId(owned.id);
+        const { data: ownedRow, error: ownedErr } = await supabase
+          .from("restaurants")
+          .select(
+            "id, name, type, address, phone, currency, plan, license_key, license_expiry, license_status, device_id, registered_devices, max_terminals, last_pos_sync_at",
+          )
+          .eq("id", owned.id)
+          .maybeSingle();
+        if (!ownedErr && ownedRow) {
+          setRestaurant(mapRow(ownedRow));
+          return;
+        }
+      }
+    }
+
     let restaurantId = localStorage.getItem(RESTAURANT_ID_KEY);
     if (!restaurantId) {
       const fromManager = await fetchPhoneManagerRestaurantId();
@@ -81,12 +125,19 @@ export function useDashboardRestaurant(): UseDashboardRestaurantResult {
     const { data, error } = await supabase
       .from("restaurants")
       .select(
-        "id, name, type, address, phone, currency, plan, license_key, license_expiry, license_status, device_id"
+        "id, name, type, address, phone, currency, plan, license_key, license_expiry, license_status, device_id, registered_devices, max_terminals, last_pos_sync_at, owner_user_id"
       )
       .eq("id", restaurantId)
       .maybeSingle();
 
     if (error || !data) {
+      clearDashboardRestaurantId();
+      setRestaurant(null);
+      return;
+    }
+
+    if (user && data.owner_user_id && data.owner_user_id !== user.id) {
+      clearDashboardRestaurantId();
       setRestaurant(null);
       return;
     }

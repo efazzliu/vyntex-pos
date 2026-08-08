@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
 import { Link, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { isAuthEmailVerified } from "@/lib/auth-email-verified.ts";
@@ -15,39 +15,70 @@ import SetupForm from "./setup-form.tsx";
 import { DashboardLicenseExpiredBanner } from "./expired-license.tsx";
 import { DashboardLocaleProvider, useDashboardLocale } from "./dashboard-locale-context.tsx";
 import { useDashboardRestaurant } from "@/hooks/use-dashboard-restaurant.ts";
-import { dashboardTypeLabel } from "@/lib/dashboard-i18n.ts";
+import { dashboardTypeLabel, type DashboardLang } from "@/lib/dashboard-i18n.ts";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu.tsx";
 import {
   LayoutDashboard,
   LogOut,
   Menu,
   ChevronLeft,
+  ChevronDown,
   Mail,
   ShieldAlert,
   ShieldCheck,
   Sparkles,
-  ExternalLink,
   KeyRound,
   Download,
-  CreditCard,
   Users,
   Building2,
-  Shield,
-  LifeBuoy,
+  Monitor,
+  CreditCard,
+  CircleHelp,
+  MessageCircle,
+  Activity,
   House,
-  Languages,
+  Settings,
 } from "lucide-react";
 import { toast } from "sonner";
 import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 
-const sidebarLinkDefs = [
-  { i18nKey: "nav.restaurant_pos", href: "/dashboard/restaurant-pos", icon: LayoutDashboard },
-  { i18nKey: "nav.licenses", href: "/dashboard/licenses", icon: KeyRound },
-  { i18nKey: "nav.downloads", href: "/dashboard/downloads", icon: Download },
-  { i18nKey: "nav.billing", href: "/dashboard/billing", icon: CreditCard },
-  { i18nKey: "nav.team_access", href: "/dashboard/team-access", icon: Users },
-  { i18nKey: "nav.business_settings", href: "/dashboard/business-settings", icon: Building2 },
-  { i18nKey: "nav.security", href: "/dashboard/security", icon: Shield },
-  { i18nKey: "nav.support", href: "/dashboard/support", icon: LifeBuoy },
+const sidebarGroups = [
+  {
+    labelKey: "nav.section_main",
+    links: [
+      { i18nKey: "nav.restaurant_pos", href: "/dashboard/restaurant-pos", icon: LayoutDashboard },
+    ],
+  },
+  {
+    labelKey: "nav.section_business",
+    links: [
+      { i18nKey: "nav.business", href: "/dashboard/business-settings", icon: Building2 },
+      { i18nKey: "nav.devices", href: "/dashboard/devices", icon: Monitor },
+      { i18nKey: "nav.team", href: "/dashboard/team-access", icon: Users },
+      { i18nKey: "nav.license", href: "/dashboard/licenses", icon: KeyRound },
+    ],
+  },
+  {
+    labelKey: "nav.section_subscription",
+    links: [
+      { i18nKey: "nav.billing", href: "/dashboard/billing", icon: CreditCard },
+      { i18nKey: "nav.downloads", href: "/dashboard/downloads", icon: Download },
+    ],
+  },
+  {
+    labelKey: "nav.section_support",
+    links: [
+      { i18nKey: "nav.help_center", href: "/dashboard/support", icon: CircleHelp },
+      { i18nKey: "nav.support_direct", href: "/contact", icon: MessageCircle },
+      { i18nKey: "nav.system_status", href: "/dashboard/system-status", icon: Activity },
+    ],
+  },
 ] as const;
 
 function DashboardSidebar({
@@ -87,22 +118,39 @@ function DashboardSidebar({
         location.pathname === "/dashboard/restaurant-pos"
       );
     }
-    return location.pathname.startsWith(href);
+    const target = new URL(href, window.location.origin);
+    const path = target.pathname;
+    if (path === "/dashboard/settings") {
+      if (location.pathname !== "/dashboard/settings") return false;
+      const tab = new URLSearchParams(location.search).get("tab");
+      const expectedTab = target.searchParams.get("tab");
+      if (!expectedTab) return !tab || tab === "account";
+      return tab === expectedTab;
+    }
+    if (target.hash) {
+      return location.pathname === path && location.hash === target.hash;
+    }
+    if (
+      (path === "/dashboard/licenses" || path === "/dashboard/support") &&
+      location.hash
+    ) {
+      return false;
+    }
+    return location.pathname.startsWith(path);
   };
-
-  const visibleLinks = sidebarLinkDefs;
 
   return (
     <aside
       className={cn(
-        "relative flex h-full flex-col border-r border-sky-500/20 bg-gradient-to-b from-[#050c16] to-[#02040a] text-zinc-100 shadow-[inset_-1px_0_0_0_rgba(56,189,248,0.08)] transition-all duration-300",
-        mobile ? "w-full" : collapsed ? "w-16" : "w-64"
+        "relative flex h-full flex-col border-r border-slate-200 bg-white text-slate-800 transition-all duration-300",
+        "dark:border-sky-500/20 dark:bg-gradient-to-b dark:from-[#050c16] dark:to-[#02040a] dark:text-zinc-100 dark:shadow-[inset_-1px_0_0_0_rgba(56,189,248,0.08)]",
+        mobile ? "w-full" : collapsed ? "w-[72px]" : "w-[230px]",
       )}
     >
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-sky-500/12 via-blue-600/5 to-transparent" />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_0%_0%,rgba(56,189,248,0.08),transparent_55%)] opacity-80" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 hidden h-40 bg-gradient-to-b from-sky-500/12 via-blue-600/5 to-transparent dark:block" />
+      <div className="pointer-events-none absolute inset-0 hidden bg-[radial-gradient(ellipse_80%_60%_at_0%_0%,rgba(56,189,248,0.08),transparent_55%)] opacity-80 dark:block" />
       {/* Header */}
-      <div className="relative z-10 flex items-center justify-between border-b border-sky-500/15 bg-black/20 p-4 backdrop-blur-sm">
+      <div className="relative z-10 flex items-center justify-between border-b border-slate-200 bg-slate-50/90 p-4 backdrop-blur-sm dark:border-sky-500/15 dark:bg-black/20">
         <Link to="/" className="flex items-center gap-2.5 min-w-0">
           <img src={VYNTEX_APP_LOGO_SRC} alt={t("layout.brand")} className="h-7 w-7 shrink-0" />
           {!collapsed && (
@@ -114,7 +162,7 @@ function DashboardSidebar({
         {!mobile && (
           <button
             onClick={onToggle}
-            className="hidden cursor-pointer rounded-lg border border-transparent p-1 text-sky-200/70 hover:border-sky-500/25 hover:bg-sky-500/10 hover:text-white lg:block"
+            className="hidden cursor-pointer rounded-lg border border-transparent p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-sky-200/70 dark:hover:border-sky-500/25 dark:hover:bg-sky-500/10 dark:hover:text-white lg:block"
           >
             <ChevronLeft
               className={cn(
@@ -128,50 +176,63 @@ function DashboardSidebar({
 
       {/* License type badge */}
       {!collapsed && vynType && (
-        <div className="relative z-10 border-b border-sky-500/15 bg-black/15 px-4 py-3 backdrop-blur-sm">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-200/45">
+        <div className="relative z-10 border-b border-slate-200 bg-slate-50/80 px-4 py-3 backdrop-blur-sm dark:border-sky-500/15 dark:bg-black/15">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-sky-200/45">
             {t("layout.active_license")}
           </p>
-          <p className="text-sm font-medium text-white truncate">
+          <p className="truncate text-sm font-medium text-slate-900 dark:text-white">
             {vynType ? dashboardTypeLabel(vynType, lang) : vynType}
           </p>
         </div>
       )}
 
       {/* Nav links */}
-      <nav className="relative z-10 flex-1 space-y-1 px-2 py-4">
-        {visibleLinks.map((link) => (
-          <Link
-            key={link.href}
-            to={link.href}
-            className={cn(
-              "flex items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-sm font-medium transition-all duration-200",
-              isActive(link.href)
-                ? "border-sky-400/35 bg-sky-500/10 text-white shadow-[0_0_28px_-10px_rgba(56,189,248,0.35)]"
-                : "text-white/55 hover:border-white/[0.08] hover:bg-white/[0.06] hover:text-white",
-              collapsed && "justify-center px-0"
-            )}
-            title={collapsed ? t(link.i18nKey) : undefined}
-          >
-            <link.icon className="size-5 shrink-0" />
-            {!collapsed && t(link.i18nKey)}
-          </Link>
+      <nav className="relative z-10 flex-1 space-y-5 overflow-y-auto px-2 py-4">
+        {sidebarGroups.map((group) => (
+          <div key={group.labelKey}>
+            {!collapsed ? (
+              <p className="mb-1.5 px-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-sky-200/40">
+                {t(group.labelKey)}
+              </p>
+            ) : null}
+            <div className="space-y-0.5">
+              {group.links.map((link) => (
+                <Link
+                  key={link.href}
+                  to={link.href}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg border border-transparent px-3 py-2 text-[13px] font-medium transition-colors",
+                    isActive(link.href)
+                      ? "border-sky-100 bg-sky-50 text-sky-700 dark:border-sky-400/30 dark:bg-sky-500/10 dark:text-white"
+                      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-white/55 dark:hover:bg-white/[0.06] dark:hover:text-white",
+                    collapsed && "justify-center px-0",
+                  )}
+                  title={collapsed ? t(link.i18nKey) : undefined}
+                >
+                  <link.icon className="size-4 shrink-0" />
+                  {!collapsed ? t(link.i18nKey) : null}
+                </Link>
+              ))}
+            </div>
+          </div>
         ))}
 
-        {!collapsed && (
-          <div className="mt-5 px-1">
-            <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-200/40">
-              {t("nav.quick_links")}
-            </p>
-            <Link
-              to="/"
-              className="flex items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-sm font-medium text-white/55 transition-all hover:border-white/[0.08] hover:bg-white/[0.06] hover:text-white"
-            >
-              <House className="size-5 shrink-0" />
-              {t("nav.website")}
-            </Link>
-          </div>
-        )}
+        <div className="border-t border-slate-200 pt-4 dark:border-white/10">
+          <Link
+            to="/dashboard/settings"
+            className={cn(
+              "flex items-center gap-3 rounded-lg border border-transparent px-3 py-2 text-[13px] font-medium transition-colors",
+              isActive("/dashboard/settings")
+                ? "border-sky-100 bg-sky-50 text-sky-700 dark:border-sky-400/30 dark:bg-sky-500/10 dark:text-white"
+                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-white/55 dark:hover:bg-white/[0.06] dark:hover:text-white",
+              collapsed && "justify-center px-0",
+            )}
+            title={collapsed ? t("nav.settings") : undefined}
+          >
+            <Settings className="size-4 shrink-0" />
+            {!collapsed ? t("nav.settings") : null}
+          </Link>
+        </div>
 
         {/* Expired indicator in sidebar */}
         {!licenseActive && !collapsed && (
@@ -199,16 +260,16 @@ function DashboardSidebar({
 
       {/* User section */}
       {!collapsed && (
-        <div className="relative z-10 border-t border-sky-500/15 bg-black/20 p-4 backdrop-blur-sm">
-          <div className="mb-3 flex items-center gap-3 rounded-xl border border-sky-500/20 bg-black/35 p-2.5 shadow-[0_0_24px_-12px_rgba(56,189,248,0.15)]">
+        <div className="relative z-10 border-t border-slate-200 bg-slate-50/90 p-4 backdrop-blur-sm dark:border-sky-500/15 dark:bg-black/20">
+          <div className="mb-3 flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm dark:border-sky-500/20 dark:bg-black/35 dark:shadow-[0_0_24px_-12px_rgba(56,189,248,0.15)]">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#0066FF] to-[#44CC00] text-xs font-bold text-white">
               {initial}
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-medium text-zinc-100 truncate">
+              <p className="truncate text-sm font-medium text-slate-900 dark:text-zinc-100">
                 {displayName}
               </p>
-              <p className="text-xs text-sky-200/40 truncate">
+              <p className="truncate text-xs text-slate-500 dark:text-sky-200/40">
                 {displayEmail}
               </p>
             </div>
@@ -216,7 +277,7 @@ function DashboardSidebar({
           <Button
             variant="ghost"
             size="sm"
-            className="w-full justify-start rounded-lg border border-transparent text-white/60 hover:border-sky-500/20 hover:bg-sky-500/10 hover:text-white"
+            className="w-full justify-start rounded-lg border border-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-white/60 dark:hover:border-sky-500/20 dark:hover:bg-sky-500/10 dark:hover:text-white"
             onClick={() => void handleSignOut()}
           >
             <LogOut className="size-4 mr-2" />
@@ -239,6 +300,230 @@ function isLicenseExpired(
   return new Date(licenseExpiry) < new Date();
 }
 
+function profileShortLabel(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) return "Account";
+  if (trimmed.includes("@")) {
+    const local = trimmed.split("@")[0] ?? trimmed;
+    return local.length > 18 ? `${local.slice(0, 16)}…` : local;
+  }
+  const first = trimmed.split(/\s+/)[0];
+  return first.length > 18 ? `${first.slice(0, 16)}…` : first;
+}
+
+function DashboardHeaderToolbar({
+  lang,
+  setLang,
+  t,
+  profileName,
+  profileTargetPath,
+  onSignOut,
+}: {
+  lang: DashboardLang;
+  setLang: (next: DashboardLang) => void;
+  t: (key: string, vars?: Record<string, string | number>) => string;
+  profileName: string;
+  profileTargetPath: string;
+  onSignOut: () => void;
+}) {
+  const profileInitial = profileName.charAt(0).toUpperCase();
+  const shortName = profileShortLabel(profileName);
+
+  return (
+    <div
+      className="flex items-center rounded-xl border border-slate-200/90 bg-white/95 p-1 shadow-sm backdrop-blur-md dark:border-white/[0.08] dark:bg-[#0a1220]/80 dark:shadow-[0_8px_32px_-12px_rgba(0,0,0,0.55)]"
+      role="toolbar"
+      aria-label="Dashboard actions"
+    >
+      <div className="flex rounded-lg p-0.5" role="group" aria-label={t("layout.lang_toggle")}>
+        {(["en", "sq"] as const).map((code) => (
+          <button
+            key={code}
+            type="button"
+            onClick={() => setLang(code)}
+            className={cn(
+              "min-w-[2.25rem] rounded-md px-2 py-1 text-[11px] font-semibold tracking-wide transition-colors",
+              lang === code
+                ? "bg-slate-900/10 text-slate-900 dark:bg-white/12 dark:text-white"
+                : "text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-sky-200/45 dark:hover:bg-white/[0.04] dark:hover:text-sky-100",
+            )}
+          >
+            {code === "en" ? t("header.lang_en") : t("header.lang_sq")}
+          </button>
+        ))}
+      </div>
+
+      <span className="mx-1 h-4 w-px shrink-0 bg-slate-200 dark:bg-white/10" aria-hidden />
+
+      <Link
+        to="/"
+        className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-sky-200/65 dark:hover:bg-white/[0.05] dark:hover:text-white"
+        title={t("header.back_website")}
+      >
+        <House className="size-3.5 shrink-0" strokeWidth={2} />
+        <span className="hidden sm:inline">{t("nav.website")}</span>
+      </Link>
+
+      <span className="mx-1 h-4 w-px shrink-0 bg-slate-200 dark:bg-white/10" aria-hidden />
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className="flex max-w-[11rem] items-center gap-1.5 rounded-lg py-1 pl-1 pr-1.5 text-left transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/35 dark:hover:bg-white/[0.05] sm:max-w-[13rem] sm:pr-2"
+            aria-label={t("nav.profile_aria")}
+          >
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-sky-100 text-xs font-semibold text-sky-800 ring-1 ring-inset ring-sky-200 dark:bg-sky-500/15 dark:text-sky-50 dark:ring-sky-400/25">
+              {profileInitial}
+            </span>
+            <span className="hidden truncate text-xs font-medium text-slate-700 sm:block dark:text-slate-200">
+              {shortName}
+            </span>
+            <ChevronDown className="hidden size-3.5 shrink-0 text-slate-400 sm:block dark:text-slate-500" strokeWidth={2} />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-52">
+          <div className="px-2 py-2">
+            <p className="truncate text-sm font-medium text-foreground">{profileName}</p>
+          </div>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem asChild>
+            <Link to={profileTargetPath} className="cursor-pointer">
+              <Settings className="size-4" />
+              {t("nav.settings")}
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            variant="destructive"
+            className="cursor-pointer"
+            onClick={() => void onSignOut()}
+          >
+            <LogOut className="size-4" />
+            {t("nav.sign_out")}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+}
+
+function DashboardShell({
+  children,
+  sidebarCollapsed,
+  onToggleSidebar,
+  mobileOpen,
+  onMobileOpenChange,
+  vynType,
+  licenseActive,
+  isAdmin,
+  profileName,
+  profileTargetPath,
+  onSignOut,
+  expiredBanner,
+}: {
+  children: ReactNode;
+  sidebarCollapsed: boolean;
+  onToggleSidebar: () => void;
+  mobileOpen: boolean;
+  onMobileOpenChange: (open: boolean) => void;
+  vynType?: string;
+  licenseActive?: boolean;
+  isAdmin?: boolean;
+  profileName: string;
+  profileTargetPath: string;
+  onSignOut: () => void;
+  expiredBanner?: ReactNode;
+}) {
+  const { t, lang, setLang } = useDashboardLocale();
+
+  const iconBtn =
+    "inline-flex size-9 shrink-0 items-center justify-center rounded-xl text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/40 dark:text-sky-200/75 dark:hover:bg-white/[0.06] dark:hover:text-white";
+
+  return (
+    <div className="flex h-dvh overflow-hidden bg-slate-50 text-slate-900 dark:bg-[#02040a] dark:text-zinc-100">
+      <div className="hidden md:block shrink-0">
+        <DashboardSidebar
+          collapsed={sidebarCollapsed}
+          onToggle={onToggleSidebar}
+          vynType={vynType}
+          licenseActive={licenseActive}
+          isAdmin={isAdmin}
+        />
+      </div>
+
+      {mobileOpen ? (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div
+            className="absolute inset-0 bg-black/60"
+            onClick={() => onMobileOpenChange(false)}
+          />
+          <div className="relative h-full w-72 border-r border-sky-500/20 shadow-[8px_0_40px_-10px_rgba(0,0,0,0.5)]">
+            <DashboardSidebar
+              collapsed={false}
+              onToggle={() => onMobileOpenChange(false)}
+              mobile
+              vynType={vynType}
+              licenseActive={licenseActive}
+              isAdmin={isAdmin}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-40 hidden justify-end px-3 pt-2.5 sm:px-5 md:flex">
+          <div className="pointer-events-auto">
+            <DashboardHeaderToolbar
+              lang={lang}
+              setLang={setLang}
+              t={t}
+              profileName={profileName}
+              profileTargetPath={profileTargetPath}
+              onSignOut={onSignOut}
+            />
+          </div>
+        </div>
+
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-40 flex justify-between px-2 pt-2.5 md:hidden">
+          <div className="pointer-events-auto flex items-center gap-0.5">
+            <button
+              type="button"
+              onClick={() => onMobileOpenChange(true)}
+              className={cn(iconBtn, "-ml-0.5")}
+              aria-label={t("nav.menu_aria")}
+            >
+              <Menu className="size-5" />
+            </button>
+            <Link
+              to="/dashboard/restaurant-pos"
+              className={cn(iconBtn, "p-0")}
+              title={t("layout.brand")}
+              aria-label={t("layout.brand")}
+            >
+              <img src={VYNTEX_APP_LOGO_SRC} alt="" className="h-7 w-7 rounded-lg" />
+            </Link>
+          </div>
+          <div className="pointer-events-auto">
+            <DashboardHeaderToolbar
+              lang={lang}
+              setLang={setLang}
+              t={t}
+              profileName={profileName}
+              profileTargetPath={profileTargetPath}
+              onSignOut={onSignOut}
+            />
+          </div>
+        </div>
+
+        <main className="relative min-h-0 min-w-0 w-full flex-1 overflow-y-auto bg-transparent">
+          {expiredBanner}
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}
+
 function DashboardContent() {
   const { t, lang, setLang } = useDashboardLocale();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -258,6 +543,13 @@ function DashboardContent() {
   useEffect(() => {
     void refreshDashboardRestaurant();
   }, [location.pathname, refreshDashboardRestaurant]);
+
+  useEffect(() => {
+    const reduced =
+      typeof window !== "undefined" &&
+      localStorage.getItem("vyntex.dashboard.reducedMotion") === "1";
+    document.documentElement.toggleAttribute("data-dashboard-reduced-motion", reduced);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -405,14 +697,58 @@ function DashboardContent() {
     }
 
     if (location.pathname === "/dashboard/get-started") {
-      return <SetupForm />;
+      return (
+        <DashboardShell
+          sidebarCollapsed={sidebarCollapsed}
+          onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
+          mobileOpen={mobileOpen}
+          onMobileOpenChange={setMobileOpen}
+          licenseActive
+          isAdmin={isAdmin}
+          profileName={user?.name?.trim() || user?.email || "Profile"}
+          profileTargetPath={
+            isAdmin || isPlatformAdminEmail(user?.email)
+              ? "/admin"
+              : "/dashboard/settings"
+          }
+          onSignOut={() => {
+            void (async () => {
+              clearDashboardRestaurantId();
+              await supabase.auth.signOut();
+              navigate("/login", { replace: true });
+            })();
+          }}
+        >
+          <SetupForm />
+        </DashboardShell>
+      );
     }
 
-    if (location.pathname === "/dashboard/settings") {
-      return <Outlet />;
-    }
-
-    return <Navigate to="/dashboard/settings" replace />;
+    return (
+      <DashboardShell
+        sidebarCollapsed={sidebarCollapsed}
+        onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
+        mobileOpen={mobileOpen}
+        onMobileOpenChange={setMobileOpen}
+        licenseActive
+        isAdmin={isAdmin}
+        profileName={user?.name?.trim() || user?.email || "Profile"}
+        profileTargetPath={
+          isAdmin || isPlatformAdminEmail(user?.email)
+            ? "/admin"
+            : "/dashboard/settings"
+        }
+        onSignOut={() => {
+          void (async () => {
+            clearDashboardRestaurantId();
+            await supabase.auth.signOut();
+            navigate("/login", { replace: true });
+          })();
+        }}
+      >
+        <Outlet />
+      </DashboardShell>
+    );
   }
 
   const expired = isLicenseExpired(
@@ -420,130 +756,35 @@ function DashboardContent() {
     restaurant.licenseExpiry
   );
   const profileName = user?.name?.trim() || user?.email || "Profile";
-  const profileInitial = profileName.charAt(0).toUpperCase();
   const profileTargetPath =
     isAdmin || isPlatformAdminEmail(user?.email) ? "/admin" : "/dashboard/settings";
 
-  const iconBtn =
-    "inline-flex size-9 shrink-0 items-center justify-center rounded-xl text-sky-200/75 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/40";
-
-  const toggleLang = () => setLang(lang === "en" ? "sq" : "en");
+  const handleHeaderSignOut = async () => {
+    clearDashboardRestaurantId();
+    await supabase.auth.signOut();
+    navigate("/login", { replace: true });
+  };
 
   return (
-    <div className="dark flex h-dvh overflow-hidden bg-[#02040a] text-zinc-100">
-      {/* Desktop sidebar */}
-      <div className="hidden lg:block shrink-0">
-        <DashboardSidebar
-          collapsed={sidebarCollapsed}
-          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-          vynType={restaurant.type}
-          licenseActive={!expired}
-          isAdmin={isAdmin}
-        />
-      </div>
-
-      {/* Mobile sidebar overlay */}
-      {mobileOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <div
-            className="absolute inset-0 bg-black/60"
-            onClick={() => setMobileOpen(false)}
-          />
-          <div className="relative h-full w-72 border-r border-sky-500/20 shadow-[8px_0_40px_-10px_rgba(0,0,0,0.5)]">
-            <DashboardSidebar
-              collapsed={false}
-              onToggle={() => setMobileOpen(false)}
-              mobile
-              vynType={restaurant.type}
-              licenseActive={!expired}
-              isAdmin={isAdmin}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Main: no top strip — toolbar floats over scroll area so page bg reaches the top */}
-      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-40 hidden justify-end px-3 pt-2.5 sm:px-5 lg:flex">
-          <div className="pointer-events-auto flex items-center gap-0.5">
-            <button
-              type="button"
-              onClick={toggleLang}
-              className={iconBtn}
-              aria-label={`${t("layout.lang_toggle")}: ${lang === "en" ? t("header.lang_en") : t("header.lang_sq")}. ${t("header.lang_click_toggle")}`}
-              title={`${t("layout.lang_toggle")} — ${t("header.lang_click_toggle")}`}
-            >
-              <Languages className="size-[18px]" strokeWidth={1.75} />
-            </button>
-            <Link
-              to="/"
-              className={iconBtn}
-              title={t("header.back_website")}
-              aria-label={t("header.back_website")}
-            >
-              <ExternalLink className="size-[18px]" strokeWidth={1.75} />
-            </Link>
-            <Link
-              to={profileTargetPath}
-              className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#0066FF] to-[#44CC00] text-[11px] font-bold text-white shadow-[0_0_16px_-4px_rgba(56,189,248,0.35)] transition-transform hover:scale-[1.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/45"
-              title={profileName}
-              aria-label={t("nav.profile_aria")}
-            >
-              {profileInitial}
-            </Link>
-          </div>
-        </div>
-
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-40 flex justify-between px-2 pt-2.5 lg:hidden">
-          <div className="pointer-events-auto flex items-center gap-0.5">
-            <button
-              type="button"
-              onClick={() => setMobileOpen(true)}
-              className={cn(iconBtn, "-ml-0.5")}
-              aria-label={t("nav.menu_aria")}
-            >
-              <Menu className="size-5" />
-            </button>
-            <Link to="/" className={cn(iconBtn, "p-0")} title={t("layout.brand")} aria-label={t("layout.brand")}>
-              <img src={VYNTEX_APP_LOGO_SRC} alt="" className="h-7 w-7 rounded-lg" />
-            </Link>
-          </div>
-          <div className="pointer-events-auto flex items-center gap-0.5">
-            <button
-              type="button"
-              onClick={toggleLang}
-              className={iconBtn}
-              aria-label={`${t("layout.lang_toggle")}: ${lang === "en" ? t("header.lang_en") : t("header.lang_sq")}. ${t("header.lang_click_toggle")}`}
-              title={`${t("layout.lang_toggle")} — ${t("header.lang_click_toggle")}`}
-            >
-              <Languages className="size-[17px]" strokeWidth={1.75} />
-            </button>
-            <Link
-              to="/"
-              className={iconBtn}
-              title={t("header.site")}
-              aria-label={t("header.site")}
-            >
-              <ExternalLink className="size-[17px]" strokeWidth={1.75} />
-            </Link>
-            <Link
-              to={profileTargetPath}
-              className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#0066FF] to-[#44CC00] text-[10px] font-bold text-white shadow-[0_0_14px_-4px_rgba(56,189,248,0.35)]"
-              aria-label={t("nav.profile_aria")}
-            >
-              {profileInitial}
-            </Link>
-          </div>
-        </div>
-
-        <main className="relative min-h-0 min-w-0 w-full flex-1 overflow-y-auto bg-transparent">
-          {expired ? (
-            <DashboardLicenseExpiredBanner licenseExpiry={restaurant.licenseExpiry} />
-          ) : null}
-          <Outlet />
-        </main>
-      </div>
-    </div>
+    <DashboardShell
+      sidebarCollapsed={sidebarCollapsed}
+      onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
+      mobileOpen={mobileOpen}
+      onMobileOpenChange={setMobileOpen}
+      vynType={restaurant.type}
+      licenseActive={!expired}
+      isAdmin={isAdmin}
+      profileName={profileName}
+      profileTargetPath={profileTargetPath}
+      onSignOut={() => void handleHeaderSignOut()}
+      expiredBanner={
+        expired ? (
+          <DashboardLicenseExpiredBanner licenseExpiry={restaurant.licenseExpiry} />
+        ) : null
+      }
+    >
+      <Outlet />
+    </DashboardShell>
   );
 }
 

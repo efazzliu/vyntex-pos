@@ -37,6 +37,7 @@ export type LocalAdmin = {
 };
 
 import type { StaffRole } from "@/pages/pos/_lib/types.ts";
+import { clearRestaurantCache } from "@/lib/supabase-pos/restaurant.ts";
 
 export type LocalStaff = {
   convexId: string;
@@ -239,12 +240,13 @@ export async function clearLocalPosSessionData(): Promise<void> {
 
 export async function saveActivation(data: Omit<ActivationData, "token">): Promise<void> {
   const previous = await getActivation();
-  if (
+  const licenseChanged =
     previous &&
-    normalizeLicenseKey(previous.licenseKey) !== normalizeLicenseKey(data.licenseKey)
-  ) {
+    normalizeLicenseKey(previous.licenseKey) !== normalizeLicenseKey(data.licenseKey);
+  if (licenseChanged) {
     await clearLocalPosSessionData();
   }
+  clearRestaurantCache();
   const token = await generateActivationToken(data.licenseKey, data.deviceId);
   await dbPut(CONFIG_STORE, "activation", { ...data, token });
 }
@@ -255,6 +257,7 @@ export async function getActivation(): Promise<ActivationData | undefined> {
 
 export async function clearActivation(): Promise<void> {
   await clearLocalPosSessionData();
+  clearRestaurantCache();
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(CONFIG_STORE, "readwrite");
@@ -598,7 +601,7 @@ export const DEFAULT_PIN_LOGIN_BRANDING: PinLoginBranding = {
 const LOGO_HEIGHT_MIN = 40;
 const LOGO_HEIGHT_MAX = 520;
 
-function normalizePinLoginBranding(
+export function normalizePinLoginBranding(
   raw: Partial<PinLoginBranding> | null | undefined,
 ): PinLoginBranding {
   const merged: PinLoginBranding = {

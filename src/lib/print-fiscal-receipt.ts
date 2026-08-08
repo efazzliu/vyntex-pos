@@ -4,7 +4,7 @@
  * - Non-fiscal pre-bill: admin template "Pre-Bill" (`non_fiscal_receipt`) in Settings → Templates.
  */
 
-import { getPinLoginBranding } from "@/lib/local-db.ts";
+import { resolvePinLoginBranding } from "@/lib/supabase-pos/license-sync.ts";
 import {
   DEFAULT_SILENT_PRINT_IPC_TIMEOUT_MS,
   hasElectronSilentPrintIpc,
@@ -98,6 +98,14 @@ export function buildFiscalReceiptHtml(args: {
   formatPrice: (n: number) => string;
   strings: FiscalReceiptStrings;
   logoDataUrl: string | null;
+  business?: {
+    name: string;
+    legalName?: string;
+    address?: string;
+    city?: string;
+    taxNumber?: string;
+    vatNumber?: string;
+  };
   /** Browser print tab title */
   pageTitle?: string;
 }): string {
@@ -116,6 +124,7 @@ export function buildFiscalReceiptHtml(args: {
     formatPrice,
     strings,
     logoDataUrl,
+    business,
     pageTitle = "Receipt",
   } = args;
 
@@ -151,6 +160,26 @@ export function buildFiscalReceiptHtml(args: {
     html += `<div style="${escapeHtml(styleFromMap(styles, "header"))}text-align:center;font-size:14px;font-weight:700;">${escapeHtml(headerMain)}</div>`;
     if (headerSub) {
       html += `<div style="${escapeHtml(styleFromMap(styles, "subheader"))}text-align:center;color:#666;font-size:11px;margin-top:4px;">${escapeHtml(headerSub)}</div>`;
+    }
+    html += `</div>`;
+  }
+
+  if (business) {
+    const businessName = business.legalName?.trim() || business.name.trim();
+    const location = [business.address, business.city]
+      .map((value) => value?.trim())
+      .filter(Boolean)
+      .join(", ");
+    html += `<div style="${dash}text-align:center;font-size:10px;">`;
+    if (businessName) {
+      html += `<div style="font-weight:700;">${escapeHtml(businessName)}</div>`;
+    }
+    if (location) html += `<div>${escapeHtml(location)}</div>`;
+    if (business.taxNumber?.trim()) {
+      html += `<div>Tax ID: ${escapeHtml(business.taxNumber.trim())}</div>`;
+    }
+    if (business.vatNumber?.trim()) {
+      html += `<div>VAT: ${escapeHtml(business.vatNumber.trim())}</div>`;
     }
     html += `</div>`;
   }
@@ -390,10 +419,45 @@ async function printPosSalesReceipt(args: {
 
   let logoDataUrl: string | null = null;
   try {
-    const branding = await getPinLoginBranding(licenseKey);
+    const branding = await resolvePinLoginBranding(licenseKey);
     logoDataUrl = branding.logoDataUrl ?? null;
   } catch {
     /* ignore */
+  }
+
+  let business:
+    | {
+        name: string;
+        legalName?: string;
+        address?: string;
+        city?: string;
+        taxNumber?: string;
+        vatNumber?: string;
+      }
+    | undefined;
+  try {
+    const company = (await runPosQuery("pos.settings.getCompanyDetails", {
+      licenseKey,
+    })) as {
+      name?: string;
+      legalName?: string;
+      address?: string;
+      city?: string;
+      taxNumber?: string;
+      vatNumber?: string;
+    };
+    if (company?.name) {
+      business = {
+        name: company.name,
+        legalName: company.legalName,
+        address: company.address,
+        city: company.city,
+        taxNumber: company.taxNumber,
+        vatNumber: company.vatNumber,
+      };
+    }
+  } catch {
+    /* optional business profile columns */
   }
 
   const html = buildFiscalReceiptHtml({
@@ -411,6 +475,7 @@ async function printPosSalesReceipt(args: {
     formatPrice,
     strings,
     logoDataUrl,
+    business,
     pageTitle,
   });
 

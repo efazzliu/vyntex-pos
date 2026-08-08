@@ -10,6 +10,7 @@ import {
   runPosQuery,
   runPosMutation,
 } from "@/lib/supabase-pos/pos-router.ts";
+import { queryClient } from "@/components/providers/query-client.tsx";
 import { enqueueMutation } from "@/lib/local-db.ts";
 import posI18n from "@/pages/pos/_lib/pos-i18n.ts";
 import { toast } from "sonner";
@@ -65,6 +66,13 @@ function posQueryStaleTime(queryId: string): number {
   if (queryId === "pos.staff.getStaff") return POS_STAFF_STALE_MS;
   if (queryId === "pos.tables.getTables") return POS_TABLES_STALE_MS;
   return 0;
+}
+
+/** Drop cached POS reads after license activation / deactivation so another venue's data cannot linger. */
+export function invalidateAllPosQueries(): void {
+  void queryClient.removeQueries({
+    predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === "pos",
+  });
 }
 
 /**

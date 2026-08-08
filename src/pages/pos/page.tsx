@@ -19,6 +19,11 @@ import PinLoginScreen from "./_components/pin-login-screen.tsx";
 import StartShiftScreen from "./_components/start-shift-screen.tsx";
 import PosApp from "./_components/pos-app.tsx";
 import { verifyLicense, getShiftStatus } from "@/lib/supabase-pos.ts";
+import { invalidateAllPosQueries } from "@/lib/convex-react-supabase.tsx";
+import {
+  cloudHasStaff,
+  hydratePosLicenseData,
+} from "@/lib/supabase-pos/license-sync.ts";
 import {
   buildActivationFromOwnedRestaurant,
   ensureDeviceOnOwnedRestaurant,
@@ -31,6 +36,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { toast } from "sonner";
 import { usePosTheme } from "./_lib/use-pos-theme.ts";
 import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
+import { sendPosDeviceHeartbeat } from "@/lib/supabase-pos/device-presence.ts";
 
 type LaunchStep =
   | "loading"
@@ -90,6 +96,18 @@ export default function PosLauncher({ accountAuthMode = false }: PosLauncherProp
               "Licenca u rivendos nga paneli. Fut përsëri çelësin. / License was reset — enter your license key again.",
             );
             setStep("activation");
+            return;
+          }
+          const heartbeatAccepted = await sendPosDeviceHeartbeat(
+            stored.licenseKey,
+            stored.deviceId,
+          );
+          if (heartbeatAccepted === false) {
+            await clearActivation();
+            setActiveStaff(null);
+            setActivation(null);
+            toast.info("This device was disconnected from the dashboard.");
+            setStep("activation");
           }
         } catch {
           /* offline — keep session */
@@ -108,6 +126,48 @@ export default function PosLauncher({ accountAuthMode = false }: PosLauncherProp
       window.clearInterval(intervalId);
     };
   }, [step, activation, accountAuthMode]);
+
+  /** Account-auth POS keeps the same remote-disconnect guarantee as license-key POS. */
+  useEffect(() => {
+    if (!accountAuthMode || !activation || step !== "ready") return;
+
+    const reverifyAccountDevice = () => {
+      if (document.visibilityState !== "visible") return;
+      void (async () => {
+        try {
+          const verification = await verifyLicense(
+            activation.licenseKey,
+            activation.deviceId,
+          );
+          const heartbeatAccepted = verification.valid
+            ? await sendPosDeviceHeartbeat(
+                activation.licenseKey,
+                activation.deviceId,
+              )
+            : false;
+          if (!verification.valid || heartbeatAccepted === false) {
+            setActiveStaff(null);
+            setActivation(null);
+            toast.info("This device was disconnected from the dashboard.");
+            setStep("account-device-blocked");
+          }
+        } catch {
+          /* offline — keep the account POS session */
+        }
+      })();
+    };
+
+    document.addEventListener("visibilitychange", reverifyAccountDevice);
+    window.addEventListener("focus", reverifyAccountDevice);
+    const intervalId = window.setInterval(reverifyAccountDevice, 45_000);
+    void reverifyAccountDevice();
+
+    return () => {
+      document.removeEventListener("visibilitychange", reverifyAccountDevice);
+      window.removeEventListener("focus", reverifyAccountDevice);
+      window.clearInterval(intervalId);
+    };
+  }, [accountAuthMode, activation, step]);
 
   async function checkAccountAuthState() {
     try {
@@ -132,6 +192,11 @@ export default function PosLauncher({ accountAuthMode = false }: PosLauncherProp
       const token = await generateActivationToken(licenseKey, deviceId);
       const built = buildActivationFromOwnedRestaurant(restaurant, deviceId, token);
       setActivation({ ...built, token });
+      const heartbeatAccepted = await sendPosDeviceHeartbeat(licenseKey, deviceId);
+      if (heartbeatAccepted === false) {
+        setStep("account-device-blocked");
+        return;
+      }
 
       const staff = await fetchDefaultPosStaffForRestaurant(restaurant.id);
       if (!staff) {
@@ -174,6 +239,17 @@ export default function PosLauncher({ accountAuthMode = false }: PosLauncherProp
           setStep("activation");
           return;
         }
+        const heartbeatAccepted = await sendPosDeviceHeartbeat(
+          stored.licenseKey,
+          stored.deviceId,
+        );
+        if (heartbeatAccepted === false) {
+          await clearActivation();
+          setActivation(null);
+          toast.info("This device was disconnected from the dashboard.");
+          setStep("activation");
+          return;
+        }
         if (verification.plan && verification.plan !== stored.plan) {
           const updated = { ...stored, plan: verification.plan };
           // Re-save with updated plan (saveActivation regenerates the token)
@@ -195,13 +271,15 @@ export default function PosLauncher({ accountAuthMode = false }: PosLauncherProp
         setActivation(stored);
       }
 
+      void hydratePosLicenseData(stored.licenseKey);
+
       const admins = await getLocalAdmins();
-      if (admins.length === 0) {
+      const hasCloudStaff = await cloudHasStaff(stored.licenseKey);
+      if (admins.length === 0 && !hasCloudStaff) {
         setStep("admin-setup");
         return;
       }
 
-      // Always go through PIN login after activation is verified
       setStep("pin-login");
     } catch {
       setStep("activation");
@@ -209,12 +287,17 @@ export default function PosLauncher({ accountAuthMode = false }: PosLauncherProp
   }
 
   const handleActivated = async () => {
+    invalidateAllPosQueries();
     const stored = await getActivation();
     if (stored) {
       setActivation(stored);
+      await hydratePosLicenseData(stored.licenseKey);
     }
     const admins = await getLocalAdmins();
-    setStep(admins.length === 0 ? "admin-setup" : "pin-login");
+    const hasCloudStaff = stored
+      ? await cloudHasStaff(stored.licenseKey)
+      : false;
+    setStep(admins.length === 0 && !hasCloudStaff ? "admin-setup" : "pin-login");
   };
 
   const handleAdminCreated = () => {

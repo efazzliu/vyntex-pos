@@ -11,7 +11,6 @@ import {
   verifyPin,
   verifyLocalStaffPin,
   type LocalStaff,
-  getPinLoginBranding,
   type PinLoginBranding,
   type PinLoginPlacement,
 } from "@/lib/local-db.ts";
@@ -24,6 +23,7 @@ import {
   sanitizeStaffPinInput,
 } from "../_lib/staff-pin.ts";
 import { APP_VERSION_LABEL, VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
+import { resolvePinLoginBranding } from "@/lib/supabase-pos/license-sync.ts";
 import { Wifi, WifiOff, Delete } from "lucide-react";
 import { usePosTheme } from "../_lib/use-pos-theme.ts";
 import posI18n from "../_lib/pos-i18n.ts";
@@ -156,7 +156,7 @@ export default function PinLoginScreen({
 
   useEffect(() => {
     let cancelled = false;
-    getPinLoginBranding(licenseKey).then((b) => {
+    resolvePinLoginBranding(licenseKey).then((b) => {
       if (!cancelled) setBranding(b);
     });
     return () => {
@@ -224,19 +224,6 @@ export default function PinLoginScreen({
       setError(false);
 
       try {
-        const localAdmin = await verifyPin(enteredPin);
-        if (localAdmin) {
-          const adminStaff: ActiveStaff = {
-            id: "local-admin",
-            name: localAdmin.name,
-            role: "admin",
-          };
-          logAdminPinLogin(adminStaff);
-          setSuccess(adminStaff);
-          setTimeout(() => void Promise.resolve(onLogin(adminStaff)), 800);
-          return;
-        }
-
         const pinHash = await hashString(enteredPin);
 
         const fromDataCache =
@@ -270,6 +257,19 @@ export default function PinLoginScreen({
             setTimeout(() => void Promise.resolve(onLogin(staff)), 800);
             return;
           }
+        }
+
+        const localAdmin = await verifyPin(enteredPin);
+        if (localAdmin) {
+          const adminStaff: ActiveStaff = {
+            id: "local-admin",
+            name: localAdmin.name,
+            role: "admin",
+          };
+          logAdminPinLogin(adminStaff);
+          setSuccess(adminStaff);
+          setTimeout(() => void Promise.resolve(onLogin(adminStaff)), 800);
+          return;
         }
 
         setError(true);

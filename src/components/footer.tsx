@@ -1,6 +1,10 @@
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { APP_VERSION_LABEL, VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
+import {
+  APP_VERSION_LABEL,
+  VYNTEX_APP_LOGO_SRC,
+  VYNTEX_INSTAGRAM_URL,
+} from "@/lib/site-constants.ts";
 
 export default function Footer() {
   const { t } = useTranslation("site");
@@ -20,7 +24,7 @@ export default function Footer() {
         links: [
           { labelKey: "footer.aboutLink", href: "/about" },
           { labelKey: "footer.contactLink", href: "/contact" },
-          { labelKey: "Instagram", href: "https://instagram.com/vyntexpos" },
+          { labelKey: "Instagram", href: VYNTEX_INSTAGRAM_URL },
         ],
       },
       {

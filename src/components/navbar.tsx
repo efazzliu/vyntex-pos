@@ -74,7 +74,7 @@ export default function Navbar() {
   const isTransparent = !scrolled && isHomePage;
 
   const langSelectClass = isTransparent
-    ? "border-white/20 bg-white/5 text-white/90"
+    ? "border-white/25 bg-white/10 text-white"
     : "";
   const ctaLabel = isAuthed ? "PROFILE" : "GET STARTED";
   const ctaPath = isAuthed ? "/dashboard/restaurant-pos" : "/register";
@@ -87,28 +87,28 @@ export default function Navbar() {
       className={cn(
         "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
         isTransparent
-          ? "bg-transparent"
-          : "bg-background/80 backdrop-blur-xl border-b border-border shadow-sm",
+          ? "border-b border-white/15 bg-[#030814]/90 shadow-lg shadow-black/10 backdrop-blur-xl"
+          : "border-b border-border bg-background/90 shadow-sm backdrop-blur-xl",
       )}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex h-[72px] items-center justify-between">
           <Link to="/" className="flex items-center gap-2.5">
-            <img src={VYNTEX_APP_LOGO_SRC} alt="Vyntex POS" className="h-8 w-8" />
+            <img src={VYNTEX_APP_LOGO_SRC} alt="Vyntex POS" className="h-9 w-9" />
             <span className="text-xl font-bold bg-gradient-to-r from-[#0066FF] to-[#44CC00] bg-clip-text text-transparent">
               Vyntex POS
             </span>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden items-center gap-2 md:flex">
             {navItems.map((link) => (
               <button
                 key={link.href}
                 onClick={() => handleNavClick(link.href)}
                 className={cn(
-                  "px-3 py-2 text-sm font-medium transition-colors rounded-md cursor-pointer",
+                  "cursor-pointer rounded-lg px-4 py-2.5 text-base font-semibold transition-colors",
                   isTransparent
-                    ? "text-white/70 hover:text-white hover:bg-white/10"
+                    ? "text-white hover:bg-white/15"
                     : "text-muted-foreground hover:text-foreground hover:bg-accent",
                   location.pathname === link.href &&
                     !isTransparent &&
@@ -124,7 +124,7 @@ export default function Navbar() {
             <Button
               size="sm"
               onClick={() => navigate(ctaPath)}
-              className="rounded-full bg-gradient-to-r from-[#0066FF] to-[#00AACC] px-4 text-white shadow-lg shadow-blue-600/25 transition-all hover:scale-[1.02] hover:from-[#0055DD] hover:to-[#0099BB]"
+              className="h-10 rounded-full bg-gradient-to-r from-[#0066FF] to-[#00AACC] px-6 text-sm font-bold text-white shadow-lg shadow-blue-600/30 transition-all hover:scale-[1.02] hover:from-[#0055DD] hover:to-[#0099BB]"
             >
               {ctaLabel}
             </Button>
@@ -134,9 +134,14 @@ export default function Navbar() {
                 if (value === "en" || value === "sq") setLanguage(value);
               }}
             >
-              <SelectTrigger className={cn("h-8 min-w-42 text-xs font-semibold", langSelectClass)}>
+              <SelectTrigger className={cn("h-10 min-w-42 text-sm font-semibold", langSelectClass)}>
                 <span className="inline-flex items-center gap-2">
-                  <Languages className="size-3.5 text-muted-foreground" />
+                  <Languages
+                    className={cn(
+                      "size-4",
+                      isTransparent ? "text-white/70" : "text-muted-foreground",
+                    )}
+                  />
                   <SelectValue />
                 </span>
               </SelectTrigger>

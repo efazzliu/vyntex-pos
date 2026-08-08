@@ -47,6 +47,7 @@
     "update:bar-pos": "node scripts/update-pos-product.mjs bar",
     "update:hotel-pos": "node scripts/update-pos-product.mjs hotel",
     "pos-update": "node scripts/update-pos-product.mjs",
+    "deploy:site": "node scripts/deploy-site.mjs",
     "deploy:vercel": "node scripts/deploy-vercel.mjs",
     "deploy:vercel:git": "cross-env VERCEL_DEPLOY=git node scripts/deploy-vercel.mjs",
     "dist:win:skip-clean": "npm run dist:win",

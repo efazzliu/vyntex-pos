@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "motion/react";
 import { useTranslation } from "react-i18next";
-import { Mail, MessageSquare, Clock } from "lucide-react";
+import { Clock, Instagram, Mail, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
@@ -13,6 +13,7 @@ import {
   SUPPORT_BUSINESS_EMAIL_READY,
   SUPPORT_EMAIL,
   SUPPORT_MAILTO_HREF,
+  VYNTEX_INSTAGRAM_URL,
 } from "@/lib/site-constants.ts";
 
 export default function ContactPage() {
@@ -130,35 +131,46 @@ export default function ContactPage() {
               className="lg:col-span-2 space-y-6"
             >
               <div className="rounded-xl border border-border bg-card p-6">
-                <div className="flex items-center gap-3 mb-3">
-                  <div
-                    className={
-                      SUPPORT_BUSINESS_EMAIL_READY
-                        ? "w-10 h-10 rounded-lg bg-gradient-to-br from-[#0066FF]/10 to-[#44CC00]/10 flex items-center justify-center"
-                        : "w-10 h-10 rounded-lg bg-muted flex items-center justify-center"
-                    }
-                  >
-                    <Mail
-                      className={
-                        SUPPORT_BUSINESS_EMAIL_READY
-                          ? "size-5 text-primary"
-                          : "size-5 text-muted-foreground"
-                      }
-                    />
-                  </div>
-                  <h3 className="font-semibold text-foreground">{t("contact.emailUs")}</h3>
-                </div>
                 {SUPPORT_BUSINESS_EMAIL_READY ? (
-                  <a
-                    href={SUPPORT_MAILTO_HREF}
-                    className="text-sm text-primary font-medium hover:underline"
-                  >
-                    {SUPPORT_EMAIL}
-                  </a>
+                  <>
+                    <div className="mb-3 flex items-center gap-3">
+                      <div className="flex size-10 items-center justify-center rounded-lg bg-gradient-to-br from-[#0066FF]/10 to-[#44CC00]/10">
+                        <Mail className="size-5 text-primary" />
+                      </div>
+                      <h3 className="font-semibold text-foreground">
+                        {t("contact.emailUs")}
+                      </h3>
+                    </div>
+                    <a
+                      href={SUPPORT_MAILTO_HREF}
+                      className="text-sm font-medium text-primary hover:underline"
+                    >
+                      {SUPPORT_EMAIL}
+                    </a>
+                  </>
                 ) : (
-                  <p role="status" className="text-sm text-muted-foreground leading-relaxed">
-                    {t("contact.emailUnavailableBody")}
-                  </p>
+                  <div>
+                    <div className="mb-3 flex items-center gap-3">
+                      <div className="flex size-10 items-center justify-center rounded-lg bg-gradient-to-br from-fuchsia-500/10 via-rose-500/10 to-amber-400/10">
+                        <Instagram className="size-5 text-rose-500" />
+                      </div>
+                      <h3 className="font-semibold text-foreground">
+                        {t("contact.instagram")}
+                      </h3>
+                    </div>
+                    <p className="text-sm leading-relaxed text-muted-foreground">
+                      {t("contact.instagramBody")}
+                    </p>
+                    <a
+                      href={VYNTEX_INSTAGRAM_URL}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-3 inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-fuchsia-600 via-rose-500 to-orange-400 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-transform hover:scale-[1.02]"
+                    >
+                      <Instagram className="size-4" />
+                      @vyntexpos
+                    </a>
+                  </div>
                 )}
               </div>
 

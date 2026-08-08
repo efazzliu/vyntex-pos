@@ -20,12 +20,14 @@ import DashboardOverview from "./pages/dashboard/page-modern.tsx";
 import DashboardSettings from "./pages/dashboard/settings/page-modern.tsx";
 import DashboardGetStartedPage from "./pages/dashboard/get-started/page.tsx";
 import DashboardLicensesPage from "./pages/dashboard/licenses/page.tsx";
+import DashboardDevicesPage from "./pages/dashboard/devices/page.tsx";
 import DashboardDownloadsPage from "./pages/dashboard/downloads/page.tsx";
 import DashboardBillingPage from "./pages/dashboard/billing/page.tsx";
 import DashboardTeamAccessPage from "./pages/dashboard/team-access/page.tsx";
 import DashboardBusinessSettingsPage from "./pages/dashboard/business-settings/page.tsx";
 import DashboardSecurityPage from "./pages/dashboard/security/page.tsx";
 import DashboardSupportPage from "./pages/dashboard/support/page.tsx";
+import DashboardSystemStatusPage from "./pages/dashboard/system-status/page.tsx";
 import AdminLayout from "./pages/admin/_components/admin-layout.tsx";
 import AdminOverview from "./pages/admin/dashboard/page.tsx";
 import AdminBusinesses from "./pages/admin/businesses/page.tsx";
@@ -110,12 +112,14 @@ export default function App() {
               <Route path="get-started" element={<DashboardGetStartedPage />} />
               <Route path="settings" element={<DashboardSettings />} />
               <Route path="licenses" element={<DashboardLicensesPage />} />
+              <Route path="devices" element={<DashboardDevicesPage />} />
               <Route path="downloads" element={<DashboardDownloadsPage />} />
               <Route path="billing" element={<DashboardBillingPage />} />
               <Route path="team-access" element={<DashboardTeamAccessPage />} />
               <Route path="business-settings" element={<DashboardBusinessSettingsPage />} />
               <Route path="security" element={<DashboardSecurityPage />} />
               <Route path="support" element={<DashboardSupportPage />} />
+              <Route path="system-status" element={<DashboardSystemStatusPage />} />
             </Route>
             <Route path="/admin" element={<AdminLayout />}>
               <Route index element={<AdminOverview />} />

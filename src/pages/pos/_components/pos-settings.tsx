@@ -61,12 +61,14 @@ import {
 } from "@/components/ui/select.tsx";
 import { Slider } from "@/components/ui/slider.tsx";
 import {
-  getPinLoginBranding,
-  savePinLoginBranding,
   DEFAULT_PIN_LOGIN_BRANDING,
   type PinLoginBranding,
   type PinLoginPlacement,
 } from "@/lib/local-db.ts";
+import {
+  persistPinLoginBranding,
+  resolvePinLoginBranding,
+} from "@/lib/supabase-pos/license-sync.ts";
 import { usePosLocale } from "./pos-locale-provider.tsx";
 import {
   errorMessageFromUnknown,
@@ -171,7 +173,7 @@ function PinLoginBrandingSection({ licenseKey }: { licenseKey: string }) {
   const offsetSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    getPinLoginBranding(licenseKey).then(setBranding);
+    resolvePinLoginBranding(licenseKey).then(setBranding);
   }, [licenseKey]);
 
   useEffect(
@@ -189,7 +191,7 @@ function PinLoginBrandingSection({ licenseKey }: { licenseKey: string }) {
         window.clearTimeout(offsetSaveTimerRef.current);
       offsetSaveTimerRef.current = window.setTimeout(() => {
         offsetSaveTimerRef.current = null;
-        void savePinLoginBranding(licenseKey, next).catch(() => {});
+        void persistPinLoginBranding(licenseKey, next).catch(() => {});
       }, 400);
     },
     [licenseKey],
@@ -198,7 +200,7 @@ function PinLoginBrandingSection({ licenseKey }: { licenseKey: string }) {
   const saveWithToast = async (next: PinLoginBranding) => {
     setBusy(true);
     try {
-      await savePinLoginBranding(licenseKey, next);
+      await persistPinLoginBranding(licenseKey, next);
       setBranding(next);
       toast.success(t("settings.pin_logo_saved"));
     } catch {
@@ -219,7 +221,7 @@ function PinLoginBrandingSection({ licenseKey }: { licenseKey: string }) {
     setBusy(true);
     try {
       const dataUrl = await resizeImageFileToJpegDataUrl(file);
-      const current = await getPinLoginBranding(licenseKey);
+      const current = await resolvePinLoginBranding(licenseKey);
       await saveWithToast({ ...current, logoDataUrl: dataUrl });
     } catch (err) {
       if (err instanceof Error && err.message === "too_large") {
@@ -286,7 +288,7 @@ function PinLoginBrandingSection({ licenseKey }: { licenseKey: string }) {
                 disabled={busy}
                 className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
                 onClick={async () => {
-                  const current = await getPinLoginBranding(licenseKey);
+                  const current = await resolvePinLoginBranding(licenseKey);
                   await saveWithToast({ ...current, logoDataUrl: null });
                 }}
               >
@@ -313,7 +315,7 @@ function PinLoginBrandingSection({ licenseKey }: { licenseKey: string }) {
                       window.clearTimeout(saveTimerRef.current);
                     saveTimerRef.current = window.setTimeout(() => {
                       saveTimerRef.current = null;
-                      void savePinLoginBranding(licenseKey, next).catch(
+                      void persistPinLoginBranding(licenseKey, next).catch(
                         () => {},
                       );
                     }, 450);
@@ -336,7 +338,7 @@ function PinLoginBrandingSection({ licenseKey }: { licenseKey: string }) {
               value={branding.placement}
               disabled={busy}
               onValueChange={async (val) => {
-                const current = await getPinLoginBranding(licenseKey);
+                const current = await resolvePinLoginBranding(licenseKey);
                 const placement = val as PinLoginPlacement;
                 await saveWithToast({
                   ...current,

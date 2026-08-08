@@ -322,3 +322,12 @@
 .dark .phone-app-shell input::placeholder {
   color: rgb(148 163 184) !important;
 }
+
+html[data-dashboard-reduced-motion] *,
+html[data-dashboard-reduced-motion] *::before,
+html[data-dashboard-reduced-motion] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}

@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
@@ -8,6 +7,8 @@ import { Spinner } from "@/components/ui/spinner.tsx";
 import { motion } from "motion/react";
 import { AlertCircle, Eye, EyeOff, ShieldCheck, UserPlus } from "lucide-react";
 import { saveLocalAdmin, hashString } from "@/lib/local-db.ts";
+import { useOnlineStatus } from "@/hooks/use-online-status.ts";
+import { hydratePosLicenseData } from "@/lib/supabase-pos/license-sync.ts";
 import { toast } from "sonner";
 import {
   STAFF_PIN_MAX_LEN,
@@ -30,6 +31,7 @@ export default function AdminSetupScreen({
   onComplete,
 }: AdminSetupScreenProps) {
   const { theme: posTheme } = usePosTheme();
+  const isOnline = useOnlineStatus();
   const createStaff = useMutation("pos.staff.createStaff");
   const syncDeviceClosePin = useMutation(
     "pos.settings.syncDeviceClosePinHash",
@@ -79,9 +81,8 @@ export default function AdminSetupScreen({
       // Save local admin to IndexedDB for offline access
       await saveLocalAdmin(name.trim(), password, pin);
 
-      // Best-effort cloud sync. Local admin is enough for device login/testing.
-      try {
-        const pinHash = await hashString(pin);
+      const pinHash = await hashString(pin);
+      if (isOnline) {
         await createStaff({
           licenseKey,
           name: name.trim(),
@@ -93,14 +94,30 @@ export default function AdminSetupScreen({
         } catch {
           // Column may be missing until SQL migration; close-day flow can sync later.
         }
-      } catch (cloudErr) {
-        console.warn("[admin-setup] cloud sync failed; keeping local admin", cloudErr);
-        toast.warning("Admin created locally. Cloud sync failed, but you can continue.");
+        await hydratePosLicenseData(licenseKey);
+      } else {
+        toast.warning(
+          "Pa internet — admini u ruajt vetëm në këtë PC. Lidhu me rrjetin që të dhënat të shkojnë në cloud dhe të vijnë në PC tjetër. / Offline — admin saved only on this device until you sync online.",
+        );
       }
 
       onComplete();
-    } catch {
-      setError("Failed to create admin profile. Please try again.");
+    } catch (err) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Failed to create admin profile. Please try again.";
+      if (isOnline && /row-level security|rls|staff permissions/i.test(msg)) {
+        setError(
+          "Stafi nuk u ruajt në cloud (RLS). Ekzekuto supabase/ensure_pos_staff_rls.sql, pastaj provo përsëri. / Could not save staff to the server.",
+        );
+      } else if (isOnline) {
+        setError(
+          "Duhet internet që admini të vijë edhe në PC tjetër. / Online connection required so your admin follows the license on other devices.",
+        );
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }

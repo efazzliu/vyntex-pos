@@ -1,6 +1,81 @@
 import { supabase } from "@/lib/supabase.ts";
+import {
+  normalizePinLoginBranding,
+  type PinLoginBranding,
+} from "@/lib/local-db.ts";
 import { assertNoPgError } from "./db-errors.ts";
 import { getRestaurantByLicense, clearRestaurantCache } from "./restaurant.ts";
+
+function isMissingPosPinBrandingColumn(err: { message?: string }): boolean {
+  const msg = String(err.message ?? "").toLowerCase();
+  return (
+    msg.includes("pos_pin_branding") ||
+    msg.includes("pos_theme") ||
+    (msg.includes("schema cache") && msg.includes("column"))
+  );
+}
+
+function brandingFromRow(raw: unknown): PinLoginBranding | null {
+  if (!raw || typeof raw !== "object") return null;
+  return normalizePinLoginBranding(raw as Partial<PinLoginBranding>);
+}
+
+export async function fetchPinBrandingFromCloud(
+  licenseKey: string,
+): Promise<PinLoginBranding | null> {
+  const r = await getRestaurantByLicense(licenseKey);
+  if (r.pos_pin_branding == null) return null;
+  return brandingFromRow(r.pos_pin_branding);
+}
+
+export async function savePinBrandingToCloud(
+  licenseKey: string,
+  branding: PinLoginBranding,
+): Promise<void> {
+  const r = await getRestaurantByLicense(licenseKey);
+  const payload = normalizePinLoginBranding(branding);
+  const { error } = await supabase
+    .from("restaurants")
+    .update({ pos_pin_branding: payload })
+    .eq("id", r.id);
+  if (error) {
+    if (isMissingPosPinBrandingColumn(error)) {
+      throw new Error(
+        "Mungon kolona pos_pin_branding. Ekzekuto supabase/migrations/028_restaurants_pos_license_sync.sql në Supabase SQL Editor.",
+      );
+    }
+    throw error;
+  }
+  clearRestaurantCache(licenseKey);
+}
+
+export async function fetchPosThemeFromCloud(
+  licenseKey: string,
+): Promise<string | null> {
+  const r = await getRestaurantByLicense(licenseKey);
+  const t = r.pos_theme;
+  return t === "light" || t === "dark" ? t : null;
+}
+
+export async function savePosThemeToCloud(
+  licenseKey: string,
+  theme: "light" | "dark",
+): Promise<void> {
+  const r = await getRestaurantByLicense(licenseKey);
+  const { error } = await supabase
+    .from("restaurants")
+    .update({ pos_theme: theme })
+    .eq("id", r.id);
+  if (error) {
+    if (isMissingPosPinBrandingColumn(error)) {
+      throw new Error(
+        "Mungon kolona pos_theme. Ekzekuto supabase/migrations/028_restaurants_pos_license_sync.sql në Supabase SQL Editor.",
+      );
+    }
+    throw error;
+  }
+  clearRestaurantCache(licenseKey);
+}
 
 export async function getCompanyDetails(licenseKey: string) {
   const r = await getRestaurantByLicense(licenseKey);
@@ -9,6 +84,11 @@ export async function getCompanyDetails(licenseKey: string) {
     type: r.type,
     address: r.address ?? "",
     phone: r.phone ?? "",
+    legalName: r.legal_name ?? "",
+    city: r.city ?? "",
+    taxNumber: r.tax_number ?? "",
+    vatNumber: r.vat_number ?? "",
+    defaultVatRate: r.default_vat_rate ?? 0.2,
     currency: r.currency,
     language: (r.language as "en" | "sq") ?? "en",
     currencySymbol: r.currency_symbol ?? "Lek",

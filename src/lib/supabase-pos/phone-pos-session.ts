@@ -22,6 +22,8 @@ export type OwnedRestaurantRow = {
   mobile_access_enabled?: boolean | null;
   /** Street / city when set on the restaurant row */
   address?: string | null;
+  /** First activation / license row creation time. */
+  created_at?: string | null;
 };
 
 const DASHBOARD_RESTAURANT_ID_KEY = "vyntex.dashboard.restaurantId";
@@ -53,7 +55,6 @@ function rowToOwned(
   const {
     owner_user_id: _u,
     owner_email: _e,
-    created_at: _c,
     ...rest
   } = row;
   return rest as OwnedRestaurantRow;

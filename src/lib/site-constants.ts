@@ -7,6 +7,7 @@ const raw = (import.meta.env.VITE_SUPPORT_EMAIL as string | undefined)?.trim();
 export const SUPPORT_EMAIL = raw && raw.includes("@") ? raw : "support@vyntexpos.com";
 
 export const SUPPORT_MAILTO_HREF = `mailto:${SUPPORT_EMAIL}`;
+export const VYNTEX_INSTAGRAM_URL = "https://www.instagram.com/vyntexpos/";
 
 /**
  * Marketing contact page: show the support address as a clickable `mailto` link.

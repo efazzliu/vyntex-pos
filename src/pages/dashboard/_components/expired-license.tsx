@@ -38,7 +38,7 @@ export function DashboardLicenseExpiredBanner({
         </div>
         <div className="flex shrink-0 flex-wrap gap-2 sm:ml-auto sm:pt-0.5">
           <Link
-            to="/dashboard/billing"
+            to="/dashboard/settings?tab=billing"
             className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-medium text-white ring-1 ring-inset ring-white/15 transition hover:bg-white/15"
           >
             <CreditCard className="size-3.5" aria-hidden />

@@ -1,189 +1,298 @@
-import { useState } from "react";
-import { Link, Navigate, useSearchParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import {
+  CalendarDays,
+  Check,
+  Copy,
+  CreditCard,
+  History,
+  KeyRound,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { cn } from "@/lib/utils.ts";
-import { useDashboardRestaurant } from "@/hooks/use-dashboard-restaurant.ts";
-import { dashboardUrlWithTrial, FREE_TRIAL_QUERY_VALUE } from "@/lib/free-trial.ts";
-import { Check, Copy, CreditCard, KeyRound, RefreshCw, Shield, Sparkles } from "lucide-react";
+import {
+  fetchAllRestaurantsOwnedBySession,
+  type OwnedRestaurantRow,
+} from "@/lib/supabase-pos/phone-pos-session.ts";
+import {
+  effectiveMaxTerminals,
+  parseRegisteredDeviceIds,
+} from "@/lib/dashboard-overview-data.ts";
+import { dashboardPlanLabel, dashboardTypeLabel } from "@/lib/dashboard-i18n.ts";
+import { useDashboardLocale } from "@/pages/dashboard/_components/dashboard-locale-context.tsx";
 
-const PLAN_LABELS: Record<string, string> = {
-  starter: "Starter",
-  professional: "Professional",
-  enterprise: "Enterprise",
-};
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", {
+function formatDate(iso: string | null | undefined, locale: string): string {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  if (!Number.isFinite(date.getTime())) return "—";
+  return date.toLocaleDateString(locale, {
     year: "numeric",
-    month: "long",
+    month: "short",
     day: "numeric",
   });
 }
 
-function daysUntil(iso: string) {
-  const diff = new Date(iso).getTime() - Date.now();
-  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+function getStatus(row: OwnedRestaurantRow): { label: string; active: boolean } {
+  const expiry = row.license_expiry ? new Date(row.license_expiry).getTime() : 0;
+  const active = row.license_status === "active" && expiry > Date.now();
+  if (active) return { label: "Active", active: true };
+  if (row.license_status === "suspended") return { label: "Suspended", active: false };
+  return { label: "Expired", active: false };
 }
 
 export default function DashboardLicensesPage() {
-  const { restaurant } = useDashboardRestaurant();
+  const { lang } = useDashboardLocale();
+  const locale = lang === "sq" ? "sq-AL" : "en-US";
+  const [licenses, setLicenses] = useState<OwnedRestaurantRow[] | null>(null);
   const [copied, setCopied] = useState(false);
-  const [searchParams] = useSearchParams();
-  const trialBanner = searchParams.get("trial") === FREE_TRIAL_QUERY_VALUE;
 
-  if (restaurant === undefined) {
+  useEffect(() => {
+    let cancelled = false;
+    void fetchAllRestaurantsOwnedBySession()
+      .then((rows) => {
+        if (!cancelled) setLicenses(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setLicenses([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const orderedLicenses = useMemo(() => {
+    return [...(licenses ?? [])].sort((a, b) => {
+      const aActive = getStatus(a).active ? 1 : 0;
+      const bActive = getStatus(b).active ? 1 : 0;
+      if (aActive !== bActive) return bActive - aActive;
+      return String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""));
+    });
+  }, [licenses]);
+
+  if (licenses === null) {
     return (
-      <div className="min-h-full w-full bg-[#05070a]">
-        <div className="mx-auto w-full max-w-6xl space-y-6 p-6 pb-10 lg:p-8 lg:pb-12">
-          <Skeleton className="h-36 rounded-2xl bg-white/5" />
-          <Skeleton className="h-56 rounded-2xl bg-white/5" />
-        </div>
+      <div className="w-full space-y-5 px-4 pb-12 pt-16 sm:px-6 lg:px-8">
+        <Skeleton className="h-20 rounded-2xl" />
+        <Skeleton className="h-80 rounded-2xl" />
       </div>
     );
   }
 
-  if (!restaurant) {
-    return <Navigate to={dashboardUrlWithTrial("get-started")} replace />;
+  if (licenses.length === 0) {
+    return (
+      <div className="flex min-h-full w-full items-center justify-center bg-slate-50/80 px-6">
+        <p className="text-base font-medium text-slate-500">
+          You don&apos;t have any licenses.
+        </p>
+      </div>
+    );
   }
 
-  const daysLeft = daysUntil(restaurant.licenseExpiry);
-  const isExpiringSoon = daysLeft <= 7;
-  const isExpired = daysLeft === 0;
-  const statusText = isExpired ? "Expired" : "Active";
+  const current = orderedLicenses[0];
+  const currentStatus = getStatus(current);
+  const devices = parseRegisteredDeviceIds(current.registered_devices, current.device_id);
+  const maxDevices = effectiveMaxTerminals(
+    current.plan ?? "professional",
+    current.max_terminals,
+  );
+  const licenseKey = current.license_key.trim().toUpperCase();
 
-  const handleCopyKey = async () => {
+  const copyKey = async () => {
     try {
-      await navigator.clipboard.writeText(restaurant.licenseKey);
+      await navigator.clipboard.writeText(licenseKey);
       setCopied(true);
       toast.success("License key copied");
-      setTimeout(() => setCopied(false), 1800);
+      window.setTimeout(() => setCopied(false), 1800);
     } catch {
-      toast.error("Could not copy. Please copy manually.");
+      toast.error("Could not copy the license key.");
     }
   };
 
   return (
-    <div className="min-h-full w-full bg-[#05070a]">
-      <div className="mx-auto w-full max-w-6xl space-y-6 p-6 pb-10 lg:p-8 lg:pb-12">
-      <section className="relative overflow-hidden rounded-2xl border border-[#315084] bg-gradient-to-br from-[#162746] via-[#10213f] to-[#0e1a31] p-6 lg:p-7">
-        <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white/80">
-          <Sparkles className="size-3.5" />
-          Licenses
-        </p>
-        <h1 className="mt-4 text-3xl font-bold text-white">Manage License Key, Plan and Expiry</h1>
-        <p className="mt-2 max-w-3xl text-sm text-[#a7b5d1]">
-          View your current license key, track expiry date, and manage renew or upgrade actions
-          from one place.
-        </p>
-      </section>
+    <div className="min-h-full w-full bg-gradient-to-br from-slate-50 via-white to-sky-50/50 px-4 pb-12 pt-16 text-slate-900 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-6xl space-y-6">
+        <header>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-600">
+            Licenses
+          </p>
+          <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
+            License Overview
+          </h1>
+          <p className="mt-2 text-sm text-slate-500">
+            Review your current plan, activation details, device usage, and license history.
+          </p>
+        </header>
 
-      {trialBanner ? (
-        <div className="rounded-xl border border-emerald-400/35 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
-          <strong className="font-semibold text-emerald-50">Free month active</strong> — your
-          Professional trial runs until the expiry date below. Renew from Billing any time before it
-          ends.
-        </div>
-      ) : null}
-
-      <section className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
-        <div className="rounded-2xl border border-[#2c4673] bg-[#121f38] p-6">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs uppercase tracking-wider text-white/60">Current License</p>
-              <h2 className="mt-1 text-xl font-semibold text-white">{restaurant.name}</h2>
-              <p className="mt-1 text-sm text-[#98aac8]">
-                Plan: {PLAN_LABELS[restaurant.plan] ?? restaurant.plan}
-              </p>
+        <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_24px_70px_-45px_rgba(14,116,202,0.35)]">
+          <div className="flex flex-col gap-4 border-b border-slate-100 bg-gradient-to-r from-sky-50 via-white to-emerald-50/50 p-6 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              <span className="flex size-12 items-center justify-center rounded-2xl bg-sky-600 text-white shadow-lg shadow-sky-200">
+                <ShieldCheck className="size-6" />
+              </span>
+              <div>
+                <p className="text-xs font-medium text-sky-700">
+                  {dashboardTypeLabel(current.type, lang)}
+                </p>
+                <h2 className="mt-0.5 text-xl font-bold">
+                  {dashboardPlanLabel(current.plan ?? "professional", lang)}
+                </h2>
+              </div>
             </div>
             <span
               className={cn(
-                "inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold",
-                isExpired
-                  ? "bg-red-500/15 text-red-300 border border-red-500/35"
-                  : "bg-emerald-500/15 text-emerald-300 border border-emerald-500/35",
+                "inline-flex self-start items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ring-1",
+                currentStatus.active
+                  ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                  : "bg-red-50 text-red-700 ring-red-200",
               )}
             >
-              <Shield className="size-3.5" />
-              {statusText}
+              <span
+                className={cn(
+                  "size-1.5 rounded-full",
+                  currentStatus.active ? "bg-emerald-500" : "bg-red-500",
+                )}
+              />
+              {currentStatus.label.toUpperCase()}
             </span>
           </div>
 
-          <div
-            className={cn(
-              "mt-5 rounded-xl border p-3 text-sm",
-              isExpiringSoon
-                ? "border-amber-400/35 bg-amber-500/10 text-amber-200"
-                : "border-[#2c4673] bg-[#0b162b] text-[#c6d1e7]",
-            )}
-          >
-            <p>
-              Expires on <span className="font-semibold">{formatDate(restaurant.licenseExpiry)}</span>
-              {isExpired ? " - renew now to continue using POS." : ` (${daysLeft} days remaining)`}
-            </p>
-          </div>
+          <div className="p-6">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 md:col-span-2">
+                <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                  <KeyRound className="size-3.5 text-sky-500" />
+                  License Key
+                </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <code className="min-w-0 flex-1 truncate font-mono text-sm font-semibold tracking-wider">
+                    {licenseKey}
+                  </code>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => void copyKey()}
+                    className="size-8 shrink-0 rounded-lg"
+                  >
+                    {copied ? (
+                      <Check className="size-4 text-emerald-600" />
+                    ) : (
+                      <Copy className="size-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
 
-          <div className="mt-6 rounded-xl border border-[#2c4673] bg-[#0b162b] p-4">
-            <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-white">
-              <KeyRound className="size-4 text-[#66b3ff]" />
-              License Key
+              <Detail label="Status" value={currentStatus.label} />
+              <Detail label="Plan" value={dashboardPlanLabel(current.plan ?? "professional", lang)} />
+              <Detail label="Activated Date" value={formatDate(current.created_at, locale)} />
+              <Detail label="Expiration Date" value={formatDate(current.license_expiry, locale)} />
+              <Detail
+                label="Renewal Date"
+                value={currentStatus.active ? formatDate(current.license_expiry, locale) : "—"}
+              />
+              <Detail label="Number of devices" value={`${devices.length}`} />
+              <Detail label="Devices used" value={`${devices.length} active`} />
+              <Detail label="Maximum devices" value={`${maxDevices}`} />
             </div>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 rounded-lg border border-[#243a63] bg-[#081225] px-3 py-2 text-sm tracking-[0.12em] text-white">
-                {restaurant.licenseKey}
-              </code>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleCopyKey}
-                className="text-white/70 hover:bg-white/10 hover:text-white"
-              >
-                {copied ? <Check className="size-4 text-emerald-300" /> : <Copy className="size-4" />}
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <Button asChild className="rounded-xl bg-sky-600 text-white hover:bg-sky-700">
+                <Link to="/dashboard/settings?tab=billing">
+                  <CreditCard className="mr-2 size-4" />
+                  Renew License
+                </Link>
+              </Button>
+              <Button asChild variant="outline" className="rounded-xl border-sky-200 text-sky-700">
+                <Link to="/pricing">
+                  <Sparkles className="mr-2 size-4" />
+                  Upgrade Plan
+                </Link>
               </Button>
             </div>
           </div>
-        </div>
+        </section>
 
-        <div className="rounded-2xl border border-[#2c4673] bg-[#121f38] p-6">
-          <h3 className="text-base font-semibold text-white">Actions</h3>
-          <p className="mt-2 text-sm text-[#98aac8]">
-            Renew your plan, upgrade for more features, or open billing for invoice history.
-          </p>
-
-          <div className="mt-5 space-y-3">
-            <Button asChild className="w-full justify-start gap-2 rounded-xl">
-              <Link to="/dashboard/billing">
-                <RefreshCw className="size-4" />
-                Renew License
-              </Link>
-            </Button>
-
-            <Button
-              asChild
-              variant="outline"
-              className="w-full justify-start gap-2 rounded-xl border-[#2c4673] bg-[#0b162b] text-white hover:bg-[#142646]"
-            >
-              <Link to="/pricing">
-                <Sparkles className="size-4" />
-                Upgrade Plan
-              </Link>
-            </Button>
-
-            <Button
-              asChild
-              variant="outline"
-              className="w-full justify-start gap-2 rounded-xl border-[#2c4673] bg-[#0b162b] text-white hover:bg-[#142646]"
-            >
-              <Link to="/dashboard/billing">
-                <CreditCard className="size-4" />
-                Open Billing
-              </Link>
-            </Button>
+        <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4">
+            <span className="flex size-9 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
+              <History className="size-4" />
+            </span>
+            <div>
+              <h2 className="text-sm font-semibold">License History</h2>
+              <p className="text-xs text-slate-500">All licenses purchased by this account.</p>
+            </div>
           </div>
-        </div>
-      </section>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[900px] text-left">
+              <thead className="bg-slate-50 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                <tr>
+                  <th className="px-5 py-3">License</th>
+                  <th className="px-5 py-3">VYN Type</th>
+                  <th className="px-5 py-3">Plan</th>
+                  <th className="px-5 py-3">Activated</th>
+                  <th className="px-5 py-3">Expires</th>
+                  <th className="px-5 py-3">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-sm">
+                {orderedLicenses.map((row) => {
+                  const status = getStatus(row);
+                  return (
+                    <tr key={row.id} className="hover:bg-slate-50/70">
+                      <td className="px-5 py-4">
+                        <code className="font-mono text-xs font-semibold tracking-wide text-slate-700">
+                          {row.license_key.trim().toUpperCase()}
+                        </code>
+                      </td>
+                      <td className="px-5 py-4 font-medium">
+                        {dashboardTypeLabel(row.type, lang)}
+                      </td>
+                      <td className="px-5 py-4 text-slate-600">
+                        {dashboardPlanLabel(row.plan ?? "professional", lang)}
+                      </td>
+                      <td className="px-5 py-4 text-slate-600">
+                        {formatDate(row.created_at, locale)}
+                      </td>
+                      <td className="px-5 py-4 text-slate-600">
+                        {formatDate(row.license_expiry, locale)}
+                      </td>
+                      <td className="px-5 py-4">
+                        <span
+                          className={cn(
+                            "inline-flex rounded-full px-2.5 py-1 text-xs font-medium",
+                            status.active
+                              ? "bg-emerald-50 text-emerald-700"
+                              : "bg-slate-100 text-slate-600",
+                          )}
+                        >
+                          {status.label}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
       </div>
+    </div>
+  );
+}
+
+function Detail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+      <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+        <CalendarDays className="size-3.5 text-sky-500" />
+        {label}
+      </p>
+      <p className="mt-2 text-sm font-semibold text-slate-800">{value}</p>
     </div>
   );
 }

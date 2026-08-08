@@ -21,7 +21,7 @@ export default function HeroSection() {
   const primaryCtaHref = useMarketingPrimaryCtaHref();
 
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-[#060B18]">
+    <section className="relative flex min-h-[640px] items-start justify-center overflow-hidden bg-[#060B18]">
       <div className="absolute inset-0">
         <div className="absolute inset-0 bg-gradient-to-b from-[#060B18] via-[#0A1628] to-[#060B18]" />
         <div
@@ -57,17 +57,17 @@ export default function HeroSection() {
         />
       </div>
 
-      <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 pt-24 pb-16 text-center">
+      <div className="relative z-10 mx-auto max-w-5xl px-4 pb-8 pt-20 text-center sm:px-6">
         <motion.div
           initial={{ opacity: 0, scale: 0.5 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.8, ease: "easeOut" }}
-          className="mb-8"
+          className="mb-4"
         >
           <img
             src={VYNTEX_APP_LOGO_SRC}
             alt="Vyntex POS"
-            className="w-20 h-20 sm:w-24 sm:h-24 mx-auto drop-shadow-[0_0_40px_rgba(0,102,255,0.4)]"
+            className="mx-auto h-14 w-14 drop-shadow-[0_0_36px_rgba(0,102,255,0.45)] sm:h-16 sm:w-16"
           />
         </motion.div>
 
@@ -75,7 +75,7 @@ export default function HeroSection() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2, duration: 0.6 }}
-          className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-white/10 bg-white/5 backdrop-blur-sm mb-8"
+          className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.07] px-4 py-1.5 backdrop-blur-sm"
         >
           <span className="w-2 h-2 rounded-full bg-[#44CC00] animate-pulse" />
           <span className="text-sm text-white/70 font-medium">{t("home.hero.badge")}</span>
@@ -85,7 +85,7 @@ export default function HeroSection() {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3, duration: 0.7 }}
-          className="text-4xl sm:text-6xl md:text-7xl font-bold tracking-tight text-balance leading-[1.08] mb-6"
+          className="mb-4 text-balance text-4xl font-bold leading-[1.06] tracking-tight sm:text-5xl md:text-6xl"
         >
           <span className="text-white">{t("home.hero.line1")}</span>
           <br />
@@ -98,7 +98,7 @@ export default function HeroSection() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5, duration: 0.6 }}
-          className="text-lg sm:text-xl text-white/55 max-w-2xl mx-auto mb-10 text-balance leading-relaxed"
+          className="mx-auto mb-7 max-w-xl text-balance text-base leading-relaxed text-white/65 sm:text-lg"
         >
           {t("home.hero.subtitle")}
         </motion.p>
@@ -107,7 +107,7 @@ export default function HeroSection() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.7, duration: 0.6 }}
-          className="flex flex-col sm:flex-row items-center justify-center gap-4"
+          className="flex flex-col items-center justify-center gap-3 sm:flex-row"
         >
           <Button
             size="lg"
@@ -134,10 +134,10 @@ export default function HeroSection() {
           initial={{ opacity: 0, y: 60 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 1, duration: 0.8 }}
-          className="mt-20 relative"
+          className="relative mt-8"
         >
-          <div className="relative mx-auto max-w-3xl rounded-2xl border border-white/10 bg-white/3 backdrop-blur-sm p-1.5 shadow-2xl shadow-blue-500/10">
-            <div className="rounded-xl bg-gradient-to-br from-[#0A1628] to-[#0F1D32] p-6 sm:p-8">
+          <div className="relative mx-auto max-w-4xl rounded-2xl border border-white/15 bg-white/[0.04] p-1.5 shadow-2xl shadow-blue-500/10 backdrop-blur-sm">
+            <div className="rounded-xl bg-gradient-to-br from-[#0A1628] to-[#0F1D32] p-5 sm:p-6">
               <div className="grid grid-cols-3 gap-3 sm:gap-4">
                 {MOCK_KEYS.map((key, i) => (
                   <motion.div
@@ -145,16 +145,16 @@ export default function HeroSection() {
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 1.2 + i * 0.1, duration: 0.4 }}
-                    className="rounded-lg border border-white/6 bg-white/4 px-3 py-4 text-center hover:bg-white/6 transition-colors"
+                    className="rounded-lg border border-white/10 bg-white/[0.05] px-3 py-3 text-center transition-colors hover:bg-white/[0.08]"
                   >
-                    <div className="text-xs sm:text-sm text-white/40 font-medium">
+                    <div className="text-xs font-medium text-white/55 sm:text-sm">
                       {t(`home.hero.${key}`)}
                     </div>
                   </motion.div>
                 ))}
               </div>
 
-              <div className="mt-5 flex items-end gap-1.5 h-16 px-2">
+              <div className="mt-4 flex h-14 items-end gap-1.5 px-2">
                 {[40, 65, 45, 80, 55, 90, 70, 85, 60, 95, 75, 50].map((h, i) => (
                   <motion.div
                     key={i}

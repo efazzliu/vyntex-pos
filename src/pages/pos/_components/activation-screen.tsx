@@ -6,13 +6,16 @@ import { Spinner } from "@/components/ui/spinner.tsx";
 import { motion } from "motion/react";
 import { AlertCircle, KeyRound, Monitor } from "lucide-react";
 import {
+  clearActivation,
   getOrCreateDeviceId,
   saveActivation,
 } from "@/lib/local-db.ts";
 import { activateLicense } from "@/lib/supabase-pos.ts";
+import { hydratePosLicenseData } from "@/lib/supabase-pos/license-sync.ts";
 import { isSupabaseConfigured } from "@/lib/supabase.ts";
 import { usePosTheme } from "../_lib/use-pos-theme.ts";
 import { APP_VERSION_LABEL, VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
+import { sendPosDeviceHeartbeat } from "@/lib/supabase-pos/device-presence.ts";
 
 type ActivationScreenProps = {
   onActivated: () => void;
@@ -90,6 +93,16 @@ export default function ActivationScreen({ onActivated }: ActivationScreenProps)
         deviceId: result.deviceId,
         activatedAt: result.activatedAt,
       });
+
+      await hydratePosLicenseData(result.licenseKey);
+      const heartbeatAccepted = await sendPosDeviceHeartbeat(
+        result.licenseKey,
+        result.deviceId,
+      );
+      if (heartbeatAccepted === false) {
+        await clearActivation();
+        throw new Error("This device is no longer assigned to the license.");
+      }
 
       onActivated();
     } catch (err) {

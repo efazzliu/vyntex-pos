@@ -231,7 +231,7 @@ export default function DashboardOverview() {
         <div className="rounded-2xl border border-zinc-800/80 bg-zinc-950/50 p-6 shadow-xl shadow-black/20 lg:p-7">
           <div className="mb-5 flex items-center gap-2 text-sm font-medium text-zinc-200">
             <HardDriveDownload className="size-4 text-blue-400" />
-            Install software
+            Restaurant POS Setup
           </div>
 
           <Button
@@ -241,9 +241,9 @@ export default function DashboardOverview() {
           >
             <span className="flex items-center gap-2">
               <Download className="size-4" />
-              Windows — 64-bit (Intel/AMD)
+              Download Restaurant POS Setup
             </span>
-            <span className="text-xs opacity-90">Recommended for most PCs</span>
+            <span className="text-xs opacity-90">Windows 64-bit (Intel / AMD)</span>
           </Button>
 
           {installerUrlArm64 ? (
