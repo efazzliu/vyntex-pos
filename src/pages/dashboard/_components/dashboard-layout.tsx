@@ -788,7 +788,32 @@ function DashboardContent() {
   );
 }
 
+/**
+ * Dashboard pages are designed light-only; without this, a dark OS/theme
+ * preference darkens the shell (sidebar/toolbar) while pages stay light.
+ */
+function useForcedLightTheme() {
+  useEffect(() => {
+    const root = document.documentElement;
+    const hadDark = root.classList.contains("dark");
+    const prevColorScheme = root.style.colorScheme;
+    const strip = () => {
+      root.classList.remove("dark");
+      root.style.colorScheme = "light";
+    };
+    strip();
+    const observer = new MutationObserver(strip);
+    observer.observe(root, { attributes: true, attributeFilter: ["class"] });
+    return () => {
+      observer.disconnect();
+      root.style.colorScheme = prevColorScheme;
+      if (hadDark) root.classList.add("dark");
+    };
+  }, []);
+}
+
 export default function DashboardLayout() {
+  useForcedLightTheme();
   return (
     <DashboardLocaleProvider>
       <DashboardContent />
