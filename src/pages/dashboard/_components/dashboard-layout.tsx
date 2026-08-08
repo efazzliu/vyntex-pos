@@ -440,7 +440,7 @@ function DashboardShell({
     "inline-flex size-9 shrink-0 items-center justify-center rounded-xl text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/40 dark:text-sky-200/75 dark:hover:bg-white/[0.06] dark:hover:text-white";
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-slate-50 text-slate-900 dark:bg-[#02040a] dark:text-zinc-100">
+    <div className="client-dashboard-shell flex h-dvh overflow-hidden bg-slate-50 text-slate-900 dark:bg-[#02040a] dark:text-zinc-100">
       <div className="hidden md:block shrink-0">
         <DashboardSidebar
           collapsed={sidebarCollapsed}

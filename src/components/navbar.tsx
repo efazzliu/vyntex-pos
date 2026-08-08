@@ -10,8 +10,9 @@ import {
   SelectValue,
 } from "@/components/ui/select.tsx";
 import { cn } from "@/lib/utils.ts";
-import { Languages, Menu, X } from "lucide-react";
+import { Languages, Menu, Moon, Sun, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { useTheme } from "next-themes";
 import { useSiteLanguage } from "@/components/providers/site-locale-provider.tsx";
 import { supabase } from "@/lib/supabase.ts";
 import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
@@ -23,6 +24,29 @@ const navItems = [
   { key: "about", href: "/about" },
   { key: "contact", href: "/contact" },
 ] as const;
+
+function ThemeToggle({ transparent }: { transparent: boolean }) {
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  const isDark = mounted && resolvedTheme === "dark";
+  return (
+    <button
+      type="button"
+      onClick={() => setTheme(isDark ? "light" : "dark")}
+      aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+      className={cn(
+        "inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full border transition-colors",
+        transparent
+          ? "border-white/25 bg-white/10 text-white hover:bg-white/20"
+          : "border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground",
+      )}
+    >
+      {isDark ? <Sun className="size-4" /> : <Moon className="size-4" />}
+    </button>
+  );
+}
 
 export default function Navbar() {
   const { t } = useTranslation("site");
@@ -128,6 +152,7 @@ export default function Navbar() {
             >
               {ctaLabel}
             </Button>
+            <ThemeToggle transparent={isTransparent} />
             <Select
               value={language}
               onValueChange={(value) => {
@@ -152,15 +177,18 @@ export default function Navbar() {
             </Select>
           </div>
 
-          <button
-            className={cn(
-              "md:hidden p-2 rounded-md cursor-pointer",
-              isTransparent ? "text-white hover:bg-white/10" : "hover:bg-accent",
-            )}
-            onClick={() => setMobileOpen(!mobileOpen)}
-          >
-            {mobileOpen ? <X className="size-5" /> : <Menu className="size-5" />}
-          </button>
+          <div className="md:hidden flex items-center gap-1.5">
+            <ThemeToggle transparent={isTransparent} />
+            <button
+              className={cn(
+                "p-2 rounded-md cursor-pointer",
+                isTransparent ? "text-white hover:bg-white/10" : "hover:bg-accent",
+              )}
+              onClick={() => setMobileOpen(!mobileOpen)}
+            >
+              {mobileOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+            </button>
+          </div>
         </div>
       </div>
 

@@ -323,6 +323,79 @@
   color: rgb(148 163 184) !important;
 }
 
+/* ── Client dashboard dark mode ─────────────────────────────────────────────
+   Dashboard pages are authored with light slate utilities; remap them under
+   .dark (same approach as the phone-app shell above). */
+.dark .client-dashboard-shell .bg-white,
+.dark .client-dashboard-shell .bg-white\/95,
+.dark .client-dashboard-shell .bg-white\/80 {
+  background-color: rgb(15 23 42 / 0.92) !important;
+}
+
+.dark .client-dashboard-shell .bg-slate-50,
+.dark .client-dashboard-shell .bg-slate-50\/50,
+.dark .client-dashboard-shell .bg-slate-50\/80,
+.dark .client-dashboard-shell .bg-slate-50\/90,
+.dark .client-dashboard-shell .bg-slate-100,
+.dark .client-dashboard-shell .hover\:bg-slate-50:hover,
+.dark .client-dashboard-shell .hover\:bg-slate-50\/70:hover,
+.dark .client-dashboard-shell .hover\:bg-slate-100:hover {
+  background-color: rgb(30 41 59 / 0.75) !important;
+}
+
+.dark .client-dashboard-shell .bg-slate-200,
+.dark .client-dashboard-shell .bg-slate-300 {
+  background-color: rgb(51 65 85 / 0.8) !important;
+}
+
+.dark .client-dashboard-shell .border-slate-100,
+.dark .client-dashboard-shell .border-slate-200,
+.dark .client-dashboard-shell .border-slate-200\/80,
+.dark .client-dashboard-shell .border-slate-200\/90,
+.dark .client-dashboard-shell .border-slate-300,
+.dark .client-dashboard-shell .hover\:border-slate-300:hover {
+  border-color: rgb(51 65 85 / 0.85) !important;
+}
+
+.dark .client-dashboard-shell .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+.dark .client-dashboard-shell .divide-slate-200\/80 > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgb(51 65 85 / 0.7) !important;
+}
+
+.dark .client-dashboard-shell .text-slate-900,
+.dark .client-dashboard-shell .text-slate-800,
+.dark .client-dashboard-shell .text-slate-700,
+.dark .client-dashboard-shell .hover\:text-slate-900:hover,
+.dark .client-dashboard-shell .hover\:text-slate-800:hover,
+.dark .client-dashboard-shell .hover\:text-slate-700:hover {
+  color: rgb(226 232 240) !important;
+}
+
+.dark .client-dashboard-shell .text-slate-600,
+.dark .client-dashboard-shell .text-slate-500 {
+  color: rgb(148 163 184) !important;
+}
+
+.dark .client-dashboard-shell .from-slate-50 {
+  --tw-gradient-from: rgb(15 23 42 / 0.9) !important;
+}
+.dark .client-dashboard-shell .from-slate-100,
+.dark .client-dashboard-shell .from-slate-200 {
+  --tw-gradient-from: rgb(30 41 59 / 0.9) !important;
+}
+.dark .client-dashboard-shell .via-white,
+.dark .client-dashboard-shell .via-slate-100 {
+  --tw-gradient-via: rgb(15 23 42 / 0.9) !important;
+}
+.dark .client-dashboard-shell .to-white {
+  --tw-gradient-to: rgb(15 23 42 / 0.9) !important;
+}
+
+.dark .client-dashboard-shell .shadow-slate-200,
+.dark .client-dashboard-shell .shadow-slate-200\/50 {
+  --tw-shadow-color: rgb(2 6 23 / 0.6) !important;
+}
+
 html[data-dashboard-reduced-motion] *,
 html[data-dashboard-reduced-motion] *::before,
 html[data-dashboard-reduced-motion] *::after {
