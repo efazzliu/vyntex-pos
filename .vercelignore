@@ -17,10 +17,10 @@ dist-phone
 dist-ssr
 .vercel
 
-android
-ios
-electron
-phone-app
+/android
+/ios
+/electron
+/phone-app
 supabase/.temp
 
 # Unpacked desktop app is 200+ MB — never upload
