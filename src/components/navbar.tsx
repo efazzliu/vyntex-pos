@@ -3,14 +3,13 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select.tsx";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu.tsx";
 import { cn } from "@/lib/utils.ts";
-import { Menu, Moon, Sun, X } from "lucide-react";
+import { Check, Languages, Menu, Moon, Sun, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useTheme } from "next-themes";
 import { useSiteLanguage } from "@/components/providers/site-locale-provider.tsx";
@@ -26,6 +25,15 @@ const navItems = [
   { key: "contact", href: "/contact" },
 ] as const;
 
+function iconButtonClass(transparent: boolean) {
+  return cn(
+    "inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full border transition-colors",
+    transparent
+      ? "border-white/25 bg-white/10 text-white hover:bg-white/20"
+      : "border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground",
+  );
+}
+
 function ThemeToggle({ transparent }: { transparent: boolean }) {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -37,21 +45,52 @@ function ThemeToggle({ transparent }: { transparent: boolean }) {
       type="button"
       onClick={() => setTheme(isDark ? "light" : "dark")}
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-      className={cn(
-        "inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full border transition-colors",
-        transparent
-          ? "border-white/25 bg-white/10 text-white hover:bg-white/20"
-          : "border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground",
-      )}
+      className={iconButtonClass(transparent)}
     >
       {isDark ? <Sun className="size-4" /> : <Moon className="size-4" />}
     </button>
   );
 }
 
+function LanguageToggle({ transparent }: { transparent: boolean }) {
+  const { language, setLanguage } = useSiteLanguage();
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label="Change language"
+          title={language === "sq" ? "Shqip" : "English"}
+          className={iconButtonClass(transparent)}
+        >
+          <Languages className="size-4" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-[10.5rem]">
+        <DropdownMenuItem
+          className="cursor-pointer gap-2"
+          onClick={() => setLanguage("en")}
+        >
+          <FlagUS />
+          <span className="flex-1 font-medium">English</span>
+          {language === "en" ? <Check className="size-4 text-[#0066FF]" /> : null}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className="cursor-pointer gap-2"
+          onClick={() => setLanguage("sq")}
+        >
+          <FlagAL />
+          <span className="flex-1 font-medium">Shqip</span>
+          {language === "sq" ? <Check className="size-4 text-[#0066FF]" /> : null}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export default function Navbar() {
   const { t } = useTranslation("site");
-  const { language, setLanguage } = useSiteLanguage();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isAuthed, setIsAuthed] = useState(false);
@@ -98,9 +137,6 @@ export default function Navbar() {
   const isHomePage = location.pathname === "/";
   const isTransparent = !scrolled && isHomePage;
 
-  const langSelectClass = isTransparent
-    ? "border-white/25 bg-white/10 text-white"
-    : "";
   const ctaLabel = isAuthed ? "PROFILE" : "GET STARTED";
   const ctaPath = isAuthed ? "/dashboard/restaurant-pos" : "/register";
 
@@ -154,34 +190,12 @@ export default function Navbar() {
               {ctaLabel}
             </Button>
             <ThemeToggle transparent={isTransparent} />
-            <Select
-              value={language}
-              onValueChange={(value) => {
-                if (value === "en" || value === "sq") setLanguage(value);
-              }}
-            >
-              <SelectTrigger className={cn("h-10 min-w-[8.5rem] text-sm font-semibold", langSelectClass)}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="min-w-[8.5rem]">
-                <SelectItem value="en">
-                  <span className="inline-flex items-center gap-2">
-                    <FlagUS />
-                    English
-                  </span>
-                </SelectItem>
-                <SelectItem value="sq">
-                  <span className="inline-flex items-center gap-2">
-                    <FlagAL />
-                    Albanian
-                  </span>
-                </SelectItem>
-              </SelectContent>
-            </Select>
+            <LanguageToggle transparent={isTransparent} />
           </div>
 
           <div className="md:hidden flex items-center gap-1.5">
             <ThemeToggle transparent={isTransparent} />
+            <LanguageToggle transparent={isTransparent} />
             <button
               className={cn(
                 "p-2 rounded-md cursor-pointer",
@@ -218,7 +232,7 @@ export default function Navbar() {
                   {t(`nav.${link.key}`)}
                 </button>
               ))}
-              <div className="pt-3 mt-2 border-t border-border space-y-3">
+              <div className="pt-3 mt-2 border-t border-border">
                 <Button
                   size="sm"
                   className="w-full"
@@ -226,30 +240,6 @@ export default function Navbar() {
                 >
                   {ctaLabel}
                 </Button>
-                <Select
-                  value={language}
-                  onValueChange={(value) => {
-                    if (value === "en" || value === "sq") setLanguage(value);
-                  }}
-                >
-                  <SelectTrigger className="h-9 w-full text-xs font-semibold">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="en">
-                      <span className="inline-flex items-center gap-2">
-                        <FlagUS />
-                        English
-                      </span>
-                    </SelectItem>
-                    <SelectItem value="sq">
-                      <span className="inline-flex items-center gap-2">
-                        <FlagAL />
-                        Albanian
-                      </span>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
             </div>
           </motion.div>
