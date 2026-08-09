@@ -1,11 +1,14 @@
 export type DashboardLang = "en" | "sq";
 
 const STORAGE_KEY = "vyntex.dashboard.locale";
+const SITE_LOCALE_STORAGE_KEY = "vyntex.site.locale";
 
 export function getDashboardLang(): DashboardLang {
   if (typeof window === "undefined") return "en";
   const stored = localStorage.getItem(STORAGE_KEY);
   if (stored === "sq" || stored === "en") return stored;
+  const site = localStorage.getItem(SITE_LOCALE_STORAGE_KEY);
+  if (site === "sq" || site === "en") return site;
   if (navigator.language.toLowerCase().startsWith("sq")) return "sq";
   return "en";
 }

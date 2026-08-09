@@ -13,6 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu.tsx";
+import { SiteLanguageToggle } from "@/components/site-language-toggle.tsx";
 import { useUserRole } from "@/hooks/use-user-role.ts";
 import { supabase } from "@/lib/supabase.ts";
 
@@ -64,6 +65,9 @@ export function AdminPageHeader() {
             >
               <Search className="size-4" />
             </button>
+            <SiteLanguageToggle
+              triggerClassName="border-slate-200/80 bg-slate-50/85 text-slate-500 shadow-[0_6px_18px_-14px_rgba(2,6,23,0.55)] hover:border-slate-300 hover:bg-white hover:text-slate-700 dark:border-slate-700/80 dark:bg-slate-900/70 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-900 dark:hover:text-slate-100"
+            />
             <button
               type="button"
               aria-label="Notifications"

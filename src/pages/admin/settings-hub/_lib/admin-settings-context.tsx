@@ -7,6 +7,12 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import {
+  APP_LANGUAGE_EVENT,
+  isAppLang,
+  setAppLanguageStores,
+} from "@/lib/app-language.ts";
+import siteI18n from "@/lib/site-i18n.ts";
 import { supabase } from "@/lib/supabase.ts";
 import type {
   AdminLang,
@@ -69,7 +75,7 @@ export function AdminSettingsProvider({ children }: { children: ReactNode }) {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
-  const [language, setLanguage] = useState("en");
+  const [language, setLanguageState] = useState("en");
   const [timezone, setTimezone] = useState("Europe/Tirane");
   const [notifications, setNotificationsState] = useState<AdminNotificationPrefs>(
     mergeNotificationPrefs(),
@@ -79,6 +85,17 @@ export function AdminSettingsProvider({ children }: { children: ReactNode }) {
   const [mfaEnabled, setMfaEnabled] = useState(false);
 
   const lang = normalizeAdminLang(language);
+
+  const setLanguage = useCallback((value: string) => {
+    const next = normalizeAdminLang(value);
+    setLanguageState(next);
+    if (isAppLang(next)) {
+      void siteI18n.changeLanguage(next);
+      setAppLanguageStores(next);
+      return;
+    }
+    applyAdminLanguage(next);
+  }, []);
 
   const t = useCallback((key: string) => adminT(lang, key), [lang]);
 
@@ -103,7 +120,8 @@ export function AdminSettingsProvider({ children }: { children: ReactNode }) {
     setEmail(u.email ?? "");
     setPhone((meta.phone ?? "").trim());
     setAvatarUrl((meta.avatar_url ?? "").trim());
-    setLanguage(nextLang);
+    // Hydrate admin preference only — do not overwrite the shared site locale.
+    setLanguageState(nextLang);
     setTimezone(meta.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC");
     setNotificationsState(mergeNotificationPrefs(meta.admin_notifications));
     setLoginHistory(meta.admin_login_history ?? []);
@@ -123,6 +141,15 @@ export function AdminSettingsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     applyAdminLanguage(lang);
   }, [lang]);
+
+  useEffect(() => {
+    const onAppLanguage = (event: Event) => {
+      const next = (event as CustomEvent<{ language?: string }>).detail?.language;
+      if (isAppLang(next)) setLanguageState(next);
+    };
+    window.addEventListener(APP_LANGUAGE_EVENT, onAppLanguage);
+    return () => window.removeEventListener(APP_LANGUAGE_EVENT, onAppLanguage);
+  }, []);
 
   useEffect(() => {
     applyAccentCss(accentHexForId(ui.accentColor));
@@ -306,6 +333,7 @@ export function AdminSettingsProvider({ children }: { children: ReactNode }) {
       loginHistory,
       ui,
       mfaEnabled,
+      setLanguage,
       setNotifications,
       setUi,
       saveAccount,

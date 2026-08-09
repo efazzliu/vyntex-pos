@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { I18nextProvider, useTranslation } from "react-i18next";
-import siteI18n, { SITE_LOCALE_STORAGE_KEY } from "@/lib/site-i18n.ts";
+import { setAppLanguageStores } from "@/lib/app-language.ts";
+import siteI18n from "@/lib/site-i18n.ts";
 
 export function SiteLocaleProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
@@ -23,8 +24,7 @@ export function useSiteLanguage() {
 
   const setLanguage = (lng: "en" | "sq") => {
     void i18n.changeLanguage(lng);
-    localStorage.setItem(SITE_LOCALE_STORAGE_KEY, lng);
-    document.documentElement.lang = lng === "sq" ? "sq" : "en";
+    setAppLanguageStores(lng);
   };
 
   return { language, setLanguage };

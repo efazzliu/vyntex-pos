@@ -2,16 +2,22 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
 import {
+  APP_LANGUAGE_EVENT,
+  isAppLang,
+  setAppLanguageStores,
+} from "@/lib/app-language.ts";
+import {
   type DashboardLang,
   dashboardT,
   getDashboardLang,
-  setDashboardLang,
 } from "@/lib/dashboard-i18n.ts";
+import siteI18n from "@/lib/site-i18n.ts";
 
 type DashboardLocaleContextValue = {
   lang: DashboardLang;
@@ -27,8 +33,18 @@ export function DashboardLocaleProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<DashboardLang>(() => getDashboardLang());
 
   const setLang = useCallback((next: DashboardLang) => {
-    setDashboardLang(next);
+    setAppLanguageStores(next);
+    void siteI18n.changeLanguage(next);
     setLangState(next);
+  }, []);
+
+  useEffect(() => {
+    const onAppLanguage = (event: Event) => {
+      const next = (event as CustomEvent<{ language?: string }>).detail?.language;
+      if (isAppLang(next)) setLangState(next);
+    };
+    window.addEventListener(APP_LANGUAGE_EVENT, onAppLanguage);
+    return () => window.removeEventListener(APP_LANGUAGE_EVENT, onAppLanguage);
   }, []);
 
   const t = useCallback(
