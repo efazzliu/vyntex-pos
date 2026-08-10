@@ -37,12 +37,10 @@ import {
   Bell,
   BellRing,
   Calendar,
-  CalendarDays,
   Check,
   CheckCircle2,
   Circle,
   Copy,
-  CreditCard,
   Download,
   HardDriveDownload,
   KeyRound,
@@ -100,6 +98,14 @@ const SETUP_STEP_KEYS = [
   "setup.products",
 ] as const;
 
+const EMPTY_SETUP_STEP_KEYS = [
+  "overview.setup_step_activate",
+  "overview.setup_step_install",
+  "overview.setup_step_printer",
+  "overview.setup_step_tables",
+  "overview.setup_step_products",
+] as const;
+
 function StatPill({
   label,
   value,
@@ -137,7 +143,13 @@ function StatPill({
   );
 }
 
-function SalesSparkline({ points }: { points: number[] }) {
+function SalesSparkline({
+  points,
+  ariaLabel,
+}: {
+  points: number[];
+  ariaLabel: string;
+}) {
   const width = 560;
   const height = 118;
   const max = Math.max(...points, 1);
@@ -153,7 +165,7 @@ function SalesSparkline({ points }: { points: number[] }) {
         viewBox={`0 0 ${width} ${height}`}
         preserveAspectRatio="none"
         className="absolute inset-0 h-full w-full overflow-visible"
-        aria-label="Monthly sales trend"
+        aria-label={ariaLabel}
       >
         <polyline
           points={coordinates.join(" ")}
@@ -190,6 +202,7 @@ export default function DashboardOverviewModern() {
   const installerUrlX64 = windowsInstallerX64Href(versionLabel);
   const installerUrlArm64 = windowsInstallerArm64Href(versionLabel);
   const dateLocale = dashboardDateLocale(lang);
+  const displayName = user?.name?.trim() || t("overview.welcome_user");
 
   useEffect(() => {
     if (!restaurant?.id) return;
@@ -239,41 +252,68 @@ export default function DashboardOverviewModern() {
           <header className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                Welcome back, {user?.name?.trim() || "User"} 👋
+                {t("overview.welcome", { name: displayName })}
               </h1>
               <p className="mt-1 text-sm text-slate-500">
-                Set up your first Vyntex POS venue from this dashboard.
+                {t("overview.empty_subtitle")}
               </p>
             </div>
             <Button asChild className="h-10 self-start rounded-xl bg-[#087cf0] px-4 text-white">
               <Link to="/dashboard/get-started">
                 <Plus className="mr-1.5 size-4" />
-                Activate license
+                {t("overview.activate_license")}
               </Link>
             </Button>
           </header>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <StatPill label="Active license" value="Not activated" subtitle="Setup required" icon={Shield} />
-            <StatPill label={t("stat.plan")} value="—" subtitle="Choose during activation" icon={Layers} />
-            <StatPill label={t("stat.days_remaining")} value="—" subtitle="No active license" icon={Timer} />
-            <StatPill label={t("devices.title")} value="0" subtitle="No connected devices" icon={Monitor} />
-            <StatPill label={t("venue.last_sync")} value="Not yet" subtitle="Activate POS first" icon={RefreshCw} />
+            <StatPill
+              label={t("overview.stat_active_license")}
+              value={t("overview.not_activated")}
+              subtitle={t("overview.setup_required")}
+              icon={Shield}
+            />
+            <StatPill
+              label={t("stat.plan")}
+              value="—"
+              subtitle={t("overview.choose_during_activation")}
+              icon={Layers}
+            />
+            <StatPill
+              label={t("stat.days_remaining")}
+              value="—"
+              subtitle={t("overview.no_active_license")}
+              icon={Timer}
+            />
+            <StatPill
+              label={t("devices.title")}
+              value="0"
+              subtitle={t("overview.no_connected_devices")}
+              icon={Monitor}
+            />
+            <StatPill
+              label={t("venue.last_sync")}
+              value={t("overview.not_yet")}
+              subtitle={t("overview.activate_pos_first")}
+              icon={RefreshCw}
+            />
           </div>
 
           <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-12">
             <section className={cn(card, "p-5 xl:col-span-4")}>
               <p className="text-[10px] font-semibold uppercase tracking-wider text-sky-600">
-                Active venue
+                {t("venue.label")}
               </p>
               <div className="mt-5 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-center">
                 <Shield className="mx-auto size-8 text-slate-300" />
-                <h2 className="mt-3 text-base font-semibold text-slate-900">No venue linked yet</h2>
+                <h2 className="mt-3 text-base font-semibold text-slate-900">
+                  {t("overview.no_venue_yet")}
+                </h2>
                 <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                  Activate a new trial or link an existing POS license to this account.
+                  {t("overview.no_venue_hint")}
                 </p>
                 <Button asChild className="mt-4 rounded-xl bg-sky-600 text-white hover:bg-sky-700">
-                  <Link to="/dashboard/get-started">Activate your license</Link>
+                  <Link to="/dashboard/get-started">{t("overview.activate_your_license")}</Link>
                 </Button>
               </div>
             </section>
@@ -284,22 +324,28 @@ export default function DashboardOverviewModern() {
                   <HardDriveDownload className="size-5" />
                 </span>
                 <div>
-                  <h3 className="text-base font-semibold">Get Vyntex POS</h3>
-                  <p className="text-xs text-slate-500">Install the Windows app before activation.</p>
+                  <h3 className="text-base font-semibold">{t("overview.get_pos")}</h3>
+                  <p className="text-xs text-slate-500">{t("overview.get_pos_hint")}</p>
                 </div>
               </div>
               <div className="mt-4 flex gap-1 rounded-lg bg-slate-100 p-1">
-                {(["windows", "mac", "android"] as const).map((tab) => (
+                {(
+                  [
+                    { id: "windows" as const, label: t("install.tab_windows") },
+                    { id: "mac" as const, label: t("install.tab_mac") },
+                    { id: "android" as const, label: t("install.tab_android") },
+                  ] as const
+                ).map((tab) => (
                   <button
-                    key={tab}
+                    key={tab.id}
                     type="button"
-                    onClick={() => setInstallTab(tab)}
+                    onClick={() => setInstallTab(tab.id)}
                     className={cn(
-                      "flex-1 rounded-md px-2 py-2 text-xs font-medium capitalize",
-                      installTab === tab ? "bg-white text-slate-900 shadow-sm" : "text-slate-500",
+                      "flex-1 rounded-md px-2 py-2 text-xs font-medium",
+                      installTab === tab.id ? "bg-white text-slate-900 shadow-sm" : "text-slate-500",
                     )}
                   >
-                    {tab}
+                    {tab.label}
                   </button>
                 ))}
               </div>
@@ -313,36 +359,36 @@ export default function DashboardOverviewModern() {
                   {t("install.win_x64")}
                 </Button>
               ) : (
-                <p className="py-10 text-center text-sm text-slate-500">Coming soon</p>
+                <p className="py-10 text-center text-sm text-slate-500">
+                  {installTab === "mac"
+                    ? t("install.tab_mac_soon")
+                    : t("install.tab_android_soon")}
+                </p>
               )}
             </section>
 
             <section className={cn(card, "p-5 xl:col-span-3")}>
               <p className="text-[10px] font-semibold uppercase tracking-wider text-sky-600">
-                Setup checklist
+                {t("setup.title")}
               </p>
-              <p className="mt-1 text-sm font-semibold">Let&apos;s get you started</p>
+              <p className="mt-1 text-sm font-semibold">{t("overview.setup_lets_start")}</p>
               <div className="mt-4 h-1.5 rounded-full bg-slate-100">
                 <div className="h-full w-0 rounded-full bg-sky-500" />
               </div>
               <ul className="mt-5 space-y-3 text-xs">
-                {["Activate your license", "Download & install app", "Connect printer", "Configure tables", "Add products"].map(
-                  (label) => (
-                    <li key={label} className="flex items-center gap-2.5 text-slate-600">
-                      <Circle className="size-4 text-slate-300" />
-                      {label}
-                    </li>
-                  ),
-                )}
+                {EMPTY_SETUP_STEP_KEYS.map((key) => (
+                  <li key={key} className="flex items-center gap-2.5 text-slate-600">
+                    <Circle className="size-4 text-slate-300" />
+                    {t(key)}
+                  </li>
+                ))}
               </ul>
             </section>
           </div>
 
           <section className="mt-4 rounded-2xl border border-sky-100 bg-gradient-to-r from-sky-50 to-blue-50 px-5 py-4">
-            <p className="text-sm font-semibold text-slate-900">Start with one month free</p>
-            <p className="mt-1 text-xs text-slate-500">
-              Create your venue, receive a license key, and manage everything from this dashboard.
-            </p>
+            <p className="text-sm font-semibold text-slate-900">{t("overview.free_month_title")}</p>
+            <p className="mt-1 text-xs text-slate-500">{t("overview.free_month_hint")}</p>
           </section>
         </div>
       </div>
@@ -381,10 +427,10 @@ export default function DashboardOverviewModern() {
         <header className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              Welcome back, {user?.name?.trim() || "User"} 👋
+              {t("overview.welcome", { name: displayName })}
             </h1>
             <p className="mt-1 text-sm text-slate-500">
-              Here&apos;s what&apos;s happening with your POS system today.
+              {t("overview.active_subtitle")}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -392,21 +438,21 @@ export default function DashboardOverviewModern() {
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
               <input
                 type="search"
-                placeholder="Search anything..."
+                placeholder={t("overview.search_placeholder")}
                 className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
               />
             </label>
             <button
               type="button"
               className="flex size-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
-              aria-label="Notifications"
+              aria-label={t("overview.notifications")}
             >
               <Bell className="size-4" />
             </button>
             <Button asChild className="h-10 rounded-xl bg-[#087cf0] px-4 text-white hover:bg-[#066bd0]">
               <Link to="/dashboard/business-settings">
                 <Plus className="mr-1.5 size-4" />
-                Quick action
+                {t("overview.quick_action")}
               </Link>
             </Button>
           </div>
@@ -414,34 +460,44 @@ export default function DashboardOverviewModern() {
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <StatPill
-            label="Active license"
+            label={t("overview.stat_active_license")}
             value={typeLabel}
-            subtitle={restaurant.licenseStatus === "active" ? "Active" : restaurant.licenseStatus}
+            subtitle={
+              restaurant.licenseStatus === "active"
+                ? t("venue.active")
+                : restaurant.licenseStatus
+            }
             icon={Shield}
           />
           <StatPill
             label={t("stat.plan")}
             value={planLabel}
-            subtitle={`${maxDevices} device limit`}
+            subtitle={t("overview.device_limit", { count: maxDevices })}
             icon={Layers}
           />
           <StatPill
             label={t("stat.days_remaining")}
             value={t("stat.days_value", { count: daysLeft })}
-            subtitle={`Until ${formatDate(restaurant.licenseExpiry, dateLocale)}`}
+            subtitle={t("overview.until_date", {
+              date: formatDate(restaurant.licenseExpiry, dateLocale),
+            })}
             icon={Timer}
             warn={isExpiringSoon}
           />
           <StatPill
             label={t("devices.title")}
             value={`${deviceCount} / ${maxDevices}`}
-            subtitle="Active devices"
+            subtitle={t("overview.active_devices")}
             icon={Monitor}
           />
           <StatPill
             label={t("venue.last_sync")}
-            value={restaurant.lastPosSyncAt ? formatDateTime(restaurant.lastPosSyncAt, dateLocale) : "Not yet"}
-            subtitle="Cloud synchronization"
+            value={
+              restaurant.lastPosSyncAt
+                ? formatDateTime(restaurant.lastPosSyncAt, dateLocale)
+                : t("overview.not_yet")
+            }
+            subtitle={t("overview.cloud_sync")}
             icon={RefreshCw}
           />
         </div>
@@ -628,7 +684,9 @@ export default function DashboardOverviewModern() {
                   {t("setup.title")}
                 </p>
                 <p className="mt-1 text-sm font-semibold text-slate-900">
-                  {setup?.percent === 100 ? "You’re all set!" : "You’re on the right track!"}
+                  {setup?.percent === 100
+                    ? t("overview.setup_complete")
+                    : t("overview.setup_on_track")}
                 </p>
               </div>
               <span className="flex size-12 shrink-0 items-center justify-center rounded-full border-4 border-sky-100 text-xs font-bold text-sky-600">
@@ -659,7 +717,7 @@ export default function DashboardOverviewModern() {
               to="/dashboard/get-started"
               className="mt-5 inline-flex text-xs font-medium text-sky-600 hover:text-sky-700"
             >
-              View full guide <ArrowRight className="ml-1 size-3.5" />
+              {t("overview.view_full_guide")} <ArrowRight className="ml-1 size-3.5" />
             </Link>
           </section>
         </div>
@@ -668,10 +726,10 @@ export default function DashboardOverviewModern() {
           <section className={cn(card, "p-5 xl:col-span-3")}>
             <div className="flex items-center justify-between">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-sky-600">
-                Notifications
+                {t("overview.notifications")}
               </p>
               <Link to="/dashboard/settings?tab=notifications" className="text-[10px] text-sky-600">
-                View all
+                {t("overview.view_all")}
               </Link>
             </div>
             <div className="mt-4 space-y-3">
@@ -680,23 +738,27 @@ export default function DashboardOverviewModern() {
                   <BellRing className="mt-0.5 size-4 shrink-0 text-amber-500" />
                   <div>
                     <p className="text-xs font-semibold text-slate-800">
-                      License expires in {daysLeft} days
+                      {t("overview.license_expires_in", { count: daysLeft })}
                     </p>
-                    <p className="mt-0.5 text-[10px] text-slate-500">Renew to avoid interruption.</p>
+                    <p className="mt-0.5 text-[10px] text-slate-500">{t("overview.renew_hint")}</p>
                   </div>
                 </div>
               ) : null}
               <div className="flex gap-3 rounded-xl bg-sky-50 p-3">
                 <PackageCheck className="mt-0.5 size-4 shrink-0 text-sky-500" />
                 <div>
-                  <p className="text-xs font-semibold text-slate-800">POS is up to date</p>
-                  <p className="mt-0.5 text-[10px] text-slate-500">Version {versionLabel} is available.</p>
+                  <p className="text-xs font-semibold text-slate-800">{t("overview.pos_up_to_date")}</p>
+                  <p className="mt-0.5 text-[10px] text-slate-500">
+                    {t("overview.version_available", { version: versionLabel })}
+                  </p>
                 </div>
               </div>
               <div className="flex gap-3 rounded-xl bg-emerald-50 p-3">
                 <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-500" />
                 <div>
-                  <p className="text-xs font-semibold text-slate-800">Cloud sync enabled</p>
+                  <p className="text-xs font-semibold text-slate-800">
+                    {t("overview.cloud_sync_enabled")}
+                  </p>
                   <p className="mt-0.5 text-[10px] text-slate-500">{lastSyncLabel}</p>
                 </div>
               </div>
@@ -709,7 +771,7 @@ export default function DashboardOverviewModern() {
                 {t("activity.title")}
               </p>
               <Link to="/dashboard/support" className="text-[10px] text-sky-600">
-                View all
+                {t("overview.view_all")}
               </Link>
             </div>
             {activity.length === 0 ? (
@@ -738,31 +800,38 @@ export default function DashboardOverviewModern() {
           <section className={cn(card, "p-5 xl:col-span-6")}>
             <div className="flex items-center justify-between gap-3">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-sky-600">
-                Monthly overview
+                {t("overview.monthly_title")}
               </p>
               <span className="rounded-lg border border-slate-200 px-2.5 py-1 text-[10px] text-slate-500">
-                This month
+                {t("overview.this_month")}
               </span>
             </div>
             <div className="mt-4 grid grid-cols-3 gap-3">
               <div>
-                <p className="text-[10px] text-slate-400">Sales</p>
+                <p className="text-[10px] text-slate-400">{t("overview.sales")}</p>
                 <p className="mt-0.5 text-base font-bold text-slate-900">
-                  {monthly.sales.toLocaleString(dateLocale, { maximumFractionDigits: 2 })} {restaurant.currency}
+                  {monthly.sales.toLocaleString(dateLocale, { maximumFractionDigits: 2 })}{" "}
+                  {restaurant.currency}
                 </p>
               </div>
               <div>
-                <p className="text-[10px] text-slate-400">Orders</p>
+                <p className="text-[10px] text-slate-400">{t("overview.orders")}</p>
                 <p className="mt-0.5 text-base font-bold text-slate-900">{monthly.orders}</p>
               </div>
               <div>
-                <p className="text-[10px] text-slate-400">Avg. order</p>
+                <p className="text-[10px] text-slate-400">{t("overview.avg_order")}</p>
                 <p className="mt-0.5 text-base font-bold text-slate-900">
-                  {monthly.averageOrder.toLocaleString(dateLocale, { maximumFractionDigits: 2 })} {restaurant.currency}
+                  {monthly.averageOrder.toLocaleString(dateLocale, {
+                    maximumFractionDigits: 2,
+                  })}{" "}
+                  {restaurant.currency}
                 </p>
               </div>
             </div>
-            <SalesSparkline points={monthly.points.length ? monthly.points : [0]} />
+            <SalesSparkline
+              points={monthly.points.length ? monthly.points : [0]}
+              ariaLabel={t("overview.sales_trend_aria")}
+            />
           </section>
         </div>
 
@@ -772,15 +841,13 @@ export default function DashboardOverviewModern() {
               <TrendingUp className="size-5" />
             </span>
             <div>
-              <p className="text-sm font-semibold text-slate-900">Upgrade your plan</p>
-              <p className="mt-0.5 text-xs text-slate-500">
-                Unlock more devices, advanced reporting, cloud backup, and priority support.
-              </p>
+              <p className="text-sm font-semibold text-slate-900">{t("overview.upgrade_title")}</p>
+              <p className="mt-0.5 text-xs text-slate-500">{t("overview.upgrade_hint")}</p>
             </div>
           </div>
           <Button asChild variant="outline" className="shrink-0 rounded-xl border-sky-200 bg-white text-sky-700">
             <Link to="/dashboard/settings?tab=billing">
-              Upgrade now <ArrowRight className="ml-2 size-4" />
+              {t("overview.upgrade_now")} <ArrowRight className="ml-2 size-4" />
             </Link>
           </Button>
         </section>
