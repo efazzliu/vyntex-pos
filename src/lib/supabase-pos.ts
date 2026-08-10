@@ -139,7 +139,7 @@ async function fetchRestaurantRowForActivation(licenseKey: string): Promise<{
     }
 
     if (data) {
-      return { row: data as RestaurantActivationRow, error: null };
+      return { row: data as unknown as RestaurantActivationRow, error: null };
     }
   }
 
