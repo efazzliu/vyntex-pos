@@ -19,11 +19,17 @@ function safeReturnPath(from: unknown): string | null {
   return from;
 }
 
-type LoginPageProps = { defaultAfterLogin?: string; showManagerCodeLink?: boolean };
+type LoginPageProps = {
+  defaultAfterLogin?: string;
+  showManagerCodeLink?: boolean;
+  /** Phone app: link to staff/waiter POS PIN login (`#/pos`). */
+  showWaiterPinLink?: boolean;
+};
 
 export default function LoginPageModern({
   defaultAfterLogin = "/dashboard",
   showManagerCodeLink = false,
+  showWaiterPinLink = false,
 }: LoginPageProps) {
   const { t } = useTranslation("site");
   const navigate = useNavigate();
@@ -225,7 +231,20 @@ export default function LoginPageModern({
                   {t("auth.login.createAccount")}
                 </Link>
               </p>
-              {showManagerCodeLink ? <p className="mt-4 text-sm"><Link to="/redeem-code" className="text-[#0066FF]">{t("auth.login.managerCodeLink")}</Link></p> : null}
+              {showWaiterPinLink ? (
+                <p className="mt-4 text-center text-sm">
+                  <Link to="/pos" className="font-medium text-[#0066FF] hover:underline">
+                    {t("auth.login.waiterPinLink")}
+                  </Link>
+                </p>
+              ) : null}
+              {showManagerCodeLink ? (
+                <p className="mt-3 text-center text-sm">
+                  <Link to="/redeem-code" className="text-[#0066FF] hover:underline">
+                    {t("auth.login.managerCodeLink")}
+                  </Link>
+                </p>
+              ) : null}
             </section>
           </div>
         </div>

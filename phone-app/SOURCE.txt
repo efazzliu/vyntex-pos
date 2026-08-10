@@ -6,8 +6,9 @@ Hyrja e dytë Vite (pa site publik): phone.html
   • Në telefon (i njëjti Wi-Fi): http://IP_E_PC:5173/phone.html
   • Build prod: dist/phone.html (bashkë me dist/index.html)
 
-Rruga (HashRouter): phone.html#/ → login → #/app (dashboard mobil), #/pos, #/admin.
+Rruga (HashRouter): phone.html#/ → login → #/app (dashboard mobil), #/pos (kyçje kamarieri me PIN), #/redeem-code.
 Shembull: http://localhost:5173/phone.html#/login
+Kamarier: http://localhost:5173/phone.html#/pos (licencë + PIN, pa email)
 
 Import në projekt: @/phone-app/...  (shembull: @/phone-app/components/Foo)
 

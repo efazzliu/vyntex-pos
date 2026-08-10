@@ -278,11 +278,14 @@ type LoginPageProps = {
   defaultAfterLogin?: string;
   /** Phone app: link to invite-code entry (no password) for venue managers. */
   showManagerCodeLink?: boolean;
+  /** Phone app: link to staff/waiter POS PIN login (`#/pos`). */
+  showWaiterPinLink?: boolean;
 };
 
 export default function LoginPage({
   defaultAfterLogin = "/dashboard",
   showManagerCodeLink = false,
+  showWaiterPinLink = false,
 }: LoginPageProps) {
   const { t } = useTranslation("site");
   const navigate = useNavigate();
@@ -447,8 +450,19 @@ export default function LoginPage({
           </Button>
         </form>
 
-        {showManagerCodeLink ? (
+        {showWaiterPinLink ? (
           <p className="mt-5 text-center text-sm">
+            <Link
+              to="/pos"
+              className="font-medium text-[#0066FF] hover:underline"
+            >
+              {t("auth.login.waiterPinLink")}
+            </Link>
+          </p>
+        ) : null}
+
+        {showManagerCodeLink ? (
+          <p className="mt-3 text-center text-sm">
             <Link
               to="/redeem-code"
               className="font-medium text-[#0066FF] hover:underline"

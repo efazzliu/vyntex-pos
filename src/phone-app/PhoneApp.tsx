@@ -1,4 +1,4 @@
-import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
+import { HashRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { DefaultProviders } from "@/components/providers/default.tsx";
 import { Toaster } from "@/components/ui/sonner.tsx";
 import { RedirectIfAuthed } from "@/components/redirect-if-authed.tsx";
@@ -7,6 +7,7 @@ import AuthCallback from "@/pages/auth/Callback.tsx";
 import LoginPage from "@/pages/auth/login/page-modern.tsx";
 import RegisterPage from "@/pages/auth/register/page-modern.tsx";
 import NotFound from "@/pages/NotFound.tsx";
+import PosLauncher from "@/pages/pos/page.tsx";
 import PhoneDashboard from "@/phone-app/components/phone-dashboard.tsx";
 import PhoneVenueHome from "@/phone-app/components/phone-venue-home.tsx";
 import PhoneOrdersPage from "@/phone-app/components/phone-orders-page.tsx";
@@ -25,15 +26,24 @@ import PhoneProfilePreferencesPage from "@/phone-app/components/phone-profile-pr
 import PhoneProfileSecurityPage from "@/phone-app/components/phone-profile-security-page.tsx";
 import PhoneProfileDisplayPage from "@/phone-app/components/phone-profile-display-page.tsx";
 
+/** Hide Sonner on full-screen POS (PIN / floor / orders), same as desktop App.tsx. */
+function PhoneToaster() {
+  const { pathname } = useLocation();
+  const isPos = pathname === "/pos" || pathname.startsWith("/pos/");
+  if (isPos) return null;
+  return <Toaster richColors position="top-right" />;
+}
+
 /**
  * Rrugë vetëm për shell-in mobil (phone.html).
  * HashRouter: URL mbetet `/phone.html#/login` etj., sepse rruga e skedarit nuk është `/`.
+ * Kamarierët: `#/pos` — aktivizim me licencë + kyçje me PIN (pa email).
  */
 export default function PhoneApp() {
   return (
     <DefaultProviders>
       <HashRouter>
-        <Toaster richColors position="top-right" />
+        <PhoneToaster />
         <PhoneAuthUrlGate>
           <Routes>
           <Route path="/" element={<Navigate to="/login" replace />} />
@@ -44,11 +54,17 @@ export default function PhoneApp() {
             path="/app/redeem-code"
             element={<Navigate to="/redeem-code" replace />}
           />
+          {/* Waiter / staff POS: license key + PIN (no Supabase account required). */}
+          <Route path="/pos" element={<PosLauncher />} />
           <Route element={<RedirectIfAuthed redirectTo="/app" />}>
             <Route
               path="/login"
               element={
-                <LoginPage defaultAfterLogin="/app" showManagerCodeLink />
+                <LoginPage
+                  defaultAfterLogin="/app"
+                  showManagerCodeLink
+                  showWaiterPinLink
+                />
               }
             />
             <Route path="/register" element={<RegisterPage />} />
