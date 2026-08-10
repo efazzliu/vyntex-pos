@@ -75,7 +75,7 @@ export default function DashboardSettingsModern() {
           </div>
           {isAdmin ? (
             <Button type="button" variant="ghost" size="sm" asChild className="h-9 shrink-0 self-start rounded-lg text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white sm:self-auto">
-              <Link to="/admin"><LayoutDashboard className="mr-1.5 size-3.5" />Admin panel</Link>
+              <Link to="/admin" state={{ from: "/dashboard/settings" }}><LayoutDashboard className="mr-1.5 size-3.5" />Admin panel</Link>
             </Button>
           ) : null}
         </div>

@@ -258,13 +258,18 @@ function AdminContentInner({ adminAccess }: { adminAccess: PlatformAdminRole | n
   const location = useLocation();
   const sidebarCollapsed = settings.ui.sidebarCollapsed;
 
-  const goBackToSite = () => {
+  const goBackToProfile = () => {
     const from = (location.state as { from?: string } | null)?.from;
-    if (typeof from === "string" && from.startsWith("/") && !from.startsWith("/admin")) {
+    if (
+      typeof from === "string" &&
+      from.startsWith("/") &&
+      !from.startsWith("/admin")
+    ) {
       navigate(from);
       return;
     }
-    navigate("/");
+    // Profile / settings — where admins enter the admin panel from.
+    navigate("/dashboard/settings");
   };
 
   useEffect(() => {
@@ -319,9 +324,9 @@ function AdminContentInner({ adminAccess }: { adminAccess: PlatformAdminRole | n
           </Link>
           <button
             type="button"
-            onClick={goBackToSite}
-            aria-label="Back to site"
-            title="Back to site"
+            onClick={goBackToProfile}
+            aria-label="Back to profile"
+            title="Back to profile"
             className="ml-auto inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-semibold bg-red-500/10 text-red-500 transition-colors hover:bg-red-500/15 active:scale-[0.98]"
           >
             <ChevronLeft className="size-3.5" />

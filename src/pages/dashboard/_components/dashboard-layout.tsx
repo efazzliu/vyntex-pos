@@ -253,6 +253,7 @@ function DashboardSidebar({
         <div className="px-3 pb-2">
           <Link
             to="/admin"
+            state={{ from: "/dashboard/settings" }}
             className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors"
           >
             <ShieldCheck className="size-4" />
