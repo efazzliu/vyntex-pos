@@ -24,12 +24,14 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils.ts";
 import { KeyRound, Loader2, Shield } from "lucide-react";
 import { supportMailtoWithSubject } from "@/lib/site-constants.ts";
+import { useDashboardLocale } from "@/pages/dashboard/_components/dashboard-locale-context.tsx";
 
 type PremiumCardProps = {
   children: React.ReactNode;
 };
 
 function SectionShell({ children }: PremiumCardProps) {
+  const { t } = useDashboardLocale();
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_20px_50px_-30px_rgba(2,6,23,0.28)] dark:border-slate-700/80 dark:bg-slate-900/90">
       <div className="mb-5 flex items-start gap-3 border-b border-slate-200 pb-4 dark:border-slate-700/80">
@@ -37,9 +39,11 @@ function SectionShell({ children }: PremiumCardProps) {
           <Shield className="size-4" />
         </div>
         <div>
-          <h2 className="text-base font-semibold text-slate-900 dark:text-white">Security settings</h2>
+          <h2 className="text-base font-semibold text-slate-900 dark:text-white">
+            {t("settings.security.title")}
+          </h2>
           <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-            Password, two-factor authentication, sessions, and account deletion.
+            {t("settings.security.subtitle")}
           </p>
         </div>
       </div>
@@ -49,6 +53,7 @@ function SectionShell({ children }: PremiumCardProps) {
 }
 
 export function DashboardSecuritySection() {
+  const { t } = useDashboardLocale();
   const navigate = useNavigate();
   const [loginHistory, setLoginHistory] = useState<DashboardLoginHistoryEntry[]>([]);
   const [sessionInfo, setSessionInfo] = useState<{
@@ -100,14 +105,14 @@ export function DashboardSecuritySection() {
   }, []);
 
   const handleChangePassword = async () => {
-    if (newPassword.length < 8) return void toast.error("Password must be at least 8 characters");
-    if (newPassword !== confirmPassword) return void toast.error("Passwords do not match");
+    if (newPassword.length < 8) return void toast.error(t("settings.security.error.password_length"));
+    if (newPassword !== confirmPassword) return void toast.error(t("settings.security.error.password_mismatch"));
     setPasswordLoading(true);
     try {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) return void toast.error(error.message);
       await recordPasswordChangedAt();
-      toast.success("Password updated");
+      toast.success(t("settings.security.password_updated"));
       setPasswordOpen(false);
       setNewPassword("");
       setConfirmPassword("");
@@ -149,7 +154,7 @@ export function DashboardSecuritySection() {
         code: mfaCode.trim(),
       });
       if (error) return void toast.error(error.message);
-      toast.success("Two-factor authentication enabled");
+      toast.success(t("settings.security.mfa_enabled"));
       setMfaOpen(false);
       setMfaCode("");
       await refreshMfa();
@@ -163,10 +168,10 @@ export function DashboardSecuritySection() {
     try {
       const { data } = await supabase.auth.mfa.listFactors();
       const totp = data?.totp?.find((f) => f.status === "verified");
-      if (!totp) return void toast.error("No active 2FA factor");
+      if (!totp) return void toast.error(t("settings.security.error.no_mfa_factor"));
       const { error } = await supabase.auth.mfa.unenroll({ factorId: totp.id });
       if (error) return void toast.error(error.message);
-      toast.success("2FA disabled");
+      toast.success(t("settings.security.mfa_disabled"));
       await refreshMfa();
     } finally {
       setMfaLoading(false);
@@ -181,12 +186,11 @@ export function DashboardSecuritySection() {
 
   const handleDeleteAccount = async () => {
     if (deleteConfirm.trim().toUpperCase() !== "DELETE") {
-      return void toast.error('Type DELETE to confirm');
+      return void toast.error(t("settings.security.error.type_delete"));
     }
     await supabase.auth.signOut({ scope: "global" });
-    toast.message("Account deletion request", {
-      description:
-        "We signed you out. Email support to complete permanent deletion of your account and data.",
+    toast.message(t("settings.security.delete_request_title"), {
+      description: t("settings.security.delete_request_desc"),
     });
     window.location.href = supportMailtoWithSubject("Vyntex POS — Delete my account");
   };
@@ -195,7 +199,7 @@ export function DashboardSecuritySection() {
     <>
       <SectionShell>
         <div className="divide-y divide-slate-100 dark:divide-slate-800">
-          <SettingsRow label="Change password" hint="Use at least 8 characters.">
+          <SettingsRow label={t("settings.security.change_password")} hint={t("settings.security.change_password_hint")}>
             <Button
               type="button"
               variant="outline"
@@ -204,13 +208,13 @@ export function DashboardSecuritySection() {
               onClick={() => setPasswordOpen(true)}
             >
               <KeyRound className="mr-1.5 size-3.5" />
-              Change password
+              {t("settings.security.change_password")}
             </Button>
           </SettingsRow>
 
           <SettingsRow
-            label="Two-factor authentication (2FA)"
-            hint={mfaEnabled ? "Authenticator app is active." : "Adds a code from your phone at sign-in."}
+            label={t("settings.security.mfa")}
+            hint={mfaEnabled ? t("settings.security.mfa_active") : t("settings.security.mfa_inactive")}
           >
             {mfaEnabled ? (
               <Button
@@ -221,7 +225,7 @@ export function DashboardSecuritySection() {
                 className="h-9 w-full rounded-xl sm:w-auto"
                 onClick={() => void disableMfa()}
               >
-                Disable 2FA
+                {t("settings.security.disable_2fa")}
               </Button>
             ) : (
               <Button
@@ -231,12 +235,12 @@ export function DashboardSecuritySection() {
                 className="h-9 w-full rounded-xl bg-[#0066FF] sm:w-auto"
                 onClick={() => void startMfaEnroll()}
               >
-                {mfaLoading ? <Loader2 className="size-4 animate-spin" /> : "Enable 2FA"}
+                {mfaLoading ? <Loader2 className="size-4 animate-spin" /> : t("settings.security.enable_2fa")}
               </Button>
             )}
           </SettingsRow>
 
-          <SettingsRow label="Active session (this device)" hint="Other devices can be signed out below.">
+          <SettingsRow label={t("settings.security.active_session")} hint={t("settings.security.active_session_hint")}>
             <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs dark:border-slate-600 dark:bg-slate-950">
               <p className="font-medium text-slate-800 dark:text-slate-100">
                 {sessionInfo ? parseUserAgentLabel(sessionInfo.userAgent) : "—"}
@@ -244,13 +248,15 @@ export function DashboardSecuritySection() {
               <p className="mt-1 text-slate-500">
                 {sessionInfo?.provider ?? "email"}
                 {sessionInfo?.expiresAt
-                  ? ` · session until ${formatSettingsDateTime(sessionInfo.expiresAt)}`
+                  ? ` · ${t("settings.security.session_until", {
+                      date: formatSettingsDateTime(sessionInfo.expiresAt),
+                    })}`
                   : ""}
               </p>
             </div>
           </SettingsRow>
 
-          <SettingsRow label="Sign out all devices" hint="Ends every active login for this account.">
+          <SettingsRow label={t("settings.security.sign_out_all")} hint={t("settings.security.sign_out_all_hint")}>
             <Button
               type="button"
               variant="destructive"
@@ -258,14 +264,14 @@ export function DashboardSecuritySection() {
               className="h-9 w-full rounded-xl sm:w-auto"
               onClick={() => void handleGlobalLogout()}
             >
-              Sign out everywhere
+              {t("settings.security.sign_out_everywhere")}
             </Button>
           </SettingsRow>
 
-          <SettingsRow wide label="Login history" hint="Recent sign-ins recorded on this account.">
+          <SettingsRow wide label={t("settings.security.login_history")} hint={t("settings.security.login_history_hint")}>
             <div className="w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-50/80 dark:border-slate-700 dark:bg-slate-950/80">
               {loginHistory.length === 0 ? (
-                <p className="px-4 py-6 text-center text-sm text-slate-500">No sign-ins recorded yet.</p>
+                <p className="px-4 py-6 text-center text-sm text-slate-500">{t("settings.security.no_signins")}</p>
               ) : (
                 <ul className="divide-y divide-slate-200/80 dark:divide-slate-800">
                   {loginHistory.map((entry) => (
@@ -290,8 +296,8 @@ export function DashboardSecuritySection() {
           </SettingsRow>
 
           <SettingsRow
-            label="Delete account"
-            hint="Permanent removal of your account and linked venues requires support confirmation."
+            label={t("settings.security.delete_account")}
+            hint={t("settings.security.delete_account_hint")}
           >
             <Button
               type="button"
@@ -303,7 +309,7 @@ export function DashboardSecuritySection() {
               )}
               onClick={() => setDeleteOpen(true)}
             >
-              Delete account
+              {t("settings.security.delete_account")}
             </Button>
           </SettingsRow>
         </div>
@@ -312,12 +318,12 @@ export function DashboardSecuritySection() {
       <Dialog open={passwordOpen} onOpenChange={setPasswordOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Change password</DialogTitle>
-            <DialogDescription>Choose a strong password you do not use elsewhere.</DialogDescription>
+            <DialogTitle>{t("settings.security.dialog.change_password_title")}</DialogTitle>
+            <DialogDescription>{t("settings.security.dialog.change_password_desc")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label htmlFor="new-password">New password</Label>
+              <Label htmlFor="new-password">{t("settings.security.new_password")}</Label>
               <Input
                 id="new-password"
                 type="password"
@@ -328,7 +334,7 @@ export function DashboardSecuritySection() {
               />
             </div>
             <div>
-              <Label htmlFor="confirm-password">Confirm password</Label>
+              <Label htmlFor="confirm-password">{t("settings.security.confirm_password")}</Label>
               <Input
                 id="confirm-password"
                 type="password"
@@ -341,10 +347,10 @@ export function DashboardSecuritySection() {
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setPasswordOpen(false)}>
-              Cancel
+              {t("settings.security.cancel")}
             </Button>
             <Button type="button" disabled={passwordLoading} onClick={() => void handleChangePassword()}>
-              {passwordLoading ? "Saving…" : "Update password"}
+              {passwordLoading ? t("settings.security.saving") : t("settings.security.update_password")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -353,17 +359,19 @@ export function DashboardSecuritySection() {
       <Dialog open={mfaOpen} onOpenChange={setMfaOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Enable two-factor authentication</DialogTitle>
-            <DialogDescription>Scan the QR code with Google Authenticator or similar.</DialogDescription>
+            <DialogTitle>{t("settings.security.mfa_dialog_title")}</DialogTitle>
+            <DialogDescription>{t("settings.security.mfa_dialog_desc")}</DialogDescription>
           </DialogHeader>
           {mfaQr ? (
-            <img src={mfaQr} alt="2FA QR code" className="mx-auto h-40 w-40 rounded-lg border" />
+            <img src={mfaQr} alt={t("settings.security.mfa_qr_alt")} className="mx-auto h-40 w-40 rounded-lg border" />
           ) : null}
           {mfaSecret ? (
-            <p className="text-center font-mono text-xs text-slate-500">Secret: {mfaSecret}</p>
+            <p className="text-center font-mono text-xs text-slate-500">
+              {t("settings.security.mfa_secret", { secret: mfaSecret })}
+            </p>
           ) : null}
           <div>
-            <Label htmlFor="mfa-code">Verification code</Label>
+            <Label htmlFor="mfa-code">{t("settings.security.verification_code")}</Label>
             <Input
               id="mfa-code"
               inputMode="numeric"
@@ -374,10 +382,10 @@ export function DashboardSecuritySection() {
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setMfaOpen(false)}>
-              Cancel
+              {t("settings.security.cancel")}
             </Button>
             <Button type="button" disabled={mfaLoading} onClick={() => void verifyMfa()}>
-              Verify & enable
+              {t("settings.security.verify_enable")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -386,24 +394,21 @@ export function DashboardSecuritySection() {
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Delete account</DialogTitle>
-            <DialogDescription>
-              This signs you out and opens an email to support to complete permanent deletion. Type{" "}
-              <strong>DELETE</strong> to continue.
-            </DialogDescription>
+            <DialogTitle>{t("settings.security.delete_dialog_title")}</DialogTitle>
+            <DialogDescription>{t("settings.security.delete_dialog_desc")}</DialogDescription>
           </DialogHeader>
           <Input
             value={deleteConfirm}
             onChange={(e) => setDeleteConfirm(e.target.value)}
-            placeholder="DELETE"
+            placeholder={t("settings.security.delete_placeholder")}
             className="font-mono"
           />
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setDeleteOpen(false)}>
-              Cancel
+              {t("settings.security.cancel")}
             </Button>
             <Button type="button" variant="destructive" onClick={() => void handleDeleteAccount()}>
-              Request deletion
+              {t("settings.security.request_deletion")}
             </Button>
           </DialogFooter>
         </DialogContent>

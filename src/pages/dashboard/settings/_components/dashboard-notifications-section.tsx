@@ -9,8 +9,10 @@ import {
 } from "../_lib/account-settings.ts";
 import type { DashboardNotificationPrefs } from "../_lib/types.ts";
 import { SettingsRow } from "./settings-row.tsx";
+import { useDashboardLocale } from "@/pages/dashboard/_components/dashboard-locale-context.tsx";
 
 export function DashboardNotificationsSection() {
+  const { t } = useDashboardLocale();
   const [notifications, setNotifications] = useState<DashboardNotificationPrefs | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -34,7 +36,7 @@ export function DashboardNotificationsSection() {
       osc.start();
       osc.stop(ctx.currentTime + 0.12);
     } catch {
-      toast.message("Could not play test sound");
+      toast.message(t("settings.notifications.test_sound_failed"));
     }
   };
 
@@ -44,7 +46,7 @@ export function DashboardNotificationsSection() {
     try {
       const err = await saveDashboardNotificationPrefs(notifications);
       if (err) toast.error(err);
-      else toast.success("Notification preferences saved");
+      else toast.success(t("settings.notifications.saved"));
     } finally {
       setSaving(false);
     }
@@ -53,7 +55,7 @@ export function DashboardNotificationsSection() {
   if (!notifications) {
     return (
       <section className="rounded-3xl border border-slate-200 bg-white p-12 dark:border-slate-700/80 dark:bg-slate-900/90">
-        <p className="text-center text-sm text-slate-500">Loading preferences…</p>
+        <p className="text-center text-sm text-slate-500">{t("settings.notifications.loading")}</p>
       </section>
     );
   }
@@ -66,40 +68,40 @@ export function DashboardNotificationsSection() {
         </div>
         <div>
           <h2 className="text-base font-semibold text-slate-900 dark:text-white">
-            Notification preferences
+            {t("settings.notifications.title")}
           </h2>
           <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-            Choose what you receive by email and in the POS app.
+            {t("settings.notifications.subtitle")}
           </p>
         </div>
       </div>
 
       <div className="divide-y divide-slate-100 dark:divide-slate-800">
-        <SettingsRow label="Email notifications" hint="Account, license, and billing messages.">
+        <SettingsRow label={t("settings.notifications.email")} hint={t("settings.notifications.email_hint")}>
           <Switch
             checked={notifications.emailNotifications}
             onCheckedChange={(checked) => patch({ emailNotifications: checked })}
           />
         </SettingsRow>
-        <SettingsRow label="POS alerts" hint="Device activation, sync issues, and critical POS events.">
+        <SettingsRow label={t("settings.notifications.pos_alerts")} hint={t("settings.notifications.pos_alerts_hint")}>
           <Switch
             checked={notifications.posAlerts}
             onCheckedChange={(checked) => patch({ posAlerts: checked })}
           />
         </SettingsRow>
-        <SettingsRow label="Sales reports" hint="Periodic summaries of revenue and orders.">
+        <SettingsRow label={t("settings.notifications.sales_reports")} hint={t("settings.notifications.sales_reports_hint")}>
           <Switch
             checked={notifications.salesReports}
             onCheckedChange={(checked) => patch({ salesReports: checked })}
           />
         </SettingsRow>
-        <SettingsRow label="Marketing emails" hint="Product news and offers (optional).">
+        <SettingsRow label={t("settings.notifications.marketing")} hint={t("settings.notifications.marketing_hint")}>
           <Switch
             checked={notifications.marketingEmails}
             onCheckedChange={(checked) => patch({ marketingEmails: checked })}
           />
         </SettingsRow>
-        <SettingsRow label="Sound notifications" hint="Play a sound for alerts in this browser.">
+        <SettingsRow label={t("settings.notifications.sound")} hint={t("settings.notifications.sound_hint")}>
           <div className="flex items-center gap-2">
             <Switch
               checked={notifications.soundNotifications}
@@ -122,7 +124,7 @@ export function DashboardNotificationsSection() {
           onClick={() => void handleSave()}
           className="h-10 rounded-xl bg-gradient-to-r from-[#0066FF] to-[#00AACC] px-5 text-white"
         >
-          {saving ? "Saving…" : "Save notifications"}
+          {saving ? t("settings.notifications.saving") : t("settings.notifications.save")}
         </Button>
       </div>
     </section>

@@ -11,38 +11,13 @@ import {
 import { Button } from "@/components/ui/button.tsx";
 import type { DashboardRestaurant } from "@/hooks/use-dashboard-restaurant.ts";
 import { KeyRound } from "lucide-react";
-
-const vynTypeLabels: Record<string, string> = {
-  restaurant: "Restaurant POS",
-  cafe: "Coffee POS",
-  bar: "Bar POS",
-  hotel: "Hotel POS",
-  fitness: "Fitness POS",
-};
-
-const planLabels = {
-  starter: "Starter",
-  professional: "Professional",
-  enterprise: "Enterprise",
-} as const;
+import { dashboardDateLocale, dashboardPlanLabel, dashboardTypeLabel } from "@/lib/dashboard-i18n.ts";
+import { useDashboardLocale } from "@/pages/dashboard/_components/dashboard-locale-context.tsx";
 
 const MOCK_INVOICES = [
-  { id: "INV-2026-003", period: "Mar 2026", amount: "€39.00", status: "Paid" },
-  { id: "INV-2026-002", period: "Feb 2026", amount: "€39.00", status: "Paid" },
+  { id: "INV-2026-003", period: "Mar 2026", amount: "€39.00", status: "paid" as const },
+  { id: "INV-2026-002", period: "Feb 2026", amount: "€39.00", status: "paid" as const },
 ];
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-}
-
-function daysUntil(iso: string) {
-  const diff = new Date(iso).getTime() - Date.now();
-  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
-}
 
 type Props = {
   restaurant: DashboardRestaurant;
@@ -50,8 +25,16 @@ type Props = {
 };
 
 export function DashboardBillingSection({ restaurant, billingCheckoutUrl }: Props) {
+  const { t, lang } = useDashboardLocale();
   const trialDaysLeft = daysUntil(restaurant.licenseExpiry);
-  const planLabel = planLabels[restaurant.plan as keyof typeof planLabels] ?? restaurant.plan;
+  const planLabel = dashboardPlanLabel(restaurant.plan, lang);
+
+  const formatDate = (iso: string) =>
+    new Date(iso).toLocaleDateString(dashboardDateLocale(lang), {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
 
   return (
     <section className="space-y-6">
@@ -62,36 +45,44 @@ export function DashboardBillingSection({ restaurant, billingCheckoutUrl }: Prop
           </div>
           <div>
             <h2 className="text-base font-semibold text-slate-900 dark:text-white">
-              Subscription & billing
+              {t("settings.billing.title")}
             </h2>
             <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-              Plan, renewal, payment method, and invoices.
+              {t("settings.billing.subtitle")}
             </p>
           </div>
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-600 dark:bg-slate-950/80">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Current plan</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {t("settings.billing.current_plan")}
+            </p>
             <p className="mt-2 flex items-center gap-2 text-lg font-semibold text-slate-900 dark:text-white">
               <BadgeEuro className="size-5 text-[#0066FF]" />
               {planLabel}
             </p>
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
               <Calendar className="mr-1.5 inline size-4" />
-              Renewal date{" "}
+              {t("settings.billing.renewal_date")}{" "}
               <span className="font-medium">{formatDate(restaurant.licenseExpiry)}</span>
-              <span className="text-slate-500"> ({trialDaysLeft} days left)</span>
+              <span className="text-slate-500">
+                {" "}
+                {t("settings.billing.days_left", { count: trialDaysLeft })}
+              </span>
             </p>
             <p className="mt-3 text-xs text-slate-500">
-              Status: <span className="font-medium capitalize">{restaurant.licenseStatus}</span>
+              {t("settings.billing.status")}{" "}
+              <span className="font-medium capitalize">{restaurant.licenseStatus}</span>
             </p>
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-600 dark:bg-slate-950/80">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Payment method</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {t("settings.billing.payment_method")}
+            </p>
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-              Managed through checkout (Paddle). Update card details in the billing portal when available.
+              {t("settings.billing.payment_hint")}
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <Button
@@ -104,12 +95,14 @@ export function DashboardBillingSection({ restaurant, billingCheckoutUrl }: Prop
                 }
               >
                 <ExternalLink className="mr-1.5 size-3.5" />
-                {billingCheckoutUrl ? "Update payment method" : "Checkout unavailable"}
+                {billingCheckoutUrl
+                  ? t("settings.billing.update_payment")
+                  : t("settings.billing.checkout_unavailable")}
               </Button>
               <Button type="button" size="sm" variant="outline" asChild className="rounded-xl">
                 <Link to="/dashboard/settings?tab=billing">
                   <FileText className="mr-1.5 size-3.5" />
-                  Full billing page
+                  {t("settings.billing.full_billing_page")}
                 </Link>
               </Button>
             </div>
@@ -120,7 +113,7 @@ export function DashboardBillingSection({ restaurant, billingCheckoutUrl }: Prop
           <Button type="button" asChild className="rounded-xl">
             <Link to="/pricing">
               <ArrowRightLeft className="mr-1.5 size-4" />
-              Upgrade / downgrade plan
+              {t("settings.billing.upgrade_downgrade")}
             </Link>
           </Button>
         </div>
@@ -129,7 +122,7 @@ export function DashboardBillingSection({ restaurant, billingCheckoutUrl }: Prop
       <div className="rounded-3xl border border-slate-200 bg-white p-6 dark:border-slate-700/80 dark:bg-slate-900/90">
         <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
           <FileText className="size-4 text-[#0066FF]" />
-          Download invoices
+          {t("settings.billing.download_invoices")}
         </div>
         <div className="space-y-2">
           {MOCK_INVOICES.map((inv) => (
@@ -143,11 +136,13 @@ export function DashboardBillingSection({ restaurant, billingCheckoutUrl }: Prop
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">{inv.amount}</span>
-                <span className="text-xs text-emerald-600 dark:text-emerald-400">{inv.status}</span>
+                <span className="text-xs text-emerald-600 dark:text-emerald-400">
+                  {t("settings.billing.invoice_paid")}
+                </span>
                 <Button type="button" variant="outline" size="sm" className="h-8 rounded-lg" asChild>
                   <Link to="/dashboard/settings?tab=billing">
                     <Download className="mr-1 size-3" />
-                    PDF
+                    {t("settings.billing.pdf")}
                   </Link>
                 </Button>
               </div>
@@ -155,25 +150,27 @@ export function DashboardBillingSection({ restaurant, billingCheckoutUrl }: Prop
           ))}
         </div>
         <p className="mt-3 text-xs text-slate-500">
-          Live Paddle invoices appear on the{" "}
+          {t("settings.billing.invoices_hint_prefix")}{" "}
           <Link to="/dashboard/settings?tab=billing" className="text-[#0066FF] hover:underline dark:text-cyan-400">
-            billing page
+            {t("settings.billing.invoices_hint_link")}
           </Link>{" "}
-          when connected.
+          {t("settings.billing.invoices_hint_suffix")}
         </p>
       </div>
 
       <div className="rounded-3xl border border-slate-200 bg-white p-6 dark:border-slate-700/80 dark:bg-slate-900/90">
-        <p className="mb-3 text-sm font-semibold text-slate-800 dark:text-slate-100">License</p>
+        <p className="mb-3 text-sm font-semibold text-slate-800 dark:text-slate-100">
+          {t("settings.billing.license")}
+        </p>
         <div className="grid gap-2 text-sm sm:grid-cols-2">
           <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-600 dark:bg-slate-950">
-            <span className="text-slate-500">Product</span>
+            <span className="text-slate-500">{t("settings.billing.product")}</span>
             <p className="font-medium text-slate-900 dark:text-white">
-              {vynTypeLabels[restaurant.type] ?? restaurant.type}
+              {dashboardTypeLabel(restaurant.type, lang)}
             </p>
           </div>
           <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-600 dark:bg-slate-950 sm:col-span-2">
-            <span className="text-slate-500">License key</span>
+            <span className="text-slate-500">{t("settings.billing.license_key")}</span>
             <p className="mt-1 flex items-center gap-2 font-mono text-xs tracking-wider text-slate-900 dark:text-white">
               <KeyRound className="size-3.5 text-[#0066FF]" />
               {restaurant.licenseKey}
@@ -183,4 +180,9 @@ export function DashboardBillingSection({ restaurant, billingCheckoutUrl }: Prop
       </div>
     </section>
   );
+}
+
+function daysUntil(iso: string) {
+  const diff = new Date(iso).getTime() - Date.now();
+  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
 }

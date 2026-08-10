@@ -75,19 +75,19 @@ function LinkLicensePanel({ onLinked }: { onLinked: () => void }) {
   const handleClaim = async () => {
     const raw = licenseInput.trim();
     if (raw.replace(/[^a-zA-Z0-9]/g, "").length < 16) {
-      toast.error("Enter the full 16-character license key from your POS or email.");
+      toast.error(t("settings.account.license_key_required"));
       return;
     }
     setClaiming(true);
     try {
       const { licenseKey } = await claimUnassignedLicenseForDashboardAccount(raw);
-      toast.success(`Venue linked — license ${licenseKey}`);
+      toast.success(t("settings.account.venue_linked_toast", { key: licenseKey }));
       onLinked();
     } catch (err) {
       toast.error(
         err instanceof Error
           ? err.message
-          : "Could not link this license. Check the key or contact support.",
+          : t("settings.account.license_link_failed"),
       );
     } finally {
       setClaiming(false);
@@ -142,11 +142,12 @@ function ActivityIcon({ id }: { id: string }) {
 }
 
 function ActivityFeed({ items }: { items: DashboardActivityItem[] }) {
+  const { t } = useDashboardLocale();
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-950/50">
       <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
         <Activity className="size-4 text-[#0066FF] dark:text-cyan-400" />
-        Activity feed
+        {t("settings.account.activity_feed")}
       </p>
       <ul className="space-y-3">
         {items.map((item) => (
@@ -385,7 +386,7 @@ export function DashboardAccountSection({
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+355 6x xxx xxxx"
+                  placeholder={t("settings.account.phone_placeholder")}
                   autoComplete="tel"
                   className={cn(fieldClass, "pl-10")}
                 />
