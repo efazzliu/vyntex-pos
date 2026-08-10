@@ -15,7 +15,8 @@ import SetupForm from "./setup-form.tsx";
 import { DashboardLicenseExpiredBanner } from "./expired-license.tsx";
 import { DashboardLocaleProvider, useDashboardLocale } from "./dashboard-locale-context.tsx";
 import { useDashboardRestaurant } from "@/hooks/use-dashboard-restaurant.ts";
-import { dashboardTypeLabel, type DashboardLang } from "@/lib/dashboard-i18n.ts";
+import { dashboardTypeLabel } from "@/lib/dashboard-i18n.ts";
+import { SiteLanguageToggle } from "@/components/site-language-toggle.tsx";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -316,15 +317,11 @@ function profileShortLabel(name: string): string {
 }
 
 function DashboardHeaderToolbar({
-  lang,
-  setLang,
   t,
   profileName,
   profileTargetPath,
   onSignOut,
 }: {
-  lang: DashboardLang;
-  setLang: (next: DashboardLang) => void;
   t: (key: string, vars?: Record<string, string | number>) => string;
   profileName: string;
   profileTargetPath: string;
@@ -344,23 +341,9 @@ function DashboardHeaderToolbar({
       role="toolbar"
       aria-label="Dashboard actions"
     >
-      <div className="flex rounded-lg p-0.5" role="group" aria-label={t("layout.lang_toggle")}>
-        {(["en", "sq"] as const).map((code) => (
-          <button
-            key={code}
-            type="button"
-            onClick={() => setLang(code)}
-            className={cn(
-              "min-w-[2.25rem] rounded-md px-2 py-1 text-[11px] font-semibold tracking-wide transition-colors",
-              lang === code
-                ? "bg-slate-900/10 text-slate-900 dark:bg-white/12 dark:text-white"
-                : "text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-sky-200/45 dark:hover:bg-white/[0.04] dark:hover:text-sky-100",
-            )}
-          >
-            {code === "en" ? t("header.lang_en") : t("header.lang_sq")}
-          </button>
-        ))}
-      </div>
+      <SiteLanguageToggle
+        triggerClassName="size-8 rounded-lg border-transparent bg-transparent text-slate-600 shadow-none hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/35 dark:text-sky-200/70 dark:hover:bg-white/[0.05] dark:hover:text-white"
+      />
 
       <span className="mx-1 h-4 w-px shrink-0 bg-slate-200 dark:bg-white/10" aria-hidden />
 
@@ -455,7 +438,7 @@ function DashboardShell({
   onSignOut: () => void;
   expiredBanner?: ReactNode;
 }) {
-  const { t, lang, setLang } = useDashboardLocale();
+  const { t } = useDashboardLocale();
 
   const iconBtn =
     "inline-flex size-9 shrink-0 items-center justify-center rounded-xl text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/40 dark:text-sky-200/75 dark:hover:bg-white/[0.06] dark:hover:text-white";
@@ -495,8 +478,6 @@ function DashboardShell({
         <div className="pointer-events-none absolute inset-x-0 top-0 z-40 hidden justify-end px-3 pt-2.5 sm:px-5 md:flex">
           <div className="pointer-events-auto">
             <DashboardHeaderToolbar
-              lang={lang}
-              setLang={setLang}
               t={t}
               profileName={profileName}
               profileTargetPath={profileTargetPath}
@@ -526,8 +507,6 @@ function DashboardShell({
           </div>
           <div className="pointer-events-auto">
             <DashboardHeaderToolbar
-              lang={lang}
-              setLang={setLang}
               t={t}
               profileName={profileName}
               profileTargetPath={profileTargetPath}
