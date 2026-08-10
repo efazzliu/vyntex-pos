@@ -254,7 +254,18 @@ function AdminGate() {
 
 function AdminContentInner({ adminAccess }: { adminAccess: PlatformAdminRole | null }) {
   const settings = useAdminSettings();
+  const navigate = useNavigate();
+  const location = useLocation();
   const sidebarCollapsed = settings.ui.sidebarCollapsed;
+
+  const goBackToSite = () => {
+    const from = (location.state as { from?: string } | null)?.from;
+    if (typeof from === "string" && from.startsWith("/") && !from.startsWith("/admin")) {
+      navigate(from);
+      return;
+    }
+    navigate("/");
+  };
 
   useEffect(() => {
     if (!settings.loaded || !settings.email) return;
@@ -306,9 +317,16 @@ function AdminContentInner({ adminAccess }: { adminAccess: PlatformAdminRole | n
               <span className="text-[#44CC00]">POS</span>
             </span>
           </Link>
-          <span className="ml-auto px-2 py-0.5 rounded text-xs font-semibold bg-red-500/10 text-red-500">
+          <button
+            type="button"
+            onClick={goBackToSite}
+            aria-label="Back to site"
+            title="Back to site"
+            className="ml-auto inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-semibold bg-red-500/10 text-red-500 transition-colors hover:bg-red-500/15 active:scale-[0.98]"
+          >
+            <ChevronLeft className="size-3.5" />
             ADMIN
-          </span>
+          </button>
         </header>
 
         <main
