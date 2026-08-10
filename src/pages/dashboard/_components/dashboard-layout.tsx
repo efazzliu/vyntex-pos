@@ -525,7 +525,7 @@ function DashboardShell({
 }
 
 function DashboardContent() {
-  const { t, lang, setLang } = useDashboardLocale();
+  const { t } = useDashboardLocale();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
