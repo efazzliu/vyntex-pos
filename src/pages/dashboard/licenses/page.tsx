@@ -36,16 +36,21 @@ function formatDate(iso: string | null | undefined, locale: string): string {
   });
 }
 
-function getStatus(row: OwnedRestaurantRow): { label: string; active: boolean } {
+function getStatus(
+  row: OwnedRestaurantRow,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): { label: string; active: boolean } {
   const expiry = row.license_expiry ? new Date(row.license_expiry).getTime() : 0;
   const active = row.license_status === "active" && expiry > Date.now();
-  if (active) return { label: "Active", active: true };
-  if (row.license_status === "suspended") return { label: "Suspended", active: false };
-  return { label: "Expired", active: false };
+  if (active) return { label: t("licenses.status_active"), active: true };
+  if (row.license_status === "suspended") {
+    return { label: t("licenses.status_suspended"), active: false };
+  }
+  return { label: t("licenses.status_expired"), active: false };
 }
 
 export default function DashboardLicensesPage() {
-  const { lang } = useDashboardLocale();
+  const { t, lang } = useDashboardLocale();
   const locale = lang === "sq" ? "sq-AL" : "en-US";
   const [licenses, setLicenses] = useState<OwnedRestaurantRow[] | null>(null);
   const [copied, setCopied] = useState(false);
@@ -66,12 +71,12 @@ export default function DashboardLicensesPage() {
 
   const orderedLicenses = useMemo(() => {
     return [...(licenses ?? [])].sort((a, b) => {
-      const aActive = getStatus(a).active ? 1 : 0;
-      const bActive = getStatus(b).active ? 1 : 0;
+      const aActive = getStatus(a, t).active ? 1 : 0;
+      const bActive = getStatus(b, t).active ? 1 : 0;
       if (aActive !== bActive) return bActive - aActive;
       return String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""));
     });
-  }, [licenses]);
+  }, [licenses, t]);
 
   if (licenses === null) {
     return (
@@ -86,14 +91,14 @@ export default function DashboardLicensesPage() {
     return (
       <div className="flex min-h-full w-full items-center justify-center bg-slate-50/80 px-6">
         <p className="text-base font-medium text-slate-500">
-          You don&apos;t have any licenses.
+          {t("licenses.empty")}
         </p>
       </div>
     );
   }
 
   const current = orderedLicenses[0];
-  const currentStatus = getStatus(current);
+  const currentStatus = getStatus(current, t);
   const devices = parseRegisteredDeviceIds(current.registered_devices, current.device_id);
   const maxDevices = effectiveMaxTerminals(
     current.plan ?? "professional",
@@ -105,10 +110,10 @@ export default function DashboardLicensesPage() {
     try {
       await navigator.clipboard.writeText(licenseKey);
       setCopied(true);
-      toast.success("License key copied");
+      toast.success(t("toast.license_copied"));
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
-      toast.error("Could not copy the license key.");
+      toast.error(t("toast.copy_failed"));
     }
   };
 
@@ -117,13 +122,13 @@ export default function DashboardLicensesPage() {
       <div className="mx-auto w-full max-w-6xl space-y-6">
         <header>
           <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-600">
-            Licenses
+            {t("licenses.eyebrow")}
           </p>
           <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
-            License Overview
+            {t("licenses.title")}
           </h1>
           <p className="mt-2 text-sm text-slate-500">
-            Review your current plan, activation details, device usage, and license history.
+            {t("licenses.subtitle")}
           </p>
         </header>
 
@@ -165,7 +170,7 @@ export default function DashboardLicensesPage() {
               <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 md:col-span-2">
                 <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                   <KeyRound className="size-3.5 text-sky-500" />
-                  License Key
+                  {t("licenses.key")}
                 </p>
                 <div className="mt-2 flex items-center gap-2">
                   <code className="min-w-0 flex-1 truncate font-mono text-sm font-semibold tracking-wider">
@@ -187,30 +192,42 @@ export default function DashboardLicensesPage() {
                 </div>
               </div>
 
-              <Detail label="Status" value={currentStatus.label} />
-              <Detail label="Plan" value={dashboardPlanLabel(current.plan ?? "professional", lang)} />
-              <Detail label="Activated Date" value={formatDate(current.created_at, locale)} />
-              <Detail label="Expiration Date" value={formatDate(current.license_expiry, locale)} />
+              <Detail label={t("licenses.status")} value={currentStatus.label} />
               <Detail
-                label="Renewal Date"
+                label={t("licenses.plan")}
+                value={dashboardPlanLabel(current.plan ?? "professional", lang)}
+              />
+              <Detail
+                label={t("licenses.activated_date")}
+                value={formatDate(current.created_at, locale)}
+              />
+              <Detail
+                label={t("licenses.expiration_date")}
+                value={formatDate(current.license_expiry, locale)}
+              />
+              <Detail
+                label={t("licenses.renewal_date")}
                 value={currentStatus.active ? formatDate(current.license_expiry, locale) : "—"}
               />
-              <Detail label="Number of devices" value={`${devices.length}`} />
-              <Detail label="Devices used" value={`${devices.length} active`} />
-              <Detail label="Maximum devices" value={`${maxDevices}`} />
+              <Detail label={t("licenses.number_of_devices")} value={`${devices.length}`} />
+              <Detail
+                label={t("licenses.devices_used")}
+                value={t("licenses.devices_active", { count: devices.length })}
+              />
+              <Detail label={t("licenses.max_devices")} value={`${maxDevices}`} />
             </div>
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <Button asChild className="rounded-xl bg-sky-600 text-white hover:bg-sky-700">
                 <Link to="/dashboard/settings?tab=billing">
                   <CreditCard className="mr-2 size-4" />
-                  Renew License
+                  {t("licenses.renew")}
                 </Link>
               </Button>
               <Button asChild variant="outline" className="rounded-xl border-sky-200 text-sky-700">
                 <Link to="/pricing">
                   <Sparkles className="mr-2 size-4" />
-                  Upgrade Plan
+                  {t("licenses.upgrade")}
                 </Link>
               </Button>
             </div>
@@ -223,25 +240,25 @@ export default function DashboardLicensesPage() {
               <History className="size-4" />
             </span>
             <div>
-              <h2 className="text-sm font-semibold">License History</h2>
-              <p className="text-xs text-slate-500">All licenses purchased by this account.</p>
+              <h2 className="text-sm font-semibold">{t("licenses.history_title")}</h2>
+              <p className="text-xs text-slate-500">{t("licenses.history_subtitle")}</p>
             </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] text-left">
               <thead className="bg-slate-50 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                 <tr>
-                  <th className="px-5 py-3">License</th>
-                  <th className="px-5 py-3">VYN Type</th>
-                  <th className="px-5 py-3">Plan</th>
-                  <th className="px-5 py-3">Activated</th>
-                  <th className="px-5 py-3">Expires</th>
-                  <th className="px-5 py-3">Status</th>
+                  <th className="px-5 py-3">{t("licenses.col_license")}</th>
+                  <th className="px-5 py-3">{t("licenses.col_type")}</th>
+                  <th className="px-5 py-3">{t("licenses.col_plan")}</th>
+                  <th className="px-5 py-3">{t("licenses.col_activated")}</th>
+                  <th className="px-5 py-3">{t("licenses.col_expires")}</th>
+                  <th className="px-5 py-3">{t("licenses.col_status")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
                 {orderedLicenses.map((row) => {
-                  const status = getStatus(row);
+                  const status = getStatus(row, t);
                   return (
                     <tr key={row.id} className="hover:bg-slate-50/70">
                       <td className="px-5 py-4">
