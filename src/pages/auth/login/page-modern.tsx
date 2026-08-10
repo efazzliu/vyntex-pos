@@ -19,11 +19,17 @@ function safeReturnPath(from: unknown): string | null {
   return from;
 }
 
-type LoginPageProps = { defaultAfterLogin?: string; showManagerCodeLink?: boolean };
+type LoginPageProps = {
+  defaultAfterLogin?: string;
+  showManagerCodeLink?: boolean;
+  /** When false, hide “create account” (phone app is login-only). Default true for web. */
+  showCreateAccountLink?: boolean;
+};
 
 export default function LoginPageModern({
   defaultAfterLogin = "/dashboard",
   showManagerCodeLink = false,
+  showCreateAccountLink = true,
 }: LoginPageProps) {
   const { t } = useTranslation("site");
   const navigate = useNavigate();
@@ -219,13 +225,21 @@ export default function LoginPageModern({
                   {loading ? t("auth.login.submitLoading") : t("auth.login.submit")}
                 </Button>
               </form>
-              <p className="mt-5 text-center text-sm text-slate-600">
-                {t("auth.login.noAccount")}{" "}
-                <Link to={registerUrlWithFreeTrial()} className="font-semibold text-[#0066FF] hover:underline">
-                  {t("auth.login.createAccount")}
-                </Link>
-              </p>
-              {showManagerCodeLink ? <p className="mt-4 text-sm"><Link to="/redeem-code" className="text-[#0066FF]">{t("auth.login.managerCodeLink")}</Link></p> : null}
+              {showCreateAccountLink ? (
+                <p className="mt-5 text-center text-sm text-slate-600">
+                  {t("auth.login.noAccount")}{" "}
+                  <Link to={registerUrlWithFreeTrial()} className="font-semibold text-[#0066FF] hover:underline">
+                    {t("auth.login.createAccount")}
+                  </Link>
+                </p>
+              ) : null}
+              {showManagerCodeLink ? (
+                <p className="mt-4 text-sm">
+                  <Link to="/redeem-code" className="text-[#0066FF]">
+                    {t("auth.login.managerCodeLink")}
+                  </Link>
+                </p>
+              ) : null}
             </section>
           </div>
         </div>

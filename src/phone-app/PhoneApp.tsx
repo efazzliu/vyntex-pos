@@ -5,7 +5,6 @@ import { RedirectIfAuthed } from "@/components/redirect-if-authed.tsx";
 import { RequireSupabaseAuth } from "@/components/require-supabase-auth.tsx";
 import AuthCallback from "@/pages/auth/Callback.tsx";
 import LoginPage from "@/pages/auth/login/page-modern.tsx";
-import RegisterPage from "@/pages/auth/register/page-modern.tsx";
 import NotFound from "@/pages/NotFound.tsx";
 import PhoneDashboard from "@/phone-app/components/phone-dashboard.tsx";
 import PhoneVenueHome from "@/phone-app/components/phone-venue-home.tsx";
@@ -18,7 +17,6 @@ import PhoneNotificationsPage from "@/phone-app/components/phone-notifications-p
 import PhoneTeamPage from "@/phone-app/components/phone-team-page.tsx";
 import { PhoneAuthUrlGate } from "@/phone-app/components/phone-auth-url-gate.tsx";
 import PhoneMobileAccessGate from "@/phone-app/components/phone-mobile-access-gate.tsx";
-import PhoneRedeemCodePage from "@/phone-app/components/phone-redeem-code-page.tsx";
 import PhoneProfilePersonalPage from "@/phone-app/components/phone-profile-personal-page.tsx";
 import PhoneProfileLicensesPage from "@/phone-app/components/phone-profile-licenses-page.tsx";
 import PhoneProfilePreferencesPage from "@/phone-app/components/phone-profile-preferences-page.tsx";
@@ -38,20 +36,21 @@ export default function PhoneApp() {
           <Routes>
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
-          {/* Managers: invite code; anonymous session or magic-link email if Anonymous is disabled. */}
-          <Route path="/redeem-code" element={<PhoneRedeemCodePage />} />
-          <Route
-            path="/app/redeem-code"
-            element={<Navigate to="/redeem-code" replace />}
-          />
+          {/* Phone app is login-only: no self-serve register / invite redeem. */}
+          <Route path="/register" element={<Navigate to="/login" replace />} />
+          <Route path="/redeem-code" element={<Navigate to="/login" replace />} />
+          <Route path="/app/redeem-code" element={<Navigate to="/login" replace />} />
           <Route element={<RedirectIfAuthed redirectTo="/app" />}>
             <Route
               path="/login"
               element={
-                <LoginPage defaultAfterLogin="/app" showManagerCodeLink />
+                <LoginPage
+                  defaultAfterLogin="/app"
+                  showCreateAccountLink={false}
+                  showManagerCodeLink={false}
+                />
               }
             />
-            <Route path="/register" element={<RegisterPage />} />
           </Route>
           <Route element={<RequireSupabaseAuth />}>
             <Route element={<PhoneMobileAccessGate />}>
