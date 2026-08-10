@@ -208,7 +208,7 @@ export default function PhoneDashboard() {
 
         {isAdmin ? (
           <Button variant="outline" className="mt-2 h-11 w-full justify-start gap-2 rounded-xl" asChild>
-            <Link to="/admin">
+            <Link to="/admin" state={{ from: "/dashboard/settings" }}>
               <ShieldCheck className="size-5 shrink-0" />
               {t("phone.venues.admin")}
             </Link>
