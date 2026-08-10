@@ -12,6 +12,7 @@ import {
   Palette,
   CreditCard as CreditCardIcon,
 } from "lucide-react";
+import { useDashboardLocale } from "@/pages/dashboard/_components/dashboard-locale-context.tsx";
 import { DashboardSecuritySection } from "./_components/dashboard-security-section.tsx";
 import { DashboardBillingSection } from "./_components/dashboard-billing-section.tsx";
 import { DashboardNotificationsSection } from "./_components/dashboard-notifications-section.tsx";
@@ -25,12 +26,12 @@ function isSettingsTab(v: string | null): v is SettingsTab {
   return SETTINGS_TABS.includes(v as SettingsTab);
 }
 
-const TAB_META: Record<SettingsTab, { label: string; Icon: typeof User }> = {
-  account: { label: "Account", Icon: User },
-  security: { label: "Security", Icon: Shield },
-  billing: { label: "Billing", Icon: CreditCardIcon },
-  notifications: { label: "Notifications", Icon: Bell },
-  appearance: { label: "Appearance", Icon: Palette },
+const TAB_META: Record<SettingsTab, { labelKey: string; Icon: typeof User }> = {
+  account: { labelKey: "settings.tab.account", Icon: User },
+  security: { labelKey: "settings.tab.security", Icon: Shield },
+  billing: { labelKey: "settings.tab.billing", Icon: CreditCardIcon },
+  notifications: { labelKey: "settings.tab.notifications", Icon: Bell },
+  appearance: { labelKey: "settings.tab.appearance", Icon: Palette },
 };
 
 const billingCheckoutUrl = import.meta.env.VITE_BILLING_CHECKOUT_URL as string | undefined;
@@ -39,6 +40,7 @@ export default function DashboardSettingsModern() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { restaurant, refresh: refreshRestaurant } = useDashboardRestaurant();
   const { isAdmin } = useUserRole();
+  const { t } = useDashboardLocale();
 
   const tabParam = searchParams.get("tab");
   const activeTab: SettingsTab = isSettingsTab(tabParam) ? tabParam : "account";
@@ -70,25 +72,57 @@ export default function DashboardSettingsModern() {
       <div className="space-y-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white sm:text-[1.75rem]">Settings</h1>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Account, security, billing, and preferences.</p>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white sm:text-[1.75rem]">
+              {t("settings.title")}
+            </h1>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              {t("settings.subtitle")}
+            </p>
           </div>
           {isAdmin ? (
             <Button type="button" variant="ghost" size="sm" asChild className="h-9 shrink-0 self-start rounded-lg text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white sm:self-auto">
-              <Link to="/admin" state={{ from: "/dashboard/settings" }}><LayoutDashboard className="mr-1.5 size-3.5" />Admin panel</Link>
+              <Link to="/admin" state={{ from: "/dashboard/settings" }}>
+                <LayoutDashboard className="mr-1.5 size-3.5" />
+                {t("settings.admin_panel")}
+              </Link>
             </Button>
           ) : null}
         </div>
-        <nav className="-mb-px flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-800" aria-label="Settings sections">
+        <nav
+          className="-mb-px flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-800"
+          aria-label={t("settings.sections_aria")}
+        >
           {SETTINGS_TABS.map((id) => {
-            const { label, Icon } = TAB_META[id];
+            const { labelKey, Icon } = TAB_META[id];
             const disabled = id === "billing" && !hasRestaurant;
             const active = activeTab === id;
             return (
-              <button key={id} type="button" disabled={disabled} onClick={() => setActiveTab(id)} className={cn("relative flex shrink-0 items-center gap-2 px-3 pb-3 pt-0.5 text-sm font-medium transition-colors", active ? "text-slate-900 dark:text-white" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200", disabled && "cursor-not-allowed opacity-40")}>
-                <Icon className={cn("size-4", active ? "text-[#0066FF] dark:text-cyan-400" : "opacity-70")} />
-                {label}
-                {active ? <span className="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-gradient-to-r from-[#0066FF] to-[#00AACC]" aria-hidden /> : null}
+              <button
+                key={id}
+                type="button"
+                disabled={disabled}
+                onClick={() => setActiveTab(id)}
+                className={cn(
+                  "relative flex shrink-0 items-center gap-2 px-3 pb-3 pt-0.5 text-sm font-medium transition-colors",
+                  active
+                    ? "text-slate-900 dark:text-white"
+                    : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200",
+                  disabled && "cursor-not-allowed opacity-40",
+                )}
+              >
+                <Icon
+                  className={cn(
+                    "size-4",
+                    active ? "text-[#0066FF] dark:text-cyan-400" : "opacity-70",
+                  )}
+                />
+                {t(labelKey)}
+                {active ? (
+                  <span
+                    className="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-gradient-to-r from-[#0066FF] to-[#00AACC]"
+                    aria-hidden
+                  />
+                ) : null}
               </button>
             );
           })}
@@ -102,11 +136,17 @@ export default function DashboardSettingsModern() {
         />
       ) : null}
       {activeTab === "security" ? <DashboardSecuritySection /> : null}
-      {activeTab === "billing" && hasRestaurant ? <DashboardBillingSection restaurant={restaurant} billingCheckoutUrl={billingHref} /> : null}
+      {activeTab === "billing" && hasRestaurant ? (
+        <DashboardBillingSection restaurant={restaurant} billingCheckoutUrl={billingHref} />
+      ) : null}
       {activeTab === "billing" && !hasRestaurant ? (
         <section className="rounded-3xl border border-slate-200 bg-white p-8 text-center dark:border-slate-700/80 dark:bg-slate-900/90">
-          <p className="text-sm text-slate-600 dark:text-slate-400">Link a license or complete setup to manage billing.</p>
-          <Button type="button" asChild className="mt-4 rounded-xl"><Link to="/">Go to setup</Link></Button>
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            {t("settings.billing_no_venue")}
+          </p>
+          <Button type="button" asChild className="mt-4 rounded-xl">
+            <Link to="/">{t("settings.go_to_setup")}</Link>
+          </Button>
         </section>
       ) : null}
       {activeTab === "notifications" ? <DashboardNotificationsSection /> : null}

@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import {
   Activity,
   Check,
@@ -39,6 +38,7 @@ import {
 } from "../_lib/account-settings.ts";
 import { useDashboardRestaurant } from "@/hooks/use-dashboard-restaurant.ts";
 import { claimUnassignedLicenseForDashboardAccount } from "@/lib/supabase-pos/claim-license-dashboard.ts";
+import { useDashboardLocale } from "@/pages/dashboard/_components/dashboard-locale-context.tsx";
 import type { DashboardActivityItem, DashboardUserMetadata } from "../_lib/types.ts";
 
 type DashboardAccountSectionProps = {
@@ -48,7 +48,27 @@ type DashboardAccountSectionProps = {
   onVenueLinked?: () => void;
 };
 
+const CHECK_LABEL_KEYS: Record<string, string> = {
+  name: "settings.account.check.name",
+  email: "settings.account.check.email",
+  verified: "settings.account.check.verified",
+  phone: "settings.account.check.phone",
+  country: "settings.account.check.country",
+  venue: "settings.account.check.venue",
+  mfa: "settings.account.check.mfa",
+};
+
+const CHECK_HINT_KEYS: Record<string, string> = {
+  name: "settings.account.check.name_hint",
+  verified: "settings.account.check.verified_hint",
+  phone: "settings.account.check.phone_hint",
+  country: "settings.account.check.country_hint",
+  venue: "settings.account.check.venue_hint",
+  mfa: "settings.account.check.mfa_hint",
+};
+
 function LinkLicensePanel({ onLinked }: { onLinked: () => void }) {
+  const { t } = useDashboardLocale();
   const [licenseInput, setLicenseInput] = useState("");
   const [claiming, setClaiming] = useState(false);
 
@@ -78,24 +98,16 @@ function LinkLicensePanel({ onLinked }: { onLinked: () => void }) {
     <div className="mt-6 rounded-2xl border border-sky-200 bg-sky-50/60 p-4 dark:border-sky-500/30 dark:bg-sky-950/40">
       <p className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
         <Link2 className="size-4 text-[#0066FF] dark:text-cyan-400" />
-        Link your license (venue)
+        {t("settings.account.link_license_title")}
       </p>
       <p className="mt-1.5 text-xs leading-relaxed text-slate-600 dark:text-slate-400">
-        If you already activated Vyntex POS on a PC, paste the same license key here so this
-        account controls billing, downloads, and cloud data. New business?{" "}
-        <Link
-          to="/dashboard/get-started"
-          className="font-medium text-[#0066FF] hover:underline dark:text-cyan-400"
-        >
-          Create a trial instead
-        </Link>
-        .
+        {t("settings.account.link_license_hint")}
       </p>
       <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
         <Input
           value={licenseInput}
           onChange={(e) => setLicenseInput(e.target.value.toUpperCase())}
-          placeholder="XXXX-XXXX-XXXX-XXXX"
+          placeholder={t("settings.account.license_placeholder")}
           className={cn(fieldClass, "font-mono tracking-wider")}
           autoComplete="off"
           spellCheck={false}
@@ -109,10 +121,10 @@ function LinkLicensePanel({ onLinked }: { onLinked: () => void }) {
           {claiming ? (
             <>
               <Loader2 className="mr-2 size-4 animate-spin" />
-              Linking…
+              {t("settings.account.linking")}
             </>
           ) : (
-            "Link license"
+            t("settings.account.link_license_cta")
           )}
         </Button>
       </div>
@@ -171,6 +183,7 @@ export function DashboardAccountSection({
   restaurantName: restaurantNameProp,
   onVenueLinked,
 }: DashboardAccountSectionProps) {
+  const { t } = useDashboardLocale();
   const { restaurant, refresh: refreshRestaurant } = useDashboardRestaurant();
   const hasRestaurant = restaurant != null || Boolean(hasRestaurantProp);
   const restaurantName = restaurant?.name ?? restaurantNameProp;
@@ -248,7 +261,7 @@ export function DashboardAccountSection({
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullName.trim()) return void toast.error("Full name is required");
+    if (!fullName.trim()) return void toast.error(t("settings.account.full_name_required"));
     setSaving(true);
     try {
       const { data, error } = await supabase.auth.updateUser({
@@ -280,7 +293,7 @@ export function DashboardAccountSection({
         }
       }
 
-      toast.success("Profile updated");
+      toast.success(t("settings.account.updated"));
     } finally {
       setSaving(false);
     }
@@ -289,7 +302,7 @@ export function DashboardAccountSection({
   if (!authLoaded) {
     return (
       <section className="rounded-3xl border border-slate-200 bg-white p-12 dark:border-slate-700/80 dark:bg-slate-900/90">
-        <p className="text-center text-sm text-slate-500">Loading account…</p>
+        <p className="text-center text-sm text-slate-500">{t("settings.account.loading")}</p>
       </section>
     );
   }
@@ -302,9 +315,11 @@ export function DashboardAccountSection({
             <User className="size-4" />
           </div>
           <div>
-            <h2 className="text-base font-semibold text-slate-900 dark:text-white">Account profile</h2>
+            <h2 className="text-base font-semibold text-slate-900 dark:text-white">
+              {t("settings.account.title")}
+            </h2>
             <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-              Full name, email, phone, and country for your account. Activity is shown on the right.
+              {t("settings.account.subtitle")}
             </p>
           </div>
         </div>
@@ -318,13 +333,13 @@ export function DashboardAccountSection({
           <div className="w-full max-w-xl space-y-5">
             <div className="space-y-2">
               <Label htmlFor="account-full-name" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                Full Name
+                {t("settings.account.full_name")}
               </Label>
               <Input
                 id="account-full-name"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="Your full name"
+                placeholder={t("settings.account.full_name_placeholder")}
                 autoComplete="name"
                 className={fieldClass}
               />
@@ -332,7 +347,7 @@ export function DashboardAccountSection({
 
             <div className="space-y-2">
               <Label htmlFor="account-email" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                Email
+                {t("settings.account.email")}
               </Label>
               <div className="relative">
                 <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
@@ -346,20 +361,22 @@ export function DashboardAccountSection({
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 {emailVerified ? (
-                  <span className="text-emerald-700 dark:text-emerald-400">Verified email address.</span>
+                  <span className="text-emerald-700 dark:text-emerald-400">
+                    {t("settings.account.email_verified")}
+                  </span>
                 ) : (
-                  <span>Email not verified yet — check your inbox for the confirmation link.</span>
+                  <span>{t("settings.account.email_unverified")}</span>
                 )}{" "}
                 <a href={SUPPORT_MAILTO_HREF} className="text-[#0066FF] hover:underline dark:text-cyan-400">
-                  Contact {SUPPORT_EMAIL}
+                  {t("settings.account.contact_prefix")} {SUPPORT_EMAIL}
                 </a>{" "}
-                to change it.
+                {t("settings.account.contact_suffix")}
               </p>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="account-phone" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                Phone Number
+                {t("settings.account.phone")}
               </Label>
               <div className="relative">
                 <Phone className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
@@ -377,13 +394,13 @@ export function DashboardAccountSection({
 
             <div className="space-y-2">
               <Label htmlFor="account-country" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                Country
+                {t("settings.account.country")}
               </Label>
               <div className="relative">
                 <Globe className="pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-slate-400" />
                 <Select value={country || undefined} onValueChange={setCountry}>
                   <SelectTrigger id="account-country" className={cn(fieldClass, "w-full pl-10")}>
-                    <SelectValue placeholder="Select your country" />
+                    <SelectValue placeholder={t("settings.account.country_placeholder")} />
                   </SelectTrigger>
                   <SelectContent>
                     {ACCOUNT_COUNTRY_OPTIONS.map((opt) => (
@@ -405,10 +422,10 @@ export function DashboardAccountSection({
                 {saving ? (
                   <>
                     <Loader2 className="mr-2 size-4 animate-spin" />
-                    Saving…
+                    {t("settings.account.saving")}
                   </>
                 ) : (
-                  "Save changes"
+                  t("settings.account.save")
                 )}
               </Button>
             </div>
@@ -416,7 +433,7 @@ export function DashboardAccountSection({
             {hasRestaurant ? (
               <p className="mt-4 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-2.5 text-xs text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-950/40 dark:text-emerald-200">
                 <Check className="size-4 shrink-0" />
-                Venue linked
+                {t("settings.account.venue_linked")}
                 {restaurantName ? (
                   <span className="font-medium">— {restaurantName}</span>
                 ) : null}
@@ -435,7 +452,9 @@ export function DashboardAccountSection({
         <aside className="space-y-4 bg-slate-50/50 p-6 dark:bg-slate-950/30">
           <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900/90">
             <div className="mb-3 flex items-center justify-between gap-2">
-              <p className="text-sm font-semibold text-slate-900 dark:text-white">Profile completion</p>
+              <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                {t("settings.account.completion")}
+              </p>
               <span className="text-sm font-bold tabular-nums text-[#0066FF] dark:text-cyan-400">
                 {completeness}%
               </span>
@@ -445,8 +464,7 @@ export function DashboardAccountSection({
               className="h-2 bg-slate-100 dark:bg-slate-800 [&>[data-slot=progress-indicator]]:bg-gradient-to-r [&>[data-slot=progress-indicator]]:from-[#0066FF] [&>[data-slot=progress-indicator]]:to-[#00AACC]"
             />
             <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-              Profile completeness: {completeness}% — link your license for 90%; enable 2FA in
-              Security for 100% (optional).
+              {t("settings.account.completion_hint", { percent: completeness })}
             </p>
             <ul className="mt-3 space-y-2 border-t border-slate-100 pt-3 dark:border-slate-800">
               {completionChecklist.map((item) => (
@@ -465,10 +483,12 @@ export function DashboardAccountSection({
                           : "text-slate-800 dark:text-slate-200",
                       )}
                     >
-                      {item.label}
+                      {t(CHECK_LABEL_KEYS[item.id] ?? item.label)}
                     </span>
                     {item.hint && !item.done ? (
-                      <span className="block text-slate-500 dark:text-slate-500">{item.hint}</span>
+                      <span className="block text-slate-500 dark:text-slate-500">
+                        {t(CHECK_HINT_KEYS[item.id] ?? item.hint)}
+                      </span>
                     ) : null}
                   </span>
                   <span className="shrink-0 tabular-nums text-slate-400">+{item.points}%</span>
