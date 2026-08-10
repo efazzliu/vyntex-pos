@@ -44,7 +44,9 @@ import {
   type CreateInviteResult,
   type PhoneManagerRow,
 } from "@/lib/supabase-pos/phone-manager-invite-ops.ts";
+import { dashboardDateLocale } from "@/lib/dashboard-i18n.ts";
 import { cn } from "@/lib/utils.ts";
+import { useDashboardLocale } from "@/pages/dashboard/_components/dashboard-locale-context.tsx";
 
 type OwnerDetails = {
   userId: string | null;
@@ -59,6 +61,8 @@ type PendingInvite = {
 };
 
 export default function DashboardTeamAccessPage() {
+  const { t, lang } = useDashboardLocale();
+  const dateLocale = dashboardDateLocale(lang);
   const { restaurant } = useDashboardRestaurant();
   const [owner, setOwner] = useState<OwnerDetails | null>(null);
   const [managers, setManagers] = useState<PhoneManagerRow[]>([]);
@@ -103,8 +107,8 @@ export default function DashboardTeamAccessPage() {
           name:
             String(ownerResult.data.owner_name ?? "").trim() ||
             email.split("@")[0] ||
-            "Business owner",
-          email: email || "Owner account",
+            t("team.business_owner"),
+          email: email || t("team.owner_account"),
         });
       }
       if (!inviteResult.error) {
@@ -117,11 +121,13 @@ export default function DashboardTeamAccessPage() {
         );
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not load team members.");
+      toast.error(
+        error instanceof Error ? error.message : t("team.toast_load_failed"),
+      );
     } finally {
       setLoading(false);
     }
-  }, [restaurant]);
+  }, [restaurant, t]);
 
   useEffect(() => {
     void load();
@@ -143,7 +149,9 @@ export default function DashboardTeamAccessPage() {
       setInvite(result);
       await load();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not create invitation.");
+      toast.error(
+        error instanceof Error ? error.message : t("team.toast_invite_failed"),
+      );
     } finally {
       setCreatingInvite(false);
     }
@@ -154,10 +162,10 @@ export default function DashboardTeamAccessPage() {
     try {
       await navigator.clipboard.writeText(invite.code);
       setCopied(true);
-      toast.success("Invitation code copied");
+      toast.success(t("team.toast_invite_copied"));
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
-      toast.error("Could not copy the invitation code.");
+      toast.error(t("team.toast_invite_copy_failed"));
     }
   };
 
@@ -169,12 +177,14 @@ export default function DashboardTeamAccessPage() {
         restaurant.id,
         removing.managerUserId,
       );
-      if (!result.ok) throw new Error(result.error || "Could not remove member.");
-      toast.success("Team member removed");
+      if (!result.ok) throw new Error(result.error || t("team.toast_remove_failed"));
+      toast.success(t("team.toast_removed"));
       setRemoving(null);
       await load();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not remove member.");
+      toast.error(
+        error instanceof Error ? error.message : t("team.toast_remove_failed"),
+      );
     } finally {
       setWorking(false);
     }
@@ -195,7 +205,7 @@ export default function DashboardTeamAccessPage() {
   if (!restaurant) {
     return (
       <div className="flex min-h-full items-center justify-center p-8 text-sm text-slate-500">
-        Link a business license before managing dashboard access.
+        {t("team.no_license")}
       </div>
     );
   }
@@ -211,13 +221,13 @@ export default function DashboardTeamAccessPage() {
               </span>
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-600">
-                  Team
+                  {t("nav.team")}
                 </p>
                 <h1 className="mt-1 text-2xl font-bold tracking-tight">
-                  Dashboard access
+                  {t("nav.team_access")}
                 </h1>
                 <p className="mt-1 max-w-2xl text-sm text-slate-500">
-                  Invite trusted people to manage this Vyntex Dashboard without sharing the owner account.
+                  {t("team.page_subtitle")}
                 </p>
               </div>
             </div>
@@ -231,30 +241,30 @@ export default function DashboardTeamAccessPage() {
               ) : (
                 <MailPlus className="mr-2 size-4" />
               )}
-              Invite member
+              {t("team.invite_member")}
             </Button>
           </div>
         </header>
 
         <section className="grid gap-4 sm:grid-cols-3">
           <SummaryCard
-            label="Active members"
+            label={t("team.metric_active_members")}
             value={`${1 + managers.length}`}
-            hint="Including the owner"
+            hint={t("team.metric_active_hint")}
             icon={Users}
             tone="sky"
           />
           <SummaryCard
-            label="Pending invites"
+            label={t("team.metric_pending_invites")}
             value={`${pendingInvites.length}`}
-            hint="Not redeemed yet"
+            hint={t("team.metric_pending_hint")}
             icon={Clock3}
             tone="amber"
           />
           <SummaryCard
-            label="Access level"
-            value="Protected"
-            hint="Individual accounts"
+            label={t("team.metric_access_level")}
+            value={t("team.metric_protected")}
+            hint={t("team.metric_access_hint")}
             icon={ShieldCheck}
             tone="emerald"
           />
@@ -264,9 +274,9 @@ export default function DashboardTeamAccessPage() {
           <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
             <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-sm font-semibold">Team members</h2>
+                <h2 className="text-sm font-semibold">{t("team.members_title")}</h2>
                 <p className="mt-1 text-xs text-slate-500">
-                  People who can open and manage this dashboard.
+                  {t("team.members_subtitle")}
                 </p>
               </div>
               <div className="relative">
@@ -274,7 +284,7 @@ export default function DashboardTeamAccessPage() {
                 <Input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search members..."
+                  placeholder={t("team.search_placeholder")}
                   className="h-9 w-full rounded-xl pl-9 sm:w-56"
                 />
               </div>
@@ -285,35 +295,39 @@ export default function DashboardTeamAccessPage() {
                 <MemberRow
                   name={owner.name}
                   email={owner.email}
-                  role="Owner"
+                  role={t("team.role_owner")}
                   joinedAt={null}
                   owner
+                  t={t}
+                  dateLocale={dateLocale}
                 />
               )}
               {visibleManagers.map((manager) => (
                 <MemberRow
                   key={manager.managerUserId}
-                  name={manager.managerEmail.split("@")[0] || "Team member"}
+                  name={manager.managerEmail.split("@")[0] || t("team.team_member")}
                   email={manager.managerEmail}
-                  role="Manager"
+                  role={t("team.role_manager")}
                   joinedAt={manager.linkedAt}
                   onRemove={() => setRemoving(manager)}
+                  t={t}
+                  dateLocale={dateLocale}
                 />
               ))}
               {managers.length === 0 && (
                 <div className="px-5 py-10 text-center">
                   <UserRound className="mx-auto size-8 text-slate-300" />
                   <p className="mt-3 text-sm font-medium text-slate-700">
-                    No team members yet
+                    {t("team.empty_members")}
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
-                    Invite a manager without sharing your password.
+                    {t("team.empty_members_hint")}
                   </p>
                 </div>
               )}
               {managers.length > 0 && visibleManagers.length === 0 && (
                 <div className="px-5 py-10 text-center text-sm text-slate-500">
-                  No members match your search.
+                  {t("team.no_search_results")}
                 </div>
               )}
             </div>
@@ -323,19 +337,19 @@ export default function DashboardTeamAccessPage() {
             <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2">
                 <KeyRound className="size-4 text-sky-600" />
-                <h2 className="text-sm font-semibold">Access roles</h2>
+                <h2 className="text-sm font-semibold">{t("team.access_roles")}</h2>
               </div>
               <div className="mt-4 space-y-3">
                 <RoleCard
                   icon={Crown}
-                  title="Owner"
-                  description="Full control, billing, licenses, and team access."
+                  title={t("team.role_owner")}
+                  description={t("team.role_owner_desc")}
                   tone="amber"
                 />
                 <RoleCard
                   icon={ShieldCheck}
-                  title="Manager"
-                  description="Can manage the linked business from their own account."
+                  title={t("team.role_manager")}
+                  description={t("team.role_manager_desc")}
                   tone="sky"
                 />
               </div>
@@ -345,7 +359,7 @@ export default function DashboardTeamAccessPage() {
               <section className="rounded-3xl border border-amber-200 bg-amber-50 p-5">
                 <div className="flex items-center gap-2 text-sm font-semibold text-amber-900">
                   <Clock3 className="size-4" />
-                  Pending invitations
+                  {t("team.pending_invitations")}
                 </div>
                 <div className="mt-3 space-y-2">
                   {pendingInvites.slice(0, 3).map((pending) => (
@@ -357,7 +371,7 @@ export default function DashboardTeamAccessPage() {
                         {pending.code}
                       </code>
                       <span className="text-[10px] text-amber-700">
-                        {formatExpiry(pending.expiresAt)}
+                        {formatExpiry(pending.expiresAt, t)}
                       </span>
                     </div>
                   ))}
@@ -368,10 +382,10 @@ export default function DashboardTeamAccessPage() {
             <section className="rounded-3xl border border-emerald-100 bg-emerald-50 p-4">
               <p className="flex items-center gap-2 text-xs font-semibold text-emerald-800">
                 <ShieldCheck className="size-4" />
-                Access policy
+                {t("team.access_policy")}
               </p>
               <p className="mt-1.5 text-[11px] leading-5 text-emerald-700">
-                Every member uses a separate verified Vyntex account. Never share the owner password.
+                {t("team.access_policy_text")}
               </p>
             </section>
           </aside>
@@ -381,10 +395,8 @@ export default function DashboardTeamAccessPage() {
       <Dialog open={Boolean(invite)} onOpenChange={(open) => !open && setInvite(null)}>
         <DialogContent className="rounded-3xl sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Invite created</DialogTitle>
-            <DialogDescription>
-              Share this one-time code with the person you trust. They must redeem it while signed in to their Vyntex account.
-            </DialogDescription>
+            <DialogTitle>{t("team.invite_created")}</DialogTitle>
+            <DialogDescription>{t("team.invite_created_desc")}</DialogDescription>
           </DialogHeader>
           {invite && (
             <div className="py-2">
@@ -403,17 +415,19 @@ export default function DashboardTeamAccessPage() {
                 )}
               </button>
               <p className="mt-3 text-center text-xs text-slate-500">
-                Expires {new Date(invite.expiresAt).toLocaleString()}
+                {t("team.expires_at", {
+                  date: new Date(invite.expiresAt).toLocaleString(dateLocale),
+                })}
               </p>
             </div>
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setInvite(null)}>
-              Done
+              {t("team.done")}
             </Button>
             <Button onClick={() => void copyInvite()}>
               <Copy className="mr-2 size-4" />
-              Copy code
+              {t("team.copy_code")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -425,13 +439,13 @@ export default function DashboardTeamAccessPage() {
       >
         <AlertDialogContent className="rounded-3xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove this team member?</AlertDialogTitle>
+            <AlertDialogTitle>{t("team.remove_title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {removing?.managerEmail} will immediately lose access to this business dashboard. Their personal Vyntex account will not be deleted.
+              {t("team.remove_description", { email: removing?.managerEmail ?? "" })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={working}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={working}>{t("team.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               disabled={working}
               onClick={(event) => {
@@ -441,7 +455,7 @@ export default function DashboardTeamAccessPage() {
               className="bg-red-600 text-white hover:bg-red-700"
             >
               {working && <Loader2 className="mr-2 size-4 animate-spin" />}
-              Remove access
+              {t("team.remove_access")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -457,13 +471,17 @@ function MemberRow({
   joinedAt,
   owner = false,
   onRemove,
+  t,
+  dateLocale,
 }: {
   name: string;
   email: string;
-  role: "Owner" | "Manager";
+  role: string;
   joinedAt: string | null;
   owner?: boolean;
   onRemove?: () => void;
+  t: (key: string, vars?: Record<string, string | number>) => string;
+  dateLocale: string;
 }) {
   const initial = (name || email || "?").charAt(0).toUpperCase();
   return (
@@ -495,7 +513,11 @@ function MemberRow({
           {role}
         </span>
         <p className="mt-1 text-[10px] text-slate-400">
-          {joinedAt ? `Joined ${new Date(joinedAt).toLocaleDateString()}` : "Primary account"}
+          {joinedAt
+            ? t("team.joined", {
+                date: new Date(joinedAt).toLocaleDateString(dateLocale),
+              })
+            : t("team.primary_account")}
         </p>
       </div>
       {onRemove && (
@@ -503,7 +525,7 @@ function MemberRow({
           variant="ghost"
           size="icon"
           onClick={onRemove}
-          title="Remove access"
+          title={t("team.remove_access")}
           className="size-9 shrink-0 rounded-xl text-slate-400 hover:bg-red-50 hover:text-red-600"
         >
           <Trash2 className="size-4" />
@@ -578,8 +600,11 @@ function RoleCard({
   );
 }
 
-function formatExpiry(iso: string): string {
+function formatExpiry(
+  iso: string,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): string {
   const minutes = Math.max(0, Math.round((new Date(iso).getTime() - Date.now()) / 60_000));
-  if (minutes < 60) return `${minutes}m left`;
-  return `${Math.ceil(minutes / 60)}h left`;
+  if (minutes < 60) return t("team.expiry_minutes", { count: minutes });
+  return t("team.expiry_hours", { count: Math.ceil(minutes / 60) });
 }
