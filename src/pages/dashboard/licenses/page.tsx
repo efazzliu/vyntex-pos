@@ -158,7 +158,7 @@ export default function DashboardLicensesPage() {
   ];
 
   return (
-    <div className="licenses-page relative min-h-full w-full overflow-hidden px-4 pb-14 pt-16 text-slate-900 sm:px-6 lg:px-8">
+    <div className="licenses-page relative min-h-full w-full overflow-x-hidden px-4 pb-14 pt-16 text-slate-900 sm:px-6 lg:px-8">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_120%_80%_at_10%_-10%,_#d7ebff_0%,_transparent_55%),radial-gradient(ellipse_90%_70%_at_100%_0%,_#c8f1ef_0%,_transparent_50%),linear-gradient(180deg,_#f3f7fc_0%,_#eef2f7_100%)]"
@@ -240,7 +240,7 @@ export default function DashboardLicensesPage() {
             <div className="grid gap-4 sm:grid-cols-[1.2fr_0.8fr]">
               <div className="rounded-2xl border border-dashed border-white/20 bg-white/[0.04] p-4 backdrop-blur-sm">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#8eb8c8]">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#a8d5e2]">
                     {t("licenses.field_key")}
                   </p>
                   <Button
@@ -270,7 +270,7 @@ export default function DashboardLicensesPage() {
 
               <div className="flex flex-col justify-between rounded-2xl border border-white/10 bg-white/[0.05] p-4">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#8eb8c8]">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#a8d5e2]">
                     {t("licenses.field_term")}
                   </p>
                   <span className="text-xs font-medium text-[#b7e4ef]">
@@ -290,7 +290,7 @@ export default function DashboardLicensesPage() {
                     style={{ width: reveal ? `${termPct}%` : "0%" }}
                   />
                 </div>
-                <p className="mt-3 text-xs text-[#9bb8c8]">
+                <p className="mt-3 text-xs font-medium text-[#c5e6ef]">
                   {t("licenses.valid_until", {
                     date: formatDate(current.license_expiry, locale),
                   })}
@@ -317,7 +317,7 @@ export default function DashboardLicensesPage() {
                   "lg:border-r lg:[&:nth-child(3n)]:border-r-0 lg:[&:nth-last-child(-n+3)]:border-b-0",
                 )}
               >
-                <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                   {fact.label}
                 </dt>
                 <dd className="mt-1.5 text-[15px] font-semibold text-[#13253f]">{fact.value}</dd>
