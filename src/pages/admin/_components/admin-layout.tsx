@@ -15,6 +15,8 @@ import {
   Settings,
   ChevronLeft,
   Menu,
+  ShieldCheck,
+  X,
 } from "lucide-react";
 import { useEffect } from "react";
 import { canAccessAdminPath, canSeeAdminNavItem, type PlatformAdminRole } from "@/lib/platform-admin.ts";
@@ -22,6 +24,7 @@ import { AdminPageHeader } from "@/pages/admin/_components/admin-page-header.tsx
 import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 import { AdminSettingsProvider, useAdminSettings } from "@/pages/admin/settings-hub/_lib/admin-settings-context.tsx";
 import { runAdminAlerts } from "@/pages/admin/settings-hub/_lib/admin-alerts.ts";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet.tsx";
 
 type SidebarItem = {
   label: string;
@@ -59,10 +62,12 @@ const sidebarSections: SidebarSection[] = [
 function AdminSidebar({
   collapsed,
   onToggle,
+  onClose,
   adminAccess,
 }: {
   collapsed: boolean;
   onToggle: () => void;
+  onClose?: () => void;
   adminAccess: PlatformAdminRole | null;
 }) {
   const location = useLocation();
@@ -88,60 +93,79 @@ function AdminSidebar({
   return (
     <aside
       className={cn(
-        "relative flex h-full flex-col overflow-hidden border-r border-slate-200/80 bg-gradient-to-b from-white via-slate-50/90 to-slate-100/70 text-slate-900 shadow-[inset_-1px_0_0_0_rgba(148,163,184,0.12)] transition-[width] duration-300 ease-out dark:border-sky-500/15 dark:from-[#050c16] dark:via-[#030812] dark:to-[#02040a] dark:text-zinc-100 dark:shadow-[inset_-1px_0_0_0_rgba(56,189,248,0.06)]",
-        collapsed ? "w-[72px]" : "w-[260px]"
+        "relative flex h-full flex-col overflow-hidden bg-[#080b13] text-white transition-[width] duration-300 ease-out",
+        collapsed ? "w-[76px]" : "w-[272px]"
       )}
     >
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-36 bg-gradient-to-b from-blue-500/[0.04] via-slate-200/20 to-transparent dark:from-sky-500/10 dark:via-blue-600/4 dark:to-transparent" />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_0%_0%,rgba(59,130,246,0.05),transparent_60%)] dark:bg-[radial-gradient(ellipse_70%_50%_at_0%_0%,rgba(56,189,248,0.07),transparent_60%)]" />
+      {/* Ambient brand glow — a fixed dark "control room" chrome, independent of the app theme. */}
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_0%_0%,rgba(0,102,255,0.20),transparent_45%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_100%_100%,rgba(68,204,0,0.14),transparent_45%)]" />
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-white/[0.08] to-transparent" />
 
-      <div className="relative z-10 flex shrink-0 items-center justify-between gap-2 border-b border-slate-200/80 bg-white/70 px-4 py-4 backdrop-blur-sm dark:border-sky-500/12 dark:bg-black/20">
+      <div className="relative z-10 flex shrink-0 items-center gap-3 px-4 pt-5 pb-4">
         <Link
           to="/"
           className={cn(
-            "flex min-w-0 flex-1 items-center gap-2.5",
+            "flex min-w-0 flex-1 items-center gap-3",
             collapsed && "justify-center"
           )}
         >
-          <img
-            src={VYNTEX_APP_LOGO_SRC}
-            alt="Vyntex POS"
-            className="h-7 w-7 shrink-0"
-          />
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0066FF] to-[#44CC00] shadow-[0_10px_26px_-10px_rgba(0,102,255,0.65)]">
+            <img src={VYNTEX_APP_LOGO_SRC} alt="Vyntex POS" className="h-5 w-5" />
+          </span>
           {!collapsed && (
-            <span className="truncate text-base font-bold tracking-tight bg-gradient-to-r from-[#0066FF] to-[#44CC00] bg-clip-text text-transparent">
-              Vyntex POS
+            <span className="min-w-0">
+              <span className="block truncate text-[15px] font-bold leading-tight tracking-tight text-white">
+                Vyntex POS
+              </span>
+              <span className="block truncate text-[10px] font-semibold uppercase tracking-[0.22em] text-white/35">
+                Control Center
+              </span>
             </span>
           )}
         </Link>
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className="hidden size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-transparent text-slate-400 transition-all hover:border-slate-200 hover:bg-slate-100 hover:text-slate-700 lg:flex dark:text-sky-200/60 dark:hover:border-sky-500/25 dark:hover:bg-sky-500/10 dark:hover:text-white"
-        >
-          <ChevronLeft className={cn("size-4 transition-transform", collapsed && "rotate-180")} />
-        </button>
+
+        {onClose ? (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close menu"
+            className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-xl text-white/50 transition-all hover:bg-white/10 hover:text-white active:scale-95"
+          >
+            <X className="size-[18px]" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className="hidden size-9 shrink-0 cursor-pointer items-center justify-center rounded-xl text-white/40 transition-all hover:bg-white/10 hover:text-white lg:flex"
+          >
+            <ChevronLeft className={cn("size-4 transition-transform", collapsed && "rotate-180")} />
+          </button>
+        )}
       </div>
 
       {!collapsed && (
-        <div className="relative z-10 border-b border-slate-200/80 bg-slate-50/60 px-4 py-2.5 backdrop-blur-sm dark:border-sky-500/12 dark:bg-black/15">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-sky-200/40">
-            Admin Console
-          </p>
+        <div className="relative z-10 mx-4 mb-4 flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.04] px-3 py-2">
+          <ShieldCheck className="size-3.5 shrink-0 text-emerald-400" />
+          <span className="truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">
+            Platform Admin
+          </span>
+          <span className="ml-auto size-1.5 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.85)]" />
         </div>
       )}
 
-      <nav className="relative z-10 flex-1 space-y-4 overflow-y-auto px-2 py-4">
+      <nav className="relative z-10 flex-1 space-y-6 overflow-y-auto px-3 pb-4">
         {sections.map((section) => (
           <div key={section.title} className="space-y-1">
             {!collapsed && (
-              <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 dark:text-sky-200/40">
+              <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-white/25">
                 {section.title}
               </p>
             )}
 
-            <div className="space-y-0.5">
+            <div className="space-y-1">
               {section.items.map((item) => {
                 const parentActive =
                   isActive(item.href) ||
@@ -151,29 +175,36 @@ function AdminSidebar({
                     <Link
                       to={item.href}
                       className={cn(
-                        "group flex items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                        "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13.5px] font-semibold transition-all duration-200",
                         parentActive
-                          ? "border-blue-200/80 bg-blue-50 text-blue-900 shadow-[0_0_24px_-12px_rgba(37,99,235,0.25)] dark:border-sky-400/35 dark:bg-sky-500/10 dark:text-white dark:shadow-[0_0_28px_-10px_rgba(56,189,248,0.35)]"
-                          : "text-slate-600 hover:border-slate-200/80 hover:bg-slate-100/80 hover:text-slate-900 dark:text-white/55 dark:hover:border-white/[0.08] dark:hover:bg-white/[0.06] dark:hover:text-white",
+                          ? "bg-white/[0.09] text-white"
+                          : "text-white/50 hover:bg-white/[0.05] hover:text-white/90",
                         collapsed && "justify-center px-0"
                       )}
                       title={collapsed ? item.label : undefined}
                     >
                       <span
+                        aria-hidden="true"
                         className={cn(
-                          "flex size-8 shrink-0 items-center justify-center rounded-lg transition-colors",
+                          "absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-gradient-to-b from-[#0066FF] to-[#44CC00] transition-opacity duration-200",
+                          parentActive ? "opacity-100" : "opacity-0"
+                        )}
+                      />
+                      <span
+                        className={cn(
+                          "flex size-9 shrink-0 items-center justify-center rounded-xl transition-all duration-200",
                           parentActive
-                            ? "bg-blue-100 text-blue-600 dark:bg-sky-500/15 dark:text-sky-300"
-                            : "text-slate-400 group-hover:bg-slate-100 group-hover:text-slate-700 dark:text-white/50 dark:group-hover:bg-white/[0.06] dark:group-hover:text-white/80"
+                            ? "bg-gradient-to-br from-[#0066FF]/30 to-[#44CC00]/25 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.08)]"
+                            : "bg-white/[0.04] text-white/40 group-hover:bg-white/[0.09] group-hover:text-white/80"
                         )}
                       >
-                        <item.icon className="size-[18px]" strokeWidth={parentActive ? 2.25 : 1.75} />
+                        <item.icon className="size-[17px]" strokeWidth={parentActive ? 2.25 : 1.75} />
                       </span>
                       {!collapsed && <span className="truncate">{item.label}</span>}
                     </Link>
 
                     {!collapsed && item.children?.length ? (
-                      <div className="ml-11 space-y-0.5 border-l border-slate-200/80 pl-3 dark:border-sky-500/15">
+                      <div className="ml-11 space-y-0.5 border-l border-white/[0.08] pl-3">
                         {item.children.map((child) => (
                           <Link
                             key={`${item.label}-${child.label}`}
@@ -181,8 +212,8 @@ function AdminSidebar({
                             className={cn(
                               "block rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all",
                               isActive(child.href)
-                                ? "bg-blue-50 font-semibold text-blue-700 dark:bg-sky-500/10 dark:text-sky-300"
-                                : "text-slate-500 hover:bg-slate-100/80 hover:text-slate-800 dark:text-white/45 dark:hover:bg-white/[0.05] dark:hover:text-white/80"
+                                ? "bg-white/[0.08] font-semibold text-white"
+                                : "text-white/40 hover:bg-white/[0.05] hover:text-white/80"
                             )}
                           >
                             {child.label}
@@ -198,15 +229,24 @@ function AdminSidebar({
         ))}
       </nav>
 
-      <div className="relative z-10 shrink-0 border-t border-slate-200/80 bg-slate-50/60 p-3 backdrop-blur-sm dark:border-sky-500/12 dark:bg-black/20">
+      <div className="relative z-10 shrink-0 border-t border-white/[0.06] p-3">
         {!collapsed ? (
-          <div className="rounded-xl border border-red-200/80 bg-red-50/80 px-3 py-2 text-center dark:border-sky-500/20 dark:bg-black/35">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-red-600/90 dark:text-red-400/90">
-              Platform Admin
-            </p>
+          <div className="flex items-center gap-2.5 rounded-xl bg-white/[0.04] px-3 py-2.5">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-orange-400 text-[11px] font-bold text-white shadow-[0_4px_14px_-4px_rgba(239,68,68,0.7)]">
+              PA
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-xs font-semibold text-white">Platform Admin</span>
+              <span className="block truncate text-[10px] text-white/40">Full system access</span>
+            </span>
           </div>
         ) : (
-          <div className="mx-auto size-2 rounded-full bg-red-500/80 dark:bg-red-400/80" title="Platform Admin" />
+          <div
+            className="mx-auto flex size-8 items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-orange-400 text-[10px] font-bold text-white shadow-[0_4px_14px_-4px_rgba(239,68,68,0.7)]"
+            title="Platform Admin"
+          >
+            PA
+          </div>
         )}
       </div>
     </aside>
@@ -352,18 +392,20 @@ function AdminContentInner({ adminAccess }: { adminAccess: PlatformAdminRole | n
       </div>
 
       {/* Mobile side drawer */}
-      {mobileSidebarOpen ? (
-        <div className="lg:hidden fixed inset-0 z-50">
-          <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-            onClick={() => setMobileSidebarOpen(false)}
-            aria-hidden="true"
+      <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
+        <SheetContent
+          side="left"
+          className="w-[272px] max-w-[85vw] border-none bg-transparent p-0 shadow-[0_0_60px_-10px_rgba(0,0,0,0.6)] sm:max-w-[300px] [&>button]:hidden lg:hidden"
+        >
+          <SheetTitle className="sr-only">Admin navigation</SheetTitle>
+          <AdminSidebar
+            collapsed={false}
+            onToggle={toggleSidebar}
+            onClose={() => setMobileSidebarOpen(false)}
+            adminAccess={adminAccess}
           />
-          <div className="absolute left-0 top-0 bottom-0 w-[260px]">
-            <AdminSidebar collapsed={false} onToggle={toggleSidebar} adminAccess={adminAccess} />
-          </div>
-        </div>
-      ) : null}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
