@@ -14,6 +14,7 @@ import {
   UsersRound,
   Settings,
   ChevronLeft,
+  Menu,
 } from "lucide-react";
 import { useEffect } from "react";
 import { canAccessAdminPath, canSeeAdminNavItem, type PlatformAdminRole } from "@/lib/platform-admin.ts";
@@ -257,6 +258,7 @@ function AdminContentInner({ adminAccess }: { adminAccess: PlatformAdminRole | n
   const navigate = useNavigate();
   const location = useLocation();
   const sidebarCollapsed = settings.ui.sidebarCollapsed;
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   const goBackToProfile = () => {
     const from = (location.state as { from?: string } | null)?.from;
@@ -284,21 +286,15 @@ function AdminContentInner({ adminAccess }: { adminAccess: PlatformAdminRole | n
     void runAdminAlerts(settings.notifications, settings.email);
   }, [settings.loaded, settings.email, settings.notifications]);
 
+  useEffect(() => {
+    if (!mobileSidebarOpen) return;
+    setMobileSidebarOpen(false);
+  }, [location.pathname, mobileSidebarOpen]);
+
   const toggleSidebar = () => {
     const next = !sidebarCollapsed;
     void settings.saveUi({ sidebarCollapsed: next });
   };
-  const mobileLinks = [
-    { href: "/admin", label: "Dashboard" },
-    { href: "/admin/subscriptions", label: "Revenue" },
-    { href: "/admin/businesses", label: "Clients" },
-    { href: "/admin/licenses", label: "Licenses" },
-    { href: "/admin/reports", label: "Analytics" },
-    { href: "/admin/support", label: "Support" },
-    { href: "/admin/users", label: "Users" },
-    { href: "/admin/team", label: "Team" },
-    { href: "/admin/settings", label: "Settings" },
-  ].filter((x) => canSeeAdminNavItem(x.href, adminAccess));
 
   return (
     <div className="flex h-dvh overflow-hidden bg-[#f4f6fa] dark:bg-[#050914]">
@@ -315,6 +311,14 @@ function AdminContentInner({ adminAccess }: { adminAccess: PlatformAdminRole | n
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Mobile header */}
         <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-background px-4 lg:hidden">
+          <button
+            type="button"
+            onClick={() => setMobileSidebarOpen(true)}
+            aria-label="Open admin menu"
+            className="inline-flex items-center justify-center rounded-xl border border-border bg-background/60 px-2.5 py-1.5 text-xs font-semibold text-foreground shadow-[0_6px_18px_-14px_rgba(2,6,23,0.55)] transition-all hover:bg-accent/60 active:scale-[0.98]"
+          >
+            <Menu className="size-4" />
+          </button>
           <Link to="/" className="flex items-center gap-2 min-w-0">
             <img src={VYNTEX_APP_LOGO_SRC} alt="Vyntex POS" className="h-6 w-6" />
             <span className="text-base font-bold tracking-tight">
@@ -336,7 +340,7 @@ function AdminContentInner({ adminAccess }: { adminAccess: PlatformAdminRole | n
 
         <main
           className={cn(
-            "flex-1 overflow-y-auto pb-[5.75rem] lg:p-3 lg:pb-3",
+            "flex-1 overflow-y-auto pb-4 lg:p-3 lg:pb-3",
             settings.ui.compactMode && "text-[13px] [&_.space-y-6]:space-y-4",
           )}
         >
@@ -345,20 +349,21 @@ function AdminContentInner({ adminAccess }: { adminAccess: PlatformAdminRole | n
           </div>
           <Outlet />
         </main>
-        <div className="lg:hidden border-t border-border bg-background px-4 py-3">
-          <div className="flex gap-3 overflow-x-auto">
-            {mobileLinks.map((x) => (
-              <Link
-                key={x.href}
-                to={x.href}
-                className="whitespace-nowrap rounded-md border border-border px-3 py-1.5 text-xs text-foreground"
-              >
-                {x.label}
-              </Link>
-            ))}
+      </div>
+
+      {/* Mobile side drawer */}
+      {mobileSidebarOpen ? (
+        <div className="lg:hidden fixed inset-0 z-50">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => setMobileSidebarOpen(false)}
+            aria-hidden="true"
+          />
+          <div className="absolute left-0 top-0 bottom-0 w-[260px]">
+            <AdminSidebar collapsed={false} onToggle={toggleSidebar} adminAccess={adminAccess} />
           </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }
