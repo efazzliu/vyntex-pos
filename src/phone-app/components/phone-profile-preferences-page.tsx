@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ChevronLeft, Globe } from "lucide-react";
+import { FlagAL, FlagUS } from "@/components/flag-icons.tsx";
 import { useSiteLanguage } from "@/components/providers/site-locale-provider.tsx";
 import { cn } from "@/lib/utils.ts";
 
@@ -37,27 +38,29 @@ export default function PhoneProfilePreferencesPage() {
         <div className="grid grid-cols-2 gap-3">
           <button
             type="button"
-            onClick={() => setLanguage("en")}
-            className={cn(
-              "rounded-xl border-2 py-3 text-sm font-semibold transition-colors",
-              language === "en"
-                ? "border-[#0066FF] bg-[#0066FF]/10 text-[#0066FF]"
-                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
-            )}
-          >
-            {t("phone.profile.langEn")}
-          </button>
-          <button
-            type="button"
             onClick={() => setLanguage("sq")}
             className={cn(
-              "rounded-xl border-2 py-3 text-sm font-semibold transition-colors",
+              "inline-flex items-center justify-center gap-2 rounded-xl border-2 py-3 text-sm font-semibold transition-colors",
               language === "sq"
                 ? "border-[#0066FF] bg-[#0066FF]/10 text-[#0066FF]"
                 : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
             )}
           >
+            <FlagAL className="h-4 w-6" />
             {t("phone.profile.langSq")}
+          </button>
+          <button
+            type="button"
+            onClick={() => setLanguage("en")}
+            className={cn(
+              "inline-flex items-center justify-center gap-2 rounded-xl border-2 py-3 text-sm font-semibold transition-colors",
+              language === "en"
+                ? "border-[#0066FF] bg-[#0066FF]/10 text-[#0066FF]"
+                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+            )}
+          >
+            <FlagUS className="h-4 w-6" />
+            {t("phone.profile.langEn")}
           </button>
         </div>
       </div>

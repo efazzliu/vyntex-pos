@@ -1,4 +1,4 @@
-import { Check, Languages } from "lucide-react";
+import { Check } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,18 +32,10 @@ export function SiteLanguageToggle({
             triggerClassName,
           )}
         >
-          <Languages className="size-4" />
+          {language === "sq" ? <FlagAL className="h-3.5 w-5" /> : <FlagUS className="h-3.5 w-5" />}
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align={align} className="min-w-[10.5rem]">
-        <DropdownMenuItem
-          className="cursor-pointer gap-2"
-          onClick={() => setLanguage("en")}
-        >
-          <FlagUS />
-          <span className="flex-1 font-medium">English</span>
-          {language === "en" ? <Check className="size-4 text-[#0066FF]" /> : null}
-        </DropdownMenuItem>
         <DropdownMenuItem
           className="cursor-pointer gap-2"
           onClick={() => setLanguage("sq")}
@@ -51,6 +43,14 @@ export function SiteLanguageToggle({
           <FlagAL />
           <span className="flex-1 font-medium">Shqip</span>
           {language === "sq" ? <Check className="size-4 text-[#0066FF]" /> : null}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className="cursor-pointer gap-2"
+          onClick={() => setLanguage("en")}
+        >
+          <FlagUS />
+          <span className="flex-1 font-medium">English</span>
+          {language === "en" ? <Check className="size-4 text-[#0066FF]" /> : null}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

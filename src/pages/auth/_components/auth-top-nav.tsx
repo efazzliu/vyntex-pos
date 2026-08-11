@@ -2,13 +2,6 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select.tsx";
 import { useSiteLanguage } from "@/components/providers/site-locale-provider.tsx";
 import { FlagAL, FlagUS } from "@/components/flag-icons.tsx";
 import { cn } from "@/lib/utils.ts";
@@ -24,9 +17,47 @@ const navItems = [
   { key: "contact", href: "/contact" },
 ] as const;
 
+function AuthLangFlags() {
+  const { language, setLanguage } = useSiteLanguage();
+
+  return (
+    <div
+      className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 p-1"
+      role="group"
+      aria-label="Language"
+    >
+      <button
+        type="button"
+        onClick={() => setLanguage("sq")}
+        aria-label="Shqip"
+        aria-pressed={language === "sq"}
+        title="Shqip"
+        className={cn(
+          "inline-flex items-center justify-center rounded-full px-2.5 py-1.5 transition-colors",
+          language === "sq" ? "bg-white/25 ring-1 ring-white/40" : "hover:bg-white/15",
+        )}
+      >
+        <FlagAL className="h-4 w-6" />
+      </button>
+      <button
+        type="button"
+        onClick={() => setLanguage("en")}
+        aria-label="English"
+        aria-pressed={language === "en"}
+        title="English"
+        className={cn(
+          "inline-flex items-center justify-center rounded-full px-2.5 py-1.5 transition-colors",
+          language === "en" ? "bg-white/25 ring-1 ring-white/40" : "hover:bg-white/15",
+        )}
+      >
+        <FlagUS className="h-4 w-6" />
+      </button>
+    </div>
+  );
+}
+
 export default function AuthTopNav() {
   const { t } = useTranslation("site");
-  const { language, setLanguage } = useSiteLanguage();
   const [isAuthed, setIsAuthed] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -79,38 +110,15 @@ export default function AuthTopNav() {
           ))}
         </nav>
 
-        <div className="hidden md:flex items-center gap-2">
+        <div className="flex items-center gap-2">
           <Button
             size="sm"
             onClick={() => navigate(ctaPath)}
-            className="rounded-full bg-gradient-to-r from-[#0066FF] to-[#00AACC] px-4 text-white shadow-lg shadow-blue-600/25 transition-all hover:scale-[1.02] hover:from-[#0055DD] hover:to-[#0099BB]"
+            className="hidden rounded-full bg-gradient-to-r from-[#0066FF] to-[#00AACC] px-4 text-white shadow-lg shadow-blue-600/25 transition-all hover:scale-[1.02] hover:from-[#0055DD] hover:to-[#0099BB] md:inline-flex"
           >
             {ctaLabel}
           </Button>
-          <Select
-            value={language}
-            onValueChange={(value) => {
-              if (value === "en" || value === "sq") setLanguage(value);
-            }}
-          >
-            <SelectTrigger className="h-8 min-w-[8.5rem] border-white/20 bg-white/5 text-xs font-semibold text-white/90">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="min-w-[8.5rem]">
-              <SelectItem value="en">
-                <span className="inline-flex items-center gap-2">
-                  <FlagUS />
-                  English
-                </span>
-              </SelectItem>
-              <SelectItem value="sq">
-                <span className="inline-flex items-center gap-2">
-                  <FlagAL />
-                  Albanian
-                </span>
-              </SelectItem>
-            </SelectContent>
-          </Select>
+          <AuthLangFlags />
         </div>
       </div>
     </header>
