@@ -300,6 +300,12 @@ function AdminContentInner({ adminAccess }: { adminAccess: PlatformAdminRole | n
     { href: "/admin/settings", label: "Settings" },
   ].filter((x) => canSeeAdminNavItem(x.href, adminAccess));
 
+  const isMobileNavActive = (href: string) => {
+    const base = href.split("?")[0]!;
+    if (href === "/admin") return location.pathname === "/admin";
+    return location.pathname.startsWith(base);
+  };
+
   return (
     <div className="flex h-dvh overflow-hidden bg-[#f4f6fa] dark:bg-[#050914]">
       {/* Desktop sidebar */}
@@ -346,16 +352,23 @@ function AdminContentInner({ adminAccess }: { adminAccess: PlatformAdminRole | n
           <Outlet />
         </main>
         <div className="lg:hidden border-t border-border bg-background px-4 py-3">
-          <div className="flex gap-3 overflow-x-auto">
-            {mobileLinks.map((x) => (
-              <Link
-                key={x.href}
-                to={x.href}
-                className="whitespace-nowrap rounded-md border border-border px-3 py-1.5 text-xs text-foreground"
-              >
-                {x.label}
-              </Link>
-            ))}
+          <div className="rounded-2xl border border-border/70 bg-background/70 px-3 py-2 backdrop-blur-xl">
+            <div className="flex gap-2 overflow-x-auto">
+              {mobileLinks.map((x) => (
+                <Link
+                  key={x.href}
+                  to={x.href}
+                  className={cn(
+                    "whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-all",
+                    isMobileNavActive(x.href)
+                      ? "border-transparent bg-gradient-to-r from-[#0066FF] to-[#44CC00] text-white shadow-[0_10px_30px_-14px_rgba(0,102,255,0.65)]"
+                      : "border-border bg-background/60 text-foreground/90 hover:bg-accent/60",
+                  )}
+                >
+                  {x.label}
+                </Link>
+              ))}
+            </div>
           </div>
         </div>
       </div>
