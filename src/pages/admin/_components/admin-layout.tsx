@@ -15,7 +15,7 @@ import {
   Settings,
   ChevronLeft,
   Menu,
-  ShieldCheck,
+  Search,
   X,
 } from "lucide-react";
 import { useEffect } from "react";
@@ -26,10 +26,17 @@ import { AdminSettingsProvider, useAdminSettings } from "@/pages/admin/settings-
 import { runAdminAlerts } from "@/pages/admin/settings-hub/_lib/admin-alerts.ts";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet.tsx";
 
+type SidebarAccent = {
+  chip: string;
+  icon: string;
+  dot: string;
+};
+
 type SidebarItem = {
   label: string;
   href: string;
-  icon: ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string; strokeWidth?: number }>;
+  accent: SidebarAccent;
   children?: Array<{
     label: string;
     href: string;
@@ -42,19 +49,33 @@ type SidebarSection = {
   items: SidebarItem[];
 };
 
+// Each nav destination gets its own accent color instead of one uniform brand tint —
+// makes items instantly recognizable at a glance, like a set of app icons.
+const ACCENTS = {
+  blue: { chip: "bg-blue-50 dark:bg-blue-500/10", icon: "text-blue-600 dark:text-blue-400", dot: "bg-blue-500" },
+  emerald: { chip: "bg-emerald-50 dark:bg-emerald-500/10", icon: "text-emerald-600 dark:text-emerald-400", dot: "bg-emerald-500" },
+  violet: { chip: "bg-violet-50 dark:bg-violet-500/10", icon: "text-violet-600 dark:text-violet-400", dot: "bg-violet-500" },
+  amber: { chip: "bg-amber-50 dark:bg-amber-500/10", icon: "text-amber-600 dark:text-amber-400", dot: "bg-amber-500" },
+  cyan: { chip: "bg-cyan-50 dark:bg-cyan-500/10", icon: "text-cyan-600 dark:text-cyan-400", dot: "bg-cyan-500" },
+  rose: { chip: "bg-rose-50 dark:bg-rose-500/10", icon: "text-rose-600 dark:text-rose-400", dot: "bg-rose-500" },
+  indigo: { chip: "bg-indigo-50 dark:bg-indigo-500/10", icon: "text-indigo-600 dark:text-indigo-400", dot: "bg-indigo-500" },
+  teal: { chip: "bg-teal-50 dark:bg-teal-500/10", icon: "text-teal-600 dark:text-teal-400", dot: "bg-teal-500" },
+  slate: { chip: "bg-slate-100 dark:bg-white/10", icon: "text-slate-600 dark:text-slate-300", dot: "bg-slate-500" },
+} as const;
+
 const sidebarSections: SidebarSection[] = [
   {
     title: "Platform",
     items: [
-      { label: "Dashboard", href: "/admin", icon: LayoutDashboard },
-      { label: "Revenue", href: "/admin/subscriptions", icon: Wallet },
-      { label: "Clients", href: "/admin/businesses", icon: Building2 },
-      { label: "Licenses", href: "/admin/licenses", icon: KeyRound },
-      { label: "Analytics", href: "/admin/reports", icon: BarChart3 },
-      { label: "Support", href: "/admin/support", icon: LifeBuoy },
-      { label: "Users", href: "/admin/users", icon: UserRound },
-      { label: "Team", href: "/admin/team", icon: UsersRound },
-      { label: "Settings", href: "/admin/settings", icon: Settings },
+      { label: "Dashboard", href: "/admin", icon: LayoutDashboard, accent: ACCENTS.blue },
+      { label: "Revenue", href: "/admin/subscriptions", icon: Wallet, accent: ACCENTS.emerald },
+      { label: "Clients", href: "/admin/businesses", icon: Building2, accent: ACCENTS.violet },
+      { label: "Licenses", href: "/admin/licenses", icon: KeyRound, accent: ACCENTS.amber },
+      { label: "Analytics", href: "/admin/reports", icon: BarChart3, accent: ACCENTS.cyan },
+      { label: "Support", href: "/admin/support", icon: LifeBuoy, accent: ACCENTS.rose },
+      { label: "Users", href: "/admin/users", icon: UserRound, accent: ACCENTS.indigo },
+      { label: "Team", href: "/admin/team", icon: UsersRound, accent: ACCENTS.teal },
+      { label: "Settings", href: "/admin/settings", icon: Settings, accent: ACCENTS.slate },
     ],
   },
 ];
@@ -71,12 +92,15 @@ function AdminSidebar({
   adminAccess: PlatformAdminRole | null;
 }) {
   const location = useLocation();
+  const [query, setQuery] = useState("");
 
   const isActive = (href: string) => {
     const basePath = href.split("?")[0];
     if (href === "/admin") return location.pathname === "/admin";
     return location.pathname.startsWith(basePath);
   };
+
+  const normalizedQuery = query.trim().toLowerCase();
 
   const sections = sidebarSections
     .map((section) => ({
@@ -85,7 +109,9 @@ function AdminSidebar({
         const childScope = item.children?.map((child) => child.href) ?? [];
         const baseScope = item.accessHrefs?.length ? item.accessHrefs : [item.href];
         const scope = Array.from(new Set([...baseScope, ...childScope]));
-        return scope.some((href) => canSeeAdminNavItem(href, adminAccess));
+        if (!scope.some((href) => canSeeAdminNavItem(href, adminAccess))) return false;
+        if (!normalizedQuery) return true;
+        return item.label.toLowerCase().includes(normalizedQuery);
       }),
     }))
     .filter((section) => section.items.length > 0);
@@ -93,161 +119,163 @@ function AdminSidebar({
   return (
     <aside
       className={cn(
-        "relative flex h-full flex-col overflow-hidden bg-[#080b13] text-white transition-[width] duration-300 ease-out",
-        collapsed ? "w-[76px]" : "w-[272px]"
+        "flex h-full flex-col bg-[#eef1f7] p-2.5 transition-[width] duration-300 ease-out dark:bg-[#050914]",
+        collapsed ? "w-[84px]" : "w-[280px]"
       )}
     >
-      {/* Ambient brand glow — a fixed dark "control room" chrome, independent of the app theme. */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_0%_0%,rgba(0,102,255,0.20),transparent_45%)]" />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_100%_100%,rgba(68,204,0,0.14),transparent_45%)]" />
-      <div className="pointer-events-none absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-white/[0.08] to-transparent" />
-
-      <div className="relative z-10 flex shrink-0 items-center gap-3 px-4 pt-5 pb-4">
-        <Link
-          to="/"
-          className={cn(
-            "flex min-w-0 flex-1 items-center gap-3",
-            collapsed && "justify-center"
-          )}
-        >
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0066FF] to-[#44CC00] shadow-[0_10px_26px_-10px_rgba(0,102,255,0.65)]">
-            <img src={VYNTEX_APP_LOGO_SRC} alt="Vyntex POS" className="h-5 w-5" />
-          </span>
-          {!collapsed && (
-            <span className="min-w-0">
-              <span className="block truncate text-[15px] font-bold leading-tight tracking-tight text-white">
+      {/* Floating card "dock" — a distinct nav shell, separate from the page chrome, that
+          follows the app's own light/dark theme instead of forcing one look. */}
+      <div className="flex h-full flex-col overflow-hidden rounded-[26px] border border-slate-200/70 bg-white shadow-[0_20px_45px_-28px_rgba(15,23,42,0.35)] dark:border-white/[0.06] dark:bg-[#0b0f1a] dark:shadow-[0_20px_45px_-28px_rgba(0,0,0,0.7)]">
+        <div className="flex shrink-0 items-center gap-2.5 px-4 pt-4 pb-3">
+          <Link
+            to="/"
+            className={cn(
+              "flex min-w-0 flex-1 items-center gap-2.5",
+              collapsed && "justify-center"
+            )}
+          >
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#0066FF] to-[#44CC00] shadow-[0_8px_18px_-8px_rgba(0,102,255,0.55)]">
+              <img src={VYNTEX_APP_LOGO_SRC} alt="Vyntex POS" className="h-[18px] w-[18px]" />
+            </span>
+            {!collapsed && (
+              <span className="min-w-0 truncate text-[15px] font-bold tracking-tight text-slate-900 dark:text-white">
                 Vyntex POS
               </span>
-              <span className="block truncate text-[10px] font-semibold uppercase tracking-[0.22em] text-white/35">
-                Control Center
-              </span>
-            </span>
-          )}
-        </Link>
-
-        {onClose ? (
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close menu"
-            className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-xl text-white/50 transition-all hover:bg-white/10 hover:text-white active:scale-95"
-          >
-            <X className="size-[18px]" />
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={onToggle}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className="hidden size-9 shrink-0 cursor-pointer items-center justify-center rounded-xl text-white/40 transition-all hover:bg-white/10 hover:text-white lg:flex"
-          >
-            <ChevronLeft className={cn("size-4 transition-transform", collapsed && "rotate-180")} />
-          </button>
-        )}
-      </div>
-
-      {!collapsed && (
-        <div className="relative z-10 mx-4 mb-4 flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.04] px-3 py-2">
-          <ShieldCheck className="size-3.5 shrink-0 text-emerald-400" />
-          <span className="truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">
-            Platform Admin
-          </span>
-          <span className="ml-auto size-1.5 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.85)]" />
-        </div>
-      )}
-
-      <nav className="relative z-10 flex-1 space-y-6 overflow-y-auto px-3 pb-4">
-        {sections.map((section) => (
-          <div key={section.title} className="space-y-1">
-            {!collapsed && (
-              <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-white/25">
-                {section.title}
-              </p>
             )}
+          </Link>
 
-            <div className="space-y-1">
-              {section.items.map((item) => {
-                const parentActive =
-                  isActive(item.href) ||
-                  (item.children?.some((child) => isActive(child.href)) ?? false);
-                return (
-                  <div key={item.label} className="space-y-0.5">
-                    <Link
-                      to={item.href}
-                      className={cn(
-                        "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13.5px] font-semibold transition-all duration-200",
-                        parentActive
-                          ? "bg-white/[0.09] text-white"
-                          : "text-white/50 hover:bg-white/[0.05] hover:text-white/90",
-                        collapsed && "justify-center px-0"
-                      )}
-                      title={collapsed ? item.label : undefined}
-                    >
-                      <span
-                        aria-hidden="true"
-                        className={cn(
-                          "absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-gradient-to-b from-[#0066FF] to-[#44CC00] transition-opacity duration-200",
-                          parentActive ? "opacity-100" : "opacity-0"
-                        )}
-                      />
-                      <span
-                        className={cn(
-                          "flex size-9 shrink-0 items-center justify-center rounded-xl transition-all duration-200",
-                          parentActive
-                            ? "bg-gradient-to-br from-[#0066FF]/30 to-[#44CC00]/25 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.08)]"
-                            : "bg-white/[0.04] text-white/40 group-hover:bg-white/[0.09] group-hover:text-white/80"
-                        )}
-                      >
-                        <item.icon className="size-[17px]" strokeWidth={parentActive ? 2.25 : 1.75} />
-                      </span>
-                      {!collapsed && <span className="truncate">{item.label}</span>}
-                    </Link>
+          {onClose ? (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close menu"
+              className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition-all hover:bg-slate-100 hover:text-slate-700 active:scale-95 dark:text-white/40 dark:hover:bg-white/10 dark:hover:text-white"
+            >
+              <X className="size-4" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onToggle}
+              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              className="hidden size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition-all hover:bg-slate-100 hover:text-slate-700 lg:flex dark:text-white/40 dark:hover:bg-white/10 dark:hover:text-white"
+            >
+              <ChevronLeft className={cn("size-4 transition-transform", collapsed && "rotate-180")} />
+            </button>
+          )}
+        </div>
 
-                    {!collapsed && item.children?.length ? (
-                      <div className="ml-11 space-y-0.5 border-l border-white/[0.08] pl-3">
-                        {item.children.map((child) => (
-                          <Link
-                            key={`${item.label}-${child.label}`}
-                            to={child.href}
-                            className={cn(
-                              "block rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all",
-                              isActive(child.href)
-                                ? "bg-white/[0.08] font-semibold text-white"
-                                : "text-white/40 hover:bg-white/[0.05] hover:text-white/80"
-                            )}
-                          >
-                            {child.label}
-                          </Link>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </nav>
-
-      <div className="relative z-10 shrink-0 border-t border-white/[0.06] p-3">
-        {!collapsed ? (
-          <div className="flex items-center gap-2.5 rounded-xl bg-white/[0.04] px-3 py-2.5">
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-orange-400 text-[11px] font-bold text-white shadow-[0_4px_14px_-4px_rgba(239,68,68,0.7)]">
-              PA
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-xs font-semibold text-white">Platform Admin</span>
-              <span className="block truncate text-[10px] text-white/40">Full system access</span>
-            </span>
-          </div>
-        ) : (
-          <div
-            className="mx-auto flex size-8 items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-orange-400 text-[10px] font-bold text-white shadow-[0_4px_14px_-4px_rgba(239,68,68,0.7)]"
-            title="Platform Admin"
-          >
-            PA
+        {!collapsed && (
+          <div className="relative shrink-0 px-3 pb-3">
+            <Search className="pointer-events-none absolute left-6 top-1/2 size-3.5 -translate-y-1/2 text-slate-400 dark:text-white/30" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search menu…"
+              className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50 pl-8 pr-3 text-[12.5px] font-medium text-slate-700 outline-none transition-colors placeholder:text-slate-400 focus:border-blue-300 focus:bg-white dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder:text-white/30 dark:focus:border-sky-500/40 dark:focus:bg-white/[0.08]"
+            />
           </div>
         )}
+
+        <nav className="flex-1 space-y-5 overflow-y-auto px-2.5 pb-3">
+          {sections.map((section) => (
+            <div key={section.title} className="space-y-1">
+              {!collapsed && (
+                <p className="mb-1.5 px-2.5 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 dark:text-white/25">
+                  {section.title}
+                </p>
+              )}
+
+              <div className="space-y-1">
+                {section.items.map((item) => {
+                  const parentActive =
+                    isActive(item.href) ||
+                    (item.children?.some((child) => isActive(child.href)) ?? false);
+                  return (
+                    <div key={item.label} className="space-y-0.5">
+                      <Link
+                        to={item.href}
+                        className={cn(
+                          "group flex items-center gap-2.5 rounded-2xl px-2 py-2 text-[13px] font-semibold transition-all duration-200",
+                          parentActive
+                            ? "bg-slate-100 text-slate-900 dark:bg-white/[0.09] dark:text-white"
+                            : "text-slate-500 hover:bg-slate-50 hover:text-slate-800 dark:text-white/50 dark:hover:bg-white/[0.05] dark:hover:text-white/85",
+                          collapsed && "justify-center px-0"
+                        )}
+                        title={collapsed ? item.label : undefined}
+                      >
+                        <span
+                          className={cn(
+                            "flex size-9 shrink-0 items-center justify-center rounded-xl transition-transform duration-200",
+                            item.accent.chip,
+                            item.accent.icon,
+                            parentActive && "scale-[1.06]"
+                          )}
+                        >
+                          <item.icon className="size-[17px]" strokeWidth={2} />
+                        </span>
+                        {!collapsed && <span className="truncate">{item.label}</span>}
+                        {!collapsed && parentActive && (
+                          <span className={cn("ml-auto size-1.5 shrink-0 rounded-full", item.accent.dot)} />
+                        )}
+                      </Link>
+
+                      {!collapsed && item.children?.length ? (
+                        <div className="ml-11 space-y-0.5 border-l border-slate-200 pl-3 dark:border-white/10">
+                          {item.children.map((child) => (
+                            <Link
+                              key={`${item.label}-${child.label}`}
+                              to={child.href}
+                              className={cn(
+                                "block rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all",
+                                isActive(child.href)
+                                  ? "bg-slate-100 font-semibold text-slate-900 dark:bg-white/[0.08] dark:text-white"
+                                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-800 dark:text-white/40 dark:hover:bg-white/[0.05] dark:hover:text-white/80"
+                              )}
+                            >
+                              {child.label}
+                            </Link>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
+          {!collapsed && sections.length === 0 && (
+            <p className="px-2.5 py-4 text-center text-xs text-slate-400 dark:text-white/30">
+              No results for “{query}”
+            </p>
+          )}
+        </nav>
+
+        <div className="shrink-0 border-t border-slate-100 p-2.5 dark:border-white/[0.06]">
+          {!collapsed ? (
+            <div className="flex items-center gap-2.5 rounded-2xl bg-slate-50 px-3 py-2.5 dark:bg-white/[0.04]">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-orange-400 text-[11px] font-bold text-white shadow-[0_4px_14px_-4px_rgba(239,68,68,0.55)]">
+                PA
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-xs font-semibold text-slate-800 dark:text-white">
+                  Platform Admin
+                </span>
+                <span className="block truncate text-[10px] text-slate-400 dark:text-white/40">
+                  Full system access
+                </span>
+              </span>
+            </div>
+          ) : (
+            <div
+              className="mx-auto flex size-8 items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-orange-400 text-[10px] font-bold text-white shadow-[0_4px_14px_-4px_rgba(239,68,68,0.55)]"
+              title="Platform Admin"
+            >
+              PA
+            </div>
+          )}
+        </div>
       </div>
     </aside>
   );
