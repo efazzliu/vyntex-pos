@@ -286,10 +286,10 @@ function AdminContentInner({ adminAccess }: { adminAccess: PlatformAdminRole | n
     void runAdminAlerts(settings.notifications, settings.email);
   }, [settings.loaded, settings.email, settings.notifications]);
 
+  // Close the mobile drawer only when the route changes (not when it opens).
   useEffect(() => {
-    if (!mobileSidebarOpen) return;
     setMobileSidebarOpen(false);
-  }, [location.pathname, mobileSidebarOpen]);
+  }, [location.pathname]);
 
   const toggleSidebar = () => {
     const next = !sidebarCollapsed;
