@@ -351,7 +351,7 @@ function AdminContentInner({ adminAccess }: { adminAccess: PlatformAdminRole | n
           </div>
           <Outlet />
         </main>
-        <div className="lg:hidden border-t border-border bg-background px-4 py-3">
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/95 px-4 py-3 backdrop-blur">
           <div className="rounded-2xl border border-border/70 bg-background/70 px-3 py-2 backdrop-blur-xl">
             <div className="flex gap-2 overflow-x-auto">
               {mobileLinks.map((x) => (
