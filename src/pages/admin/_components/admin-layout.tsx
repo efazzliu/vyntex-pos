@@ -157,14 +157,20 @@ function AdminSidebar({
       </div>
 
       {!collapsed && (
-        <div className="relative shrink-0 px-3 pt-3">
-          <Search className="pointer-events-none absolute left-6 top-1/2 size-3.5 -translate-y-1/2 text-slate-400 dark:text-white/30" />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search"
-            className="h-8 w-full rounded-md border border-slate-200 bg-transparent pl-8 pr-3 text-[12.5px] text-slate-700 outline-none transition-colors placeholder:text-slate-400 focus:border-slate-400 dark:border-white/10 dark:text-white dark:placeholder:text-white/30 dark:focus:border-white/25"
-          />
+        <div className="shrink-0 px-3 pt-3">
+          <div className="flex h-8 items-center rounded-md border border-slate-200 px-2.5 transition-colors focus-within:border-slate-400 dark:border-white/10 dark:focus-within:border-white/25">
+            <Search
+              className="size-3.5 shrink-0 text-slate-400 dark:text-white/30"
+              strokeWidth={2}
+              aria-hidden="true"
+            />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search"
+              className="h-full min-w-0 flex-1 bg-transparent pl-2 pr-1 text-[12.5px] leading-none text-slate-700 outline-none placeholder:text-slate-400 dark:text-white dark:placeholder:text-white/30"
+            />
+          </div>
         </div>
       )}
 
