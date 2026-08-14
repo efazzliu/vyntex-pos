@@ -44,15 +44,31 @@ type SidebarSection = {
 
 const sidebarSections: SidebarSection[] = [
   {
-    title: "Platform",
+    title: "Overview",
+    items: [{ label: "Dashboard", href: "/admin", icon: LayoutDashboard }],
+  },
+  {
+    title: "Business",
     items: [
-      { label: "Dashboard", href: "/admin", icon: LayoutDashboard },
-      { label: "Revenue", href: "/admin/subscriptions", icon: Wallet },
       { label: "Clients", href: "/admin/businesses", icon: Building2 },
       { label: "Licenses", href: "/admin/licenses", icon: KeyRound },
-      { label: "Analytics", href: "/admin/reports", icon: BarChart3 },
-      { label: "Support", href: "/admin/support", icon: LifeBuoy },
       { label: "Users", href: "/admin/users", icon: UserRound },
+    ],
+  },
+  {
+    title: "Finance",
+    items: [
+      { label: "Revenue", href: "/admin/subscriptions", icon: Wallet },
+      { label: "Analytics", href: "/admin/reports", icon: BarChart3 },
+    ],
+  },
+  {
+    title: "Operations",
+    items: [{ label: "Support", href: "/admin/support", icon: LifeBuoy }],
+  },
+  {
+    title: "Admin",
+    items: [
       { label: "Team", href: "/admin/team", icon: UsersRound },
       { label: "Settings", href: "/admin/settings", icon: Settings },
     ],
@@ -90,7 +106,8 @@ function AdminSidebar({
         const scope = Array.from(new Set([...baseScope, ...childScope]));
         if (!scope.some((href) => canSeeAdminNavItem(href, adminAccess))) return false;
         if (!normalizedQuery) return true;
-        return item.label.toLowerCase().includes(normalizedQuery);
+        const haystack = `${section.title} ${item.label}`.toLowerCase();
+        return haystack.includes(normalizedQuery);
       }),
     }))
     .filter((section) => section.items.length > 0);
@@ -151,11 +168,18 @@ function AdminSidebar({
         </div>
       )}
 
-      <nav className="flex-1 space-y-4 overflow-y-auto px-2 py-3">
-        {sections.map((section) => (
-          <div key={section.title} className="space-y-0.5">
-            {!collapsed && (
-              <p className="mb-1 px-2 text-[10.5px] font-semibold uppercase tracking-wider text-slate-400 dark:text-white/30">
+      <nav className="flex-1 space-y-1 overflow-y-auto px-2 py-3">
+        {sections.map((section, sectionIndex) => (
+          <div key={section.title} className={cn("space-y-0.5", sectionIndex > 0 && "pt-3")}>
+            {collapsed ? (
+              sectionIndex > 0 ? (
+                <div
+                  className="mx-auto mb-2 h-px w-6 bg-slate-200 dark:bg-white/10"
+                  aria-hidden="true"
+                />
+              ) : null
+            ) : (
+              <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 dark:text-white/30">
                 {section.title}
               </p>
             )}
@@ -176,7 +200,7 @@ function AdminSidebar({
                           : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-white/60 dark:hover:bg-white/5 dark:hover:text-white",
                         collapsed && "justify-center px-0"
                       )}
-                      title={collapsed ? item.label : undefined}
+                      title={collapsed ? `${section.title} · ${item.label}` : undefined}
                     >
                       <span
                         aria-hidden="true"
