@@ -544,7 +544,8 @@
         "paying": "Recording payment…",
         "paid": "Table closed.",
         "payFailed": "Payment failed. Try again.",
-        "closeTable": "Close table"
+        "closeTable": "Close table",
+        "closeOrder": "Close order"
       },
       "loginLink": "I'm a waiter — take orders with PIN",
       "pairedVenue": "Paired venue",
@@ -600,7 +601,8 @@
       "notifReadyBadge": "{{count}} ready",
       "notifTableHeading": "Table {{table}}",
       "notifReadyToastTitle": "Kitchen ready",
-      "notifReadyToastBody": "{{table}}: {{item}}"
+      "notifReadyToastBody": "{{table}}: {{item}}",
+      "notifOpenOrderMissing": "Could not open this table order."
     },
     "guestMenu": {
       "eyebrow": "Digital menu",
