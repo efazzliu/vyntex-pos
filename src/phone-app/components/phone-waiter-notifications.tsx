@@ -1,6 +1,8 @@
+import { useMemo } from "react";
 import { useQuery } from "convex/react";
 import { useTranslation } from "react-i18next";
-import { Bell, ChefHat } from "lucide-react";
+import { Bell, CheckCircle2, ChefHat } from "lucide-react";
+import { cn } from "@/lib/utils.ts";
 import { getWaiterSession } from "@/phone-app/lib/waiter-session.ts";
 
 type KitchenLine = {
@@ -14,17 +16,63 @@ type KitchenLine = {
   status: string;
 };
 
+type TableGroup = {
+  tableName: string;
+  lines: KitchenLine[];
+  readyCount: number;
+};
+
+function isReadyStatus(status: string): boolean {
+  return String(status).toLowerCase() === "ready";
+}
+
+function groupByTable(lines: KitchenLine[]): TableGroup[] {
+  const map = new Map<string, KitchenLine[]>();
+  for (const line of lines) {
+    const key = line.tableName.trim() || "—";
+    const list = map.get(key) ?? [];
+    list.push(line);
+    map.set(key, list);
+  }
+
+  const groups: TableGroup[] = [...map.entries()].map(([tableName, groupLines]) => {
+    const sorted = [...groupLines].sort((a, b) => {
+      const aReady = isReadyStatus(a.status) ? 0 : 1;
+      const bReady = isReadyStatus(b.status) ? 0 : 1;
+      if (aReady !== bReady) return aReady - bReady;
+      return a.orderNumber - b.orderNumber || a.name.localeCompare(b.name);
+    });
+    return {
+      tableName,
+      lines: sorted,
+      readyCount: sorted.filter((l) => isReadyStatus(l.status)).length,
+    };
+  });
+
+  groups.sort((a, b) => {
+    if (a.readyCount > 0 && b.readyCount === 0) return -1;
+    if (b.readyCount > 0 && a.readyCount === 0) return 1;
+    return a.tableName.localeCompare(b.tableName, undefined, { numeric: true });
+  });
+  return groups;
+}
+
 export default function PhoneWaiterNotifications() {
   const { t } = useTranslation("site");
   const session = getWaiterSession();
   const licenseKey = session?.licenseKey ?? "";
 
   const queue = useQuery(
-    "pos.orders.getKitchenQueue",
+    "pos.orders.getWaiterKitchenNotifications",
     licenseKey ? { licenseKey } : "skip",
   ) as KitchenLine[] | undefined;
 
   const lines = queue ?? [];
+  const groups = useMemo(() => groupByTable(lines), [lines]);
+  const readyCount = useMemo(
+    () => lines.filter((l) => isReadyStatus(l.status)).length,
+    [lines],
+  );
 
   return (
     <div className="flex min-h-dvh flex-col bg-[#070b14] pb-[5.75rem] text-white">
@@ -35,32 +83,85 @@ export default function PhoneWaiterNotifications() {
         <h1 className="text-xl font-semibold tracking-tight">
           {t("phone.waiter.navNotifications")}
         </h1>
+        {readyCount > 0 ? (
+          <p className="mt-1 text-[13px] text-emerald-400/90">
+            {t("phone.waiter.notifReadyCount", { count: readyCount })}
+          </p>
+        ) : null}
       </header>
 
       <main className="flex-1 overflow-y-auto px-5">
-        {lines.length === 0 ? (
+        {groups.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-16 text-center">
             <Bell className="size-8 text-white/25" />
             <p className="text-sm text-white/45">{t("phone.waiter.notifEmpty")}</p>
           </div>
         ) : (
-          <div className="space-y-2 pb-4">
-            {lines.map((line) => (
-              <div
-                key={line.lineId}
-                className="rounded-2xl border border-white/10 bg-white/[0.04] px-3.5 py-3"
+          <div className="space-y-4 pb-4">
+            {groups.map((group) => (
+              <section
+                key={group.tableName}
+                className={cn(
+                  "overflow-hidden rounded-2xl border",
+                  group.readyCount > 0
+                    ? "border-emerald-400/35 bg-emerald-500/[0.06]"
+                    : "border-white/10 bg-white/[0.03]",
+                )}
               >
-                <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-wide text-white/40">
-                  <ChefHat className="size-3.5" />
-                  {line.tableName} · #{line.orderNumber}
+                <div className="flex items-center justify-between gap-2 border-b border-white/10 px-3.5 py-2.5">
+                  <h2 className="text-[15px] font-semibold tracking-tight">
+                    {t("phone.waiter.notifTableHeading", {
+                      table: group.tableName,
+                    })}
+                  </h2>
+                  {group.readyCount > 0 ? (
+                    <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[11px] font-semibold text-emerald-300">
+                      {t("phone.waiter.notifReadyBadge", {
+                        count: group.readyCount,
+                      })}
+                    </span>
+                  ) : (
+                    <span className="text-[11px] font-medium uppercase tracking-wide text-white/35">
+                      {t("phone.waiter.notifKitchen")}
+                    </span>
+                  )}
                 </div>
-                <p className="text-[14px] font-medium">
-                  {line.quantity}× {line.name}
-                </p>
-                <p className="mt-0.5 text-[12px] text-amber-300/90">
-                  {t("phone.waiter.notifKitchen")}
-                </p>
-              </div>
+                <ul className="divide-y divide-white/8">
+                  {group.lines.map((line) => {
+                    const ready = isReadyStatus(line.status);
+                    return (
+                      <li
+                        key={line.lineId}
+                        className="flex items-start gap-2.5 px-3.5 py-3"
+                      >
+                        {ready ? (
+                          <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-400" />
+                        ) : (
+                          <ChefHat className="mt-0.5 size-4 shrink-0 text-amber-300/80" />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[14px] font-medium">
+                            {line.quantity}× {line.name}
+                          </p>
+                          <p className="mt-0.5 text-[11px] text-white/40">
+                            #{line.orderNumber}
+                          </p>
+                          <p
+                            className={cn(
+                              "mt-0.5 text-[12px] font-medium",
+                              ready ? "text-emerald-300" : "text-amber-300/90",
+                            )}
+                          >
+                            {ready
+                              ? t("phone.waiter.notifReady")
+                              : t("phone.waiter.notifKitchen")}
+                          </p>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
             ))}
           </div>
         )}

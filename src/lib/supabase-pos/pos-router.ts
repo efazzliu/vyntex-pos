@@ -57,6 +57,10 @@ export async function runPosQuery(
       return orders.getKitchenQueue({
         licenseKey: args.licenseKey as string,
       });
+    case "pos.orders.getWaiterKitchenNotifications":
+      return orders.getWaiterKitchenNotifications({
+        licenseKey: args.licenseKey as string,
+      });
     case "pos.orders.getNonFiscalOrders":
       return orders.getNonFiscalOrders(args);
     case "pos.settings.getPrinters":

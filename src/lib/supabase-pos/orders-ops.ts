@@ -418,6 +418,114 @@ export async function getKitchenQueue(args: {
   return out;
 }
 
+/**
+ * Waiter phone notifications: items still cooking or marked ready by kitchen,
+ * for open tickets (grouped by table in the UI).
+ */
+export async function getWaiterKitchenNotifications(args: {
+  licenseKey: string;
+}): Promise<KitchenQueueLine[]> {
+  const r = await getRestaurantByLicense(args.licenseKey);
+  const { data: sales, error: sErr } = await supabase
+    .from("sales")
+    .select("id, order_number, status, table_id, table_ref, created_at")
+    .eq("restaurant_id", r.id)
+    .in("status", ["open", "sent-to-kitchen"]);
+
+  assertNoPgError("Waiter kitchen notifications sales", sErr);
+  const saleRows = sales ?? [];
+  if (saleRows.length === 0) return [];
+
+  const saleIds = saleRows.map((x) => String(x.id));
+  const saleById = new Map(
+    saleRows.map((row) => [String(row.id), row] as const),
+  );
+
+  const selectWithStation = supabase
+    .from("sale_items")
+    .select("id, sale_id, name, quantity, notes, station, status, created_at")
+    .in("sale_id", saleIds)
+    .in("status", ["sent", "preparing", "ready"]);
+  let itemsRes = await selectWithStation;
+  let rowsMissingStation = false;
+  if (
+    itemsRes.error &&
+    isMissingPgColumnError(itemsRes.error.message, "station")
+  ) {
+    rowsMissingStation = true;
+    itemsRes = await supabase
+      .from("sale_items")
+      .select("id, sale_id, name, quantity, notes, status, created_at")
+      .in("sale_id", saleIds)
+      .in("status", ["sent", "preparing", "ready"]);
+  }
+  assertNoPgError("Waiter kitchen notifications items", itemsRes.error);
+  const items = itemsRes.data;
+
+  const floorIds = [
+    ...new Set(
+      saleRows
+        .map((row) => saleFloorTableId(row as Parameters<typeof saleFloorTableId>[0]))
+        .filter((id) => id.length > 0),
+    ),
+  ];
+  const tableNameById = new Map<string, string>();
+  if (floorIds.length > 0) {
+    const { data: tblRows, error: tErr } = await supabase
+      .from("pos_floor_tables")
+      .select("id, name")
+      .in("id", floorIds);
+    if (!tErr) {
+      for (const t of tblRows ?? []) {
+        tableNameById.set(String(t.id), String(t.name ?? "Table"));
+      }
+    }
+  }
+
+  const out: KitchenQueueLine[] = [];
+  for (const it of items ?? []) {
+    const sid = String(it.sale_id ?? "");
+    const sale = saleById.get(sid);
+    if (!sale) continue;
+    const fid = saleFloorTableId(sale as Parameters<typeof saleFloorTableId>[0]);
+    const tableName = fid ? (tableNameById.get(fid) ?? "Table") : "—";
+    const on = displayOrderNumber(
+      sid,
+      (sale as { order_number?: number | null }).order_number,
+    );
+    const station = rowsMissingStation
+      ? undefined
+      : ((it as { station?: string | null }).station as
+          | "kitchen"
+          | "bar"
+          | null
+          | undefined) ?? undefined;
+    out.push({
+      lineId: String(it.id),
+      saleId: sid,
+      orderNumber: on,
+      tableName,
+      name: String(it.name ?? ""),
+      quantity: Number(it.quantity),
+      notes: (it.notes as string | null) ?? undefined,
+      station,
+      status: String(it.status ?? ""),
+      createdAt: String(it.created_at ?? ""),
+    });
+  }
+
+  // Ready first (newest ready first), then cooking (oldest first).
+  out.sort((a, b) => {
+    const aReady = a.status === "ready" ? 0 : 1;
+    const bReady = b.status === "ready" ? 0 : 1;
+    if (aReady !== bReady) return aReady - bReady;
+    const aTs = new Date(a.createdAt).getTime();
+    const bTs = new Date(b.createdAt).getTime();
+    return aReady === 0 ? bTs - aTs : aTs - bTs;
+  });
+  return out;
+}
+
 export async function bumpKitchenTicketItem(args: {
   licenseKey: string;
   lineId: string;

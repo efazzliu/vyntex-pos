@@ -593,7 +593,13 @@
         "menuQrUnavailable": "QR e menysë nuk është gati ende.",
         "ordersEmpty": "Nuk ke tavolina të hapura ende.",
       "notifEmpty": "Nuk ka njoftime nga kuzhina tani.",
-      "notifKitchen": "Në kuzhinë"
+      "notifKitchen": "Në kuzhinë",
+      "notifReady": "Gati — merre",
+      "notifReadyCount": "{{count}} gati për t’u marrë",
+      "notifReadyBadge": "{{count}} gati",
+      "notifTableHeading": "Tavolina {{table}}",
+      "notifReadyToastTitle": "Kuzhina gati",
+      "notifReadyToastBody": "{{table}}: {{item}}"
     },
     "guestMenu": {
       "eyebrow": "Menyja dixhitale",
