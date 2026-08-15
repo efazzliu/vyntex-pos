@@ -1,11 +1,12 @@
+import { useState } from "react";
 import { motion } from "motion/react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Play } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
-import { toast } from "sonner";
 import { useMarketingPrimaryCtaHref } from "@/hooks/use-marketing-primary-cta-href.ts";
 import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
+import DemoVideoDialog from "./demo-video-dialog.tsx";
 
 const MOCK_KEYS = [
   "mockOrders",
@@ -19,6 +20,7 @@ const MOCK_KEYS = [
 export default function HeroSection() {
   const { t } = useTranslation("site");
   const primaryCtaHref = useMarketingPrimaryCtaHref();
+  const [demoOpen, setDemoOpen] = useState(false);
 
   return (
     <section className="relative flex min-h-svh items-center justify-center overflow-hidden bg-[#060B18]">
@@ -122,13 +124,15 @@ export default function HeroSection() {
           <Button
             size="lg"
             variant="ghost"
-            onClick={() => toast.info(t("home.hero.demoToast"))}
+            onClick={() => setDemoOpen(true)}
             className="text-white/60 hover:text-white hover:bg-white/10 px-8 h-12 text-base"
           >
             <Play className="mr-1 size-4" />
             {t("home.hero.ctaDemo")}
           </Button>
         </motion.div>
+
+        <DemoVideoDialog open={demoOpen} onOpenChange={setDemoOpen} />
 
         <motion.div
           initial={{ opacity: 0, y: 60 }}
