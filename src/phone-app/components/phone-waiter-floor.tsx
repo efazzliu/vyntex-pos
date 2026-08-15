@@ -256,42 +256,45 @@ export default function PhoneWaiterFloor() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3">
             {displayTables.map((table) => {
               const summary = orderSummaries?.[table._id];
               const colors = tableColors(table, summary, staff.id, isAdminOrManager);
+              const statusLine = summary
+                ? waiterCanPay
+                  ? summary.total.toFixed(0)
+                  : t("phone.waiter.tableOpen")
+                : t("phone.waiter.tableFree");
               return (
                 <button
                   key={table._id}
                   type="button"
                   onClick={() => handleTableTap(table)}
                   className={cn(
-                    "flex flex-col items-center justify-center gap-1 rounded-2xl border-2 px-2 py-5 transition active:scale-[0.97]",
+                    // Fixed phone tile size — never grows with content or viewport columns.
+                    "box-border flex h-[7.25rem] w-full shrink-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-2xl border-2 px-2 transition active:brightness-110",
                     colors.bg,
                     colors.border,
                   )}
                 >
-                  <span className="text-base font-bold text-white">
+                  <span className="max-w-full truncate text-base font-bold leading-none text-white">
                     {table.name}
                   </span>
-                  {summary ? (
-                    waiterCanPay ? (
-                      <span className={cn("text-[11px] font-semibold tabular-nums", colors.text)}>
-                        {summary.total.toFixed(0)}
-                      </span>
-                    ) : null
-                  ) : (
-                    <span className={cn("text-[11px] font-medium", colors.text)}>
-                      {t("phone.waiter.tableFree")}
-                    </span>
-                  )}
-                  {table.status === "bill-printed" ? (
-                    <span className="text-[10px] font-medium text-blue-300">
-                      {t("phone.waiter.order.billRequested")}
-                    </span>
-                  ) : null}
-                  <span className="flex items-center gap-1 text-[10px] text-white/35">
-                    <Users className="size-2.5" />
+                  <span
+                    className={cn(
+                      "max-w-full truncate text-[11px] font-semibold leading-none tabular-nums",
+                      colors.text,
+                    )}
+                  >
+                    {statusLine}
+                  </span>
+                  <span className="h-3 max-w-full truncate text-[10px] font-medium leading-none text-blue-300">
+                    {table.status === "bill-printed"
+                      ? t("phone.waiter.order.billRequested")
+                      : "\u00a0"}
+                  </span>
+                  <span className="flex h-3 items-center gap-1 text-[10px] leading-none text-white/35">
+                    <Users className="size-2.5 shrink-0" />
                     {table.seats}
                   </span>
                 </button>
