@@ -544,7 +544,8 @@
         "paying": "Duke regjistruar pagesën…",
         "paid": "Tavolina u mbyll.",
         "payFailed": "Pagesa dështoi. Provo përsëri.",
-        "closeTable": "Mbyll tavolinën"
+        "closeTable": "Mbyll tavolinën",
+        "closeOrder": "Mbyll porosinë"
       },
       "loginLink": "Jam kamarier — porosi me PIN",
       "pairedVenue": "Lokali i lidhur",
@@ -600,7 +601,8 @@
       "notifReadyBadge": "{{count}} gati",
       "notifTableHeading": "Tavolina {{table}}",
       "notifReadyToastTitle": "Kuzhina gati",
-      "notifReadyToastBody": "{{table}}: {{item}}"
+      "notifReadyToastBody": "{{table}}: {{item}}",
+      "notifOpenOrderMissing": "Nuk u hap porosia e kësaj tavoline."
     },
     "guestMenu": {
       "eyebrow": "Menyja dixhitale",

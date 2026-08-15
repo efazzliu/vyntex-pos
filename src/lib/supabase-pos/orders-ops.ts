@@ -304,6 +304,7 @@ export type KitchenQueueLine = {
   lineId: string;
   saleId: string;
   orderNumber: number;
+  tableId?: string;
   tableName: string;
   name: string;
   quantity: number;
@@ -401,6 +402,7 @@ export async function getKitchenQueue(args: {
       lineId: String(it.id),
       saleId: sid,
       orderNumber: on,
+      tableId: fid || undefined,
       tableName,
       name: String(it.name ?? ""),
       quantity: Number(it.quantity),
@@ -504,6 +506,7 @@ export async function getWaiterKitchenNotifications(args: {
       lineId: String(it.id),
       saleId: sid,
       orderNumber: on,
+      tableId: fid || undefined,
       tableName,
       name: String(it.name ?? ""),
       quantity: Number(it.quantity),
