@@ -492,6 +492,7 @@
       "noTablesTitle": "Nuk ka tavolina ende",
       "noTablesBody": "Shto dhoma dhe tavolina te POS → Floor plan në kompjuterin e lokalit. Do të shfaqen automatikisht këtu.",
       "tableFree": "Lirë",
+      "tableOpen": "Hapur",
       "tableTakenBy": "Kjo tavolinë është zënë nga {{name}}.",
       "anotherWaiter": "një kamarier tjetër",
       "orderingSoon": "Porosia për {{table}} vjen së shpejti.",
