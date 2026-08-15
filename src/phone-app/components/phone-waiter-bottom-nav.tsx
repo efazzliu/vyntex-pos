@@ -1,7 +1,9 @@
 import { NavLink, useLocation } from "react-router-dom";
+import { useQuery } from "convex/react";
 import { useTranslation } from "react-i18next";
 import { Bell, ClipboardList, LayoutGrid, UtensilsCrossed } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
+import { getWaiterSession } from "@/phone-app/lib/waiter-session.ts";
 
 const ITEMS = [
   { to: "/waiter/floor", key: "navTables", icon: LayoutGrid },
@@ -13,6 +15,15 @@ const ITEMS = [
 export function PhoneWaiterBottomNav() {
   const { t } = useTranslation("site");
   const location = useLocation();
+  const session = getWaiterSession();
+  const licenseKey = session?.licenseKey ?? "";
+  const queue = useQuery(
+    "pos.orders.getWaiterKitchenNotifications",
+    licenseKey ? { licenseKey } : "skip",
+  ) as { status?: string }[] | undefined;
+  const readyCount = (queue ?? []).filter(
+    (l) => String(l.status ?? "").toLowerCase() === "ready",
+  ).length;
 
   return (
     <nav
@@ -30,22 +41,31 @@ export function PhoneWaiterBottomNav() {
               ? location.pathname === "/waiter/floor" ||
                 location.pathname.startsWith("/waiter/table/")
               : location.pathname === item.to;
+          const showReadyBadge =
+            item.to === "/waiter/notifications" && readyCount > 0;
           return (
             <NavLink
               key={item.to}
               to={item.to}
               className={cn(
-                "flex flex-1 flex-col items-center justify-center gap-0.5 rounded-xl py-2 transition-colors",
+                "relative flex flex-1 flex-col items-center justify-center gap-0.5 rounded-xl py-2 transition-colors",
                 active ? "bg-[#0066FF]/15" : "active:bg-white/5",
               )}
             >
-              <Icon
-                className={cn(
-                  "size-5",
-                  active ? "text-[#7eb6ff]" : "text-white/40",
-                )}
-                strokeWidth={active ? 2.25 : 1.75}
-              />
+              <span className="relative">
+                <Icon
+                  className={cn(
+                    "size-5",
+                    active ? "text-[#7eb6ff]" : "text-white/40",
+                  )}
+                  strokeWidth={active ? 2.25 : 1.75}
+                />
+                {showReadyBadge ? (
+                  <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-500 px-1 text-[9px] font-bold text-[#06200a]">
+                    {readyCount > 9 ? "9+" : readyCount}
+                  </span>
+                ) : null}
+              </span>
               <span
                 className={cn(
                   "max-w-[4.5rem] truncate text-[10px] font-semibold",

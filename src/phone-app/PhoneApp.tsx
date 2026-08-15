@@ -25,6 +25,7 @@ import PhoneProfileDisplayPage from "@/phone-app/components/phone-profile-displa
 import PhoneWaiterLogin from "@/phone-app/components/phone-waiter-login.tsx";
 import PhoneWaiterFloor from "@/phone-app/components/phone-waiter-floor.tsx";
 import PhoneWaiterPair from "@/phone-app/components/phone-waiter-pair.tsx";
+import PhoneWaiterPreview from "@/phone-app/components/phone-waiter-preview.tsx";
 import PhoneWaiterOrder from "@/phone-app/components/phone-waiter-order.tsx";
 import PhoneWaiterShell from "@/phone-app/components/phone-waiter-shell.tsx";
 import PhoneWaiterMenu from "@/phone-app/components/phone-waiter-menu.tsx";
@@ -48,6 +49,8 @@ export default function PhoneApp() {
           {/* Waiters: PIN login for phone orders (no Supabase account). */}
           <Route path="/waiter" element={<PhoneWaiterLogin />} />
           <Route path="/waiter/pair" element={<PhoneWaiterPair />} />
+          {/* Design preview: skip QR/code when testing on phone only. */}
+          <Route path="/waiter/preview" element={<PhoneWaiterPreview />} />
           <Route path="/m/:venueId" element={<PhoneGuestMenu />} />
           <Route element={<PhoneWaiterShell />}>
             <Route path="/waiter/floor" element={<PhoneWaiterFloor />} />

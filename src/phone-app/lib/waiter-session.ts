@@ -4,6 +4,9 @@ const VENUE_KEY = "vyntex-waiter-venue-key";
 const SESSION_KEY = "vyntex-waiter-session";
 const PAIR_KEY = "vyntex-waiter-phone-pair";
 
+/** Local design/demo venue — no POS QR/code required. */
+export const WAITER_DESIGN_PREVIEW_LICENSE = "DEMO-PREVIEW";
+
 export type WaiterSession = {
   licenseKey: string;
   staff: ActiveStaff;
@@ -17,6 +20,43 @@ export type WaiterPhonePair = {
   deviceRowId: string;
   pairedAt: number;
 };
+
+export function isWaiterDesignPreviewLicense(licenseKey: string): boolean {
+  return normalizeWaiterVenueKey(licenseKey) === WAITER_DESIGN_PREVIEW_LICENSE;
+}
+
+export function isWaiterDesignPreviewActive(): boolean {
+  const session = getWaiterSession();
+  if (session && isWaiterDesignPreviewLicense(session.licenseKey)) return true;
+  const pair = getWaiterPhonePair();
+  return Boolean(pair && isWaiterDesignPreviewLicense(pair.licenseKey));
+}
+
+/** Enter waiter UI without QR pairing (phone-only design preview). */
+export function enterWaiterDesignPreview(
+  staffName = "Kamerier Demo",
+  restaurantName = "Demo Restaurant",
+): WaiterSession {
+  const pair: WaiterPhonePair = {
+    licenseKey: WAITER_DESIGN_PREVIEW_LICENSE,
+    restaurantName: restaurantName.trim() || "Demo Restaurant",
+    deviceId: "design-preview-device",
+    deviceRowId: "design-preview-row",
+    pairedAt: Date.now(),
+  };
+  setWaiterPhonePair(pair);
+  const session: WaiterSession = {
+    licenseKey: WAITER_DESIGN_PREVIEW_LICENSE,
+    staff: {
+      id: "00000000-0000-4000-8000-000000000001",
+      name: staffName.trim() || "Kamerier Demo",
+      role: "waiter",
+    },
+    signedInAt: Date.now(),
+  };
+  setWaiterSession(session);
+  return session;
+}
 
 export function normalizeWaiterVenueKey(raw: string): string {
   return raw.trim().toUpperCase().replace(/\s+/g, "");

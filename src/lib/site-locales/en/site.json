@@ -492,6 +492,7 @@
       "noTablesTitle": "No tables yet",
       "noTablesBody": "Add rooms and tables in POS → Floor plan on the restaurant computer. They will appear here automatically.",
       "tableFree": "Free",
+      "tableOpen": "Open",
       "tableTakenBy": "This table is taken by {{name}}.",
       "anotherWaiter": "another waiter",
       "orderingSoon": "Ordering for {{table}} is coming soon.",
@@ -593,7 +594,13 @@
         "menuQrUnavailable": "Menu QR is not available yet.",
         "ordersEmpty": "No open tables yet.",
       "notifEmpty": "No kitchen updates right now.",
-      "notifKitchen": "In kitchen"
+      "notifKitchen": "In kitchen",
+      "notifReady": "Ready — pick up",
+      "notifReadyCount": "{{count}} ready for pickup",
+      "notifReadyBadge": "{{count}} ready",
+      "notifTableHeading": "Table {{table}}",
+      "notifReadyToastTitle": "Kitchen ready",
+      "notifReadyToastBody": "{{table}}: {{item}}"
     },
     "guestMenu": {
       "eyebrow": "Digital menu",
