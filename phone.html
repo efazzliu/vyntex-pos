@@ -31,6 +31,15 @@
         }
         document.documentElement.classList.add(theme);
       } catch (e) {}
+      // Phone chat apps often strip #hash — allow ?preview=1 entry.
+      try {
+        const q = new URLSearchParams(window.location.search);
+        if (q.get("preview") === "1" && !window.location.hash.includes("/waiter/preview")) {
+          window.location.replace(
+            window.location.pathname + "?preview=1#/waiter/preview",
+          );
+        }
+      } catch (e) {}
     </script>
     <link href="/src/index.css" rel="stylesheet" />
   </head>
