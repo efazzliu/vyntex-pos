@@ -35,8 +35,14 @@
       try {
         const q = new URLSearchParams(window.location.search);
         if (q.get("preview") === "1" && !window.location.hash.includes("/waiter/preview")) {
+          const keep = new URLSearchParams();
+          keep.set("preview", "1");
+          const name = q.get("name");
+          const venue = q.get("venue");
+          if (name) keep.set("name", name);
+          if (venue) keep.set("venue", venue);
           window.location.replace(
-            window.location.pathname + "?preview=1#/waiter/preview",
+            window.location.pathname + "?" + keep.toString() + "#/waiter/preview",
           );
         }
       } catch (e) {}

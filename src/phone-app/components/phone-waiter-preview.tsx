@@ -5,12 +5,16 @@ import { enterWaiterDesignPreview } from "@/phone-app/lib/waiter-session.ts";
 /**
  * Phone-only design entry: skips QR/code pairing and opens the waiter floor.
  * Use: /phone.html#/waiter/preview
+ * Optional query: ?preview=1&name=Artes&venue=Enterprise
  */
 export default function PhoneWaiterPreview() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    enterWaiterDesignPreview();
+    const q = new URLSearchParams(window.location.search);
+    const name = q.get("name")?.trim() || "Kamerier Demo";
+    const venue = q.get("venue")?.trim() || "Enterprise";
+    enterWaiterDesignPreview(name, venue);
     navigate("/waiter/floor", { replace: true });
   }, [navigate]);
 

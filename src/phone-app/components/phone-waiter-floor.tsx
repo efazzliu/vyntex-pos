@@ -42,12 +42,12 @@ const DEMO_FLOOR_TABLES: FloorTable[] = [
 const DEMO_ORDER_SUMMARIES: Record<string, TableOrderSummary> = {
   "demo-t2": {
     staffId: "00000000-0000-4000-8000-000000000001",
-    staffName: "Kamerier Demo",
+    staffName: "Artes",
     total: 1850,
   },
   "demo-t6": {
     staffId: "00000000-0000-4000-8000-000000000001",
-    staffName: "Kamerier Demo",
+    staffName: "Artes",
     total: 920,
   },
   "demo-t7": {

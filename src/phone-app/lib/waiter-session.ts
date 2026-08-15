@@ -33,10 +33,13 @@ export function isWaiterDesignPreviewActive(): boolean {
 }
 
 /** Enter waiter UI without QR pairing (phone-only design preview). */
-export function enterWaiterDesignPreview(staffName = "Kamerier Demo"): WaiterSession {
+export function enterWaiterDesignPreview(
+  staffName = "Kamerier Demo",
+  restaurantName = "Demo Restaurant",
+): WaiterSession {
   const pair: WaiterPhonePair = {
     licenseKey: WAITER_DESIGN_PREVIEW_LICENSE,
-    restaurantName: "Demo Restaurant",
+    restaurantName: restaurantName.trim() || "Demo Restaurant",
     deviceId: "design-preview-device",
     deviceRowId: "design-preview-row",
     pairedAt: Date.now(),
