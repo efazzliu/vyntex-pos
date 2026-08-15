@@ -70,7 +70,10 @@
       "modules": "Core POS Modules",
       "uptime": "Uptime Guaranteed",
       "trial": "Month Free On Professional",
-      "support": "Priority Support"
+      "support": "Priority Support",
+      "restaurants": "Restaurants Served",
+      "transactions": "Orders Processed",
+      "countries": "Countries Worldwide"
     },
     "cta": {
       "titleBefore": "Ready to transform your",
