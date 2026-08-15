@@ -22,6 +22,10 @@ import PhoneProfileLicensesPage from "@/phone-app/components/phone-profile-licen
 import PhoneProfilePreferencesPage from "@/phone-app/components/phone-profile-preferences-page.tsx";
 import PhoneProfileSecurityPage from "@/phone-app/components/phone-profile-security-page.tsx";
 import PhoneProfileDisplayPage from "@/phone-app/components/phone-profile-display-page.tsx";
+import PhoneWaiterLogin from "@/phone-app/components/phone-waiter-login.tsx";
+import PhoneWaiterFloor from "@/phone-app/components/phone-waiter-floor.tsx";
+import PhoneWaiterPair from "@/phone-app/components/phone-waiter-pair.tsx";
+import PhoneWaiterOrder from "@/phone-app/components/phone-waiter-order.tsx";
 
 /**
  * Rrugë vetëm për shell-in mobil (phone.html).
@@ -36,6 +40,11 @@ export default function PhoneApp() {
           <Routes>
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
+          {/* Waiters: PIN login for phone orders (no Supabase account). */}
+          <Route path="/waiter" element={<PhoneWaiterLogin />} />
+          <Route path="/waiter/pair" element={<PhoneWaiterPair />} />
+          <Route path="/waiter/floor" element={<PhoneWaiterFloor />} />
+          <Route path="/waiter/table/:tableId" element={<PhoneWaiterOrder />} />
           {/* Phone app is login-only: no self-serve register / invite redeem. */}
           <Route path="/register" element={<Navigate to="/login" replace />} />
           <Route path="/redeem-code" element={<Navigate to="/login" replace />} />
@@ -48,6 +57,7 @@ export default function PhoneApp() {
                   defaultAfterLogin="/app"
                   showCreateAccountLink={false}
                   showManagerCodeLink={false}
+                  showWaiterLink
                 />
               }
             />

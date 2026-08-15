@@ -14,6 +14,7 @@ export type DashboardPosDevice = {
   last_seen_at: string;
   last_sync_at: string | null;
   disconnected_at: string | null;
+  device_kind?: "pos" | "waiter_phone" | string | null;
 };
 
 export function detectPosDeviceOs(): string {
@@ -60,13 +61,22 @@ export async function fetchDashboardPosDevices(
   restaurantIds: string[],
 ): Promise<DashboardPosDevice[]> {
   if (!isSupabaseConfigured || restaurantIds.length === 0) return [];
-  const { data, error } = await supabase
+  const colsWithKind =
+    "id, restaurant_id, device_id, display_name, location_name, os, app_version, ip_address, first_seen_at, last_seen_at, last_sync_at, disconnected_at, device_kind";
+  const colsWithoutKind =
+    "id, restaurant_id, device_id, display_name, location_name, os, app_version, ip_address, first_seen_at, last_seen_at, last_sync_at, disconnected_at";
+  let { data, error } = await supabase
     .from("pos_devices")
-    .select(
-      "id, restaurant_id, device_id, display_name, location_name, os, app_version, ip_address, first_seen_at, last_seen_at, last_sync_at, disconnected_at",
-    )
+    .select(colsWithKind)
     .in("restaurant_id", restaurantIds)
     .order("last_seen_at", { ascending: false });
+  if (error && /device_kind|column/i.test(error.message)) {
+    ({ data, error } = await supabase
+      .from("pos_devices")
+      .select(colsWithoutKind)
+      .in("restaurant_id", restaurantIds)
+      .order("last_seen_at", { ascending: false }));
+  }
   if (error) throw new Error(error.message);
   return (data ?? []) as DashboardPosDevice[];
 }

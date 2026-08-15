@@ -75,6 +75,18 @@ export type QueuedPrintJob = {
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
+    if (typeof indexedDB === "undefined") {
+      reject(new Error("IndexedDB unavailable"));
+      return;
+    }
+
+    let settled = false;
+    const finish = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      fn();
+    };
+
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
     request.onupgradeneeded = () => {
@@ -111,8 +123,10 @@ function openDB(): Promise<IDBDatabase> {
       }
     };
 
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+    request.onsuccess = () => finish(() => resolve(request.result));
+    request.onerror = () => finish(() => reject(request.error ?? new Error("IndexedDB open failed")));
+    request.onblocked = () =>
+      finish(() => reject(new Error("IndexedDB open blocked")));
   });
 }
 
@@ -193,13 +207,77 @@ export async function hashString(input: string): Promise<string> {
 
 // ── Device ID ─────────────────────────────────────────
 
-export async function getOrCreateDeviceId(): Promise<string> {
-  const existing = await dbGet<string>(CONFIG_STORE, "deviceId");
-  if (existing) return existing;
+const DEVICE_ID_LS_KEY = "vyntex.pos.deviceId";
 
-  const deviceId = crypto.randomUUID();
-  await dbPut(CONFIG_STORE, "deviceId", deviceId);
-  return deviceId;
+function newDeviceId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `dev-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function readLocalDeviceId(): string | null {
+  try {
+    const value = localStorage.getItem(DEVICE_ID_LS_KEY);
+    return value && value.trim() ? value.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalDeviceId(id: string): void {
+  try {
+    localStorage.setItem(DEVICE_ID_LS_KEY, id);
+  } catch {
+    // private mode / storage blocked
+  }
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error("timeout")), ms);
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
+/**
+ * Stable device id for license binding.
+ * Prefers IndexedDB, falls back to localStorage if IDB is slow/unavailable
+ * (common cause of activation screen stuck on "Generating...").
+ */
+export async function getOrCreateDeviceId(): Promise<string> {
+  const fromLs = readLocalDeviceId();
+
+  try {
+    const existing = await withTimeout(dbGet<string>(CONFIG_STORE, "deviceId"), 2500);
+    if (existing) {
+      writeLocalDeviceId(existing);
+      return existing;
+    }
+
+    const deviceId = fromLs ?? newDeviceId();
+    writeLocalDeviceId(deviceId);
+    try {
+      await withTimeout(dbPut(CONFIG_STORE, "deviceId", deviceId), 2500);
+    } catch {
+      // localStorage already has it
+    }
+    return deviceId;
+  } catch {
+    if (fromLs) return fromLs;
+    const deviceId = newDeviceId();
+    writeLocalDeviceId(deviceId);
+    return deviceId;
+  }
 }
 
 // ── Activation Token ──────────────────────────────────
@@ -238,34 +316,94 @@ export async function clearLocalPosSessionData(): Promise<void> {
   });
 }
 
+const ACTIVATION_LS_KEY = "vyntex.pos.activation";
+
+function readLocalActivation(): ActivationData | undefined {
+  try {
+    const raw = localStorage.getItem(ACTIVATION_LS_KEY);
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw) as ActivationData;
+    if (!parsed?.licenseKey || !parsed?.deviceId || !parsed?.token) return undefined;
+    return parsed;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeLocalActivation(data: ActivationData): void {
+  try {
+    localStorage.setItem(ACTIVATION_LS_KEY, JSON.stringify(data));
+  } catch {
+    // private mode / storage blocked
+  }
+}
+
+function clearLocalActivation(): void {
+  try {
+    localStorage.removeItem(ACTIVATION_LS_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 export async function saveActivation(data: Omit<ActivationData, "token">): Promise<void> {
   const previous = await getActivation();
   const licenseChanged =
     previous &&
     normalizeLicenseKey(previous.licenseKey) !== normalizeLicenseKey(data.licenseKey);
   if (licenseChanged) {
-    await clearLocalPosSessionData();
+    try {
+      await clearLocalPosSessionData();
+    } catch (err) {
+      // IndexedDB often throws DOMException "Internal error." in Electron
+      console.warn("[local-db] clearLocalPosSessionData failed", err);
+    }
   }
   clearRestaurantCache();
   const token = await generateActivationToken(data.licenseKey, data.deviceId);
-  await dbPut(CONFIG_STORE, "activation", { ...data, token });
+  const full: ActivationData = { ...data, token };
+  writeLocalActivation(full);
+  try {
+    await withTimeout(dbPut(CONFIG_STORE, "activation", full), 2500);
+  } catch (err) {
+    // Persist via localStorage so activation is not blocked by broken IndexedDB
+    console.warn("[local-db] IndexedDB saveActivation failed; using localStorage", err);
+  }
 }
 
 export async function getActivation(): Promise<ActivationData | undefined> {
-  return dbGet<ActivationData>(CONFIG_STORE, "activation");
+  try {
+    const fromDb = await withTimeout(dbGet<ActivationData>(CONFIG_STORE, "activation"), 2500);
+    if (fromDb?.licenseKey && fromDb?.deviceId && fromDb?.token) {
+      writeLocalActivation(fromDb);
+      return fromDb;
+    }
+  } catch (err) {
+    console.warn("[local-db] IndexedDB getActivation failed; using localStorage", err);
+  }
+  return readLocalActivation();
 }
 
 export async function clearActivation(): Promise<void> {
-  await clearLocalPosSessionData();
+  clearLocalActivation();
+  try {
+    await clearLocalPosSessionData();
+  } catch (err) {
+    console.warn("[local-db] clearLocalPosSessionData failed", err);
+  }
   clearRestaurantCache();
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(CONFIG_STORE, "readwrite");
-    const store = tx.objectStore(CONFIG_STORE);
-    const request = store.delete("activation");
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
+  try {
+    const db = await withTimeout(openDB(), 2500);
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(CONFIG_STORE, "readwrite");
+      const store = tx.objectStore(CONFIG_STORE);
+      const request = store.delete("activation");
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.warn("[local-db] IndexedDB clearActivation failed", err);
+  }
 }
 
 export async function verifyLocalToken(

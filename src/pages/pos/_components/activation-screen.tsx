@@ -29,9 +29,29 @@ export default function ActivationScreen({ onActivated }: ActivationScreenProps)
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // Load device ID on mount
+  // Load device ID on mount (never leave the UI stuck on "Generating...")
   useEffect(() => {
-    getOrCreateDeviceId().then(setDeviceId);
+    let cancelled = false;
+    void getOrCreateDeviceId()
+      .then((id) => {
+        if (!cancelled) setDeviceId(id);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        const fallback =
+          typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+            ? crypto.randomUUID()
+            : `dev-${Date.now().toString(36)}`;
+        try {
+          localStorage.setItem("vyntex.pos.deviceId", fallback);
+        } catch {
+          // ignore
+        }
+        setDeviceId(fallback);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleSegmentChange = (index: number, value: string) => {
@@ -83,7 +103,7 @@ export default function ActivationScreen({ onActivated }: ActivationScreenProps)
     try {
       const result = await activateLicense(fullKey, deviceId);
 
-      // Save activation data locally
+      // Save activation data locally — critical for continuing past this screen
       await saveActivation({
         licenseKey: result.licenseKey,
         plan: result.plan,
@@ -94,23 +114,46 @@ export default function ActivationScreen({ onActivated }: ActivationScreenProps)
         activatedAt: result.activatedAt,
       });
 
-      await hydratePosLicenseData(result.licenseKey);
-      const heartbeatAccepted = await sendPosDeviceHeartbeat(
-        result.licenseKey,
-        result.deviceId,
-      );
-      if (heartbeatAccepted === false) {
-        await clearActivation();
-        throw new Error("This device is no longer assigned to the license.");
+      // Cloud sync / presence must not block a successful activation
+      try {
+        await hydratePosLicenseData(result.licenseKey);
+      } catch (hydrateErr) {
+        console.warn("[activation] hydrate failed (non-blocking)", hydrateErr);
+      }
+      try {
+        const heartbeatAccepted = await sendPosDeviceHeartbeat(
+          result.licenseKey,
+          result.deviceId,
+        );
+        if (heartbeatAccepted === false) {
+          await clearActivation();
+          throw new Error("This device is no longer assigned to the license.");
+        }
+      } catch (hbErr) {
+        if (
+          hbErr instanceof Error &&
+          /no longer assigned/i.test(hbErr.message)
+        ) {
+          throw hbErr;
+        }
+        console.warn("[activation] heartbeat failed (non-blocking)", hbErr);
       }
 
       onActivated();
     } catch (err) {
-      setError(
+      const raw =
         err instanceof Error
           ? err.message
-          : "An unexpected error occurred. Please try again."
-      );
+          : "An unexpected error occurred. Please try again.";
+      const lower = raw.toLowerCase();
+      // PostgREST/Supabase often hides the real DB fault behind this phrase
+      if (lower === "internal error." || lower === "internal error" || lower.includes("internal server error")) {
+        setError(
+          "Ruajtja lokale dështoi (IndexedDB në Electron). Mbyll dhe rihap POS, pastaj provo përsëri. / Local storage failed — restart POS and try again.",
+        );
+      } else {
+        setError(raw);
+      }
     } finally {
       setLoading(false);
     }

@@ -162,7 +162,7 @@ export default function BulkFiscalizationSheet({
         <Button
           size="sm"
           disabled={nonFiscalCount === 0}
-          className="bg-[#0066FF] hover:bg-[#0055DD] text-white text-xs font-semibold px-4 h-8"
+          className="bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold px-4 h-8 shadow-sm"
         >
           <Zap className="size-3.5 mr-1.5" />
           {t("dashboard.bulk_fiscalize")}

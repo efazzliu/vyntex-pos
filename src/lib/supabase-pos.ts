@@ -229,7 +229,13 @@ export async function activateLicense(
         "Supabase bllokon leximin (RLS). Ekzekuto në SQL Editor: supabase/ensure_pos_restaurants_anon_for_activation.sql",
       );
     }
-    throw new Error(errorMessageFromUnknown(fetchError, "Invalid license key."));
+    const rawMsg = errorMessageFromUnknown(fetchError, "Invalid license key.");
+    if (/^internal error\.?$/i.test(rawMsg.trim())) {
+      throw new Error(
+        "Gabim i brendshëm në Supabase gjatë kërkimit të licencës. Kontrollo që RPC vyntex_restaurant_for_activation ekziston (ensure_pos_restaurants_anon_for_activation.sql) dhe provo përsëri.",
+      );
+    }
+    throw new Error(rawMsg);
   }
 
   if (!row) {
@@ -274,7 +280,12 @@ export async function activateLicense(
       })
       .eq("id", row.id);
     if (updateError) {
-      throw new Error("Failed to bind this device to the license.");
+      const detail = errorMessageFromUnknown(updateError, "");
+      throw new Error(
+        detail
+          ? `Failed to bind this device to the license. (${detail})`
+          : "Failed to bind this device to the license.",
+      );
     }
   } else if (devices.length >= maxTerminals) {
     throw new Error(
@@ -291,7 +302,12 @@ export async function activateLicense(
       })
       .eq("id", row.id);
     if (updateError) {
-      throw new Error("Failed to bind this device to the license.");
+      const detail = errorMessageFromUnknown(updateError, "");
+      throw new Error(
+        detail
+          ? `Failed to bind this device to the license. (${detail})`
+          : "Failed to bind this device to the license.",
+      );
     }
   }
 

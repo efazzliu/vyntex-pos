@@ -10,6 +10,7 @@ import {
   Pencil,
   RefreshCw,
   Router,
+  Smartphone,
   Unplug,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -283,11 +284,20 @@ export default function DashboardDevicesPage() {
                         <td className="px-5 py-4">
                           <div className="flex items-center gap-3">
                             <span className="flex size-9 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
-                              <Monitor className="size-4" />
+                              {device.device_kind === "waiter_phone" ? (
+                                <Smartphone className="size-4" />
+                              ) : (
+                                <Monitor className="size-4" />
+                              )}
                             </span>
                             <div>
                               <p className="font-semibold text-slate-800">
                                 {device.display_name}
+                                {device.device_kind === "waiter_phone" ? (
+                                  <span className="ml-2 rounded-md bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-700">
+                                    Phone
+                                  </span>
+                                ) : null}
                               </p>
                               <code className="block max-w-40 truncate text-[10px] text-slate-400">
                                 {device.device_id}

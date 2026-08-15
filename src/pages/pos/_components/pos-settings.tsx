@@ -44,6 +44,7 @@ import {
   Pencil,
 } from "lucide-react";
 import TemplateManager from "./template-manager.tsx";
+import WaiterPhonePairSection from "./waiter-phone-pair-section.tsx";
 import {
   Dialog,
   DialogContent,
@@ -940,6 +941,8 @@ export default function PosSettings({
               </div>
             </section>
           )}
+
+          <WaiterPhonePairSection licenseKey={licenseKey} />
 
           <PinLoginBrandingSection licenseKey={licenseKey} />
 

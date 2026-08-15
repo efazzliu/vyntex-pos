@@ -24,12 +24,15 @@ type LoginPageProps = {
   showManagerCodeLink?: boolean;
   /** When false, hide “create account” (phone app is login-only). Default true for web. */
   showCreateAccountLink?: boolean;
+  /** Phone app: link to waiter PIN login. */
+  showWaiterLink?: boolean;
 };
 
 export default function LoginPageModern({
   defaultAfterLogin = "/dashboard",
   showManagerCodeLink = false,
   showCreateAccountLink = true,
+  showWaiterLink = false,
 }: LoginPageProps) {
   const { t } = useTranslation("site");
   const navigate = useNavigate();
@@ -237,6 +240,13 @@ export default function LoginPageModern({
                 <p className="mt-4 text-sm">
                   <Link to="/redeem-code" className="text-[#0066FF]">
                     {t("auth.login.managerCodeLink")}
+                  </Link>
+                </p>
+              ) : null}
+              {showWaiterLink ? (
+                <p className="mt-4 text-center text-sm">
+                  <Link to="/waiter" className="text-[#0066FF]">
+                    {t("phone.waiter.loginLink")}
                   </Link>
                 </p>
               ) : null}

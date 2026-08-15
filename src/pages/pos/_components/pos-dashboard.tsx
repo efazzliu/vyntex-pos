@@ -118,30 +118,28 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: "#FF3B30",
 };
 
-/** Dashboard shell — layered mesh + depth (CSS “3D” glass panels). */
+/** Dashboard shell — cool mist paper + teal/sky atmosphere (no purple glass). */
 const dashCanvas =
-  "relative isolate min-h-full min-w-0 bg-slate-100 p-6 lg:p-8 before:pointer-events-none before:absolute before:inset-0 before:-z-10 before:bg-[radial-gradient(ellipse_120%_85%_at_50%_-35%,rgba(99,102,241,0.2),transparent),radial-gradient(ellipse_70%_55%_at_100%_0%,rgba(236,72,153,0.14),transparent),radial-gradient(ellipse_55%_45%_at_0%_105%,rgba(14,165,233,0.12),transparent)]";
-/** Raised glass card (KPIs, section bodies). */
+  "relative isolate min-h-full min-w-0 overflow-hidden bg-[#e7eef5] p-5 sm:p-6 lg:p-8 before:pointer-events-none before:absolute before:inset-0 before:-z-10 before:bg-[radial-gradient(ellipse_95%_70%_at_8%_-8%,rgba(13,148,136,0.16),transparent_52%),radial-gradient(ellipse_65%_55%_at_100%_0%,rgba(2,132,199,0.12),transparent_48%),linear-gradient(165deg,#f5f8fb_0%,#e7eef5_48%,#dde7f0_100%)]";
+/** Solid elevated card — crisp, readable KPIs. */
 const dashCard =
-  "rounded-3xl border border-white/70 bg-white/75 p-5 shadow-[0_1px_0_0_rgba(255,255,255,0.95)_inset,0_2px_4px_-1px_rgba(15,23,42,0.05),0_20px_50px_-22px_rgba(15,23,42,0.18)] backdrop-blur-xl backdrop-saturate-150 transition-[transform,box-shadow] duration-300 ease-out hover:-translate-y-1 hover:shadow-[0_1px_0_0_rgba(255,255,255,1)_inset,0_10px_28px_-10px_rgba(99,102,241,0.25),0_28px_64px_-24px_rgba(15,23,42,0.22)]";
+  "rounded-2xl border border-slate-200/90 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_10px_28px_-14px_rgba(15,23,42,0.12)] transition-[box-shadow,transform] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_2px_6px_rgba(15,23,42,0.06),0_18px_40px_-16px_rgba(15,23,42,0.16)]";
 /** Large chart / analytics panels. */
 const dashPanel =
-  "rounded-3xl border border-white/70 bg-white/72 p-4 shadow-[0_1px_0_0_rgba(255,255,255,0.92)_inset,0_14px_44px_-16px_rgba(15,23,42,0.16)] backdrop-blur-xl backdrop-saturate-150 transition-[transform,box-shadow] duration-300 ease-out hover:-translate-y-0.5 hover:shadow-[0_22px_52px_-18px_rgba(79,70,229,0.2)] lg:p-5";
+  "rounded-2xl border border-slate-200/90 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.13)] transition-[box-shadow] duration-200 ease-out hover:shadow-[0_2px_8px_rgba(15,23,42,0.05),0_20px_44px_-18px_rgba(15,23,42,0.15)] lg:p-5";
 /** Inset well for charts inside a panel. */
 const dashInnerWell =
-  "rounded-2xl border border-slate-200/50 bg-gradient-to-br from-white/95 via-slate-50/85 to-indigo-50/25 p-4 shadow-[inset_0_2px_8px_rgba(15,23,42,0.06)]";
-const dashMuted = "text-slate-600";
-const dashLabel = "text-[10px] font-semibold uppercase tracking-wider text-slate-500";
-const ACCENT = "#3b82f6";
-const ORANGE_SERIES = "#fb923c";
+  "rounded-xl border border-slate-100 bg-[#f4f8fb] p-4";
+const dashMuted = "text-slate-500";
+const dashLabel = "text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400";
 
 const DONUT_PALETTE = [
-  "#fb923c",
-  ACCENT,
-  "#14b8a6",
-  "#a855f7",
-  "#ec4899",
-  "#eab308",
+  "#0d9488",
+  "#0284c7",
+  "#ea580c",
+  "#059669",
+  "#e11d48",
+  "#ca8a04",
 ];
 
 function parseYmdToLocalNoon(ymd: string): Date {
@@ -228,19 +226,45 @@ function DashboardRangeCalendar({
     return `${a.toLocaleDateString(displayLocaleTag, { day: "numeric", month: "short" })} – ${b.toLocaleDateString(displayLocaleTag, opts)}`;
   }, [displayLocaleTag, fromYmd, selected.from, selected.to, toYmd]);
   const todayNoon = startOfLocalTodayNoon();
+  const quickRanges = [
+    {
+      label: language === "sq" ? "Sot" : "Today",
+      range: () => {
+        const today = formatLocalYmd(new Date());
+        return { from: today, to: today };
+      },
+    },
+    {
+      label: language === "sq" ? "7 ditët" : "Last 7 days",
+      range: () => {
+        const end = new Date();
+        const start = new Date();
+        start.setDate(end.getDate() - 6);
+        return { from: formatLocalYmd(start), to: formatLocalYmd(end) };
+      },
+    },
+    {
+      label: language === "sq" ? "Ky muaj" : "This month",
+      range: () => {
+        const end = new Date();
+        const start = new Date(end.getFullYear(), end.getMonth(), 1);
+        return { from: formatLocalYmd(start), to: formatLocalYmd(end) };
+      },
+    },
+  ];
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="group inline-flex min-w-[220px] max-w-full shrink-0 items-center gap-3 rounded-2xl border border-white/70 bg-white/75 px-4 py-2.5 text-left shadow-[0_10px_28px_-12px_rgba(15,23,42,0.15),inset_0_1px_0_rgba(255,255,255,0.92)] backdrop-blur-xl outline-none transition hover:border-indigo-200/80 hover:bg-white/90 hover:shadow-[0_14px_36px_-12px_rgba(99,102,241,0.22)] focus-visible:ring-2 focus-visible:ring-indigo-400/50"
+          className="group inline-flex min-w-[220px] max-w-full shrink-0 items-center gap-3 rounded-2xl border border-slate-200/90 bg-white px-4 py-2.5 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04),0_10px_24px_-12px_rgba(15,23,42,0.12)] outline-none transition hover:border-teal-300/80 hover:shadow-[0_2px_8px_rgba(13,148,136,0.12),0_14px_32px_-14px_rgba(15,23,42,0.14)] focus-visible:ring-2 focus-visible:ring-teal-500/40"
         >
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500/15 to-violet-600/10 ring-1 ring-indigo-500/15">
-            <CalendarDays className="size-5 text-indigo-700" strokeWidth={2} />
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700 ring-1 ring-teal-600/15">
+            <CalendarDays className="size-5" strokeWidth={2} />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+            <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
               {t("dashboard.calendar_range_label")}
             </span>
             <span className="block truncate text-sm font-semibold tracking-tight text-slate-900">{label}</span>
@@ -250,14 +274,43 @@ function DashboardRangeCalendar({
       </PopoverTrigger>
       <PopoverContent
         align="end"
-        sideOffset={10}
-        className="w-auto max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-white/80 bg-white/95 p-0 shadow-[0_24px_60px_-20px_rgba(15,23,42,0.28)] backdrop-blur-xl"
+        sideOffset={12}
+        collisionPadding={16}
+        className="!w-[380px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-[22px] border border-slate-200/80 bg-white p-0 shadow-[0_24px_70px_-20px_rgba(15,23,42,0.28)]"
       >
-        <div className="border-b border-slate-200/70 bg-gradient-to-r from-slate-50/90 to-indigo-50/40 px-4 py-3">
-          <p className="text-sm font-semibold text-slate-900">{t("dashboard.calendar_range_label")}</p>
-          <p className="mt-0.5 text-xs leading-relaxed text-slate-600">{t("dashboard.calendar_range_hint")}</p>
+        <div className="relative overflow-hidden border-b border-teal-900/10 bg-gradient-to-br from-teal-700 via-teal-700 to-cyan-700 px-5 py-4 text-white">
+          <div className="pointer-events-none absolute -right-8 -top-10 size-32 rounded-full border-[18px] border-white/5" />
+          <div className="relative flex items-start gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/12 ring-1 ring-white/20">
+              <CalendarDays className="size-5" />
+            </span>
+            <div>
+              <p className="text-sm font-semibold">{t("dashboard.calendar_range_label")}</p>
+              <p className="mt-0.5 text-xs leading-relaxed text-teal-50/80">
+                {t("dashboard.calendar_range_hint")}
+              </p>
+            </div>
+          </div>
         </div>
-        <div className="p-2">
+        <div className="border-b border-slate-100 px-4 py-3">
+          <div className="flex gap-2">
+            {quickRanges.map((quickRange) => (
+              <button
+                key={quickRange.label}
+                type="button"
+                onClick={() => {
+                  const range = quickRange.range();
+                  onRangeYmd(range.from, range.to);
+                  setOpen(false);
+                }}
+                className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 text-[11px] font-semibold text-slate-600 transition hover:border-teal-300 hover:bg-teal-50 hover:text-teal-800"
+              >
+                {quickRange.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex justify-center p-3">
           <DayPickerCalendar
             mode="range"
             numberOfMonths={1}
@@ -285,23 +338,14 @@ function DashboardRangeCalendar({
               c.setHours(12, 0, 0, 0);
               return c.getTime() > todayNoon.getTime();
             }}
-            className="rounded-xl [--cell-size:2.25rem]"
+            className="w-full bg-transparent p-1 [--cell-size:2.45rem] [&_.rdp-month]:w-full [&_.rdp-month_grid]:w-full [&_.rdp-month_caption]:mb-2 [&_.rdp-caption_label]:text-[15px] [&_.rdp-caption_label]:font-bold [&_.rdp-button_previous]:rounded-xl [&_.rdp-button_previous]:border [&_.rdp-button_previous]:border-slate-200 [&_.rdp-button_previous]:text-slate-600 [&_.rdp-button_previous]:shadow-sm [&_.rdp-button_next]:rounded-xl [&_.rdp-button_next]:border [&_.rdp-button_next]:border-slate-200 [&_.rdp-button_next]:text-slate-600 [&_.rdp-button_next]:shadow-sm [&_.rdp-weekday]:text-[11px] [&_.rdp-weekday]:font-semibold [&_.rdp-weekday]:uppercase [&_.rdp-weekday]:tracking-wide [&_.rdp-weekday]:text-slate-400 [&_.rdp-day_button]:rounded-xl [&_.rdp-day_button]:text-sm [&_.rdp-day_button]:transition-colors [&_.rdp-day_button:hover]:bg-teal-50 [&_.rdp-day_button:hover]:text-teal-800 [&_button[data-range-start=true]]:!bg-teal-600 [&_button[data-range-start=true]]:!text-white [&_button[data-range-end=true]]:!bg-teal-600 [&_button[data-range-end=true]]:!text-white [&_button[data-range-middle=true]]:!bg-teal-50 [&_button[data-range-middle=true]]:!text-teal-900 [&_button[data-selected-single=true]]:!bg-teal-600 [&_button[data-selected-single=true]]:!text-white"
           />
         </div>
-        <div className="flex justify-end gap-2 border-t border-slate-200/70 bg-slate-50/50 px-3 py-2.5">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="rounded-xl border-slate-200/80 bg-white/90 text-xs font-semibold"
-            onClick={() => {
-              const y = formatLocalYmd(new Date());
-              onRangeYmd(y, y);
-              setOpen(false);
-            }}
-          >
-            {t("dashboard.period_day")}
-          </Button>
+        <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/70 px-4 py-3">
+          <span className="text-[11px] font-medium text-slate-400">
+            {language === "sq" ? "Zgjidh fillimin dhe mbarimin" : "Select start and end dates"}
+          </span>
+          <span className="size-2 rounded-full bg-teal-500 ring-4 ring-teal-500/10" />
         </div>
       </PopoverContent>
     </Popover>
@@ -536,13 +580,16 @@ export default function PosDashboard({
 
   return (
     <div className={`${dashCanvas} space-y-8`}>
-      <div className="relative flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="bg-gradient-to-r from-slate-900 via-indigo-900 to-slate-900 bg-clip-text text-3xl font-bold tracking-tight text-transparent drop-shadow-[0_2px_12px_rgba(99,102,241,0.15)]">
+          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-teal-700/80">
+            Vyntex POS
+          </p>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-[2rem]">
             {String(t("dashboard.welcome_back", { name: staffName }))}
           </h1>
           {showStarterLayout ? (
-            <p className={`mt-1 text-sm ${dashMuted}`}>{t("starter_overview.subtitle")}</p>
+            <p className={`mt-1.5 text-sm ${dashMuted}`}>{t("starter_overview.subtitle")}</p>
           ) : null}
         </div>
         <DashboardRangeCalendar
@@ -579,7 +626,7 @@ export default function PosDashboard({
               value={formatPrice(stats.avgOrderValue)}
               trend={null}
               trendLabel={starterMetricFootnote}
-              accent="violet"
+              accent="rose"
             />
             <MetricTrendCard
               title={t("dashboard.exec_kpi_active_orders")}
@@ -614,7 +661,7 @@ export default function PosDashboard({
               value={formatPrice(periodSummaries.month.avgOrderValue)}
               trend={growthPercent(monthCurrentAvg, monthPreviousAvg)}
               trendLabel={t("dashboard.metric_trend_this_month")}
-              accent="violet"
+              accent="rose"
             />
             <MetricTrendCard
               title={t("dashboard.exec_kpi_active_orders")}
@@ -700,7 +747,7 @@ export default function PosDashboard({
                         className="flex items-center justify-between border-b border-slate-200/45 py-1.5 last:border-0"
                       >
                         <div className="flex min-w-0 items-center gap-3">
-                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-500/15 text-xs font-bold text-blue-400">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-50 text-xs font-bold text-teal-700 ring-1 ring-teal-600/10">
                             {s.name
                               .split(" ")
                               .map((n) => n[0])
@@ -727,14 +774,14 @@ export default function PosDashboard({
                 {stats.topItems.length === 0 ? (
                   <p className={`text-sm ${dashMuted} py-2`}>{t("dashboard.empty_sales")}</p>
                 ) : (
-                  <div className="divide-y divide-slate-200/40 rounded-2xl border border-white/60 bg-white/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] backdrop-blur-sm">
+                  <div className="divide-y divide-slate-100 rounded-xl border border-slate-100 bg-[#f4f8fb]">
                     {stats.topItems.map((item, idx) => (
                       <div
                         key={`${item.name}-${idx}`}
                         className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm"
                       >
                         <div className="flex min-w-0 flex-1 items-center gap-3">
-                          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-xs font-bold text-slate-600 tabular-nums">
+                          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-teal-50 text-xs font-bold text-teal-800 tabular-nums ring-1 ring-teal-600/10">
                             {idx + 1}
                           </span>
                           <span className="truncate font-medium text-slate-900">{item.name}</span>
@@ -784,10 +831,10 @@ function SupplyProfitChartSection({
     <div className={dashPanel}>
       <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="flex size-9 items-center justify-center rounded-xl bg-teal-500/15 text-teal-700 ring-1 ring-teal-500/20">
+          <div className="flex items-center gap-2.5">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700 ring-1 ring-teal-600/15">
               <Package className="size-4" />
-            </span>
+            </div>
             <h3 className="text-base font-bold tracking-tight text-slate-900">
               {t("dashboard.supply_chart_title")}
             </h3>
@@ -799,25 +846,25 @@ function SupplyProfitChartSection({
       </div>
 
       <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <div className={`rounded-2xl border border-slate-200/60 bg-white/60 px-3 py-2.5 ${dashInnerWell} !p-3`}>
+        <div className={`rounded-xl border border-slate-100 bg-[#f4f8fb] px-3 py-2.5`}>
           <p className={dashLabel}>{t("dashboard.inventory_total")}</p>
           <p className="text-sm font-bold text-slate-900 tabular-nums">
             {loading ? "…" : formatPrice(inventory.totalValue)}
           </p>
         </div>
-        <div className={`rounded-2xl border border-orange-200/50 bg-orange-50/40 px-3 py-2.5`}>
+        <div className={`rounded-xl border border-orange-200/60 bg-orange-50/50 px-3 py-2.5`}>
           <p className={dashLabel}>{t("dashboard.inventory_kitchen")}</p>
           <p className="text-sm font-bold text-slate-900 tabular-nums">
             {loading ? "…" : formatPrice(inventory.kitchenValue)}
           </p>
         </div>
-        <div className={`rounded-2xl border border-violet-200/50 bg-violet-50/40 px-3 py-2.5`}>
+        <div className={`rounded-xl border border-sky-200/60 bg-sky-50/50 px-3 py-2.5`}>
           <p className={dashLabel}>{t("dashboard.inventory_bar")}</p>
           <p className="text-sm font-bold text-slate-900 tabular-nums">
             {loading ? "…" : formatPrice(inventory.barValue)}
           </p>
         </div>
-        <div className={`rounded-2xl border border-slate-200/60 bg-white/60 px-3 py-2.5`}>
+        <div className={`rounded-xl border border-slate-100 bg-[#f4f8fb] px-3 py-2.5`}>
           <p className={dashLabel}>{t("dashboard.inventory_count_label")}</p>
           <p className="text-sm font-bold text-slate-900 tabular-nums">
             {loading ? "…" : t("dashboard.inventory_items", { count: inventory.trackedItemCount })}
@@ -861,21 +908,21 @@ function SupplyProfitChartSection({
               <Bar
                 dataKey="revenue"
                 name={t("dashboard.supply_legend_revenue")}
-                fill="#3b82f6"
+                fill="#0284c7"
                 radius={[4, 4, 0, 0]}
                 maxBarSize={28}
               />
               <Bar
                 dataKey="supplyIntake"
                 name={t("dashboard.supply_legend_intake")}
-                fill="#14b8a6"
+                fill="#0d9488"
                 radius={[4, 4, 0, 0]}
                 maxBarSize={28}
               />
               <Bar
                 dataKey="stockExpense"
                 name={t("dashboard.supply_legend_expense")}
-                fill="#f97316"
+                fill="#ea580c"
                 radius={[4, 4, 0, 0]}
                 maxBarSize={28}
               />
@@ -883,9 +930,9 @@ function SupplyProfitChartSection({
                 type="monotone"
                 dataKey="estimatedProfit"
                 name={t("dashboard.supply_legend_profit")}
-                stroke="#22c55e"
+                stroke="#059669"
                 strokeWidth={2.5}
-                dot={{ r: 3, fill: "#22c55e", strokeWidth: 0 }}
+                dot={{ r: 3, fill: "#059669", strokeWidth: 0 }}
                 activeDot={{ r: 5 }}
               />
             </ComposedChart>
@@ -910,44 +957,60 @@ function MetricTrendCard({
   icon: LucideIcon;
   trend: number | null;
   trendLabel: string;
-  accent: "emerald" | "blue" | "violet" | "amber" | "cyan";
+  accent: "emerald" | "blue" | "rose" | "amber" | "cyan" | "violet";
   sub?: string;
 }) {
   const trendUp = (trend ?? 0) >= 0;
   const tone =
     accent === "emerald"
-      ? "bg-emerald-500/15 text-emerald-300"
+      ? {
+          bar: "bg-teal-500",
+          icon: "bg-teal-50 text-teal-700 ring-teal-600/15",
+        }
       : accent === "blue"
-        ? "bg-blue-500/15 text-blue-300"
-        : accent === "violet"
-          ? "bg-violet-500/15 text-violet-300"
+        ? {
+            bar: "bg-sky-500",
+            icon: "bg-sky-50 text-sky-700 ring-sky-600/15",
+          }
+        : accent === "rose" || accent === "violet"
+          ? {
+              bar: "bg-rose-500",
+              icon: "bg-rose-50 text-rose-700 ring-rose-600/15",
+            }
           : accent === "amber"
-            ? "bg-amber-500/15 text-amber-300"
-            : "bg-cyan-500/15 text-cyan-300";
+            ? {
+                bar: "bg-amber-500",
+                icon: "bg-amber-50 text-amber-700 ring-amber-600/15",
+              }
+            : {
+                bar: "bg-cyan-500",
+                icon: "bg-cyan-50 text-cyan-700 ring-cyan-600/15",
+              };
 
   return (
-    <div className={`h-full min-h-[118px] ${dashCard} !p-4`}>
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{title}</p>
+    <div className={`relative h-full min-h-[118px] overflow-hidden ${dashCard} !p-4`}>
+      <span className={`absolute inset-y-3 left-0 w-1 rounded-full ${tone.bar}`} aria-hidden />
+      <div className="mb-3 flex items-center justify-between gap-2 pl-2">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">{title}</p>
         <span
-          className={`inline-flex size-9 items-center justify-center rounded-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] ring-1 ring-white/50 ${tone}`}
+          className={`inline-flex size-9 items-center justify-center rounded-xl ring-1 ${tone.icon}`}
         >
-          <Icon className="size-4 drop-shadow-sm" />
+          <Icon className="size-4" />
         </span>
       </div>
-      <p className="truncate text-xl font-bold tracking-tight text-slate-900">{value}</p>
-      {sub ? <p className="mt-0.5 text-xs text-slate-400">{sub}</p> : null}
-      <div className="mt-2 flex items-center gap-1.5 text-xs">
+      <p className="truncate pl-2 text-xl font-bold tracking-tight text-slate-900 tabular-nums">{value}</p>
+      {sub ? <p className="mt-0.5 pl-2 text-xs text-slate-400">{sub}</p> : null}
+      <div className="mt-2 flex items-center gap-1.5 pl-2 text-xs">
         {trend === null ? null : trendUp ? (
-          <ArrowUpRight className="size-3.5 text-emerald-400" />
+          <ArrowUpRight className="size-3.5 text-teal-600" />
         ) : (
-          <ArrowDownRight className="size-3.5 text-red-400" />
+          <ArrowDownRight className="size-3.5 text-red-500" />
         )}
         {trend === null ? (
           <span
             className={
               trendLabel.trim().startsWith("+")
-                ? "font-semibold text-emerald-500"
+                ? "font-semibold text-teal-600"
                 : trendLabel.trim().startsWith("-")
                   ? "font-semibold text-red-500"
                   : "text-slate-400"
@@ -957,11 +1020,11 @@ function MetricTrendCard({
           </span>
         ) : (
           <>
-            <span className={trendUp ? "font-semibold text-emerald-400" : "font-semibold text-red-400"}>
+            <span className={trendUp ? "font-semibold text-teal-600" : "font-semibold text-red-500"}>
               {trendUp ? "+" : ""}
               {trend.toFixed(1)}%
             </span>
-            <span className="text-slate-500">{trendLabel}</span>
+            <span className="text-slate-400">{trendLabel}</span>
           </>
         )}
       </div>
@@ -1020,9 +1083,9 @@ function StarterDashboardDetailColumn({
   if (loading) {
     return (
       <div className="flex flex-col gap-4">
-        <div className={`${dashPanel} h-52 animate-pulse rounded-3xl bg-slate-200/40`} />
-        <div className={`${dashPanel} h-44 animate-pulse rounded-3xl bg-slate-200/40`} />
-        <div className={`${dashPanel} h-40 animate-pulse rounded-3xl bg-slate-200/40`} />
+        <div className={`${dashPanel} h-52 animate-pulse rounded-2xl bg-slate-100`} />
+        <div className={`${dashPanel} h-44 animate-pulse rounded-2xl bg-slate-100`} />
+        <div className={`${dashPanel} h-40 animate-pulse rounded-2xl bg-slate-100`} />
       </div>
     );
   }
@@ -1032,8 +1095,8 @@ function StarterDashboardDetailColumn({
       <section className={`w-full min-w-0 ${dashPanel}`}>
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400/25 to-teal-700/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] ring-1 ring-white/55">
-              <BarChart2 className="size-5 text-emerald-700 drop-shadow-sm" strokeWidth={2} />
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700 ring-1 ring-teal-600/15">
+              <BarChart2 className="size-5" strokeWidth={2} />
             </div>
             <div className="min-w-0">
               <h3 className="text-lg font-semibold tracking-tight text-slate-900">
@@ -1050,7 +1113,7 @@ function StarterDashboardDetailColumn({
             icon={UtensilsCrossed}
             label={t("starter_overview.today_active_tables")}
             value={String(stats.activeTables)}
-            color="#a855f7"
+            color="#0d9488"
           />
         </div>
       </section>
@@ -1058,8 +1121,8 @@ function StarterDashboardDetailColumn({
       <section className={`w-full min-w-0 ${dashPanel}`}>
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400/25 to-orange-700/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] ring-1 ring-white/55">
-              <Clock className="size-5 text-amber-700 drop-shadow-sm" strokeWidth={2} />
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700 ring-1 ring-amber-600/15">
+              <Clock className="size-5" strokeWidth={2} />
             </div>
             <div className="min-w-0">
               <h3 className="text-lg font-semibold tracking-tight text-slate-900">{t("starter_overview.orders_section")}</h3>
@@ -1078,8 +1141,8 @@ function StarterDashboardDetailColumn({
       <section className={`w-full min-w-0 ${dashPanel}`}>
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-400/25 to-sky-700/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] ring-1 ring-white/55">
-              <Banknote className="size-5 text-cyan-800 drop-shadow-sm" strokeWidth={2} />
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-700 ring-1 ring-sky-600/15">
+              <Banknote className="size-5" strokeWidth={2} />
             </div>
             <div className="min-w-0">
               <h3 className="text-lg font-semibold tracking-tight text-slate-900">{t("starter_overview.cash_register_section")}</h3>
@@ -1201,8 +1264,8 @@ function WeeklyActivityByDayCard({
     <section className={`w-full min-w-0 ${dashPanel}`}>
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-400/25 to-violet-700/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] ring-1 ring-white/55">
-            <BarChart2 className="size-5 text-indigo-600 drop-shadow-sm" strokeWidth={2} />
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-700 ring-1 ring-sky-600/15">
+            <BarChart2 className="size-5" strokeWidth={2} />
           </div>
           <div className="min-w-0">
             <h3 className="text-lg font-semibold tracking-tight text-slate-900">
@@ -1212,7 +1275,7 @@ function WeeklyActivityByDayCard({
           </div>
         </div>
         {peakDay ? (
-          <p className="text-right text-xs font-semibold text-indigo-700 tabular-nums">
+          <p className="text-right text-xs font-semibold text-teal-700 tabular-nums">
             {t("dashboard.week_activity_peak", {
               day: peakDay.day,
               amount: formatPrice(peakDay.revenue),
@@ -1222,7 +1285,7 @@ function WeeklyActivityByDayCard({
       </div>
 
       {loading ? (
-        <div className="h-[200px] animate-pulse rounded-2xl bg-gradient-to-br from-slate-200/50 via-slate-100/80 to-indigo-100/25" />
+        <div className="h-[200px] animate-pulse rounded-xl bg-slate-100" />
       ) : chartData.length === 0 ? (
         <p className={`py-10 text-center text-sm ${dashMuted}`}>{t("dashboard.week_activity_empty")}</p>
       ) : isEmpty ? (
@@ -1246,21 +1309,21 @@ function WeeklyActivityByDayCard({
                 tickFormatter={(v) => formatPrice(Number(v))}
               />
               <Tooltip
-                cursor={{ fill: "rgba(99, 102, 241, 0.06)" }}
+                cursor={{ fill: "rgba(13, 148, 136, 0.08)" }}
                 content={({ active, label, payload }) => {
                   if (!active || !payload?.length) return null;
                   const revenue = Number((payload[0]?.payload as { revenue?: number })?.revenue ?? 0);
                   return (
-                    <div className="rounded-xl border border-white/70 bg-white/90 px-3 py-2 shadow-[0_12px_28px_-8px_rgba(15,23,42,0.18)] backdrop-blur-md">
+                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-[0_12px_28px_-8px_rgba(15,23,42,0.16)]">
                       <p className="text-xs font-medium text-slate-500">{String(label)}</p>
-                      <p className="text-sm font-semibold text-indigo-700 tabular-nums">{formatPrice(revenue)}</p>
+                      <p className="text-sm font-semibold text-teal-700 tabular-nums">{formatPrice(revenue)}</p>
                     </div>
                   );
                 }}
               />
               <Bar dataKey="revenue" radius={[10, 10, 0, 0]} maxBarSize={48} isAnimationActive={false}>
                 {chartData.map((_, i) => (
-                  <Cell key={`wk-${i}`} fill={i === maxIdx ? "#4f46e5" : "#cbd5e1"} />
+                  <Cell key={`wk-${i}`} fill={i === maxIdx ? "#0d9488" : "#cbd5e1"} />
                 ))}
               </Bar>
             </BarChart>
@@ -1320,8 +1383,8 @@ function PopularTimesCard({
     <section className={`w-full min-w-0 ${dashPanel}`}>
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-400/30 to-fuchsia-600/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] ring-1 ring-white/55">
-            <Clock className="size-5 text-violet-600 drop-shadow-sm" strokeWidth={2} />
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700 ring-1 ring-teal-600/15">
+            <Clock className="size-5" strokeWidth={2} />
           </div>
           <div className="min-w-0">
             <h3 className="text-lg font-semibold tracking-tight text-slate-900">
@@ -1331,7 +1394,7 @@ function PopularTimesCard({
           </div>
         </div>
         {peakMeta ? (
-          <p className="text-right text-xs font-medium text-violet-700 tabular-nums">
+          <p className="text-right text-xs font-medium text-teal-700 tabular-nums">
             {t("dashboard.popular_times_peak", {
               hour: formatHourSnapchat(peakMeta.hour),
               level: t(popularTimesBusyLevelKey(peakMeta.count, peakMeta.count)),
@@ -1347,10 +1410,10 @@ function PopularTimesCard({
               key={`${label}-${i}`}
               type="button"
               onClick={() => setDayIdx(i)}
-              className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-[transform,box-shadow,background] ${
+              className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-[transform,background,color] ${
                 i === safeIdx
-                  ? "bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-[0_4px_14px_-4px_rgba(124,58,237,0.55),inset_0_1px_0_rgba(255,255,255,0.35)]"
-                  : "border border-white/50 bg-white/50 text-slate-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] backdrop-blur-sm hover:-translate-y-0.5 hover:bg-white/80"
+                  ? "bg-teal-600 text-white shadow-[0_4px_14px_-4px_rgba(13,148,136,0.55)]"
+                  : "border border-slate-200 bg-white text-slate-600 hover:-translate-y-0.5 hover:border-teal-200 hover:text-teal-800"
               }`}
             >
               {label}
@@ -1360,7 +1423,7 @@ function PopularTimesCard({
       ) : null}
 
       {loading ? (
-        <div className="h-[220px] animate-pulse rounded-2xl bg-gradient-to-br from-slate-200/50 via-violet-100/40 to-fuchsia-100/30" />
+        <div className="h-[220px] animate-pulse rounded-xl bg-slate-100" />
       ) : dayCount === 0 || chartData.length === 0 ? (
         <p className={`py-10 text-center text-sm ${dashMuted}`}>{t("dashboard.popular_times_empty")}</p>
       ) : isEmpty ? (
@@ -1371,9 +1434,9 @@ function PopularTimesCard({
             <BarChart data={chartData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }} barCategoryGap="12%">
               <defs>
                 <linearGradient id="popularTimesBarFill" x1="0" y1="1" x2="0" y2="0">
-                  <stop offset="0%" stopColor="#c4b5fd" stopOpacity={0.35} />
-                  <stop offset="55%" stopColor="#a78bfa" />
-                  <stop offset="100%" stopColor="#7c3aed" />
+                  <stop offset="0%" stopColor="#99f6e4" stopOpacity={0.4} />
+                  <stop offset="55%" stopColor="#2dd4bf" />
+                  <stop offset="100%" stopColor="#0d9488" />
                 </linearGradient>
               </defs>
               <CartesianGrid stroke="#f1f5f9" strokeDasharray="4 4" vertical={false} />
@@ -1393,16 +1456,16 @@ function PopularTimesCard({
                 allowDecimals={false}
               />
               <Tooltip
-                cursor={{ fill: "rgba(139, 92, 246, 0.08)" }}
+                cursor={{ fill: "rgba(13, 148, 136, 0.08)" }}
                 content={({ active, label, payload }) => {
                   if (!active || !payload?.length) return null;
                   const c = Number((payload[0]?.payload as { count?: number })?.count ?? 0);
                   const peakCount = peakMeta?.count ?? 0;
                   const levelKey = popularTimesBusyLevelKey(c, peakCount);
                   return (
-                    <div className="rounded-xl border border-white/70 bg-white/90 px-3 py-2 shadow-[0_12px_28px_-8px_rgba(15,23,42,0.18)] backdrop-blur-md">
+                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-[0_12px_28px_-8px_rgba(15,23,42,0.16)]">
                       <p className="text-xs font-medium text-slate-500">{formatHourSnapchat(Number(label))}</p>
-                      <p className="text-sm font-semibold text-violet-700">{t(levelKey)}</p>
+                      <p className="text-sm font-semibold text-teal-700">{t(levelKey)}</p>
                     </div>
                   );
                 }}
@@ -1480,17 +1543,17 @@ function OrdersAnalyticsSection({
     <section className={`w-full min-w-0 ${dashPanel}`}>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-400/25 to-indigo-700/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] ring-1 ring-white/55">
-            <TrendingUp className="size-5 text-blue-600 drop-shadow-sm" strokeWidth={2.25} />
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-700 ring-1 ring-sky-600/15">
+            <TrendingUp className="size-5" strokeWidth={2.25} />
           </div>
           <div className="min-w-0">
             <h3 className="text-lg font-semibold tracking-tight text-slate-900">
               {t("dashboard.chart_title")}
             </h3>
             <p className={`text-xs ${dashMuted}`}>{t("dashboard.sales_trend_subtitle")}</p>
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5 text-[11px] text-slate-600">
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5 text-[11px] text-slate-500">
               <span className="inline-flex items-center gap-1.5">
-                <span className="size-2 shrink-0 rounded-full bg-blue-600" />
+                <span className="size-2 shrink-0 rounded-full bg-teal-600" />
                 {t("dashboard.chart_series_current")}
               </span>
               <span className="inline-flex items-center gap-1.5">
@@ -1509,7 +1572,7 @@ function OrdersAnalyticsSection({
               {growth !== null ? (
                 <p
                   className={`text-sm font-semibold tabular-nums ${
-                    growth >= 0 ? "text-emerald-600" : "text-red-500"
+                    growth >= 0 ? "text-teal-600" : "text-red-500"
                   }`}
                 >
                   {growth >= 0 ? "+" : ""}
@@ -1521,7 +1584,7 @@ function OrdersAnalyticsSection({
           <select
             value={mode}
             onChange={(e) => onModeChange(e.target.value as SalesChartMode)}
-            className="h-9 shrink-0 rounded-xl border border-white/60 bg-white/55 px-3 text-sm font-medium text-slate-800 shadow-[0_2px_10px_-4px_rgba(15,23,42,0.12),inset_0_1px_0_rgba(255,255,255,0.85)] backdrop-blur-md outline-none transition hover:border-indigo-200/70 hover:bg-white/80"
+            className="h-9 shrink-0 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 shadow-sm outline-none transition hover:border-teal-300 focus:ring-2 focus:ring-teal-500/30"
           >
             {ordersAnalyticsModes.map((item) => (
               <option key={item.value} value={item.value}>
@@ -1533,7 +1596,7 @@ function OrdersAnalyticsSection({
       </div>
 
       {loading ? (
-        <div className="h-[240px] animate-pulse rounded-2xl bg-gradient-to-br from-slate-200/50 via-slate-100/80 to-indigo-100/30" />
+        <div className="h-[240px] animate-pulse rounded-xl bg-slate-100" />
       ) : isEmpty ? (
         <p className={`py-12 text-center text-sm ${dashMuted}`}>{t("dashboard.chart_empty")}</p>
       ) : (
@@ -1542,8 +1605,8 @@ function OrdersAnalyticsSection({
             <ComposedChart data={data} margin={{ top: 8, right: 12, left: 4, bottom: 4 }}>
               <defs>
                 <linearGradient id="salesTrendArea" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#2563eb" stopOpacity={0.32} />
-                  <stop offset="100%" stopColor="#2563eb" stopOpacity={0} />
+                  <stop offset="0%" stopColor="#0d9488" stopOpacity={0.28} />
+                  <stop offset="100%" stopColor="#0d9488" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid stroke="#e2e8f0" strokeDasharray="4 4" vertical />
@@ -1574,14 +1637,14 @@ function OrdersAnalyticsSection({
                     priorOrders: number;
                   };
                   return (
-                    <div className="min-w-[180px] rounded-xl border border-white/70 bg-white/85 px-3 py-2.5 shadow-[0_12px_28px_-8px_rgba(15,23,42,0.18)] backdrop-blur-md">
+                    <div className="min-w-[180px] rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-[0_12px_28px_-8px_rgba(15,23,42,0.16)]">
                       <p className="text-xs font-medium text-slate-500">
                         {t("dashboard.sales_tooltip_period", { label: String(label ?? "") })}
                       </p>
                       <div className="mt-2 space-y-1.5 text-sm">
                         <div className="flex items-center justify-between gap-3">
                           <span className="text-slate-600">{t("dashboard.chart_series_current")}</span>
-                          <span className="font-semibold tabular-nums text-blue-600">{formatPrice(row.revenue)}</span>
+                          <span className="font-semibold tabular-nums text-teal-700">{formatPrice(row.revenue)}</span>
                         </div>
                         <div className="flex items-center justify-between gap-3">
                           <span className="text-slate-600">{t("dashboard.chart_series_previous")}</span>
@@ -1626,13 +1689,13 @@ function OrdersAnalyticsSection({
                 type="monotone"
                 dataKey="revenue"
                 name={String(t("dashboard.chart_series_current"))}
-                stroke="#2563eb"
-                strokeWidth={2}
-                dot={{ r: 3, fill: "#2563eb", strokeWidth: 0 }}
+                stroke="#0d9488"
+                strokeWidth={2.25}
+                dot={{ r: 3, fill: "#0d9488", strokeWidth: 0 }}
                 activeDot={{
                   r: 5,
                   fill: "#ffffff",
-                  stroke: "#2563eb",
+                  stroke: "#0d9488",
                   strokeWidth: 2,
                 }}
                 isAnimationActive={false}
@@ -1645,7 +1708,7 @@ function OrdersAnalyticsSection({
   );
 }
 
-const SALES_BAR_ACTIVE = "#7B89F4";
+const SALES_BAR_ACTIVE = "#0d9488";
 
 function shortMonthTickLabel(full: string): string {
   const t = full.trim();
@@ -1684,22 +1747,22 @@ function SalesBarTooltipContent({
   if (!row) return null;
   const vs = growthPercent(row.revenue, row.prevRevenue);
   return (
-    <div className="rounded-xl border border-white/70 bg-white/90 px-3 py-2.5 shadow-[0_14px_32px_-10px_rgba(15,23,42,0.2)] backdrop-blur-md ring-1 ring-indigo-100/40">
+    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-[0_14px_32px_-10px_rgba(15,23,42,0.16)]">
       <div className="mb-1 flex items-center gap-2">
         <Wallet className="size-3.5 text-slate-500" />
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
           {t("dashboard.sales_analytics_income")}
         </span>
       </div>
       <p className="text-xs text-slate-500">{row.fullLabel}</p>
       <div className="mt-1.5 flex items-center gap-2">
-        <span className="size-2 shrink-0 rounded-full bg-indigo-500" />
+        <span className="size-2 shrink-0 rounded-full bg-teal-600" />
         <span className="text-lg font-bold tabular-nums text-slate-900">{formatPrice(row.revenue)}</span>
       </div>
       {vs !== null ? (
         <p
           className={`mt-1.5 flex items-center gap-1 text-xs font-semibold tabular-nums ${
-            vs >= 0 ? "text-emerald-600" : "text-red-500"
+            vs >= 0 ? "text-teal-600" : "text-red-500"
           }`}
         >
           {vs >= 0 ? (
@@ -1773,7 +1836,7 @@ function SalesAnalyticsBarCard({
           <button
             type="button"
             onClick={onViewDetails}
-            className="inline-flex size-10 items-center justify-center rounded-xl border border-white/70 bg-gradient-to-b from-white to-slate-100/90 text-slate-700 shadow-[0_4px_14px_-6px_rgba(15,23,42,0.18),inset_0_1px_0_rgba(255,255,255,0.95)] transition hover:-translate-y-0.5 hover:text-indigo-700 hover:shadow-[0_8px_22px_-6px_rgba(99,102,241,0.35)] active:translate-y-0"
+            className="inline-flex size-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-teal-300 hover:text-teal-700 hover:shadow-md active:translate-y-0"
             aria-label={String(t("dashboard.sales_analytics_detail"))}
           >
             <ChevronRight className="size-4" strokeWidth={2} />
@@ -1782,7 +1845,7 @@ function SalesAnalyticsBarCard({
       </div>
 
       {loading ? (
-        <div className="h-[260px] animate-pulse rounded-2xl bg-gradient-to-br from-slate-200/50 via-slate-100/80 to-violet-100/25" />
+        <div className="h-[260px] animate-pulse rounded-xl bg-slate-100" />
       ) : isEmpty ? (
         <p className="py-12 text-center text-sm text-slate-500">{t("dashboard.chart_empty")}</p>
       ) : (
@@ -1917,7 +1980,7 @@ function DashboardInsights({
         <p className={`text-[11px] ${dashMuted} mt-0.5`}>{t("dashboard.top5_products_subtitle")}</p>
       </div>
       {loading ? (
-        <div className="mx-auto h-[220px] w-[220px] rounded-full bg-gradient-to-br from-slate-200/60 to-indigo-100/40 shadow-[inset_0_4px_12px_rgba(15,23,42,0.08)] animate-pulse" />
+        <div className="mx-auto h-[220px] w-[220px] rounded-full bg-slate-100 animate-pulse" />
       ) : donutData.length === 0 || donutTotalQty <= 0 ? (
         <p className={`text-sm ${dashMuted} py-16 text-center`}>{t("dashboard.donut_empty")}</p>
       ) : (
@@ -2016,7 +2079,7 @@ function FiscalSystemSection({
             <h3 className="text-lg font-semibold text-slate-900">{t("dashboard.fiscal_system_title")}</h3>
             <p className={`text-xs ${dashMuted}`}>{t("dashboard.fiscal_system_subtitle")}</p>
           </div>
-          <span className="rounded-full border border-white/60 bg-white/55 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-sm">
+          <span className="rounded-full border border-teal-200 bg-teal-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-teal-800">
             {t("dashboard.today_badge")}
           </span>
         </div>
@@ -2105,10 +2168,10 @@ function KpiCard({
           {sub ? <p className={`text-xs ${dashMuted} mt-1`}>{sub}</p> : null}
         </div>
         <div
-          className="flex size-11 shrink-0 items-center justify-center rounded-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] ring-1 ring-white/50"
-          style={{ backgroundColor: `${color}28` }}
+          className="flex size-11 shrink-0 items-center justify-center rounded-xl ring-1 ring-black/5"
+          style={{ backgroundColor: `${color}18` }}
         >
-          <Icon className="size-5 drop-shadow-sm" style={{ color }} />
+          <Icon className="size-5" style={{ color }} />
         </div>
       </div>
     </div>
@@ -2126,9 +2189,9 @@ function SectionCard({
 }) {
   return (
     <div className={dashCard}>
-      <div className="mb-4 flex items-center gap-2">
-        <span className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-slate-100 to-slate-200/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] ring-1 ring-white/60">
-          <Icon className="size-4 text-slate-600 drop-shadow-sm" />
+      <div className="mb-4 flex items-center gap-2.5">
+        <span className="flex size-8 items-center justify-center rounded-lg bg-slate-50 text-slate-600 ring-1 ring-slate-200/80">
+          <Icon className="size-4" />
         </span>
         <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
       </div>
