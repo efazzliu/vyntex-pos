@@ -10,6 +10,7 @@ import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import PublicLayout from "./components/public-layout.tsx";
 import VynTypes from "./pages/vyn-types/page.tsx";
+import ProductDemo from "./pages/product-demo/page.tsx";
 import Pricing from "./pages/pricing/page.tsx";
 import About from "./pages/about/page.tsx";
 import Contact from "./pages/contact/page.tsx";
@@ -99,6 +100,7 @@ export default function App() {
           <Route element={<PublicLayout />}>
             <Route path="/" element={<DesktopHomeRoute />} />
             <Route path="/vyn-types" element={<VynTypes />} />
+            <Route path="/product-demo" element={<ProductDemo />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
