@@ -1,4 +1,5 @@
 const { app, BrowserWindow, shell, ipcMain, screen } = require("electron");
+const { registerAppUpdateIpc } = require("./app-update.cjs");
 const fs = require("node:fs");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
@@ -413,6 +414,7 @@ function createWindow() {
 app.whenReady().then(() => {
   registerPrintHtmlSilentIpc();
   registerGetSystemPrintersIpc();
+  registerAppUpdateIpc();
   createWindow();
 
   app.on("activate", () => {

@@ -24,6 +24,15 @@ interface VyntexDesktopApi {
     payload: PrintHtmlSilentPayload,
   ) => Promise<{ ok: boolean; error?: string }>;
   getSystemPrinters?: () => Promise<GetSystemPrintersIpcResult>;
+  checkForAppUpdate?: () => Promise<{
+    ok: boolean;
+    currentVersion: string;
+    latestVersion: string;
+    updateAvailable: boolean;
+    packaged: boolean;
+  }>;
+  installAppUpdate?: () => Promise<{ ok: boolean; error?: string }>;
+  onAppUpdateProgress?: (callback: (percent: number) => void) => () => void;
 }
 
 declare global {

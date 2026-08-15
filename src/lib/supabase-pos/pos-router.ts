@@ -39,6 +39,8 @@ export async function runPosQuery(
       return menu.getAllItems(args.licenseKey as string);
     case "pos.menu.getMenus":
       return menu.getMenus(args.licenseKey as string);
+    case "pos.menu.getGuestMenu":
+      return menu.getGuestMenu(args.restaurantId as string);
     case "pos.orders.getOrdersByTable":
       return orders.getOrdersByTable({
         licenseKey: args.licenseKey as string,
@@ -266,6 +268,18 @@ export async function runPosMutation(
     case "pos.settings.updateCompanyProfile":
       return settings.updateCompanyProfile(
         args as Parameters<typeof settings.updateCompanyProfile>[0],
+      );
+    case "pos.settings.updateTaxSettings":
+      return settings.updateTaxSettings(
+        args as Parameters<typeof settings.updateTaxSettings>[0],
+      );
+    case "pos.settings.updatePaymentSettings":
+      return settings.updatePaymentSettings(
+        args as Parameters<typeof settings.updatePaymentSettings>[0],
+      );
+    case "pos.settings.updateOrderAvailabilitySettings":
+      return settings.updateOrderAvailabilitySettings(
+        args as Parameters<typeof settings.updateOrderAvailabilitySettings>[0],
       );
     case "pos.settings.syncDeviceClosePinHash":
       return settings.syncDeviceClosePinHash({

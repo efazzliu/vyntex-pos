@@ -18,6 +18,7 @@ import { setDashboardRestaurantId } from "@/hooks/use-dashboard-restaurant.ts";
 import { errorMessageFromUnknown } from "@/lib/supabase-pos/db-errors.ts";
 import { planTerminalFloor } from "@/pages/pos/_lib/plan-features.ts";
 import { defaultSelfServeTrialExpiry, FREE_TRIAL_QUERY_VALUE } from "@/lib/free-trial.ts";
+import { POS_LICENSE_LOCALE_INSERT, localeFieldsFromCurrencyCode } from "@/lib/pos-locale-defaults.ts";
 import { APP_VERSION_LABEL, VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 import { cn } from "@/lib/utils.ts";
 
@@ -143,7 +144,7 @@ export default function SetupForm() {
   const [type] = useState<"restaurant">("restaurant");
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
-  const [currency, setCurrency] = useState("USD");
+  const [currency, setCurrency] = useState("EUR");
   const [plan] = useState<"professional">("professional");
 
   const generateLicenseKey = () => {
@@ -179,7 +180,8 @@ export default function SetupForm() {
           type,
           address: address.trim() || null,
           phone: phone.trim() || null,
-          currency,
+          ...POS_LICENSE_LOCALE_INSERT,
+          ...localeFieldsFromCurrencyCode(currency),
           plan,
           license_key: newLicenseKey,
           license_expiry: expiry.toISOString(),

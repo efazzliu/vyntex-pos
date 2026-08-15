@@ -404,3 +404,40 @@ html[data-dashboard-reduced-motion] *::after {
   transition-duration: 0.01ms !important;
   scroll-behavior: auto !important;
 }
+
+/* Hide native scrollbar (Windows) while keeping swipe on chip rows. */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.waiter-cat-scroll {
+  overflow-x: auto !important;
+  overflow-y: hidden;
+  touch-action: pan-x !important;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  cursor: grab;
+}
+.waiter-cat-scroll:active {
+  cursor: grabbing;
+}
+.waiter-cat-scroll * {
+  touch-action: pan-x !important;
+}
+
+.waiter-cat-scroll-y {
+  overflow-y: auto !important;
+  overflow-x: hidden;
+  touch-action: pan-y !important;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+.waiter-cat-scroll-y * {
+  touch-action: pan-y !important;
+}

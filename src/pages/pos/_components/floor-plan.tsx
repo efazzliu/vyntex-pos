@@ -39,6 +39,7 @@ import {
   DoorOpen,
   Wallet,
   UtensilsCrossed,
+  Menu,
 } from "lucide-react";
 import type { TableStatus, TableShape } from "../_lib/types.ts";
 import { useOnlineStatus } from "@/hooks/use-online-status.ts";
@@ -53,6 +54,7 @@ import ExpenseDialog from "./expense-dialog.tsx";
 import StaffConsumptionDialog from "./staff-consumption-dialog.tsx";
 import { usePosLocale } from "./pos-locale-provider.tsx";
 import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
+import { parsePosPaymentSettings } from "@/lib/pos-payment-handling.ts";
 
 type TableOrderSummary = {
   staffId: string;
@@ -957,6 +959,11 @@ function WaiterFloorView({
   const orderSummaries = useQuery("pos.tables.getTableOrderSummaries", {
     licenseKey,
   }) as Record<string, TableOrderSummary> | undefined;
+  const companyQuery = useQuery("pos.settings.getCompanyDetails", { licenseKey });
+  const paymentSettings = parsePosPaymentSettings(
+    (companyQuery as { paymentSettings?: unknown } | undefined)?.paymentSettings,
+  );
+  const showPendingPayments = paymentSettings.handling === "counter";
 
   const [activeZone, setActiveZone] = useState<string | null>(null);
 
@@ -1049,9 +1056,9 @@ function WaiterFloorView({
 
   if (resolvedTables.length === 0 && isWaiterFullScreen) {
     return (
-      <div className="h-full flex flex-col p-3">
+      <div className="h-full flex flex-col">
         {waiter && <WaiterTopBar waiter={waiter} />}
-        <div className="flex-1 flex items-center justify-center">
+        <div className="flex-1 flex items-center justify-center p-3">
           <Empty>
             <EmptyHeader>
               <EmptyMedia variant="icon"><MapPinned /></EmptyMedia>
@@ -1065,11 +1072,15 @@ function WaiterFloorView({
   }
 
   return (
-    <div className={cn("h-full flex flex-col", isWaiterFullScreen ? "p-3 gap-3" : "p-6 lg:p-8 gap-4")}>
-      {isWaiterFullScreen && waiter && (
-        <>
-          <WaiterTopBar waiter={waiter} />
-          {zones.length > 0 && (
+    <div className="h-full flex flex-col">
+      {isWaiterFullScreen && waiter ? <WaiterTopBar waiter={waiter} /> : null}
+      <div
+        className={cn(
+          "flex min-h-0 flex-1 flex-col",
+          isWaiterFullScreen ? "gap-3 p-3" : "gap-4 p-6 lg:p-8",
+        )}
+      >
+      {isWaiterFullScreen && waiter && zones.length > 0 ? (
             <div className="flex items-center gap-2 overflow-x-auto pb-1">
               {zones.map((zone) => {
                     const count = resolvedTables.filter((t) => t.zone === zone)
@@ -1094,9 +1105,15 @@ function WaiterFloorView({
                 );
               })}
             </div>
-          )}
-        </>
-      )}
+      ) : null}
+
+      {showPendingPayments ? (
+        <PendingPaymentsStrip
+          tables={resolvedTables}
+          summaries={orderSummaries}
+          onSelect={(id) => onTableSelect?.(id)}
+        />
+      ) : null}
 
       <div className="flex-1 overflow-hidden rounded-xl border border-[#1e2a45] bg-[#0D1326]">
         <div
@@ -1234,6 +1251,53 @@ function WaiterFloorView({
           })()}
         </div>
       </div>
+      </div>
+    </div>
+  );
+}
+
+function PendingPaymentsStrip({
+  tables,
+  summaries,
+  onSelect,
+}: {
+  tables: Doc<"tables">[];
+  summaries: Record<string, TableOrderSummary> | undefined;
+  onSelect: (tableId: Id<"tables">) => void;
+}) {
+  const { t, formatPrice } = usePosLocale();
+  const pending = tables.filter((tb) => tb.status === "bill-printed");
+  if (pending.length === 0) return null;
+
+  return (
+    <div className="shrink-0 rounded-xl border border-blue-500/30 bg-blue-950/25 p-3 space-y-2">
+      <div className="flex items-center gap-2">
+        <Wallet className="size-4 text-blue-400" />
+        <h3 className="text-sm font-semibold text-white">
+          {t("floor.pending_payments")}
+        </h3>
+        <span className="text-[11px] font-medium text-blue-300/80 tabular-nums">
+          {pending.length}
+        </span>
+      </div>
+      <div className="flex gap-2 overflow-x-auto pb-0.5">
+        {pending.map((tb) => {
+          const sum = summaries?.[tb._id];
+          return (
+            <button
+              key={tb._id}
+              type="button"
+              onClick={() => onSelect(tb._id)}
+              className="shrink-0 rounded-lg border border-blue-500/40 bg-[#0D1326] px-3 py-2 text-left hover:bg-blue-950/50 cursor-pointer"
+            >
+              <p className="text-sm font-semibold text-white">{tb.name}</p>
+              <p className="text-[11px] text-blue-300/80">
+                {sum ? formatPrice(sum.total) : t("floor.bill_printed")}
+              </p>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1245,53 +1309,79 @@ function WaiterTopBar({ waiter }: { waiter: WaiterInfo }) {
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [consumptionOpen, setConsumptionOpen] = useState(false);
   const isAdmin = waiter.role === "admin" || waiter.role === "manager";
-  const nameColor = isAdmin ? "text-[#0066FF]" : "text-[#44CC00]";
-
-  // Show consumption button for admins/managers or waiters with permission
   const showConsumption = isAdmin || !!waiter.canLogStaffConsumption;
+  const roleKey = waiter.role ? `staff.role_${waiter.role}` : "";
+  const roleLabel = roleKey ? t(roleKey) : "";
+  const roleText = roleLabel && roleLabel !== roleKey ? roleLabel : waiter.role;
+  const showName =
+    !roleText || waiter.name.trim().toLowerCase() !== String(roleText).trim().toLowerCase();
 
-  const logoElement = waiter.onLogoClick ? (
-    <button onClick={waiter.onLogoClick} className="cursor-pointer shrink-0 hover:opacity-80 transition-opacity">
-      <img src={VYNTEX_APP_LOGO_SRC} alt="Vyntex POS" className="h-8 w-8" />
+  const logoButton = (
+    <button
+      type="button"
+      onClick={waiter.onLogoClick}
+      className="flex shrink-0 items-center gap-2 rounded-md py-1 pr-1.5 -ml-1 hover:bg-[#1e2a45] transition-colors cursor-pointer"
+      aria-label={t("nav.menu")}
+    >
+      <img src={VYNTEX_APP_LOGO_SRC} alt="" className="h-7 w-7" />
+      {waiter.onLogoClick ? <Menu className="size-4 text-[#8b93a7]" /> : null}
     </button>
-  ) : (
-    <img src={VYNTEX_APP_LOGO_SRC} alt="Vyntex POS" className="h-8 w-8 shrink-0" />
+  );
+
+  const logoStatic = (
+    <img src={VYNTEX_APP_LOGO_SRC} alt="" className="h-7 w-7 shrink-0" />
   );
 
   return (
     <>
-      <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-[#131A2E] border border-[#1e2a45]">
-        {logoElement}
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-white truncate">{waiter.businessName}</p>
-          <p className={cn("text-[10px] font-medium", nameColor)}>{waiter.name}</p>
+      <header className="flex h-12 shrink-0 items-center gap-3 border-b border-[#1e2a45] bg-[#0A0F1E] px-4">
+        {waiter.onLogoClick ? logoButton : logoStatic}
+        <div className="h-5 w-px shrink-0 bg-[#1e2a45]" />
+        <div className="min-w-0 flex items-center gap-2">
+          <p className="truncate text-[13px] font-semibold tracking-tight text-white">
+            {waiter.businessName}
+          </p>
+          {roleText ? (
+            <span className="shrink-0 rounded-md bg-[#0066FF]/12 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#0066FF]">
+              {roleText}
+            </span>
+          ) : null}
         </div>
+        <div className="flex-1" />
+        {showName ? (
+          <p className="hidden sm:block max-w-[10rem] truncate text-[12px] text-[#8b93a7]">
+            {waiter.name}
+          </p>
+        ) : null}
         {showConsumption && waiter.staffId && waiter.licenseKey && (
           <button
+            type="button"
             onClick={() => setConsumptionOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-amber-400 hover:bg-amber-500/10 transition-colors text-xs font-medium cursor-pointer"
+            className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium text-[#8b93a7] hover:bg-[#1e2a45] hover:text-white transition-colors cursor-pointer"
           >
             <UtensilsCrossed className="size-3.5" />
-            {t("floor.toolbar_staff_meal")}
+            <span className="hidden md:inline">{t("floor.toolbar_staff_meal")}</span>
           </button>
         )}
         {waiter.staffId && waiter.licenseKey && waiter.role !== "admin" && waiter.role !== "manager" && (
           <button
+            type="button"
             onClick={() => setExpenseOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-emerald-400 hover:bg-emerald-500/10 transition-colors text-xs font-medium cursor-pointer"
+            className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium text-[#8b93a7] hover:bg-[#1e2a45] hover:text-white transition-colors cursor-pointer"
           >
             <Wallet className="size-3.5" />
-            {t("floor.toolbar_expenses")}
+            <span className="hidden md:inline">{t("floor.toolbar_expenses")}</span>
           </button>
         )}
         <button
+          type="button"
           onClick={waiter.onLogout}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-amber-400 hover:bg-amber-500/10 transition-colors text-xs font-medium cursor-pointer"
+          className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium text-[#8b93a7] hover:bg-red-500/10 hover:text-red-400 transition-colors cursor-pointer"
         >
           <LogOut className="size-3.5" />
-          {t("nav.logout")}
+          <span className="hidden sm:inline">{t("nav.logout")}</span>
         </button>
-      </div>
+      </header>
 
       {waiter.staffId && waiter.licenseKey && waiter.role !== "admin" && waiter.role !== "manager" && (
         <ExpenseDialog

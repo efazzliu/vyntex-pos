@@ -177,7 +177,8 @@ function invalidateAfterOrderMutation(
   if (
     mutationId === "pos.orders.createOrder" ||
     mutationId === "pos.orders.submitCartOrder" ||
-    mutationId === "pos.orders.payOrder"
+    mutationId === "pos.orders.payOrder" ||
+    mutationId === "pos.orders.printBill"
   ) {
     void qc.invalidateQueries({
       queryKey: posQueryKey("pos.tables.getTables", { licenseKey }),
@@ -332,6 +333,7 @@ function invalidatePosQueriesAfterMutation(
 
   if (ns === "stock") {
     invalidatePosPrefix(qc, "pos.stock.");
+    invalidatePosPrefix(qc, "pos.menu.");
     return;
   }
 
@@ -378,6 +380,9 @@ export function useQuery(
   }
 
   const refetchSummaries = id === "pos.tables.getTableOrderSummaries";
+  const refetchTables = id === "pos.tables.getTables";
+  const refetchMenuItems = id === "pos.menu.getAllItems";
+  const refetchCompanyDetails = id === "pos.settings.getCompanyDetails";
   const refetchKitchenQueue = id === "pos.orders.getKitchenQueue";
   const refetchDailyDashboard =
     id === "pos.dashboard.getDashboardStats" ||
@@ -393,9 +398,11 @@ export function useQuery(
     refetchOnWindowFocus: false,
     /** Desktop / Electron often reports offline while Supabase still works; don't pause POS reads. */
     networkMode: "always",
-    refetchInterval: refetchSummaries
+    refetchInterval: refetchSummaries || refetchTables
       ? 3500
-      : refetchKitchenQueue
+      : refetchMenuItems || refetchCompanyDetails
+        ? 8000
+        : refetchKitchenQueue
         ? 4000
         : refetchDailyDashboard
           ? 120_000

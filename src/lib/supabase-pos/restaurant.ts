@@ -12,6 +12,7 @@ export type RestaurantRow = {
   tax_number?: string | null;
   vat_number?: string | null;
   default_vat_rate?: number | null;
+  timezone?: string | null;
   currency: string;
   language: string | null;
   currency_symbol: string | null;
@@ -26,6 +27,8 @@ export type RestaurantRow = {
   pos_device_close_pin_hash?: string | null;
   pos_pin_branding?: unknown;
   pos_theme?: string | null;
+  pos_payment_settings?: unknown;
+  pos_enforce_availability?: boolean | null;
   max_terminals?: number;
   registered_devices?: unknown;
 };
@@ -43,11 +46,14 @@ function cacheRestaurantRow(row: RestaurantRow, lookupVariants: string[]): Resta
 
 export async function getRestaurantByLicense(
   licenseKey: string,
+  opts?: { fresh?: boolean },
 ): Promise<RestaurantRow> {
   const variants = licenseKeyLookupVariants(licenseKey);
-  for (const v of variants) {
-    const hit = cache.get(v.trim().toUpperCase());
-    if (hit) return hit;
+  if (!opts?.fresh) {
+    for (const v of variants) {
+      const hit = cache.get(v.trim().toUpperCase());
+      if (hit) return hit;
+    }
   }
 
   for (const variant of variants) {

@@ -8,6 +8,14 @@ import {
 } from "./mappers.ts";
 import { normalizeSupplyRecipeForDb } from "./supply-recipe-ops.ts";
 import { hasEnterpriseSupplyRecipe } from "@/pages/pos/_lib/plan-features.ts";
+import {
+  POS_DEFAULT_CURRENCY_DECIMALS,
+  POS_DEFAULT_CURRENCY_POSITION,
+  POS_DEFAULT_CURRENCY_SYMBOL,
+  resolvePosCurrencyDecimals,
+  resolvePosCurrencyPosition,
+  resolvePosCurrencySymbol,
+} from "@/lib/pos-locale-defaults.ts";
 
 function pgMissingColumnMessage(error: { message?: string }, column: string): boolean {
   const m = String(error.message ?? "").toLowerCase();
@@ -104,6 +112,67 @@ export async function getAllItems(licenseKey: string) {
   return (data ?? []).map((row) =>
     menuItemFromRow(row as Parameters<typeof menuItemFromRow>[0]),
   );
+}
+
+export async function getGuestMenu(restaurantId: string) {
+  const id = restaurantId.trim();
+  if (!id) throw new Error("missing_venue");
+
+  let venueName = "";
+  let currencySymbol = POS_DEFAULT_CURRENCY_SYMBOL;
+  let currencyPosition: "prefix" | "suffix" = POS_DEFAULT_CURRENCY_POSITION;
+  let currencyDecimals = POS_DEFAULT_CURRENCY_DECIMALS;
+
+  const { data: rest } = await supabase
+    .from("restaurants")
+    .select(
+      "id, name, currency_symbol, currency_position, currency_decimals, license_status",
+    )
+    .eq("id", id)
+    .maybeSingle();
+
+  if (rest) {
+    venueName = String(rest.name ?? "").trim();
+    currencySymbol = resolvePosCurrencySymbol(rest.currency_symbol);
+    currencyPosition = resolvePosCurrencyPosition(rest.currency_position);
+    currencyDecimals = resolvePosCurrencyDecimals(rest.currency_decimals);
+  }
+
+  const { data: cats, error: cErr } = await supabase
+    .from("menu_categories")
+    .select("*")
+    .eq("restaurant_id", id)
+    .eq("is_active", true)
+    .order("display_order", { ascending: true });
+  if (cErr) throw cErr;
+
+  const { data: items, error: iErr } = await supabase
+    .from("menu_items")
+    .select("*")
+    .eq("restaurant_id", id)
+    .order("display_order", { ascending: true });
+  if (iErr) throw iErr;
+
+  const categories = (cats ?? [])
+    .map((row) =>
+      menuCategoryFromRow(row as Parameters<typeof menuCategoryFromRow>[0]),
+    )
+    .filter(
+      (c) => !SUPPLY_CATEGORY_NAMES.has(normalizeSupplyCategoryName(c.name)),
+    );
+  const allowedCats = new Set(categories.map((c) => c._id));
+  const menuItems = (items ?? [])
+    .map((row) => menuItemFromRow(row as Parameters<typeof menuItemFromRow>[0]))
+    .filter((i) => i.available && allowedCats.has(i.categoryId));
+
+  return {
+    venueName,
+    currencySymbol,
+    currencyPosition,
+    currencyDecimals,
+    categories,
+    items: menuItems,
+  };
 }
 
 export async function getMenus(licenseKey: string) {
@@ -310,7 +379,6 @@ export async function updateItem(args: Record<string, unknown>) {
     available: args.available,
     display_order: args.displayOrder,
     station: args.station,
-    vat_rate: args.vatRate,
     category_id: args.categoryId,
     menu_id: args.menuId,
     is_favorite: args.isFavorite,
@@ -320,6 +388,9 @@ export async function updateItem(args: Record<string, unknown>) {
     current_stock: args.currentStock,
     low_stock_threshold: args.lowStockThreshold,
   };
+  if (args.vatRate !== undefined) {
+    patch.vat_rate = args.vatRate;
+  }
 
   const recipeNormUpdate = normalizeSupplyRecipeForDb(args.supplyRecipe);
   if (recipeNormUpdate !== undefined) {
@@ -378,17 +449,19 @@ export async function toggleItemAvailability(args: {
   licenseKey: string;
   itemId: string;
 }) {
-  await getRestaurantByLicense(args.licenseKey);
+  const r = await getRestaurantByLicense(args.licenseKey);
   const { data: row } = await supabase
     .from("menu_items")
     .select("available")
     .eq("id", args.itemId)
+    .eq("restaurant_id", r.id)
     .single();
   if (!row) return;
   await supabase
     .from("menu_items")
     .update({ available: !row.available })
-    .eq("id", args.itemId);
+    .eq("id", args.itemId)
+    .eq("restaurant_id", r.id);
 }
 
 export async function createMenu(args: { licenseKey: string; name: string }) {

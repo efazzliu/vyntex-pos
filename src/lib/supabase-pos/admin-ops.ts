@@ -13,6 +13,7 @@ import {
 } from "@/pages/pos/_lib/plan-features.ts";
 import { supabase } from "@/lib/supabase.ts";
 import { clearRestaurantCache } from "@/lib/supabase-pos/restaurant.ts";
+import { POS_LICENSE_LOCALE_INSERT } from "@/lib/pos-locale-defaults.ts";
 import { isMissingPgColumnError } from "./db-errors.ts";
 import type {
   AdminMrrTrendPoint,
@@ -177,6 +178,7 @@ export async function createClaimableLicense(
         owner_name: null,
         max_terminals: maxTerminals,
         registered_devices: [],
+        ...POS_LICENSE_LOCALE_INSERT,
       })
       .select("id, license_key, plan, license_expiry")
       .single();

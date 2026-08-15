@@ -12,10 +12,12 @@ import posI18n from "../_lib/pos-i18n.ts";
 
 type WaiterPhonePairSectionProps = {
   licenseKey: string;
+  canActivate?: boolean;
 };
 
 export default function WaiterPhonePairSection({
   licenseKey,
+  canActivate = true,
 }: WaiterPhonePairSectionProps) {
   const t = useCallback(
     (key: string, opts?: Record<string, unknown>) => posI18n.t(key, opts),
@@ -70,8 +72,9 @@ export default function WaiterPhonePairSection({
   }, [licenseKey, t]);
 
   useEffect(() => {
+    if (!canActivate) return;
     void refresh();
-  }, [refresh]);
+  }, [canActivate, refresh]);
 
   useEffect(() => {
     if (!expiresAt) {
@@ -88,13 +91,31 @@ export default function WaiterPhonePairSection({
   }, [expiresAt]);
 
   useEffect(() => {
+    if (!canActivate) return;
     if (remainingSec === 0 && code) {
       void refresh();
     }
-  }, [remainingSec, code, refresh]);
+  }, [canActivate, remainingSec, code, refresh]);
 
   const mins = remainingSec != null ? Math.floor(remainingSec / 60) : null;
   const secs = remainingSec != null ? remainingSec % 60 : null;
+
+  if (!canActivate) {
+    return (
+      <section className="rounded-xl border border-[#1e2a45] bg-[#0D1326] p-5 space-y-2">
+        <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+          <Smartphone className="size-5 text-[#0066FF]" />
+          {t("settings.waiter_pair_title")}
+        </h2>
+        <p className="text-sm text-[#8b93a7]">
+          {t("settings.waiter_pair_desc")}
+        </p>
+        <p className="text-xs text-amber-400/90">
+          {t("settings.admin_only_device_activation")}
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section className="rounded-xl border border-[#1e2a45] bg-[#0D1326] p-5 space-y-4">

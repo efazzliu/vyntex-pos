@@ -12,6 +12,7 @@ import {
 } from "@/phone-app/lib/waiter-session.ts";
 import { uuidOrNull, staffIdsEqual } from "@/lib/supabase-pos/uuid.ts";
 import { cn } from "@/lib/utils.ts";
+import { useWaiterCanPay } from "@/phone-app/hooks/use-waiter-can-pay.ts";
 
 type TableOrderSummary = {
   staffId: string;
@@ -61,6 +62,7 @@ export default function PhoneWaiterFloor() {
   const [activeZone, setActiveZone] = useState<string | null>(null);
 
   const licenseKey = session?.licenseKey ?? "";
+  const waiterCanPay = useWaiterCanPay(licenseKey);
   const tables = useQuery(
     "pos.tables.getTables",
     licenseKey ? { licenseKey } : "skip",
@@ -159,7 +161,7 @@ export default function PhoneWaiterFloor() {
       </header>
 
       {zones.length > 0 ? (
-        <div className="relative z-10 flex gap-2 overflow-x-auto px-5 pb-3">
+        <div className="relative z-10 grid grid-cols-3 gap-2 overflow-x-hidden px-5 pb-3">
           {zones.map((zone) => {
             const count = resolvedTables.filter((tb) => tb.zone === zone).length;
             const isActive = activeZone === zone;
@@ -169,16 +171,16 @@ export default function PhoneWaiterFloor() {
                 type="button"
                 onClick={() => setActiveZone(zone)}
                 className={cn(
-                  "flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2 text-[13px] font-medium transition-all",
+                  "flex h-11 min-w-0 items-center justify-between gap-1.5 rounded-xl px-2.5 text-[13px] font-medium transition-all",
                   isActive
                     ? "bg-[#0066FF] text-white shadow-lg shadow-[#0066FF]/25"
                     : "border border-white/10 bg-white/[0.05] text-white/60",
                 )}
               >
-                {zone}
+                <span className="min-w-0 truncate">{zone}</span>
                 <span
                   className={cn(
-                    "rounded-full px-1.5 py-0.5 text-[11px]",
+                    "flex size-5 shrink-0 items-center justify-center rounded-full text-[11px]",
                     isActive ? "bg-white/20" : "bg-white/10",
                   )}
                 >
@@ -193,7 +195,7 @@ export default function PhoneWaiterFloor() {
       <motion.main
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative z-10 flex-1 overflow-y-auto px-5 pb-10"
+        className="relative z-10 flex-1 overflow-y-auto overflow-x-hidden px-5 pb-24"
       >
         {resolvedTables.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 py-24 text-center">
@@ -227,14 +229,21 @@ export default function PhoneWaiterFloor() {
                     {table.name}
                   </span>
                   {summary ? (
-                    <span className={cn("text-[11px] font-semibold tabular-nums", colors.text)}>
-                      {summary.total.toFixed(0)}
-                    </span>
+                    waiterCanPay ? (
+                      <span className={cn("text-[11px] font-semibold tabular-nums", colors.text)}>
+                        {summary.total.toFixed(0)}
+                      </span>
+                    ) : null
                   ) : (
                     <span className={cn("text-[11px] font-medium", colors.text)}>
                       {t("phone.waiter.tableFree")}
                     </span>
                   )}
+                  {table.status === "bill-printed" ? (
+                    <span className="text-[10px] font-medium text-blue-300">
+                      {t("phone.waiter.order.billRequested")}
+                    </span>
+                  ) : null}
                   <span className="flex items-center gap-1 text-[10px] text-white/35">
                     <Users className="size-2.5" />
                     {table.seats}

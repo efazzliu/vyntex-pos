@@ -76,6 +76,18 @@ import {
 import { hasSplitBills } from "../_lib/plan-features.ts";
 import SplitBillItemPicker from "./split-bill-item-picker.tsx";
 import { usePosTheme } from "../_lib/use-pos-theme.ts";
+import {
+  parsePosPaymentSettings,
+  posTerminalCanProcessPayment,
+  roleCanRefund,
+} from "@/lib/pos-payment-handling.ts";
+import {
+  getOrderBlockReason,
+  isMenuItemShownForOrdering,
+  parseOrderBlockError,
+  resolveEnforceOrderAvailability,
+  type OrderBlockReason,
+} from "@/lib/pos-order-availability.ts";
 
 type PaymentType =
   | "fiscal"
@@ -174,6 +186,7 @@ export default function OrderScreen({
   });
   const staffListQuery = useQuery('pos.staff.getStaff', { licenseKey });
   const printersQuery = useQuery("pos.settings.getPrinters", { licenseKey });
+  const companyQuery = useQuery("pos.settings.getCompanyDetails", { licenseKey });
   const { t, formatPrice, currency } = usePosLocale();
 
   const { data: categoriesRaw, isHydrated: categoriesHydrated } =
@@ -231,6 +244,7 @@ export default function OrderScreen({
 
   const submitCartOrder = useMutation("pos.orders.submitCartOrder");
   const payOrder = useMutation("pos.orders.payOrder");
+  const printBill = useMutation("pos.orders.printBill");
   const transferOrders = useMutation("pos.orders.transferOrdersToTable");
   const mergeOrders = useMutation("pos.orders.mergeTableOrders");
 
@@ -283,6 +297,23 @@ export default function OrderScreen({
 
   const currentTable = tablesList.find((t) => t._id === tableId);
   const existingOrder = activeOrders[0];
+  const paymentSettings = parsePosPaymentSettings(
+    (companyQuery as { paymentSettings?: unknown } | undefined)?.paymentSettings,
+  );
+  const canProcessPayment = posTerminalCanProcessPayment(staffRole, paymentSettings);
+  const enforceAvailability = resolveEnforceOrderAvailability(
+    (companyQuery as { enforceOrderAvailability?: unknown } | undefined)
+      ?.enforceOrderAvailability,
+    licenseKey,
+  );
+
+  const toastOrderBlocked = (reason: OrderBlockReason, name: string) => {
+    toast.error(
+      reason === "stock"
+        ? t("order.blocked_stock", { name })
+        : t("order.blocked_stopped", { name }),
+    );
+  };
 
   const orderBalanceDue =
     existingOrder &&
@@ -295,7 +326,10 @@ export default function OrderScreen({
       ? (existingOrder as { paidAmount: number }).paidAmount
       : 0;
   const splitBillsEnabled =
-    hasSplitBills(plan) && canSplitBillsQuick && orderBalanceDue > 0.009;
+    hasSplitBills(plan) &&
+    canSplitBillsQuick &&
+    paymentSettings.allowSplitBill !== false &&
+    orderBalanceDue > 0.009;
 
   const payDueNow = pendingPayAmount ?? orderBalanceDue;
   const tenderedCash =
@@ -415,8 +449,11 @@ export default function OrderScreen({
 
   // Check if there are any manually-flagged favorites
   const manualFavorites = useMemo(
-    () => menuItems.filter((i) => i.isFavorite && i.available),
-    [menuItems],
+    () =>
+      menuItems.filter(
+        (i) => i.isFavorite && isMenuItemShownForOrdering(i, enforceAvailability),
+      ),
+    [menuItems, enforceAvailability],
   );
 
   // Auto-populate: top 10 most sold if no manual favorites
@@ -424,10 +461,14 @@ export default function OrderScreen({
     if (manualFavorites.length > 0) return [];
     if (!menuItems) return [];
     return [...menuItems]
-      .filter((i) => i.available && (i.totalSold ?? 0) > 0)
+      .filter(
+        (i) =>
+          isMenuItemShownForOrdering(i, enforceAvailability) &&
+          (i.totalSold ?? 0) > 0,
+      )
       .sort((a, b) => (b.totalSold ?? 0) - (a.totalSold ?? 0))
       .slice(0, 10);
-  }, [menuItems, manualFavorites]);
+  }, [menuItems, manualFavorites, enforceAvailability]);
 
   const filteredItems = useMemo(() => {
     if (!menuItems) return [];
@@ -436,7 +477,11 @@ export default function OrderScreen({
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       return menuItems
-        .filter((i) => i.available && i.name.toLowerCase().includes(q))
+        .filter(
+          (i) =>
+            isMenuItemShownForOrdering(i, enforceAvailability) &&
+            i.name.toLowerCase().includes(q),
+        )
         .sort((a, b) => a.displayOrder - b.displayOrder);
     }
 
@@ -447,9 +492,20 @@ export default function OrderScreen({
         : autoFavorites;
     }
     return menuItems
-      .filter((i) => i.categoryId === selectedCategory && i.available)
+      .filter(
+        (i) =>
+          i.categoryId === selectedCategory &&
+          isMenuItemShownForOrdering(i, enforceAvailability),
+      )
       .sort((a, b) => a.displayOrder - b.displayOrder);
-  }, [menuItems, selectedCategory, manualFavorites, autoFavorites, searchQuery]);
+  }, [
+    menuItems,
+    selectedCategory,
+    manualFavorites,
+    autoFavorites,
+    searchQuery,
+    enforceAvailability,
+  ]);
 
   // Cart totals — tax-inclusive: prices already include TVSH
   const DEFAULT_VAT = 0.20;
@@ -472,6 +528,17 @@ export default function OrderScreen({
     .reduce((sum, i) => sum + i.quantity, 0);
 
   const addToCart = (item: Doc<"menuItems">) => {
+    const existingQty =
+      cart.find((c) => c.menuItemId === item._id && !c.notes)?.quantity ?? 0;
+    const blocked = getOrderBlockReason(
+      item,
+      existingQty + 1,
+      enforceAvailability,
+    );
+    if (blocked) {
+      toastOrderBlocked(blocked, item.name);
+      return;
+    }
     setCart((prev) => {
       const existing = prev.find(
         (c) => c.menuItemId === item._id && !c.notes
@@ -502,6 +569,21 @@ export default function OrderScreen({
     delta: number,
     notes?: string
   ) => {
+    if (delta > 0) {
+      const item = menuItems.find((i) => i._id === menuItemId);
+      const line = cart.find(
+        (c) =>
+          c.menuItemId === menuItemId && (c.notes ?? "") === (notes ?? ""),
+      );
+      const nextQty = (line?.quantity ?? 0) + delta;
+      if (item) {
+        const blocked = getOrderBlockReason(item, nextQty, enforceAvailability);
+        if (blocked) {
+          toastOrderBlocked(blocked, item.name);
+          return;
+        }
+      }
+    }
     setCart((prev) =>
       prev
         .map((c) =>
@@ -687,7 +769,17 @@ export default function OrderScreen({
         setCart([]);
         onBack();
       } catch (error) {
-        toast.error(errorMessageFromUnknown(error, t("order.err_send_order")));
+        toast.error(
+          (() => {
+            const blocked = parseOrderBlockError(error);
+            if (blocked) {
+              return blocked.reason === "stock"
+                ? t("order.blocked_stock", { name: blocked.name })
+                : t("order.blocked_stopped", { name: blocked.name });
+            }
+            return errorMessageFromUnknown(error, t("order.err_send_order"));
+          })(),
+        );
       } finally {
         sendOrderInFlightRef.current = false;
         setIsSubmitting(false);
@@ -718,7 +810,14 @@ export default function OrderScreen({
       runTicketPrint(result.ticketOrderRef);
     } catch (error) {
       setCart(cartBackup);
-      toast.error(errorMessageFromUnknown(error, t("order.err_send_order")));
+      const blocked = parseOrderBlockError(error);
+      toast.error(
+        blocked
+          ? blocked.reason === "stock"
+            ? t("order.blocked_stock", { name: blocked.name })
+            : t("order.blocked_stopped", { name: blocked.name })
+          : errorMessageFromUnknown(error, t("order.err_send_order")),
+      );
     } finally {
       sendOrderInFlightRef.current = false;
     }
@@ -863,6 +962,15 @@ export default function OrderScreen({
         }
         return;
       }
+      try {
+        await printBill({
+          licenseKey,
+          orderId: existingOrder._id,
+          tableId,
+        });
+      } catch {
+        /* table status is best-effort after a successful print */
+      }
     } catch (e) {
       toast.error(errorMessageFromUnknown(e, t("order.bill_load_failed")));
     }
@@ -882,6 +990,10 @@ export default function OrderScreen({
 
   // Open payment drawer (right column slide-over)
   const openPayDialog = () => {
+    if (!canProcessPayment) {
+      toast.error(t("order.pay_not_allowed"));
+      return;
+    }
     setPayStep("type");
     setPendingPayAmount(null);
     setPendingSettledSaleItemIds(null);
@@ -925,7 +1037,11 @@ export default function OrderScreen({
   }, [canChargeDebtQuick]);
 
   const sentItemsHeaderActions = useMemo((): ReactNode => {
-    if (!existingOrder || (!canChargeDebtQuick && !canMarkComplimentaryQuick)) {
+    if (
+      !existingOrder ||
+      !canProcessPayment ||
+      (!canChargeDebtQuick && !canMarkComplimentaryQuick)
+    ) {
       return null;
     }
     const quickBtn =
@@ -970,6 +1086,7 @@ export default function OrderScreen({
     );
   }, [
     existingOrder,
+    canProcessPayment,
     canChargeDebtQuick,
     canMarkComplimentaryQuick,
     isLightPos,
@@ -1324,13 +1441,20 @@ export default function OrderScreen({
                   const cartItem = cart.find(
                     (c) => c.menuItemId === item._id
                   );
+                  const visualBlock = getOrderBlockReason(
+                    item,
+                    1,
+                    enforceAvailability,
+                  );
                   return (
                     <button
                       key={item._id}
                       onClick={() => addToCart(item)}
                       className={cn(
                         "relative text-left rounded-xl border p-4 transition-all cursor-pointer",
-                        cartItem
+                        visualBlock
+                          ? "border-[#1e2a45] bg-[#0c101c] opacity-60 hover:opacity-80"
+                          : cartItem
                           ? "border-[#0066FF]/50 bg-[#0066FF]/10"
                           : "border-[#1e2a45] bg-[#131A2E] hover:border-[#2a3a5a]"
                       )}
@@ -1365,7 +1489,14 @@ export default function OrderScreen({
                       <p className="text-sm font-bold text-[#0066FF] mt-2">
                         {formatPrice(item.price)}
                       </p>
-                      {cartItem && (
+                      {visualBlock ? (
+                        <p className="text-[10px] font-semibold text-amber-400 mt-1">
+                          {visualBlock === "stock"
+                            ? t("order.out_of_stock")
+                            : t("order.stopped_badge")}
+                        </p>
+                      ) : null}
+                      {cartItem && !visualBlock && (
                         <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-[#0066FF] flex items-center justify-center text-white text-xs font-bold">
                           {cartItem.quantity}
                         </div>
@@ -1602,6 +1733,7 @@ export default function OrderScreen({
                 staffId={staffId}
                 staffName={staffName}
                 staffRole={staffRole}
+                allowRefund={roleCanRefund(staffRole, paymentSettings)}
                 menuItems={menuItems}
                 headerActions={sentItemsHeaderActions}
               />
@@ -1787,6 +1919,7 @@ export default function OrderScreen({
               )}
               {existingOrder && (
                 <>
+                  {canProcessPayment ? (
                   <Button
                     className="bg-emerald-600 hover:bg-emerald-700 text-white"
                     onClick={openPayDialog}
@@ -1794,7 +1927,8 @@ export default function OrderScreen({
                     <CreditCard className="size-4 mr-1.5" />
                     {t("btn.pay")}
                   </Button>
-                  <Button variant="secondary" onClick={handlePrintBill}>
+                  ) : null}
+                  <Button variant="secondary" onClick={handlePrintBill} className={canProcessPayment ? "" : "col-span-2"}>
                     <Receipt className="size-4 mr-1.5" />
                     {t("btn.print_bill")}
                   </Button>
@@ -2548,6 +2682,7 @@ function ExistingOrderItems({
   staffId,
   staffName,
   staffRole,
+  allowRefund = false,
   menuItems,
   headerActions,
 }: {
@@ -2557,6 +2692,7 @@ function ExistingOrderItems({
   staffId: string;
   staffName: string;
   staffRole: string;
+  allowRefund?: boolean;
   menuItems: Doc<"menuItems">[];
   headerActions?: ReactNode | null;
 }) {
@@ -2764,7 +2900,7 @@ function ExistingOrderItems({
             )}
           </div>
 
-          {(staffRole === "admin" || staffRole === "manager") && (
+          {allowRefund && (
             <button
               onClick={() => handleVoid(group.itemIds)}
               className="p-1 rounded hover:bg-red-500/10 text-[#5a6580] hover:text-red-400 cursor-pointer"

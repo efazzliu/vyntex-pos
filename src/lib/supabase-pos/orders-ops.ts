@@ -27,6 +27,7 @@ function itemRowToDoc(r: {
   station: string | null;
   status: string;
   vat_rate: number | string | null;
+  created_at?: string | null;
 }) {
   return {
     _id: r.id,
@@ -39,6 +40,7 @@ function itemRowToDoc(r: {
     station: (r.station as "kitchen" | "bar" | undefined) ?? undefined,
     status: r.status,
     vatRate: r.vat_rate != null ? Number(r.vat_rate) : 0.2,
+    createdAt: r.created_at ?? undefined,
   };
 }
 
@@ -728,6 +730,48 @@ async function insertOrderLinesAndRecalc(
   await recalcSaleTotals(orderId);
 }
 
+async function assertMenuLinesOrderable(
+  licenseKey: string,
+  lines: OrderLineInput[],
+) {
+  const r = await getRestaurantByLicense(licenseKey);
+  const { data: enforceRow } = await supabase
+    .from("restaurants")
+    .select("pos_enforce_availability")
+    .eq("id", r.id)
+    .maybeSingle();
+  if (enforceRow?.pos_enforce_availability !== true) return;
+
+  const qtyById = new Map<string, number>();
+  for (const line of lines) {
+    const id = String(line.menuItemId ?? "").trim();
+    if (!id) continue;
+    const q = Number(line.quantity ?? 0);
+    if (!Number.isFinite(q) || q <= 0) continue;
+    qtyById.set(id, (qtyById.get(id) ?? 0) + q);
+  }
+  if (qtyById.size === 0) return;
+
+  const { data, error } = await supabase
+    .from("menu_items")
+    .select("id, name, available, track_stock, current_stock")
+    .eq("restaurant_id", r.id)
+    .in("id", [...qtyById.keys()]);
+  assertNoPgError("Check item availability", error);
+
+  const byId = new Map((data ?? []).map((row) => [String(row.id), row]));
+  for (const [id, qty] of qtyById) {
+    const row = byId.get(id);
+    const name = String(row?.name ?? id);
+    if (!row || row.available === false) {
+      throw new Error(`UNAVAILABLE_STOPPED:${name}`);
+    }
+    if (row.track_stock && Number(row.current_stock ?? 0) < qty) {
+      throw new Error(`UNAVAILABLE_STOCK:${name}`);
+    }
+  }
+}
+
 /** One round-trip recalc after all lines (faster than addItemToOrder per line). */
 export async function addItemsToOrderBulk(args: {
   licenseKey: string;
@@ -743,6 +787,7 @@ export async function addItemsToOrderBulk(args: {
   if (args.staffId) {
     await assertSaleStaffCanEdit(args.orderId, args.staffId);
   }
+  await assertMenuLinesOrderable(args.licenseKey, args.lines);
   await insertOrderLinesAndRecalc(args.orderId, args.lines);
 }
 
@@ -753,6 +798,7 @@ export async function addItemToOrder(
   } & OrderLineInput,
 ) {
   await getRestaurantByLicense(args.licenseKey);
+  await assertMenuLinesOrderable(args.licenseKey, [args]);
   await insertOneOrderLine(args.orderId, args);
   await recalcSaleTotals(args.orderId);
 }
@@ -1030,6 +1076,7 @@ export async function submitCartOrder(args: {
       await assertSaleStaffCanEdit(orderId, args.staffId);
     }
   }
+  await assertMenuLinesOrderable(args.licenseKey, args.lines);
   await insertOrderLinesAndRecalc(orderId, args.lines);
   const sendResult = await executeMarkOrderSentToKitchen({
     licenseKey: args.licenseKey,
@@ -1045,7 +1092,24 @@ export async function submitCartOrder(args: {
   return { ...sendResult, orderSnapshot };
 }
 
-export async function printBill(_args: Record<string, unknown>) {
+export async function printBill(args: Record<string, unknown>) {
+  const licenseKey = String(args.licenseKey ?? "");
+  const orderId = String(args.orderId ?? "");
+  if (!licenseKey || !orderId) return true;
+  const r = await getRestaurantByLicense(licenseKey);
+  const { data: order, error } = await supabase
+    .from("sales")
+    .select("*")
+    .eq("id", orderId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!order || order.restaurant_id !== r.id) throw new Error("Order not found");
+  const tableId =
+    saleFloorTableId(order as Parameters<typeof saleFloorTableId>[0]) ||
+    String(args.tableId ?? "");
+  if (tableId) {
+    await updateFloorTableStatusSafe(tableId, "bill-printed", "Request bill");
+  }
   return true;
 }
 

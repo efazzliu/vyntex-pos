@@ -26,6 +26,11 @@ import PhoneWaiterLogin from "@/phone-app/components/phone-waiter-login.tsx";
 import PhoneWaiterFloor from "@/phone-app/components/phone-waiter-floor.tsx";
 import PhoneWaiterPair from "@/phone-app/components/phone-waiter-pair.tsx";
 import PhoneWaiterOrder from "@/phone-app/components/phone-waiter-order.tsx";
+import PhoneWaiterShell from "@/phone-app/components/phone-waiter-shell.tsx";
+import PhoneWaiterMenu from "@/phone-app/components/phone-waiter-menu.tsx";
+import PhoneWaiterOrders from "@/phone-app/components/phone-waiter-orders.tsx";
+import PhoneWaiterNotifications from "@/phone-app/components/phone-waiter-notifications.tsx";
+import PhoneGuestMenu from "@/phone-app/components/phone-guest-menu.tsx";
 
 /**
  * Rrugë vetëm për shell-in mobil (phone.html).
@@ -43,7 +48,13 @@ export default function PhoneApp() {
           {/* Waiters: PIN login for phone orders (no Supabase account). */}
           <Route path="/waiter" element={<PhoneWaiterLogin />} />
           <Route path="/waiter/pair" element={<PhoneWaiterPair />} />
-          <Route path="/waiter/floor" element={<PhoneWaiterFloor />} />
+          <Route path="/m/:venueId" element={<PhoneGuestMenu />} />
+          <Route element={<PhoneWaiterShell />}>
+            <Route path="/waiter/floor" element={<PhoneWaiterFloor />} />
+            <Route path="/waiter/menu" element={<PhoneWaiterMenu />} />
+            <Route path="/waiter/orders" element={<PhoneWaiterOrders />} />
+            <Route path="/waiter/notifications" element={<PhoneWaiterNotifications />} />
+          </Route>
           <Route path="/waiter/table/:tableId" element={<PhoneWaiterOrder />} />
           {/* Phone app is login-only: no self-serve register / invite redeem. */}
           <Route path="/register" element={<Navigate to="/login" replace />} />

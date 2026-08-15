@@ -42,9 +42,42 @@ import {
   CircleDollarSign,
   ImageIcon,
   Pencil,
+  Wallet,
+  UtensilsCrossed,
+  Users,
+  Percent,
+  Bell,
+  Plug,
+  Landmark,
+  HardDrive,
+  Shield,
+  MonitorSmartphone,
+  SlidersHorizontal,
+  ArrowRight,
+  Smartphone,
+  Store,
+  Package,
 } from "lucide-react";
 import TemplateManager from "./template-manager.tsx";
 import WaiterPhonePairSection from "./waiter-phone-pair-section.tsx";
+import AppUpdateSection from "./app-update-section.tsx";
+import type { PosView } from "../_lib/types.ts";
+import {
+  type SettingsCategoryId,
+  POS_TIMEZONES,
+  writePaymentManagerRoles,
+} from "./pos-settings-categories.ts";
+import {
+  parsePosPaymentSettings,
+  readLocalPaymentSettings,
+  writeLocalPaymentSettings,
+  type PaymentHandlingMode,
+  type PosPaymentSettings,
+} from "@/lib/pos-payment-handling.ts";
+import {
+  readLocalEnforceOrderAvailability,
+  writeLocalEnforceOrderAvailability,
+} from "@/lib/pos-order-availability.ts";
 import {
   Dialog,
   DialogContent,
@@ -62,6 +95,7 @@ import {
   SelectValue,
 } from "@/components/ui/select.tsx";
 import { Slider } from "@/components/ui/slider.tsx";
+import { Switch } from "@/components/ui/switch.tsx";
 import {
   DEFAULT_PIN_LOGIN_BRANDING,
   type PinLoginBranding,
@@ -519,7 +553,31 @@ type PosSettingsProps = {
   plan: string;
   theme: "dark" | "light";
   onThemeChange: (theme: "dark" | "light") => void;
+  onNavigate?: (view: PosView) => void;
+  staffRole?: string;
 };
+
+const SETTINGS_NAV: {
+  id: SettingsCategoryId;
+  icon: typeof Settings;
+  titleKey: string;
+  descKey: string;
+}[] = [
+  { id: "general", icon: Building2, titleKey: "settings.cat.general", descKey: "settings.cat.general_desc" },
+  { id: "payments", icon: Wallet, titleKey: "settings.cat.payments", descKey: "settings.cat.payments_desc" },
+  { id: "menu", icon: UtensilsCrossed, titleKey: "settings.cat.menu", descKey: "settings.cat.menu_desc" },
+  { id: "devices", icon: Printer, titleKey: "settings.cat.devices", descKey: "settings.cat.devices_desc" },
+  { id: "users", icon: Users, titleKey: "settings.cat.users", descKey: "settings.cat.users_desc" },
+  { id: "tax", icon: Percent, titleKey: "settings.cat.tax", descKey: "settings.cat.tax_desc" },
+  { id: "notifications", icon: Bell, titleKey: "settings.cat.notifications", descKey: "settings.cat.notifications_desc" },
+  { id: "integrations", icon: Plug, titleKey: "settings.cat.integrations", descKey: "settings.cat.integrations_desc" },
+  { id: "money", icon: Landmark, titleKey: "settings.cat.money", descKey: "settings.cat.money_desc" },
+  { id: "backup", icon: HardDrive, titleKey: "settings.cat.backup", descKey: "settings.cat.backup_desc" },
+  { id: "security", icon: Shield, titleKey: "settings.cat.security", descKey: "settings.cat.security_desc" },
+  { id: "print", icon: Receipt, titleKey: "settings.cat.print", descKey: "settings.cat.print_desc" },
+  { id: "customerDisplay", icon: MonitorSmartphone, titleKey: "settings.cat.customer_display", descKey: "settings.cat.customer_display_desc" },
+  { id: "other", icon: SlidersHorizontal, titleKey: "settings.cat.other", descKey: "settings.cat.other_desc" },
+];
 
 const TYPE_ICONS = {
   bluetooth: Bluetooth,
@@ -553,8 +611,16 @@ export default function PosSettings({
   plan,
   theme,
   onThemeChange,
+  onNavigate,
+  staffRole,
 }: PosSettingsProps) {
   const { t, formatPrice } = usePosLocale();
+  const isAdminStaff = staffRole === "admin";
+  const isManagerStaff = staffRole === "manager";
+  const canEditBusinessIdentity = isAdminStaff;
+  const canEditLanguageCurrency = isAdminStaff;
+  const canEditTimezone = isAdminStaff || isManagerStaff;
+  const canActivateDevices = isAdminStaff;
   const printersQuery = useQuery('pos.settings.getPrinters', { licenseKey });
   const companyQuery = useQuery('pos.settings.getCompanyDetails', { licenseKey });
   const addPrinter = useMutation('pos.settings.addPrinter');
@@ -562,13 +628,30 @@ export default function PosSettings({
   const deletePrinter = useMutation('pos.settings.deletePrinter');
   const updateLocale = useMutation('pos.settings.updateLocaleSettings');
   const updateCompanyProfile = useMutation('pos.settings.updateCompanyProfile');
+  const updateTax = useMutation('pos.settings.updateTaxSettings');
+  const updatePaymentSettings = useMutation('pos.settings.updatePaymentSettings');
+  const updateOrderAvailability = useMutation(
+    "pos.settings.updateOrderAvailabilitySettings",
+  );
 
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [systemPrinterDialogOpen, setSystemPrinterDialogOpen] =
     useState(false);
   const [scanning, setScanning] = useState(false);
-  const [activeTab, setActiveTab] = useState<"general" | "templates">("general");
+  const [activeCategory, setActiveCategory] =
+    useState<SettingsCategoryId>("general");
   const [savingLocale, setSavingLocale] = useState(false);
+  const [paymentSettings, setPaymentSettings] = useState<PosPaymentSettings>(() =>
+    readLocalPaymentSettings(licenseKey),
+  );
+  const [savingPayment, setSavingPayment] = useState(false);
+  const [enforceAvailability, setEnforceAvailability] = useState(() =>
+    readLocalEnforceOrderAvailability(licenseKey),
+  );
+  const [savingAvailability, setSavingAvailability] = useState(false);
+  const [draftVatNumber, setDraftVatNumber] = useState("");
+  const [draftVatRate, setDraftVatRate] = useState("20");
+  const [savingTax, setSavingTax] = useState(false);
   const [editingCompany, setEditingCompany] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [draftAddress, setDraftAddress] = useState("");
@@ -595,22 +678,76 @@ export default function PosSettings({
           name: "Restaurant POS",
           address: "",
           phone: "",
-          currency: "Lek",
+          currency: "EUR",
           plan: "professional",
           licenseStatus: "active",
           licenseExpiry: undefined as string | undefined,
-          language: "sq",
-          currencySymbol: "Lek",
-          currencyPosition: "suffix",
+          language: "en",
+          timezone: "Europe/Tirane",
+          vatNumber: "",
+          defaultVatRate: 0.2,
+          currencySymbol: "€",
+          currencyPosition: "prefix",
           currencyDecimals: 2,
         };
+  const companyTimezone = String(
+    (company as { timezone?: string }).timezone || "Europe/Tirane",
+  );
+  const timezoneOptions = POS_TIMEZONES.includes(
+    companyTimezone as (typeof POS_TIMEZONES)[number],
+  )
+    ? [...POS_TIMEZONES]
+    : [companyTimezone, ...POS_TIMEZONES];
+
+  useEffect(() => {
+    const fromCloud = (company as { paymentSettings?: unknown }).paymentSettings;
+    if (fromCloud) {
+      const parsed = parsePosPaymentSettings(fromCloud);
+      setPaymentSettings(parsed);
+      writeLocalPaymentSettings(licenseKey, parsed);
+      return;
+    }
+    setPaymentSettings(readLocalPaymentSettings(licenseKey));
+  }, [licenseKey, companyQuery]);
+
+  useEffect(() => {
+    const cloud = (company as { enforceOrderAvailability?: unknown })
+      .enforceOrderAvailability;
+    if (typeof cloud === "boolean") {
+      setEnforceAvailability(cloud);
+      writeLocalEnforceOrderAvailability(licenseKey, cloud);
+      return;
+    }
+    setEnforceAvailability(readLocalEnforceOrderAvailability(licenseKey));
+  }, [licenseKey, companyQuery]);
+
+  useEffect(() => {
+    const vat = Number((company as { defaultVatRate?: number }).defaultVatRate);
+    const pct = Number.isFinite(vat) ? Math.round(vat * 100) : 20;
+    setDraftVatNumber(String((company as { vatNumber?: string }).vatNumber ?? ""));
+    setDraftVatRate(String(pct));
+  }, [company]);
 
   // ── Locale save helpers ────────────────────────────────
 
   const handleLocaleChange = async (
-    field: "language" | "currencySymbol" | "currencyPosition" | "currencyDecimals",
+    field:
+      | "language"
+      | "currencySymbol"
+      | "currencyPosition"
+      | "currencyDecimals"
+      | "timezone",
     value: string | number,
   ) => {
+    if (field === "timezone") {
+      if (!canEditTimezone) {
+        toast.error(t("settings.admin_only_identity"));
+        return;
+      }
+    } else if (!canEditLanguageCurrency) {
+      toast.error(t("settings.admin_only_identity"));
+      return;
+    }
     setSavingLocale(true);
     try {
       await updateLocale({ licenseKey, [field]: value });
@@ -647,6 +784,10 @@ export default function PosSettings({
   );
 
   const startEditCompany = () => {
+    if (!canEditBusinessIdentity) {
+      toast.error(t("settings.admin_only_identity"));
+      return;
+    }
     setDraftName(company.name);
     setDraftAddress(company.address ?? "");
     setDraftPhone(company.phone ?? "");
@@ -654,6 +795,10 @@ export default function PosSettings({
   };
 
   const saveCompany = async () => {
+    if (!canEditBusinessIdentity) {
+      toast.error(t("settings.admin_only_identity"));
+      return;
+    }
     const name = draftName.trim();
     if (!name) {
       toast.error(t("settings.company_name_required"));
@@ -675,6 +820,105 @@ export default function PosSettings({
       setSavingCompany(false);
     }
   };
+
+  const savePaymentSettings = async (next: PosPaymentSettings) => {
+    if (staffRole === "waiter") {
+      toast.error(t("settings.payment_waiter_blocked"));
+      return;
+    }
+    const parsed = parsePosPaymentSettings(next);
+    const normalized: PosPaymentSettings = {
+      ...parsed,
+      allowSplitBill: isAdminStaff
+        ? parsed.allowSplitBill
+        : paymentSettings.allowSplitBill,
+      allowRefund: isAdminStaff
+        ? parsed.allowRefund
+        : paymentSettings.allowRefund,
+    };
+    setPaymentSettings(normalized);
+    writeLocalPaymentSettings(licenseKey, normalized);
+    writePaymentManagerRoles(licenseKey, normalized.counterRoles);
+    setSavingPayment(true);
+    try {
+      await updatePaymentSettings({
+        licenseKey,
+        handling: normalized.handling,
+        manager: normalized.counterRoles.manager,
+        waiter: normalized.counterRoles.waiter,
+        methods: normalized.methods,
+        allowSplitBill: normalized.allowSplitBill,
+        allowRefund: normalized.allowRefund,
+      });
+      toast.success(t("settings.saved"));
+    } catch (err) {
+      toast.error(errorMessageFromUnknown(err, t("settings.save_failed")));
+    } finally {
+      setSavingPayment(false);
+    }
+  };
+
+  const saveEnforceAvailability = async (next: boolean) => {
+    if (!isAdminStaff) {
+      toast.error(t("settings.availability_admin_only"));
+      return;
+    }
+    setEnforceAvailability(next);
+    writeLocalEnforceOrderAvailability(licenseKey, next);
+    setSavingAvailability(true);
+    try {
+      await updateOrderAvailability({ licenseKey, enforce: next });
+      toast.success(t("settings.saved"));
+    } catch (err) {
+      toast.error(errorMessageFromUnknown(err, t("settings.save_failed")));
+    } finally {
+      setSavingAvailability(false);
+    }
+  };
+
+  const saveTax = async () => {
+    if (!isAdminStaff) {
+      toast.error(t("settings.admin_only_vat"));
+      return;
+    }
+    const ratePct = Number(draftVatRate);
+    if (!Number.isFinite(ratePct) || ratePct < 0 || ratePct > 100) {
+      toast.error(t("settings.vat_rate_invalid"));
+      return;
+    }
+    setSavingTax(true);
+    try {
+      await updateTax({
+        licenseKey,
+        vatNumber: draftVatNumber,
+        defaultVatRate: ratePct / 100,
+      });
+      toast.success(t("settings.saved"));
+    } catch (err) {
+      toast.error(errorMessageFromUnknown(err, t("settings.save_failed")));
+    } finally {
+      setSavingTax(false);
+    }
+  };
+
+  const visibleSettingsNav = useMemo(
+    () =>
+      SETTINGS_NAV.filter(
+        (item) => item.id !== "payments" || staffRole !== "waiter",
+      ),
+    [staffRole],
+  );
+  const activeNav =
+    visibleSettingsNav.find((c) => c.id === activeCategory) ??
+    visibleSettingsNav[0] ??
+    SETTINGS_NAV[0];
+  const ActiveIcon = activeNav.icon;
+
+  useEffect(() => {
+    if (staffRole === "waiter" && activeCategory === "payments") {
+      setActiveCategory("general");
+    }
+  }, [staffRole, activeCategory]);
 
   // ── Bluetooth scanning ──────────────────────────────────
 
@@ -785,51 +1029,61 @@ export default function PosSettings({
   };
 
   return (
-    <div className="p-6 lg:p-8 space-y-8">
-      {/* ── Header ── */}
-      <div>
-        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-          <Settings className="size-6" />
-          {t("settings.title")}
-        </h1>
-        <p className="text-[#8b93a7] text-sm mt-1">
-          {t("settings.description")}
-        </p>
-      </div>
+    <div className="flex flex-col lg:flex-row lg:items-stretch min-h-full">
+      <aside className="lg:w-[280px] shrink-0 border-b lg:border-b-0 lg:border-r border-[#1e2a45] bg-[#0D1326] lg:sticky lg:top-0 lg:max-h-[calc(100vh-3.5rem)] lg:overflow-y-auto">
+        <div className="px-4 pt-5 pb-3 hidden lg:block">
+          <p className="text-xs font-semibold uppercase tracking-wider text-[#5a6580]">
+            {t("settings.title")}
+          </p>
+        </div>
+        <nav className="flex lg:flex-col gap-1 p-2 overflow-x-auto lg:overflow-x-visible">
+          {visibleSettingsNav.map((item) => {
+            const Icon = item.icon;
+            const selected = activeCategory === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setActiveCategory(item.id)}
+                className={cn(
+                  "flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-colors cursor-pointer shrink-0 lg:shrink lg:w-full",
+                  selected
+                    ? "bg-[#0066FF] text-[#ffffff]"
+                    : "text-[#8b93a7] hover:text-white hover:bg-[#1e2a45]",
+                )}
+              >
+                <Icon className="size-4 shrink-0" />
+                <span className="text-sm font-medium whitespace-nowrap">
+                  {t(item.titleKey)}
+                </span>
+              </button>
+            );
+          })}
+        </nav>
+      </aside>
 
-      {/* ── Tabs ── */}
-      <div className="flex items-center gap-1 p-1 rounded-xl bg-[#131A2E] border border-[#1e2a45] w-fit">
-        <button
-          onClick={() => setActiveTab("general")}
-          className={cn(
-            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer",
-            activeTab === "general"
-              ? "bg-[#0066FF] text-white"
-              : "text-[#8b93a7] hover:text-white hover:bg-[#1e2a45]",
-          )}
-        >
-          <Settings className="size-4" />
-          {t("settings.general")}
-        </button>
-        <button
-          onClick={() => setActiveTab("templates")}
-          className={cn(
-            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer",
-            activeTab === "templates"
-              ? "bg-[#0066FF] text-white"
-              : "text-[#8b93a7] hover:text-white hover:bg-[#1e2a45]",
-          )}
-        >
-          <Receipt className="size-4" />
-          {t("settings.templates")}
-        </button>
-      </div>
+      <div className="flex-1 min-w-0 p-6 lg:p-8 space-y-8">
+        <div>
+          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+            <ActiveIcon className="size-6" />
+            {t(activeNav.titleKey)}
+          </h1>
+          <p className="text-[#8b93a7] text-sm mt-1">
+            {t(activeNav.descKey)}
+          </p>
+        </div>
 
-      {/* ── Tab content ── */}
-      {activeTab === "templates" ? (
-        <TemplateManager licenseKey={licenseKey} />
-      ) : (
-        <>
+        {activeCategory === "print" ? (
+          <TemplateManager licenseKey={licenseKey} />
+        ) : null}
+
+        {activeCategory === "general" ? (
+          <>
+          {!isAdminStaff ? (
+            <p className="text-xs text-amber-400/90 -mt-1">
+              {t("settings.manager_general_hint")}
+            </p>
+          ) : null}
           {/* ── Company Details ── */}
           {company && (
             <section className="rounded-xl border border-[#1e2a45] bg-[#0D1326] p-5 space-y-4">
@@ -838,7 +1092,8 @@ export default function PosSettings({
                   <Building2 className="size-5 text-[#0066FF]" />
                   {t("settings.company_details")}
                 </h2>
-                {editingCompany ? (
+                {canEditBusinessIdentity ? (
+                editingCompany ? (
                   <div className="flex flex-wrap items-center gap-2">
                     <Button
                       type="button"
@@ -871,10 +1126,11 @@ export default function PosSettings({
                     <Pencil className="size-3.5 mr-1.5" />
                     {t("settings.company_edit")}
                   </Button>
-                )}
+                )
+                ) : null}
               </div>
 
-              {editingCompany ? (
+              {editingCompany && canEditBusinessIdentity ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2 sm:col-span-2">
                     <Label className="text-[#8b93a7] text-xs uppercase tracking-wider">
@@ -914,7 +1170,7 @@ export default function PosSettings({
               ) : null}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {editingCompany ? null : (
+                {editingCompany && canEditBusinessIdentity ? null : (
                   <>
                     <DetailCard icon={Building2} label={t("settings.business_name")} value={company.name} />
                     <DetailCard icon={MapPin} label={t("settings.address")} value={company.address || t("settings.not_set")} />
@@ -942,10 +1198,6 @@ export default function PosSettings({
             </section>
           )}
 
-          <WaiterPhonePairSection licenseKey={licenseKey} />
-
-          <PinLoginBrandingSection licenseKey={licenseKey} />
-
           {/* ── Language & Currency ── */}
           {company && (
             <section className="rounded-xl border border-[#1e2a45] bg-[#0D1326] p-5 space-y-5">
@@ -963,12 +1215,15 @@ export default function PosSettings({
                   <button
                     type="button"
                     onClick={() => handleLocaleChange("language", "en")}
-                    disabled={savingLocale}
+                    disabled={savingLocale || !canEditLanguageCurrency}
                     className={cn(
-                      "flex items-center gap-1.5 px-4 py-2 text-xs font-medium transition-colors cursor-pointer",
+                      "flex items-center gap-1.5 px-4 py-2 text-xs font-medium transition-colors",
                       company.language === "en"
                         ? "bg-[#0066FF] text-white"
                         : "bg-[#131A2E] text-[#5a6580] hover:text-white",
+                      canEditLanguageCurrency
+                        ? "cursor-pointer"
+                        : "cursor-not-allowed opacity-70",
                     )}
                   >
                     <FlagUS className="h-3 w-4" />
@@ -977,18 +1232,43 @@ export default function PosSettings({
                   <button
                     type="button"
                     onClick={() => handleLocaleChange("language", "sq")}
-                    disabled={savingLocale}
+                    disabled={savingLocale || !canEditLanguageCurrency}
                     className={cn(
-                      "flex items-center gap-1.5 px-4 py-2 text-xs font-medium transition-colors cursor-pointer",
+                      "flex items-center gap-1.5 px-4 py-2 text-xs font-medium transition-colors",
                       company.language === "sq"
                         ? "bg-[#0066FF] text-white"
                         : "bg-[#131A2E] text-[#5a6580] hover:text-white",
+                      canEditLanguageCurrency
+                        ? "cursor-pointer"
+                        : "cursor-not-allowed opacity-70",
                     )}
                   >
                     <FlagAL className="h-3 w-4" />
                     Albanian
                   </button>
                 </div>
+              </SettingRow>
+
+              <SettingRow
+                label={t("settings.timezone")}
+                description={t("settings.timezone_desc")}
+              >
+                <Select
+                  value={companyTimezone}
+                  onValueChange={(val) => handleLocaleChange("timezone", val)}
+                  disabled={savingLocale || !canEditTimezone}
+                >
+                  <SelectTrigger className="w-56 bg-[#131A2E] border-[#1e2a45] text-white text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {timezoneOptions.map((tz) => (
+                      <SelectItem key={tz} value={tz}>
+                        {tz}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </SettingRow>
 
               {/* Currency Symbol */}
@@ -1001,7 +1281,7 @@ export default function PosSettings({
                   onValueChange={(val) =>
                     handleLocaleChange("currencySymbol", val)
                   }
-                  disabled={savingLocale}
+                  disabled={savingLocale || !canEditLanguageCurrency}
                 >
                   <SelectTrigger className="w-48 bg-[#131A2E] border-[#1e2a45] text-white text-xs">
                     <SelectValue />
@@ -1027,12 +1307,15 @@ export default function PosSettings({
                     onClick={() =>
                       handleLocaleChange("currencyPosition", "prefix")
                     }
-                    disabled={savingLocale}
+                    disabled={savingLocale || !canEditLanguageCurrency}
                     className={cn(
-                      "flex items-center gap-1.5 px-4 py-2 text-xs font-medium transition-colors cursor-pointer",
+                      "flex items-center gap-1.5 px-4 py-2 text-xs font-medium transition-colors",
                       company.currencyPosition === "prefix"
                         ? "bg-[#0066FF] text-white"
                         : "bg-[#131A2E] text-[#5a6580] hover:text-white",
+                      canEditLanguageCurrency
+                        ? "cursor-pointer"
+                        : "cursor-not-allowed opacity-70",
                     )}
                   >
                     <CircleDollarSign className="size-3.5" />
@@ -1043,12 +1326,15 @@ export default function PosSettings({
                     onClick={() =>
                       handleLocaleChange("currencyPosition", "suffix")
                     }
-                    disabled={savingLocale}
+                    disabled={savingLocale || !canEditLanguageCurrency}
                     className={cn(
-                      "flex items-center gap-1.5 px-4 py-2 text-xs font-medium transition-colors cursor-pointer",
+                      "flex items-center gap-1.5 px-4 py-2 text-xs font-medium transition-colors",
                       company.currencyPosition === "suffix"
                         ? "bg-[#0066FF] text-white"
                         : "bg-[#131A2E] text-[#5a6580] hover:text-white",
+                      canEditLanguageCurrency
+                        ? "cursor-pointer"
+                        : "cursor-not-allowed opacity-70",
                     )}
                   >
                     {t("settings.position_suffix")}
@@ -1067,7 +1353,7 @@ export default function PosSettings({
                   onValueChange={(val) =>
                     handleLocaleChange("currencyDecimals", Number(val))
                   }
-                  disabled={savingLocale}
+                  disabled={savingLocale || !canEditLanguageCurrency}
                 >
                   <SelectTrigger className="w-32 bg-[#131A2E] border-[#1e2a45] text-white text-xs">
                     <SelectValue />
@@ -1092,7 +1378,158 @@ export default function PosSettings({
               </div>
             </section>
           )}
+          <AppUpdateSection />
+          </>
+        ) : null}
 
+        {activeCategory === "payments" ? (
+          staffRole === "waiter" ? (
+            <p className="text-sm text-amber-400/90">
+              {t("settings.payment_waiter_blocked")}
+            </p>
+          ) : (
+          <PaymentManagementSection
+            settings={paymentSettings}
+            saving={savingPayment}
+            isAdmin={isAdminStaff}
+            onChange={(next) => void savePaymentSettings(next)}
+          />
+          )
+        ) : null}
+
+        {activeCategory === "menu" ? (
+          <SettingsJumpCard
+            icon={UtensilsCrossed}
+            title={t("settings.cat.menu")}
+            description={t("settings.cat.menu_desc")}
+            actionLabel={t("settings.open_menu")}
+            onAction={() => onNavigate?.("menu")}
+          />
+        ) : null}
+
+        {activeCategory === "users" ? (
+          <>
+            <SettingsJumpCard
+              icon={Users}
+              title={t("nav.staff")}
+              description={t("settings.cat.users_desc")}
+              actionLabel={t("settings.open_staff")}
+              onAction={() => onNavigate?.("staff")}
+            />
+            <PinLoginBrandingSection licenseKey={licenseKey} />
+          </>
+        ) : null}
+
+        {activeCategory === "tax" ? (
+          <section className="rounded-xl border border-[#1e2a45] bg-[#0D1326] p-5 space-y-5">
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              <Percent className="size-5 text-[#0066FF]" />
+              {t("settings.cat.tax")}
+            </h2>
+            {!isAdminStaff ? (
+              <p className="text-xs text-amber-400/90">
+                {t("settings.admin_only_vat")}
+              </p>
+            ) : null}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-[#8b93a7] text-xs uppercase tracking-wider">
+                  {t("settings.vat_number")}
+                </Label>
+                <Input
+                  value={draftVatNumber}
+                  onChange={(e) => setDraftVatNumber(e.target.value)}
+                  disabled={!isAdminStaff}
+                  className="bg-[#0A0F1E] border-[#1e2a45] text-white h-11"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[#8b93a7] text-xs uppercase tracking-wider">
+                  {t("settings.vat_rate")}
+                </Label>
+                <Select
+                  value={draftVatRate}
+                  onValueChange={setDraftVatRate}
+                  disabled={!isAdminStaff}
+                >
+                  <SelectTrigger className="bg-[#131A2E] border-[#1e2a45] text-white h-11">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {["0", "8", "10", "18", "20"].map((n) => (
+                      <SelectItem key={n} value={n}>
+                        {n}%
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <Button
+              type="button"
+              className="bg-[#0066FF] hover:bg-[#0052CC]"
+              onClick={() => void saveTax()}
+              disabled={savingTax || !isAdminStaff}
+            >
+              {savingTax ? "…" : t("settings.company_save")}
+            </Button>
+          </section>
+        ) : null}
+
+        {activeCategory === "notifications" ? (
+          <CategoryPlaceholder description={t("settings.cat.notifications_desc")} />
+        ) : null}
+        {activeCategory === "integrations" ? (
+          <CategoryPlaceholder description={t("settings.cat.integrations_desc")} />
+        ) : null}
+        {activeCategory === "money" ? (
+          <CategoryPlaceholder description={t("settings.cat.money_desc")} />
+        ) : null}
+        {activeCategory === "backup" ? (
+          <>
+            <section className="rounded-xl border border-[#1e2a45] bg-[#0D1326] p-5 space-y-4">
+              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                <Package className="size-5 text-[#0066FF]" />
+                {t("settings.availability_title")}
+              </h2>
+              <p className="text-sm text-[#8b93a7]">
+                {t("settings.availability_desc")}
+              </p>
+              <SettingRow
+                label={t("settings.availability_toggle")}
+                description={t("settings.availability_toggle_desc")}
+              >
+                <Switch
+                  checked={enforceAvailability}
+                  disabled={!isAdminStaff || savingAvailability}
+                  onCheckedChange={(v) => void saveEnforceAvailability(v)}
+                  className="data-[state=checked]:bg-[#0066FF] data-[state=checked]:border-[#0066FF]"
+                />
+              </SettingRow>
+              {!isAdminStaff ? (
+                <p className="text-xs text-amber-400/90">
+                  {t("settings.availability_admin_only")}
+                </p>
+              ) : null}
+            </section>
+            <SettingsJumpCard
+              icon={Package}
+              title={t("nav.stock")}
+              description={t("settings.availability_stock_jump")}
+              actionLabel={t("settings.open_stock")}
+              onAction={() => onNavigate?.("stock")}
+            />
+          </>
+        ) : null}
+        {activeCategory === "security" ? (
+          <CategoryPlaceholder description={t("settings.cat.security_desc")} />
+        ) : null}
+        {activeCategory === "customerDisplay" ? (
+          <CategoryPlaceholder description={t("settings.cat.customer_display_desc")} />
+        ) : null}
+
+        {activeCategory === "other" ? (
+          <>
           {/* ── Appearance ── */}
           <section className="rounded-xl border border-[#1e2a45] bg-[#0D1326] p-5 space-y-4">
             <h2 className="text-lg font-semibold text-white flex items-center gap-2">
@@ -1138,6 +1575,16 @@ export default function PosSettings({
               </div>
             </SettingRow>
           </section>
+          <AppUpdateSection />
+          </>
+        ) : null}
+
+        {activeCategory === "devices" ? (
+          <>
+          <WaiterPhonePairSection
+            licenseKey={licenseKey}
+            canActivate={canActivateDevices}
+          />
 
           {/* ── Printers & Peripherals ── */}
           <section className="rounded-xl border border-[#1e2a45] bg-[#0D1326] p-5 space-y-5">
@@ -1232,12 +1679,331 @@ export default function PosSettings({
             licenseKey={licenseKey}
             addPrinter={addPrinter}
           />
-        </>
-      )}
+          </>
+        ) : null}
+      </div>
     </div>
   );
 }
 
+function CategoryPlaceholder({ description }: { description: string }) {
+  const { t } = usePosLocale();
+  return (
+    <section className="rounded-xl border border-[#1e2a45] bg-[#0D1326] p-8 space-y-2">
+      <p className="text-sm text-[#8b93a7] leading-relaxed">{description}</p>
+      <p className="text-xs text-[#5a6580]">{t("settings.cat_coming_soon")}</p>
+    </section>
+  );
+}
+
+function SettingsJumpCard({
+  icon: Icon,
+  title,
+  description,
+  actionLabel,
+  onAction,
+}: {
+  icon: typeof Building2;
+  title: string;
+  description: string;
+  actionLabel: string;
+  onAction: () => void;
+}) {
+  return (
+    <section className="rounded-xl border border-[#1e2a45] bg-[#0D1326] p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+      <div className="flex items-start gap-3 flex-1 min-w-0">
+        <div className="p-2.5 rounded-xl bg-[#1e2a45] shrink-0">
+          <Icon className="size-5 text-[#0066FF]" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-white">{title}</p>
+          <p className="text-xs text-[#8b93a7] mt-1 leading-relaxed">{description}</p>
+        </div>
+      </div>
+      <Button
+        type="button"
+        className="bg-[#0066FF] hover:bg-[#0052CC] shrink-0"
+        onClick={onAction}
+      >
+        {actionLabel}
+        <ArrowRight className="size-4 ml-1.5" />
+      </Button>
+    </section>
+  );
+}
+
+function PaymentManagementSection({
+  settings,
+  saving,
+  isAdmin,
+  onChange,
+}: {
+  settings: PosPaymentSettings;
+  saving: boolean;
+  isAdmin: boolean;
+  onChange: (next: PosPaymentSettings) => void;
+}) {
+  const { t } = usePosLocale();
+  const handling = settings.handling;
+  const setHandling = (next: PaymentHandlingMode) => {
+    if (saving) return;
+    onChange({ ...settings, handling: next });
+  };
+
+  const toggleMethod = (key: "cash" | "card" | "qr", value: boolean) => {
+    if (saving) return;
+    const methods = { ...settings.methods, [key]: value };
+    if (!methods.cash && !methods.card && !methods.qr) {
+      toast.error(t("settings.payment_methods_one"));
+      return;
+    }
+    onChange({ ...settings, methods });
+  };
+
+  return (
+    <>
+      {!isAdmin ? (
+        <p className="text-xs text-amber-400/90 -mt-1">
+          {t("settings.manager_payments_hint")}
+        </p>
+      ) : null}
+      <section className="rounded-xl border border-[#1e2a45] bg-[#0D1326] p-5 space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+            <Wallet className="size-5 text-[#0066FF]" />
+            {t("settings.payment_handling")}
+          </h2>
+          <p className="text-sm text-[#8b93a7] mt-1">{t("settings.payment_handling_desc")}</p>
+          <p className="text-xs text-[#5a6580] mt-2">{t("settings.payment_phone_note")}</p>
+        </div>
+
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => setHandling("waiter")}
+          className={cn(
+            "w-full text-left rounded-xl border p-4 space-y-2 transition-colors",
+            handling === "waiter"
+              ? "border-[#0066FF] bg-[#0066FF]/10"
+              : "border-[#1e2a45] bg-[#131A2E]/60 hover:border-[#2a3a5c]",
+          )}
+        >
+          <div className="flex items-start gap-3">
+            <span
+              className={cn(
+                "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border",
+                handling === "waiter" ? "border-[#0066FF]" : "border-[#5a6580]",
+              )}
+            >
+              {handling === "waiter" ? (
+                <span className="size-2 rounded-full bg-[#0066FF]" />
+              ) : null}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-white flex items-center gap-2">
+                <Smartphone className="size-4 text-[#0066FF]" />
+                {t("settings.payment_mode_waiter")}
+              </p>
+              <p className="text-xs text-[#8b93a7] mt-1">
+                {t("settings.payment_mode_waiter_lead")}
+              </p>
+              <ul className="mt-2 space-y-1 text-xs text-[#8b93a7]">
+                <li>• {t("settings.payment_mode_waiter_1")}</li>
+                <li>• {t("settings.payment_mode_waiter_2")}</li>
+                <li>• {t("settings.payment_mode_waiter_3")}</li>
+              </ul>
+            </div>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => setHandling("counter")}
+          className={cn(
+            "w-full text-left rounded-xl border p-4 space-y-2 transition-colors",
+            handling === "counter"
+              ? "border-[#0066FF] bg-[#0066FF]/10"
+              : "border-[#1e2a45] bg-[#131A2E]/60 hover:border-[#2a3a5c]",
+          )}
+        >
+          <div className="flex items-start gap-3">
+            <span
+              className={cn(
+                "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border",
+                handling === "counter" ? "border-[#0066FF]" : "border-[#5a6580]",
+              )}
+            >
+              {handling === "counter" ? (
+                <span className="size-2 rounded-full bg-[#0066FF]" />
+              ) : null}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-white flex items-center gap-2">
+                <Store className="size-4 text-[#0066FF]" />
+                {t("settings.payment_mode_counter")}
+              </p>
+              <p className="text-xs text-[#8b93a7] mt-1">
+                {t("settings.payment_mode_counter_lead")}
+              </p>
+              <ul className="mt-2 space-y-1 text-xs text-[#8b93a7]">
+                <li>• {t("settings.payment_mode_counter_1")}</li>
+                <li>• {t("settings.payment_mode_counter_2")}</li>
+                <li>• {t("settings.payment_mode_counter_3")}</li>
+                <li>• {t("settings.payment_mode_counter_4")}</li>
+              </ul>
+            </div>
+          </div>
+        </button>
+      </section>
+
+      {handling === "counter" ? (
+        <section className="rounded-xl border border-[#1e2a45] bg-[#0D1326] p-5 space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold text-white">
+              {t("settings.payment_counter_who")}
+            </h2>
+            <p className="text-sm text-[#8b93a7] mt-1">
+              {t("settings.payment_counter_who_desc")}
+            </p>
+          </div>
+          <div className="space-y-2">
+            {(
+              [
+                { key: "admin" as const, locked: true },
+                { key: "manager" as const, locked: false },
+                { key: "waiter" as const, locked: false },
+              ]
+            ).map(({ key, locked }) => (
+              <label
+                key={key}
+                className={cn(
+                  "flex items-center justify-between p-3 rounded-lg bg-[#131A2E]/60 border border-[#1e2a45]/50",
+                  locked ? "opacity-80" : "cursor-pointer",
+                )}
+              >
+                <span className="text-sm font-medium text-white">
+                  {t(`settings.payment_role_${key}`)}
+                </span>
+                <input
+                  type="checkbox"
+                  className="size-4 accent-[#0066FF]"
+                  checked={settings.counterRoles[key]}
+                  disabled={locked || saving}
+                  onChange={(e) =>
+                    onChange({
+                      ...settings,
+                      counterRoles: {
+                        ...settings.counterRoles,
+                        [key]: e.target.checked,
+                        admin: true,
+                      },
+                    })
+                  }
+                />
+              </label>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      <section className="rounded-xl border border-[#1e2a45] bg-[#0D1326] p-5 space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold text-white">
+            {t("settings.payment_methods")}
+          </h2>
+          <p className="text-sm text-[#8b93a7] mt-1">
+            {t("settings.payment_methods_desc")}
+          </p>
+        </div>
+        {(
+          [
+            { key: "cash" as const, labelKey: "settings.payment_method_cash" },
+            { key: "card" as const, labelKey: "settings.payment_method_card" },
+            { key: "qr" as const, labelKey: "settings.payment_method_qr" },
+          ]
+        ).map((row) => (
+          <SettingRow
+            key={row.key}
+            label={t(row.labelKey)}
+            description=""
+          >
+            <Switch
+              checked={settings.methods[row.key]}
+              disabled={saving}
+              onCheckedChange={(v) => toggleMethod(row.key, v)}
+              className="data-[state=checked]:bg-[#0066FF] data-[state=checked]:border-[#0066FF]"
+            />
+          </SettingRow>
+        ))}
+      </section>
+
+      <section className="rounded-xl border border-[#1e2a45] bg-[#0D1326] p-5 space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold text-white">
+            {t("settings.payment_critical")}
+          </h2>
+          <p className="text-sm text-[#8b93a7] mt-1">
+            {t("settings.payment_critical_desc")}
+          </p>
+          {!isAdmin ? (
+            <p className="text-xs text-amber-400/90 mt-2">
+              {t("settings.payment_admin_approval")}
+            </p>
+          ) : null}
+        </div>
+        <SettingRow
+          label={t("settings.payment_split")}
+          description={t("settings.payment_split_desc")}
+        >
+          <Switch
+            checked={settings.allowSplitBill}
+            disabled={saving || !isAdmin}
+            onCheckedChange={(v) => {
+              if (!isAdmin) {
+                toast.error(t("settings.payment_admin_approval"));
+                return;
+              }
+              onChange({ ...settings, allowSplitBill: v });
+            }}
+            className="data-[state=checked]:bg-[#0066FF] data-[state=checked]:border-[#0066FF]"
+          />
+        </SettingRow>
+        <SettingRow
+          label={t("settings.payment_refund")}
+          description={t("settings.payment_refund_desc")}
+        >
+          <Switch
+            checked={settings.allowRefund}
+            disabled={saving || !isAdmin}
+            onCheckedChange={(v) => {
+              if (!isAdmin) {
+                toast.error(t("settings.payment_admin_approval"));
+                return;
+              }
+              onChange({ ...settings, allowRefund: v });
+            }}
+            className="data-[state=checked]:bg-[#0066FF] data-[state=checked]:border-[#0066FF]"
+          />
+        </SettingRow>
+        <SettingRow
+          label={t("settings.payment_close_table")}
+          description={
+            handling === "waiter"
+              ? t("settings.payment_close_table_waiter")
+              : t("settings.payment_close_table_counter")
+          }
+        >
+          <span className="text-xs text-[#8b93a7]">
+            {handling === "waiter"
+              ? t("settings.payment_mode_waiter")
+              : t("settings.payment_mode_counter")}
+          </span>
+        </SettingRow>
+      </section>
+    </>
+  );
+}
 // ── Setting Row ─────────────────────────────────────────
 
 function SettingRow({
@@ -1253,7 +2019,9 @@ function SettingRow({
     <div className="flex items-center justify-between p-3 rounded-lg bg-[#131A2E]/60 border border-[#1e2a45]/50 flex-wrap gap-3">
       <div>
         <p className="text-sm font-medium text-white">{label}</p>
-        <p className="text-xs text-[#5a6580] mt-0.5">{description}</p>
+        {description ? (
+          <p className="text-xs text-[#5a6580] mt-0.5">{description}</p>
+        ) : null}
       </div>
       {children}
     </div>

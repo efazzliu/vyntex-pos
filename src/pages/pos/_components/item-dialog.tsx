@@ -166,6 +166,7 @@ export type EditingItem = {
   supplyStorage?: SupplyStorage;
   /** Per 1 sold unit: deduct `qtyPerUnit` from each supply row (same unit as that row’s stock). */
   supplyRecipe?: { supplyMenuItemId: Id<"menuItems">; qtyPerUnit: number }[];
+  vatRate?: number;
 };
 
 /** DB / mappers sometimes emit "" for null category_id; `??` does not treat "" as missing. */
@@ -206,6 +207,8 @@ type ItemDialogProps = {
   dialogNewTitleOverride?: "supply_kitchen" | "supply_bar";
   /** Enterprise: optional supply recipe (BOM) on sellable items. */
   enterpriseSupplyRecipe?: boolean;
+  canEditVat?: boolean;
+  canEditRecipe?: boolean;
 };
 
 export default function ItemDialog({
@@ -223,6 +226,8 @@ export default function ItemDialog({
   initialName,
   dialogNewTitleOverride,
   enterpriseSupplyRecipe = false,
+  canEditVat = true,
+  canEditRecipe = true,
 }: ItemDialogProps) {
   const { currency, t } = usePosLocale();
   const stockUnitOptions = useMemo(
@@ -269,6 +274,7 @@ export default function ItemDialog({
   );
   const [supplyDetailsOpen, setSupplyDetailsOpen] = useState(false);
   const [recipeLines, setRecipeLines] = useState<RecipeUiLine[]>([]);
+  const [vatPct, setVatPct] = useState("20");
   const [selectedCategoryId, setSelectedCategoryId] = useState<
     Id<"menuCategories"> | undefined
   >(undefined);
@@ -316,6 +322,8 @@ export default function ItemDialog({
         setName(editing.name);
         setDescription(editing.description ?? "");
         setPrice(editing.price.toString());
+        const vatRounded = Math.round(Number(editing.vatRate ?? 0.2) * 100);
+        setVatPct(String(Number.isFinite(vatRounded) ? vatRounded : 20));
         setAvailable(editing.available);
         setStation(editing.station ?? undefined);
         setMenuId(editing.menuId ?? undefined);
@@ -386,6 +394,7 @@ export default function ItemDialog({
         setName(initialName ?? "");
         setDescription("");
         setPrice("");
+        setVatPct("20");
         setAvailable(initialAvailable ?? true);
         setStation(initialStation);
         setMenuId(undefined);
@@ -549,9 +558,12 @@ export default function ItemDialog({
       };
 
       const recipeSavePayload =
-        enterpriseSupplyRecipe && !supplyMallContext
+        canEditRecipe && enterpriseSupplyRecipe && !supplyMallContext
           ? parseRecipeForApi(recipeLines)
           : undefined;
+      const vatRatePayload = canEditVat
+        ? Number(vatPct) / 100
+        : undefined;
 
       if (editing) {
         await updateItem({
@@ -575,6 +587,7 @@ export default function ItemDialog({
               : (editing.currentStock ?? (parseFloat(initialStock) || 0))
             : undefined,
           ...supplyMutationPayload,
+          ...(vatRatePayload !== undefined ? { vatRate: vatRatePayload } : {}),
           ...(recipeSavePayload !== undefined
             ? { supplyRecipe: recipeSavePayload }
             : {}),
@@ -589,6 +602,7 @@ export default function ItemDialog({
           name: name.trim(),
           description: description.trim() || undefined,
           price: priceNum,
+          vatRate: vatRatePayload ?? editing.vatRate,
           available,
           categoryId: categoryForSubmit!,
           menuId,
@@ -637,6 +651,7 @@ export default function ItemDialog({
           staffMealPrice: parsedStaffMealPrice,
           ...stockArgs,
           ...(supplyCreate ? supplyMutationPayload : {}),
+          ...(vatRatePayload !== undefined ? { vatRate: vatRatePayload } : {}),
           ...(recipeSavePayload !== undefined
             ? { supplyRecipe: recipeSavePayload }
             : {}),
@@ -647,6 +662,7 @@ export default function ItemDialog({
           name: name.trim(),
           description: description.trim() || undefined,
           price: priceNum,
+          vatRate: vatRatePayload,
           available: true,
           categoryId: categoryIdForCreate,
           menuId,
@@ -967,6 +983,29 @@ export default function ItemDialog({
               className="border-slate-200 bg-slate-50 text-slate-900"
             />
           </div>
+
+          {canEditVat && !supplyMallContext ? (
+            <div className="space-y-2">
+              <Label className="text-slate-600">{t("menu.label_vat")}</Label>
+              <div className="flex flex-wrap gap-1.5">
+                {["0", "8", "10", "18", "20"].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setVatPct(n)}
+                    className={cn(
+                      "px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer border",
+                      vatPct === n
+                        ? "bg-[#0066FF]/20 border-[#0066FF]/50 text-[#0066FF]"
+                        : "bg-white border-slate-200 text-slate-600 hover:border-slate-300",
+                    )}
+                  >
+                    {n}%
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           {!supplyMallContext && categoryPicker}
 
@@ -1430,7 +1469,7 @@ export default function ItemDialog({
             </div>
           )}
 
-          {enterpriseSupplyRecipe && !supplyMallContext && (
+          {canEditRecipe && enterpriseSupplyRecipe && !supplyMallContext && (
             <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/90 p-4">
               <div className="flex items-start gap-2">
                 <ClipboardList className="mt-0.5 size-4 shrink-0 text-slate-500" />

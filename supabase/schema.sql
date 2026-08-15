@@ -12,10 +12,10 @@ create table if not exists public.restaurants (
   address text,
   phone text,
   currency text not null default 'EUR',
-  language text check (language in ('en', 'sq')),
-  currency_symbol text,
-  currency_position text check (currency_position in ('prefix', 'suffix')),
-  currency_decimals int,
+  language text default 'en' check (language in ('en', 'sq')),
+  currency_symbol text default '€',
+  currency_position text default 'prefix' check (currency_position in ('prefix', 'suffix')),
+  currency_decimals int default 2,
   plan text not null check (plan in ('starter', 'professional', 'enterprise')),
   license_key text not null unique,
   license_expiry timestamptz not null,
@@ -35,6 +35,10 @@ alter table public.restaurants
   add column if not exists max_terminals int not null default 1;
 alter table public.restaurants
   add column if not exists registered_devices jsonb not null default '[]'::jsonb;
+alter table public.restaurants
+  add column if not exists pos_payment_settings jsonb;
+alter table public.restaurants
+  add column if not exists pos_enforce_availability boolean not null default false;
 
 do $$
 begin

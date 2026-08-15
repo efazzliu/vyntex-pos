@@ -26,7 +26,13 @@ import { PosViewErrorBoundary } from "./pos-view-error-boundary.tsx";
 import { usePosLocale } from "./pos-locale-provider.tsx";
 import { initPrintQueueOnStartup } from "@/lib/print-queue.ts";
 import { persistPosTheme } from "@/lib/supabase-pos/license-sync.ts";
-import { LogOut } from "lucide-react";
+import {
+  POS_DEFAULT_CURRENCY_DECIMALS,
+  POS_DEFAULT_CURRENCY_POSITION,
+  POS_DEFAULT_CURRENCY_SYMBOL,
+  POS_DEFAULT_LANGUAGE,
+} from "@/lib/pos-locale-defaults.ts";
+import { LogOut, Menu } from "lucide-react";
 import { toast } from "sonner";
 import {
   canAccessView,
@@ -56,12 +62,13 @@ export default function PosApp({
 
   return (
     <PosLocaleProvider
-      language={(company?.language as "en" | "sq") ?? "en"}
-      currencySymbol={company?.currencySymbol ?? "Lek"}
+      language={(company?.language as "en" | "sq") ?? POS_DEFAULT_LANGUAGE}
+      currencySymbol={company?.currencySymbol ?? POS_DEFAULT_CURRENCY_SYMBOL}
       currencyPosition={
-        (company?.currencyPosition as "prefix" | "suffix") ?? "suffix"
+        (company?.currencyPosition as "prefix" | "suffix") ??
+        POS_DEFAULT_CURRENCY_POSITION
       }
-      currencyDecimals={company?.currencyDecimals ?? 2}
+      currencyDecimals={company?.currencyDecimals ?? POS_DEFAULT_CURRENCY_DECIMALS}
     >
       <PosAppInner
         activation={activation}
@@ -341,6 +348,7 @@ function PosAppInner({
               licenseKey: activation.licenseKey,
               onLogout,
               canLogStaffConsumption,
+              role: "waiter",
             }}
           />
         </div>
@@ -372,6 +380,7 @@ function PosAppInner({
             <AdminTopBar
               businessName={activation.businessName}
               staffName={activeStaff.name}
+              staffRole={activeStaff.role}
               onLogoClick={() => setDrawerOpen(true)}
               onLogout={onLogout}
             />
@@ -451,6 +460,7 @@ function PosAppInner({
                   stockActorName={activeStaff.name}
                   enterpriseSupplyMall={hasEnterpriseSupplyMall(activation.plan)}
                   enterpriseSupplyRecipe={hasEnterpriseSupplyRecipe(activation.plan)}
+                  staffRole={activeStaff.role}
                 />
               </div>
             ))}
@@ -532,6 +542,8 @@ function PosAppInner({
                   plan={activation.plan}
                   theme={theme}
                   onThemeChange={handleThemeChange}
+                  onNavigate={setActiveViewFromPlan}
+                  staffRole={activeStaff.role}
                 />
               </div>
             ))}
@@ -640,36 +652,56 @@ function PosAppInner({
 function AdminTopBar({
   businessName,
   staffName,
+  staffRole,
   onLogoClick,
   onLogout,
 }: {
   businessName: string;
   staffName: string;
+  staffRole: string;
   onLogoClick: () => void;
   onLogout: () => void;
 }) {
   const { t } = usePosLocale();
+  const roleKey = `staff.role_${staffRole}`;
+  const roleLabel = t(roleKey);
+  const roleText = roleLabel === roleKey ? staffRole : roleLabel;
+  const showName = staffName.trim().toLowerCase() !== roleText.trim().toLowerCase();
+
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 mx-3 mt-3 rounded-xl bg-[#131A2E] border border-[#1e2a45] shrink-0">
+    <header className="flex h-12 shrink-0 items-center gap-3 border-b border-[#1e2a45] bg-[#0A0F1E] px-4">
       <button
+        type="button"
         onClick={onLogoClick}
-        className="cursor-pointer shrink-0 hover:opacity-80 transition-opacity"
+        className="flex shrink-0 items-center gap-2 rounded-md py-1 pr-1.5 -ml-1 hover:bg-[#1e2a45] transition-colors cursor-pointer"
+        aria-label={t("nav.menu")}
       >
-        <img src={VYNTEX_APP_LOGO_SRC} alt="Vyntex POS" className="h-8 w-8" />
+        <img src={VYNTEX_APP_LOGO_SRC} alt="" className="h-7 w-7" />
+        <Menu className="size-4 text-[#8b93a7]" />
       </button>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-white truncate">
+      <div className="h-5 w-px shrink-0 bg-[#1e2a45]" />
+      <div className="min-w-0 flex items-center gap-2">
+        <p className="truncate text-[13px] font-semibold tracking-tight text-white">
           {businessName}
         </p>
-        <p className="text-[10px] text-[#0066FF] font-medium">{staffName}</p>
+        <span className="shrink-0 rounded-md bg-[#0066FF]/12 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#0066FF]">
+          {roleText}
+        </span>
       </div>
+      <div className="flex-1" />
+      {showName ? (
+        <p className="hidden sm:block max-w-[10rem] truncate text-[12px] text-[#8b93a7]">
+          {staffName}
+        </p>
+      ) : null}
       <button
+        type="button"
         onClick={onLogout}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-amber-400 hover:bg-amber-500/10 transition-colors text-xs font-medium cursor-pointer"
+        className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium text-[#8b93a7] hover:bg-red-500/10 hover:text-red-400 transition-colors cursor-pointer"
       >
         <LogOut className="size-3.5" />
-        {t("nav.logout")}
+        <span className="hidden sm:inline">{t("nav.logout")}</span>
       </button>
-    </div>
+    </header>
   );
 }

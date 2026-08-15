@@ -105,6 +105,8 @@ type MenuManagementProps = {
   enterpriseSupplyMall?: boolean;
   /** Enterprise: optional BOM / recipe on menu items (përbërës → furnizim). */
   enterpriseSupplyRecipe?: boolean;
+  /** Admin vs manager: managers cannot delete, change VAT, or edit recipes/cost. */
+  staffRole?: string;
 };
 
 export default function MenuManagement({
@@ -112,8 +114,13 @@ export default function MenuManagement({
   stockActorName = "",
   enterpriseSupplyMall = false,
   enterpriseSupplyRecipe = false,
+  staffRole,
 }: MenuManagementProps) {
   const { t, formatPrice } = usePosLocale();
+  const isAdminStaff = staffRole === "admin";
+  const canDeleteMenuItems = isAdminStaff;
+  const canEditVat = isAdminStaff;
+  const canEditRecipe = isAdminStaff;
   const isOnline = useOnlineStatus();
   const categoriesQuery = useQuery('pos.menu.getCategories', { licenseKey });
   const menusQuery = useQuery('pos.menu.getMenus', { licenseKey });
@@ -307,6 +314,10 @@ export default function MenuManagement({
   // ── Handlers ──────────────────────────────────────
 
   const handleDeleteCategory = async (catId: Id<"menuCategories">) => {
+    if (!canDeleteMenuItems) {
+      toast.error(t("menu_page.admin_only_delete"));
+      return;
+    }
     const itemCount =
       allItems?.filter((i) => i.categoryId === catId).length ?? 0;
     if (
@@ -341,6 +352,10 @@ export default function MenuManagement({
   };
 
   const handleDeleteItem = async (itemId: Id<"menuItems">) => {
+    if (!canDeleteMenuItems) {
+      toast.error(t("menu_page.admin_only_delete"));
+      return;
+    }
     if (!window.confirm(t("menu_page.confirm_del_item"))) return;
     try {
       await deleteItem({ licenseKey, itemId });
@@ -358,6 +373,10 @@ export default function MenuManagement({
   };
 
   const handleDeleteSelectedItems = async () => {
+    if (!canDeleteMenuItems) {
+      toast.error(t("menu_page.admin_only_delete"));
+      return;
+    }
     if (selectedFilteredCount <= 0) return;
     if (
       !window.confirm(
@@ -554,6 +573,10 @@ export default function MenuManagement({
   };
 
   const handleDeleteMenu = async (menuId: Id<"menus">) => {
+    if (!canDeleteMenuItems) {
+      toast.error(t("menu_page.admin_only_delete"));
+      return;
+    }
     if (!window.confirm(t("menu_page.confirm_del_menu"))) return;
     try {
       await deleteMenu({ licenseKey, menuId });
@@ -599,6 +622,11 @@ export default function MenuManagement({
 
   return (
     <div className="min-h-full space-y-6 bg-gradient-to-b from-slate-50 to-white p-6 lg:p-8">
+      {!isAdminStaff ? (
+        <p className="text-xs text-amber-700/90 -mb-3">
+          {t("menu_page.manager_hint")}
+        </p>
+      ) : null}
       {/* ─── 1. Category Cards ─────────────────────── */}
       <section className="space-y-3">
         <h2 className="text-lg font-bold text-slate-900">{t("menu_page.categories")}</h2>
@@ -671,7 +699,11 @@ export default function MenuManagement({
                   });
                   setCategoryDialogOpen(true);
                 }}
-                onDelete={() => handleDeleteCategory(cat._id)}
+                onDelete={
+                  canDeleteMenuItems
+                    ? () => handleDeleteCategory(cat._id)
+                    : undefined
+                }
                 isHidden={!cat.isActive}
               />
             ))}
@@ -747,7 +779,7 @@ export default function MenuManagement({
                   }))}
           </h2>
           <div className="flex flex-wrap items-center justify-end gap-2">
-            {selectedFilteredCount > 0 ? (
+            {selectedFilteredCount > 0 && canDeleteMenuItems ? (
               <Button
                 size="sm"
                 variant="outline"
@@ -821,12 +853,14 @@ export default function MenuManagement({
                   >
                     <Pencil className="size-2 text-slate-600" />
                   </button>
+                  {canDeleteMenuItems ? (
                   <button
                     onClick={() => handleDeleteMenu(m._id)}
                     className="w-4 h-4 rounded-full bg-slate-200 flex items-center justify-center cursor-pointer hover:bg-red-100"
                   >
                     <X className="size-2 text-red-400" />
                   </button>
+                  ) : null}
                 </div>
               </div>
             ))}
@@ -920,7 +954,9 @@ export default function MenuManagement({
           {/* Table header */}
           <div className="grid grid-cols-[44px_1fr_140px_120px_90px_110px_118px] items-center gap-3 bg-slate-50 px-4 py-3">
             <div className="flex justify-center">
-              <Checkbox checked={allChecked} onCheckedChange={toggleAll} />
+              {canDeleteMenuItems ? (
+                <Checkbox checked={allChecked} onCheckedChange={toggleAll} />
+              ) : null}
             </div>
             <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
               {t("menu_page.col_product")}
@@ -976,10 +1012,12 @@ export default function MenuManagement({
               >
                 {/* Checkbox */}
                 <div className="flex justify-center">
-                  <Checkbox
-                    checked={isChecked}
-                    onCheckedChange={() => toggleItem(item._id)}
-                  />
+                  {canDeleteMenuItems ? (
+                    <Checkbox
+                      checked={isChecked}
+                      onCheckedChange={() => toggleItem(item._id)}
+                    />
+                  ) : null}
                 </div>
 
                 {/* Product: Thumbnail + Name + Description */}
@@ -1106,6 +1144,7 @@ export default function MenuManagement({
                   >
                     <Pencil className="size-3.5 text-slate-500" />
                   </button>
+                  {canDeleteMenuItems ? (
                   <button
                     type="button"
                     title={t("btn.delete")}
@@ -1115,6 +1154,7 @@ export default function MenuManagement({
                   >
                     <Trash2 className="size-3.5 text-red-400" />
                   </button>
+                  ) : null}
                 </div>
               </div>
             );
@@ -1164,6 +1204,8 @@ export default function MenuManagement({
             icon: c.icon,
           }))}
           enterpriseSupplyRecipe={enterpriseSupplyRecipe}
+          canEditVat={canEditVat}
+          canEditRecipe={canEditRecipe}
           dialogNewTitleOverride={
             enterpriseSupplyMall && mallView === "kitchen"
               ? "supply_kitchen"

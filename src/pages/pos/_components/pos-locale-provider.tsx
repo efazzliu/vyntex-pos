@@ -8,6 +8,12 @@ import {
 } from "react";
 import { I18nextProvider, useTranslation } from "react-i18next";
 import posI18n from "../_lib/pos-i18n.ts";
+import {
+  POS_DEFAULT_CURRENCY_DECIMALS,
+  POS_DEFAULT_CURRENCY_POSITION,
+  POS_DEFAULT_CURRENCY_SYMBOL,
+  POS_DEFAULT_LANGUAGE,
+} from "@/lib/pos-locale-defaults.ts";
 
 // ── Currency config type ────────────────────────────────
 
@@ -27,15 +33,16 @@ type PosLocaleContextType = {
 };
 
 const DEFAULT_CURRENCY: CurrencyConfig = {
-  symbol: "Lek",
-  position: "suffix",
-  decimals: 2,
+  symbol: POS_DEFAULT_CURRENCY_SYMBOL,
+  position: POS_DEFAULT_CURRENCY_POSITION,
+  decimals: POS_DEFAULT_CURRENCY_DECIMALS,
 };
 
 const PosLocaleContext = createContext<PosLocaleContextType>({
-  language: "en",
+  language: POS_DEFAULT_LANGUAGE,
   currency: DEFAULT_CURRENCY,
-  formatPrice: (amount) => `${amount.toFixed(2)} Lek`,
+  formatPrice: (amount) =>
+    `${POS_DEFAULT_CURRENCY_SYMBOL}${amount.toFixed(POS_DEFAULT_CURRENCY_DECIMALS)}`,
   t: (key) => key,
 });
 
@@ -55,9 +62,9 @@ type PosLocaleProviderProps = {
 
 function PosLocaleInner({
   language,
-  currencySymbol = "Lek",
-  currencyPosition = "suffix",
-  currencyDecimals = 2,
+  currencySymbol = POS_DEFAULT_CURRENCY_SYMBOL,
+  currencyPosition = POS_DEFAULT_CURRENCY_POSITION,
+  currencyDecimals = POS_DEFAULT_CURRENCY_DECIMALS,
   children,
 }: PosLocaleProviderProps) {
   const { i18n, t } = useTranslation("pos");

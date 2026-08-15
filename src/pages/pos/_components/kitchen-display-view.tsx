@@ -1,7 +1,15 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery as useTanStackQuery } from "@tanstack/react-query";
-import { useMutation } from "convex/react";
-import { ChefHat, Wine, CheckCircle2, AlertCircle } from "lucide-react";
+import { useMutation, useQuery } from "convex/react";
+import {
+  AlertCircle,
+  Ban,
+  CheckCircle2,
+  ChefHat,
+  RotateCcw,
+  Search,
+  Wine,
+} from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { toast } from "sonner";
 import { usePosLocale } from "./pos-locale-provider.tsx";
@@ -9,6 +17,8 @@ import type { KitchenQueueLine } from "@/lib/supabase-pos/orders-ops.ts";
 import { posQueryKey, runPosQuery } from "@/lib/supabase-pos/pos-router.ts";
 import { isSupabaseConfigured } from "@/lib/supabase.ts";
 import { cn } from "@/lib/utils.ts";
+import type { Doc } from "@/convex/_generated/dataModel.d.ts";
+import { resolveEnforceOrderAvailability } from "@/lib/pos-order-availability.ts";
 
 type KitchenDisplayViewProps = {
   licenseKey: string;
@@ -20,6 +30,140 @@ type GroupedTicket = {
   tableName: string;
   lines: KitchenQueueLine[];
 };
+
+function KitchenStopPanel({ licenseKey }: { licenseKey: string }) {
+  const { t } = usePosLocale();
+  const [search, setSearch] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const menuItems = useQuery("pos.menu.getAllItems", { licenseKey }) as
+    | Doc<"menuItems">[]
+    | undefined;
+  const company = useQuery("pos.settings.getCompanyDetails", {
+    licenseKey,
+  }) as { enforceOrderAvailability?: boolean } | undefined;
+  const toggleAvailability = useMutation("pos.menu.toggleItemAvailability");
+  const enforce = resolveEnforceOrderAvailability(
+    company?.enforceOrderAvailability,
+    licenseKey,
+  );
+
+  const rows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return [...(menuItems ?? [])]
+      .filter((i) => !q || i.name.toLowerCase().includes(q))
+      .sort((a, b) => {
+        const aOff = a.available === false ? 0 : 1;
+        const bOff = b.available === false ? 0 : 1;
+        if (aOff !== bOff) return aOff - bOff;
+        const aKit = a.station === "kitchen" ? 0 : 1;
+        const bKit = b.station === "kitchen" ? 0 : 1;
+        if (aKit !== bKit) return aKit - bKit;
+        return a.name.localeCompare(b.name);
+      });
+  }, [menuItems, search]);
+
+  const handleToggle = async (item: Doc<"menuItems">) => {
+    if (busyId) return;
+    setBusyId(item._id);
+    const stopping = item.available !== false;
+    try {
+      await toggleAvailability({ licenseKey, itemId: item._id });
+      toast.success(stopping ? t("kitchen.stop_ok") : t("kitchen.resume_ok"));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("kitchen.stop_failed"));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <section className="rounded-2xl border border-[#1e2a45] bg-[#131A2E] overflow-hidden">
+      <div className="px-4 py-3 border-b border-[#1e2a45] bg-[#0D1326]">
+        <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+          <Ban className="size-4 text-amber-400" />
+          {t("kitchen.stop_title")}
+        </h2>
+        <p className="text-xs text-[#8b93a7] mt-1">{t("kitchen.stop_desc")}</p>
+        <p className="text-[11px] mt-1.5 text-amber-400/90">
+          {enforce
+            ? t("kitchen.stop_enforce_on")
+            : t("kitchen.stop_enforce_off")}
+        </p>
+        <div className="relative mt-3">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-[#5a6580]" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t("kitchen.stop_search")}
+            className="w-full pl-9 pr-3 py-2 rounded-lg bg-[#0A0F1E] border border-[#1e2a45] text-white text-sm placeholder:text-[#5a6580] focus:outline-none focus:border-[#0066FF]"
+          />
+        </div>
+      </div>
+      <ul className="max-h-64 overflow-y-auto divide-y divide-[#1e2a45]">
+        {rows.length === 0 ? (
+          <li className="px-4 py-6 text-center text-xs text-[#5a6580]">
+            {t("kitchen.stop_empty")}
+          </li>
+        ) : (
+          rows.map((item) => {
+            const stopped = item.available === false;
+            return (
+              <li
+                key={item._id}
+                className="flex items-center gap-3 px-4 py-2.5"
+              >
+                <div className="mt-0.5 shrink-0">
+                  {item.station === "bar" ? (
+                    <Wine className="size-4 text-purple-400" />
+                  ) : (
+                    <ChefHat className="size-4 text-orange-400" />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p
+                    className={cn(
+                      "text-sm font-medium truncate",
+                      stopped ? "text-amber-200" : "text-white",
+                    )}
+                  >
+                    {item.name}
+                  </p>
+                  {stopped ? (
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-400">
+                      {t("kitchen.stopped")}
+                    </p>
+                  ) : null}
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={busyId === item._id}
+                  className={cn(
+                    "shrink-0 gap-1.5",
+                    stopped
+                      ? "bg-emerald-600 hover:bg-emerald-700"
+                      : "bg-amber-600 hover:bg-amber-700",
+                  )}
+                  onClick={() => void handleToggle(item)}
+                >
+                  {stopped ? (
+                    <RotateCcw className="size-3.5" />
+                  ) : (
+                    <Ban className="size-3.5" />
+                  )}
+                  {stopped
+                    ? t("kitchen.resume_item")
+                    : t("kitchen.stop_item")}
+                </Button>
+              </li>
+            );
+          })
+        )}
+      </ul>
+    </section>
+  );
+}
 
 export default function KitchenDisplayView({
   licenseKey,
@@ -104,91 +248,96 @@ export default function KitchenDisplayView({
             <AlertCircle className="size-8 opacity-90" />
             {t("kitchen.supabase_required")}
           </div>
-        ) : kitchenQuery.isError ? (
-          <div className="rounded-2xl border border-red-500/40 bg-red-500/10 py-12 px-4 text-center space-y-3">
-            <p className="text-red-200 text-sm">{t("kitchen.load_failed")}</p>
-            <p className="text-xs text-red-300/90 break-words max-w-lg mx-auto">
-              {kitchenQuery.error instanceof Error
-                ? kitchenQuery.error.message
-                : String(kitchenQuery.error ?? "")}
-            </p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="border-red-400/40 text-red-100 hover:bg-red-500/20"
-              onClick={() => void kitchenQuery.refetch()}
-            >
-              {t("stock_page.retry")}
-            </Button>
-          </div>
-        ) : queue === undefined && !kitchenQuery.isError ? (
-          <div className="text-[#5a6580] text-sm py-12 text-center">
-            {t("common.loading")}
-          </div>
-        ) : grouped.length === 0 ? (
-          <div className="rounded-2xl border border-[#1e2a45] bg-[#131A2E] py-16 text-center text-[#5a6580]">
-            {t("kitchen.empty")}
-          </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            {grouped.map((ticket) => (
-              <div
-                key={ticket.saleId}
-                className="rounded-2xl border border-[#1e2a45] bg-[#131A2E] overflow-hidden"
-              >
-                <div className="flex items-center justify-between px-4 py-3 border-b border-[#1e2a45] bg-[#0D1326]">
-                  <div>
-                    <p className="text-lg font-bold text-white">
-                      #{ticket.orderNumber}
-                    </p>
-                    <p className="text-xs text-[#0066FF] font-medium">
-                      {ticket.tableName}
-                    </p>
-                  </div>
-                </div>
-                <ul className="divide-y divide-[#1e2a45]">
-                  {ticket.lines.map((line) => (
-                    <li
-                      key={line.lineId}
-                      className="flex items-start gap-3 px-4 py-3"
-                    >
-                      <div className="mt-0.5 shrink-0">
-                        {line.station === "bar" ? (
-                          <Wine className="size-5 text-purple-400" />
-                        ) : (
-                          <ChefHat className="size-5 text-orange-400" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-white font-medium">
-                          <span className="text-[#0066FF] tabular-nums">
-                            {line.quantity}×
-                          </span>{" "}
-                          {line.name}
-                        </p>
-                        {line.notes ? (
-                          <p className="text-xs text-amber-400/90 mt-1">
-                            {line.notes}
-                          </p>
-                        ) : null}
-                      </div>
-                      <Button
-                        size="sm"
-                        className={cn(
-                          "shrink-0 gap-1.5 bg-emerald-600 hover:bg-emerald-700",
-                        )}
-                        onClick={() => void handleBump(line)}
-                      >
-                        <CheckCircle2 className="size-4" />
-                        {t("kitchen.ready")}
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
+          <>
+            <KitchenStopPanel licenseKey={licenseKey} />
+            {kitchenQuery.isError ? (
+              <div className="rounded-2xl border border-red-500/40 bg-red-500/10 py-12 px-4 text-center space-y-3">
+                <p className="text-red-200 text-sm">{t("kitchen.load_failed")}</p>
+                <p className="text-xs text-red-300/90 break-words max-w-lg mx-auto">
+                  {kitchenQuery.error instanceof Error
+                    ? kitchenQuery.error.message
+                    : String(kitchenQuery.error ?? "")}
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="border-red-400/40 text-red-100 hover:bg-red-500/20"
+                  onClick={() => void kitchenQuery.refetch()}
+                >
+                  {t("stock_page.retry")}
+                </Button>
               </div>
-            ))}
-          </div>
+            ) : queue === undefined && !kitchenQuery.isError ? (
+              <div className="text-[#5a6580] text-sm py-12 text-center">
+                {t("common.loading")}
+              </div>
+            ) : grouped.length === 0 ? (
+              <div className="rounded-2xl border border-[#1e2a45] bg-[#131A2E] py-16 text-center text-[#5a6580]">
+                {t("kitchen.empty")}
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                {grouped.map((ticket) => (
+                  <div
+                    key={ticket.saleId}
+                    className="rounded-2xl border border-[#1e2a45] bg-[#131A2E] overflow-hidden"
+                  >
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-[#1e2a45] bg-[#0D1326]">
+                      <div>
+                        <p className="text-lg font-bold text-white">
+                          #{ticket.orderNumber}
+                        </p>
+                        <p className="text-xs text-[#0066FF] font-medium">
+                          {ticket.tableName}
+                        </p>
+                      </div>
+                    </div>
+                    <ul className="divide-y divide-[#1e2a45]">
+                      {ticket.lines.map((line) => (
+                        <li
+                          key={line.lineId}
+                          className="flex items-start gap-3 px-4 py-3"
+                        >
+                          <div className="mt-0.5 shrink-0">
+                            {line.station === "bar" ? (
+                              <Wine className="size-5 text-purple-400" />
+                            ) : (
+                              <ChefHat className="size-5 text-orange-400" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white font-medium">
+                              <span className="text-[#0066FF] tabular-nums">
+                                {line.quantity}×
+                              </span>{" "}
+                              {line.name}
+                            </p>
+                            {line.notes ? (
+                              <p className="text-xs text-amber-400/90 mt-1">
+                                {line.notes}
+                              </p>
+                            ) : null}
+                          </div>
+                          <Button
+                            size="sm"
+                            className={cn(
+                              "shrink-0 gap-1.5 bg-emerald-600 hover:bg-emerald-700",
+                            )}
+                            onClick={() => void handleBump(line)}
+                          >
+                            <CheckCircle2 className="size-4" />
+                            {t("kitchen.ready")}
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
