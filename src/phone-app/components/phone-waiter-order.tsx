@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQuery } from "convex/react";
 import type { Doc, Id } from "@/convex/_generated/dataModel.d.ts";
@@ -97,10 +97,15 @@ function groupSentLines(items: SentLine[]) {
 export default function PhoneWaiterOrder() {
   const { t } = useTranslation("site");
   const navigate = useNavigate();
+  const location = useLocation();
   const params = useParams<{ tableId: string }>();
   const tableId = params.tableId ?? "";
   const session = getWaiterSession();
   const licenseKey = session?.licenseKey ?? "";
+  const backTo =
+    typeof (location.state as { from?: unknown } | null)?.from === "string"
+      ? String((location.state as { from: string }).from)
+      : "/waiter/floor";
 
   useEffect(() => {
     if (!session) navigate("/waiter", { replace: true });
@@ -419,7 +424,7 @@ export default function PhoneWaiterOrder() {
       setPayOpen(false);
       setHistoryOpen(false);
       setCenterNotice(t("phone.waiter.order.paid"));
-      window.setTimeout(() => navigate("/waiter/floor", { replace: true }), 700);
+      window.setTimeout(() => navigate(backTo, { replace: true }), 700);
     } catch {
       toast.error(t("phone.waiter.order.payFailed"));
     } finally {
@@ -443,7 +448,8 @@ export default function PhoneWaiterOrder() {
       <header className="relative z-10 flex items-center gap-3 px-4 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
         <button
           type="button"
-          onClick={() => navigate("/waiter/floor")}
+          onClick={() => navigate(backTo)}
+          aria-label={t("phone.waiter.order.closeOrder")}
           className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.05] text-white/70 active:scale-95"
         >
           <ArrowLeft className="size-4" />
