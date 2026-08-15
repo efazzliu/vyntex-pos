@@ -67,10 +67,10 @@
       }
     },
     "stats": {
-      "restaurants": "Restaurants Served",
+      "modules": "Core POS Modules",
       "uptime": "Uptime Guaranteed",
-      "transactions": "Transactions Processed",
-      "countries": "Countries Worldwide"
+      "trial": "Month Free On Professional",
+      "support": "Priority Support"
     },
     "cta": {
       "titleBefore": "Ready to transform your",
