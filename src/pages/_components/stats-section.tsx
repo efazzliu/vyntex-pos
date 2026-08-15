@@ -2,12 +2,12 @@ import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-const STAT_KEYS = ["restaurants", "uptime", "transactions", "countries"] as const;
+const STAT_KEYS = ["modules", "uptime", "trial", "support"] as const;
 const STAT_VALUES = [
-  { value: 2500, suffix: "+", decimals: 0 },
+  { value: 6, suffix: "", decimals: 0 },
   { value: 99.9, suffix: "%", decimals: 1 },
-  { value: 12, suffix: "M+", decimals: 0 },
-  { value: 45, suffix: "+", decimals: 0 },
+  { value: 1, suffix: "", decimals: 0 },
+  { value: 24, suffix: "/7", decimals: 0 },
 ] as const;
 
 function AnimatedCounter({

@@ -67,10 +67,10 @@
       }
     },
     "stats": {
-      "restaurants": "Restorante të shërbyera",
+      "modules": "Module kryesore POS",
       "uptime": "Disponueshmëri e garantuar",
-      "transactions": "Transaksione të përpunuara",
-      "countries": "Vende në botë"
+      "trial": "Muaj falas në Professional",
+      "support": "Mbështetje prioritare"
     },
     "cta": {
       "titleBefore": "Gati të transformoni",
