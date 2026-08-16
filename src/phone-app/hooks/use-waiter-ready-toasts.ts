@@ -27,7 +27,7 @@ export function useWaiterReadyToasts(licenseKey: string) {
     if (!queue) return;
     const readyLines = queue.filter(
       (l) =>
-        l.station !== "bar" && String(l.status).toLowerCase() === "ready",
+        l.station === "kitchen" && String(l.status).toLowerCase() === "ready",
     );
     const readyIds = readyLines.map((l) => l.lineId);
     if (!primed.current) {

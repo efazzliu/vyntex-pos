@@ -23,7 +23,8 @@ export function PhoneWaiterBottomNav() {
   ) as { status?: string; station?: string }[] | undefined;
   const readyCount = (queue ?? []).filter(
     (l) =>
-      l.station !== "bar" && String(l.status ?? "").toLowerCase() === "ready",
+      l.station === "kitchen" &&
+      String(l.status ?? "").toLowerCase() === "ready",
   ).length;
 
   return (

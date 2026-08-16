@@ -37,9 +37,9 @@ function isReadyStatus(status: string): boolean {
   return String(status).toLowerCase() === "ready";
 }
 
-/** Notifications list is kitchen-only (exclude bar). Missing station → kitchen. */
+/** Notifications list is kitchen-only (exclude bar). */
 function isKitchenStation(station: KitchenLine["station"]): boolean {
-  return station !== "bar";
+  return station === "kitchen";
 }
 
 function groupByTable(lines: KitchenLine[]): TableGroup[] {
