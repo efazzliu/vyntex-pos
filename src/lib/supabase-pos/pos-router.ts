@@ -229,6 +229,10 @@ export async function runPosMutation(
       return orders.bumpKitchenTicketItem(
         args as Parameters<typeof orders.bumpKitchenTicketItem>[0],
       );
+    case "pos.orders.markWaiterLineDelivered":
+      return orders.markWaiterLineDelivered(
+        args as Parameters<typeof orders.markWaiterLineDelivered>[0],
+      );
     case "pos.orders.voidItem":
       return orders.voidItem(args);
     case "pos.orders.updateOrderStatus":
