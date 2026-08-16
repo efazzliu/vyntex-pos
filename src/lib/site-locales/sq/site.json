@@ -273,7 +273,10 @@
       }
     },
     "milestones": [
-      { "year": "2026", "event": "Fillon zhvillimi i Vyntex POS — po ndërtojmë produktin dhe po shkruajmë të ardhmen e hospitalitetit" }
+      {
+        "year": "2026",
+        "event": "Fillon zhvillimi i Vyntex POS — po ndërtojmë produktin dhe po shkruajmë të ardhmen e hospitalitetit"
+      }
     ]
   },
   "legal": {
@@ -798,5 +801,23 @@
       "toastAlreadyRegistered": "Ky email është tashmë i regjistruar. Email-i i verifikimit u ridërgua.",
       "toastSuccess": "Regjistrimi u krye. Verifiko fillimisht email-in."
     }
+  },
+  "demoVideo": {
+    "title": "Shiko Vyntex POS në veprim",
+    "subtitle": "Një video 2-minutëshe se si merret një porosi, menaxhohen tavolinat dhe bëhet pagesa.",
+    "fallback": "Shfletuesi juaj nuk mbështet video të inkorporuar.",
+    "tryHint": "Preferon ta provosh vetë?",
+    "tryButton": "Provo demo interaktive"
+  },
+  "productDemo": {
+    "badge": "Demo interaktive · të dhëna shembull",
+    "title": "Provo Vyntex POS tani",
+    "subtitle": "Nuk kërkohet regjistrim. Ul një tavolinë, krijo një porosi dhe merr pagesën — njësoj si në aplikacionin real.",
+    "tabFloor": "Tavolinat",
+    "tabMenu": "Menu",
+    "tabStaff": "Stafi",
+    "tabAnalytics": "Analitika",
+    "liveBadge": "Modalitet demo",
+    "ctaHint": "Gati të përdorësh këtë në restorantin tënd?"
   }
 }

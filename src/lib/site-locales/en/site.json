@@ -273,7 +273,10 @@
       }
     },
     "milestones": [
-      { "year": "2026", "event": "Vyntex POS development begins — building the product and writing what's next for hospitality" }
+      {
+        "year": "2026",
+        "event": "Vyntex POS development begins — building the product and writing what's next for hospitality"
+      }
     ]
   },
   "legal": {
@@ -798,5 +801,23 @@
       "toastAlreadyRegistered": "This email is already registered. Verification email was sent again.",
       "toastSuccess": "Registration successful. Please verify your email first."
     }
+  },
+  "demoVideo": {
+    "title": "See Vyntex POS in action",
+    "subtitle": "A 2-minute walkthrough of taking an order, managing tables, and getting paid.",
+    "fallback": "Your browser does not support embedded video.",
+    "tryHint": "Prefer to click around yourself?",
+    "tryButton": "Try the interactive demo"
+  },
+  "productDemo": {
+    "badge": "Interactive demo · sample data",
+    "title": "Try Vyntex POS right now",
+    "subtitle": "No sign-up needed. Seat a table, build an order, and charge it — just like the real app.",
+    "tabFloor": "Floor Plan",
+    "tabMenu": "Menu",
+    "tabStaff": "Staff",
+    "tabAnalytics": "Analytics",
+    "liveBadge": "Demo mode",
+    "ctaHint": "Ready to run this at your restaurant?"
   }
 }
