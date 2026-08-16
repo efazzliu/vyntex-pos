@@ -20,9 +20,10 @@ export function PhoneWaiterBottomNav() {
   const queue = useQuery(
     "pos.orders.getWaiterKitchenNotifications",
     licenseKey ? { licenseKey } : "skip",
-  ) as { status?: string }[] | undefined;
+  ) as { status?: string; station?: string }[] | undefined;
   const readyCount = (queue ?? []).filter(
-    (l) => String(l.status ?? "").toLowerCase() === "ready",
+    (l) =>
+      l.station !== "bar" && String(l.status ?? "").toLowerCase() === "ready",
   ).length;
 
   return (

@@ -9,6 +9,7 @@ type KitchenLine = {
   name: string;
   quantity: number;
   status: string;
+  station?: "kitchen" | "bar";
 };
 
 /** Toast when kitchen marks a line ready — runs while waiter shell is open. */
@@ -25,7 +26,8 @@ export function useWaiterReadyToasts(licenseKey: string) {
   useEffect(() => {
     if (!queue) return;
     const readyLines = queue.filter(
-      (l) => String(l.status).toLowerCase() === "ready",
+      (l) =>
+        l.station !== "bar" && String(l.status).toLowerCase() === "ready",
     );
     const readyIds = readyLines.map((l) => l.lineId);
     if (!primed.current) {
