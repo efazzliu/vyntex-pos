@@ -89,7 +89,7 @@ export default function PhoneWaiterNotifications() {
       return;
     }
     navigate(`/waiter/table/${id}`, {
-      state: { from: "/waiter/notifications" },
+      state: { from: "/waiter/notifications", openOrderSheet: true },
     });
   };
 

@@ -102,10 +102,10 @@ export default function PhoneWaiterOrder() {
   const tableId = params.tableId ?? "";
   const session = getWaiterSession();
   const licenseKey = session?.licenseKey ?? "";
+  const routeState = (location.state as { from?: unknown; openOrderSheet?: unknown } | null) ?? null;
   const backTo =
-    typeof (location.state as { from?: unknown } | null)?.from === "string"
-      ? String((location.state as { from: string }).from)
-      : "/waiter/floor";
+    typeof routeState?.from === "string" ? String(routeState.from) : "/waiter/floor";
+  const openOrderSheetOnEntry = routeState?.openOrderSheet === true;
 
   useEffect(() => {
     if (!session) navigate("/waiter", { replace: true });
@@ -183,7 +183,7 @@ export default function PhoneWaiterOrder() {
   const [searchQuery, setSearchQuery] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(openOrderSheetOnEntry);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [centerNotice, setCenterNotice] = useState<string | null>(null);
   const [payOpen, setPayOpen] = useState(false);
@@ -778,95 +778,114 @@ export default function PhoneWaiterOrder() {
       ) : null}
 
       {historyOpen ? (
-        <div className="fixed inset-0 z-30 flex flex-col bg-[#070b14] pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]">
-          <div className="flex justify-end px-4 pb-2">
-            <button
-              type="button"
-              onClick={() => setHistoryOpen(false)}
-              className="flex size-8 items-center justify-center rounded-lg text-white/50"
-            >
-              <X className="size-4" />
-            </button>
-          </div>
-
-          <div className="mx-4 flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-[#f3efe6] text-[#141820] shadow-2xl">
-            <div className="border-b border-black/10 px-5 py-4 text-center">
-              <h2 className="text-[18px] font-semibold tracking-tight">
-                {company?.name || t("phone.waiter.order.billTitle", { defaultValue: "Fatura" })}
+        <div className="fixed inset-0 z-30 flex flex-col justify-end bg-black/60">
+          <button
+            type="button"
+            aria-label={t("btn.cancel")}
+            className="absolute inset-0"
+            onClick={() => setHistoryOpen(false)}
+          />
+          <div className="relative z-10 flex max-h-[88vh] flex-col rounded-t-3xl border-t border-white/10 bg-[#0d1326] pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div className="flex items-center justify-between px-4 py-3.5">
+              <h2 className="text-[15px] font-semibold text-white">
+                {t("phone.waiter.order.previousOrders")}
               </h2>
-              <p className="mt-1 text-[13px] text-black/55">
-                {[currentTable?.zone, currentTable?.name, existingOrder ? `#${existingOrder.orderNumber}` : null]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </p>
+              <button
+                type="button"
+                onClick={() => setHistoryOpen(false)}
+                className="flex size-8 items-center justify-center rounded-lg text-white/50"
+              >
+                <X className="size-4" />
+              </button>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto no-scrollbar px-3 py-2">
-              <div className="mb-1 grid grid-cols-[minmax(0,1fr)_4.1rem_2.4rem_4.6rem] items-center gap-x-1.5 px-1 text-[10px] font-medium text-black/40">
-                <span className="truncate">{t("phone.waiter.order.billItem", { defaultValue: "Produkti" })}</span>
-                <span className="text-right">{t("phone.waiter.order.billUnit", { defaultValue: "Çmimi" })}</span>
-                <span className="text-center">{t("phone.waiter.order.billQty", { defaultValue: "Sasia" })}</span>
-                <span className="text-right">{t("phone.waiter.order.billLine", { defaultValue: "Totali" })}</span>
+            <div className="mx-4 mb-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-[#f3efe6] text-[#141820]">
+              <div className="border-b border-black/10 px-5 py-3 text-center">
+                <h3 className="text-[16px] font-semibold tracking-tight">
+                  {company?.name || t("phone.waiter.order.billTitle", { defaultValue: "Fatura" })}
+                </h3>
+                <p className="mt-1 text-[12px] text-black/55">
+                  {[currentTable?.zone, currentTable?.name, existingOrder ? `#${existingOrder.orderNumber}` : null]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
               </div>
-              <div className="divide-y divide-black/10">
-                {groupedSent.map((g) => (
-                  <div
-                    key={g.key}
-                    className="grid grid-cols-[minmax(0,1fr)_4.1rem_2.4rem_4.6rem] items-center gap-x-1.5 px-1 py-2.5"
+
+              <div className="min-h-0 flex-1 overflow-y-auto no-scrollbar px-3 py-2">
+                {groupedSent.length === 0 ? (
+                  <p className="py-8 text-center text-[13px] text-black/40">
+                    {t("phone.waiter.order.cartEmpty")}
+                  </p>
+                ) : (
+                  <>
+                    <div className="mb-1 grid grid-cols-[minmax(0,1fr)_4.1rem_2.4rem_4.6rem] items-center gap-x-1.5 px-1 text-[10px] font-medium text-black/40">
+                      <span className="truncate">{t("phone.waiter.order.billItem", { defaultValue: "Produkti" })}</span>
+                      <span className="text-right">{t("phone.waiter.order.billUnit", { defaultValue: "Çmimi" })}</span>
+                      <span className="text-center">{t("phone.waiter.order.billQty", { defaultValue: "Sasia" })}</span>
+                      <span className="text-right">{t("phone.waiter.order.billLine", { defaultValue: "Totali" })}</span>
+                    </div>
+                    <div className="divide-y divide-black/10">
+                      {groupedSent.map((g) => (
+                        <div
+                          key={g.key}
+                          className="grid grid-cols-[minmax(0,1fr)_4.1rem_2.4rem_4.6rem] items-center gap-x-1.5 px-1 py-2.5"
+                        >
+                          <span className="min-w-0 truncate text-[13px] font-medium leading-snug">{g.name}</span>
+                          <span className="text-right text-[11px] tabular-nums text-black/50">
+                            {formatPrice(g.price)}
+                          </span>
+                          <span className="text-center text-[13px] font-semibold tabular-nums">{g.qty}</span>
+                          <span className="text-right text-[13px] font-semibold tabular-nums">
+                            {formatPrice(g.price * g.qty)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="border-t border-dashed border-black/20 px-4 py-4">
+                <div className="flex items-end justify-between gap-3">
+                  <span className="text-[12px] font-medium text-black/50">
+                    {t("phone.waiter.order.billDue", { defaultValue: "Për t'u paguar" })}
+                  </span>
+                  <span className="text-[22px] font-bold tabular-nums leading-none">
+                    {formatPrice(orderWithItems?.total ?? billTotal)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {existingOrder ? (
+              <div className="px-4">
+                {waiterCanPay ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHistoryOpen(false);
+                      setPayOpen(true);
+                    }}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3.5 text-[15px] font-semibold text-white"
                   >
-                    <span className="min-w-0 truncate text-[13px] font-medium leading-snug">{g.name}</span>
-                    <span className="text-right text-[11px] tabular-nums text-black/50">
-                      {formatPrice(g.price)}
-                    </span>
-                    <span className="text-center text-[13px] font-semibold tabular-nums">{g.qty}</span>
-                    <span className="text-right text-[13px] font-semibold tabular-nums">
-                      {formatPrice(g.price * g.qty)}
-                    </span>
-                  </div>
-                ))}
+                    <CreditCard className="size-4" />
+                    {t("phone.waiter.order.payment")}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void handleRequestBill()}
+                    disabled={payBusy}
+                    className="flex w-full items-center justify-center rounded-xl bg-[#0066FF] py-3.5 text-[15px] font-semibold text-white disabled:opacity-50"
+                  >
+                    {billRequested
+                      ? t("phone.waiter.order.billRequested")
+                      : t("phone.waiter.order.requestBill")}
+                  </button>
+                )}
               </div>
-            </div>
-
-            <div className="border-t border-dashed border-black/20 px-4 py-4">
-              <div className="flex items-end justify-between gap-3">
-                <span className="text-[12px] font-medium text-black/50">
-                  {t("phone.waiter.order.billDue", { defaultValue: "Për t'u paguar" })}
-                </span>
-                <span className="text-[22px] font-bold tabular-nums leading-none">
-                  {formatPrice(orderWithItems?.total ?? billTotal)}
-                </span>
-              </div>
-            </div>
+            ) : null}
           </div>
-
-          {existingOrder ? (
-            <div className="px-4 pt-3">
-              {waiterCanPay ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setHistoryOpen(false);
-                    setPayOpen(true);
-                  }}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3.5 text-[15px] font-semibold text-white"
-                >
-                  <CreditCard className="size-4" />
-                  {t("phone.waiter.order.payment")}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => void handleRequestBill()}
-                  disabled={payBusy}
-                  className="flex w-full items-center justify-center rounded-xl bg-[#0066FF] py-3.5 text-[15px] font-semibold text-white disabled:opacity-50"
-                >
-                  {billRequested
-                    ? t("phone.waiter.order.billRequested")
-                    : t("phone.waiter.order.requestBill")}
-                </button>
-              )}
-            </div>
-          ) : null}
         </div>
       ) : null}
 
