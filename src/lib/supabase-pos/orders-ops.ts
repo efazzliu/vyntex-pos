@@ -421,7 +421,7 @@ export async function getKitchenQueue(args: {
 }
 
 /**
- * Waiter phone notifications: items still cooking or marked ready by kitchen,
+ * Waiter phone notifications: kitchen station lines only (sent/preparing/ready)
  * for open tickets (grouped by table in the UI).
  */
 export async function getWaiterKitchenNotifications(args: {
@@ -464,6 +464,27 @@ export async function getWaiterKitchenNotifications(args: {
   assertNoPgError("Waiter kitchen notifications items", itemsRes.error);
   const items = itemsRes.data;
 
+  // Resolve station from menu when sale_items.station is missing/null (common in older DBs).
+  const stationByMenuName = new Map<string, "kitchen" | "bar">();
+  {
+    const { data: menuRows, error: mErr } = await supabase
+      .from("menu_items")
+      .select("name, station")
+      .eq("restaurant_id", r.id);
+    if (!mErr) {
+      for (const m of menuRows ?? []) {
+        const nameKey = String(m.name ?? "")
+          .trim()
+          .toLowerCase();
+        const st = String(m.station ?? "").toLowerCase();
+        if (!nameKey) continue;
+        if (st === "kitchen" || st === "bar") {
+          stationByMenuName.set(nameKey, st);
+        }
+      }
+    }
+  }
+
   const floorIds = [
     ...new Set(
       saleRows
@@ -495,23 +516,33 @@ export async function getWaiterKitchenNotifications(args: {
       sid,
       (sale as { order_number?: number | null }).order_number,
     );
-    const station = rowsMissingStation
+    const itemName = String(it.name ?? "");
+    const fromRow = rowsMissingStation
       ? undefined
       : ((it as { station?: string | null }).station as
           | "kitchen"
           | "bar"
           | null
           | undefined) ?? undefined;
+    const fromMenu = stationByMenuName.get(itemName.trim().toLowerCase());
+    const station: "kitchen" | "bar" | undefined =
+      fromRow === "kitchen" || fromRow === "bar"
+        ? fromRow
+        : fromMenu;
+
+    // Waiter notifications: kitchen tickets only (never bar).
+    if (station !== "kitchen") continue;
+
     out.push({
       lineId: String(it.id),
       saleId: sid,
       orderNumber: on,
       tableId: fid || undefined,
       tableName,
-      name: String(it.name ?? ""),
+      name: itemName,
       quantity: Number(it.quantity),
       notes: (it.notes as string | null) ?? undefined,
-      station,
+      station: "kitchen",
       status: String(it.status ?? ""),
       createdAt: String(it.created_at ?? ""),
     });
