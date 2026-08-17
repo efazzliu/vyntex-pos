@@ -5,7 +5,8 @@
     "pricing": "Çmimet",
     "about": "Rreth nesh",
     "contact": "Kontakt",
-    "dashboard": "Paneli"
+    "dashboard": "Paneli",
+    "phoneApp": "Aplikacioni"
   },
   "footer": {
     "tagline": "Platformë POS për restorante moderne. Thjeshtoni operacionet me stil.",
@@ -28,6 +29,7 @@
       "line2": "pikës së shitjes",
       "subtitle": "POS për restorante moderne. Filloni me 1 muaj falas në Professional — pastaj menaxhoni porositë, pagesat dhe operacionet në një vend.",
       "ctaPrimary": "Fillo falas",
+      "ctaPhone": "Hap aplikacionin",
       "ctaDemo": "Shiko demo",
       "demoToast": "Së shpejti në një përditësim të ardhshëm!",
       "mockOrders": "Porosi",

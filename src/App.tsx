@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { BrowserRouter, HashRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { PHONE_APP_PATH } from "./lib/guest-menu-url.ts";
 import { DefaultProviders } from "./components/providers/default.tsx";
 import { Toaster } from "./components/ui/sonner.tsx";
 import { RedirectIfAuthed } from "./components/redirect-if-authed.tsx";
@@ -50,6 +52,15 @@ import AdminContacts from "./pages/admin/support-center/page.tsx";
 import AdminFinance from "./pages/admin/finance-legacy/page.tsx";
 import AdminSettings from "./pages/admin/settings-hub/page.tsx";
 import PosLauncher from "./pages/pos/page.tsx";
+
+/** Marketing SPA fallback: `/phone` is rewritten to phone.html on Vercel/Vite; this covers hosts that still serve index.html. */
+function PhoneAppEntryRedirect() {
+  useEffect(() => {
+    const { search, hash } = window.location;
+    window.location.replace(`${PHONE_APP_PATH}${search}${hash}`);
+  }, []);
+  return null;
+}
 
 function DesktopHomeRoute() {
   const isElectron =
@@ -149,6 +160,8 @@ export default function App() {
             </Route>
           </Route>
           <Route path="/pos" element={<PosLauncher />} />
+          <Route path="/phone" element={<PhoneAppEntryRedirect />} />
+          <Route path="/phone/" element={<PhoneAppEntryRedirect />} />
           <Route path="*" element={<NotFound />} />
             </>
           )}

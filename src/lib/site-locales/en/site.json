@@ -5,7 +5,8 @@
     "pricing": "Pricing",
     "about": "About",
     "contact": "Contact",
-    "dashboard": "Dashboard"
+    "dashboard": "Dashboard",
+    "phoneApp": "Phone app"
   },
   "footer": {
     "tagline": "Enterprise-grade POS platform for modern restaurants. Streamline your operations with elegance.",
@@ -28,6 +29,7 @@
       "line2": "Point-of-Sale",
       "subtitle": "Enterprise-grade POS for modern restaurants. Start with 1 month free on Professional — then streamline orders, payments, and operations in one place.",
       "ctaPrimary": "Get Started Free",
+      "ctaPhone": "Open phone app",
       "ctaDemo": "Watch Demo",
       "demoToast": "Coming soon in a future milestone!",
       "mockOrders": "Orders",

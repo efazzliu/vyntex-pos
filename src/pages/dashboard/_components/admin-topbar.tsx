@@ -5,9 +5,9 @@ import {
   Building2,
   CalendarDays,
   ChevronDown,
+  ChevronLeft,
   LayoutDashboard,
   LogOut,
-  Menu,
   Search,
   Settings,
 } from "lucide-react";
@@ -41,7 +41,7 @@ import type { DatePreset } from "../_lib/admin-center-types.ts";
 
 const PRESETS: DatePreset[] = ["today", "week", "month", "last_month", "quarter", "year", "custom"];
 
-export function AdminTopbar({ onMenu }: { onMenu: () => void }) {
+export function AdminTopbar() {
   const { t, lang } = useDashboardLocale();
   const navigate = useNavigate();
   const { user } = useUserRole();
@@ -88,14 +88,13 @@ export function AdminTopbar({ onMenu }: { onMenu: () => void }) {
 
   return (
     <header className="flex h-16 shrink-0 items-center gap-3 border-b border-slate-200/80 bg-white/90 px-3 backdrop-blur-md sm:px-5">
-      <button
-        type="button"
-        onClick={onMenu}
-        className="inline-flex size-9 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 md:hidden"
-        aria-label={t("nav.menu_aria")}
+      <Link
+        to="/app"
+        className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 md:hidden"
+        aria-label={t("ac.nav.back_venues")}
       >
-        <Menu className="size-5" />
-      </button>
+        <ChevronLeft className="size-5" />
+      </Link>
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

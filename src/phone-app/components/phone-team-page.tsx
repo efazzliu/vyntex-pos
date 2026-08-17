@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/lib/supabase.ts";
 import { useTranslation } from "react-i18next";
-import { ChevronLeft, Copy, Trash2, Users } from "lucide-react";
+import { ChevronLeft, Copy, KeyRound, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button.tsx";
 import {
@@ -196,6 +196,20 @@ export default function PhoneTeamPage() {
           <div className="min-w-0 flex-1">
             <p className="font-semibold text-slate-900">{t("phone.team.staffPinTitle")}</p>
             <p className="text-xs text-slate-500">{t("phone.team.staffPinDesc")}</p>
+          </div>
+          <span className="text-slate-300">›</span>
+        </Link>
+
+        <Link
+          to="/redeem-code"
+          className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:bg-slate-50"
+        >
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
+            <KeyRound className="size-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-slate-900">{t("phone.team.redeemLinkTitle")}</p>
+            <p className="text-xs text-slate-500">{t("phone.team.redeemLinkDesc")}</p>
           </div>
           <span className="text-slate-300">›</span>
         </Link>

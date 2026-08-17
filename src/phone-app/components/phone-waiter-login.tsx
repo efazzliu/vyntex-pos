@@ -527,6 +527,15 @@ export default function PhoneWaiterLogin() {
           </motion.div>
         ) : null}
 
+        <p className="pt-4 text-center text-sm">
+          <Link
+            to="/login"
+            className="font-medium underline-offset-4"
+            style={{ color: accent }}
+          >
+            {t("phone.waiter.managerLogin")}
+          </Link>
+        </p>
         <p
           className={cn(
             "pt-3 text-center text-[10px]",

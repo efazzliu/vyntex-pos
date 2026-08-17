@@ -33,6 +33,7 @@ import PhoneWaiterMenu from "@/phone-app/components/phone-waiter-menu.tsx";
 import PhoneWaiterOrders from "@/phone-app/components/phone-waiter-orders.tsx";
 import PhoneWaiterNotifications from "@/phone-app/components/phone-waiter-notifications.tsx";
 import PhoneGuestMenu from "@/phone-app/components/phone-guest-menu.tsx";
+import PhoneRedeemCodePage from "@/phone-app/components/phone-redeem-code-page.tsx";
 import AdminCenterLayout from "@/pages/admin-center/layout.tsx";
 import AdminCenterOverview from "@/pages/admin-center/overview.tsx";
 import AdminCenterVenues from "@/pages/admin-center/venues.tsx";
@@ -75,10 +76,13 @@ export default function PhoneApp() {
               </PhoneAccessBrandingProvider>
             }
           />
-          {/* Phone app is login-only: no self-serve register / invite redeem. */}
+          {/* Phone app: no public register. Managers still join with an invite code. */}
           <Route path="/register" element={<Navigate to="/login" replace />} />
-          <Route path="/redeem-code" element={<Navigate to="/login" replace />} />
-          <Route path="/app/redeem-code" element={<Navigate to="/login" replace />} />
+          <Route path="/redeem-code" element={<PhoneRedeemCodePage />} />
+          <Route
+            path="/app/redeem-code"
+            element={<Navigate to="/redeem-code" replace />}
+          />
           <Route element={<RedirectIfAuthed redirectTo="/app" />}>
             <Route
               path="/login"
@@ -86,7 +90,7 @@ export default function PhoneApp() {
                 <LoginPage
                   defaultAfterLogin="/app"
                   showCreateAccountLink={false}
-                  showManagerCodeLink={false}
+                  showManagerCodeLink
                   showWaiterLink
                   formOnly
                 />

@@ -6,6 +6,34 @@ import react from "@vitejs/plugin-react-swc";
 import { defineConfig, type Plugin } from "vite";
 import { createInstallerMiddleware } from "./scripts/vite-installer-middleware.ts";
 
+/** Serve the phone MPA at `/phone` (same as production rewrite to phone.html). */
+function phoneAppAliasPlugin(): Plugin {
+  const rewritePhonePath = (url: string | undefined) => {
+    if (!url) return url;
+    const q = url.indexOf("?");
+    const pathOnly = q === -1 ? url : url.slice(0, q);
+    if (pathOnly !== "/phone" && pathOnly !== "/phone/") return url;
+    return `/phone.html${q === -1 ? "" : url.slice(q)}`;
+  };
+  return {
+    name: "vyntex-phone-app-alias",
+    configureServer(server) {
+      server.middlewares.use((req, _res, next) => {
+        const nextUrl = rewritePhonePath(req.url);
+        if (nextUrl && nextUrl !== req.url) req.url = nextUrl;
+        next();
+      });
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use((req, _res, next) => {
+        const nextUrl = rewritePhonePath(req.url);
+        if (nextUrl && nextUrl !== req.url) req.url = nextUrl;
+        next();
+      });
+    },
+  };
+}
+
 function viteInstallerPlugin(): Plugin {
   return {
     name: "vite-installer-middleware",
@@ -174,6 +202,7 @@ export default defineConfig(() => {
       },
     },
     plugins: [
+      phoneAppAliasPlugin(),
       viteInstallerPlugin(),
       writeBuildMetaJsonPlugin(),
       copyVersionedInstallerToDistPlugin(),
