@@ -219,6 +219,22 @@ const DICT: Record<DashboardLang, Record<string, string>> = {
     "licenses.history_title": "License history",
     "licenses.history_subtitle": "Every license linked to this account.",
     "licenses.manage": "Manage billing",
+    "business.eyebrow": "Businesses",
+    "business.title": "Your businesses",
+    "business.subtitle":
+      "Every venue linked to this account. Tap a card to open that business.",
+    "business.count": "{{count}} businesses",
+    "business.empty_title": "No business linked yet",
+    "business.empty_body":
+      "Activate or link a POS license to this account. Your venues will appear here as cards.",
+    "business.activate": "Activate license",
+    "business.view_licenses": "View licenses",
+    "business.open": "Open business",
+    "business.opening": "Opening…",
+    "business.details": "Business details",
+    "business.expires": "Expires {{date}}",
+    "business.license": "License {{key}}",
+    "business.back": "All businesses",
   },
   sq: {
     "layout.brand": "Vyntex POS",
@@ -410,6 +426,22 @@ const DICT: Record<DashboardLang, Record<string, string>> = {
     "licenses.history_title": "Historiku i licencave",
     "licenses.history_subtitle": "Çdo licencë e lidhur me këtë llogari.",
     "licenses.manage": "Menaxho faturimin",
+    "business.eyebrow": "Bizneset",
+    "business.title": "Bizneset tuaja",
+    "business.subtitle":
+      "Çdo lokal i lidhur me këtë llogari. Prekni kartën për të hapur atë biznes.",
+    "business.count": "{{count}} biznese",
+    "business.empty_title": "Nuk ka biznes të lidhur ende",
+    "business.empty_body":
+      "Aktivizo ose lidh një licencë POS me këtë llogari. Lokalet do të shfaqen këtu si karta.",
+    "business.activate": "Aktivizo licencën",
+    "business.view_licenses": "Shiko licencat",
+    "business.open": "Hap biznesin",
+    "business.opening": "Duke hapur…",
+    "business.details": "Detajet e biznesit",
+    "business.expires": "Skadon {{date}}",
+    "business.license": "Licenca {{key}}",
+    "business.back": "Të gjitha bizneset",
   },
 };
 
