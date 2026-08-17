@@ -23,28 +23,18 @@ export type DashboardBusinessProfile = {
 const BUSINESS_PROFILE_SELECT =
   "id, name, legal_name, type, address, city, postal_code, country, phone, business_email, website, tax_number, vat_number, default_vat_rate, currency, language, timezone";
 
-export async function fetchDashboardBusinessProfile(
-  restaurantId: string,
-): Promise<DashboardBusinessProfile> {
-  const { data, error } = await supabase
-    .from("restaurants")
-    .select(BUSINESS_PROFILE_SELECT)
-    .eq("id", restaurantId)
-    .single();
-  if (error) {
-    const missingColumn =
-      /column|schema cache/i.test(error.message) &&
-      /legal_name|business_email|vat_number|default_vat_rate|timezone/i.test(
-        error.message,
-      );
-    if (missingColumn) {
-      throw new Error(
-        "Business profile fields are not installed. Run supabase/migrations/031_restaurants_business_profile.sql.",
-      );
-    }
-    throw new Error(error.message);
-  }
-  const row = data as Record<string, unknown>;
+const BASIC_PROFILE_SELECT = "id, name, type, address, phone, currency, language";
+
+function isMissingBusinessProfileColumn(message: string): boolean {
+  return (
+    /column|schema cache/i.test(message) &&
+    /legal_name|business_email|vat_number|default_vat_rate|timezone|postal_code|website|tax_number|city|country|business_profile_updated_at/i.test(
+      message,
+    )
+  );
+}
+
+function mapProfile(row: Record<string, unknown>): DashboardBusinessProfile {
   return {
     id: String(row.id),
     name: String(row.name ?? ""),
@@ -66,6 +56,31 @@ export async function fetchDashboardBusinessProfile(
   };
 }
 
+export async function fetchDashboardBusinessProfile(
+  restaurantId: string,
+): Promise<DashboardBusinessProfile> {
+  const { data, error } = await supabase
+    .from("restaurants")
+    .select(BUSINESS_PROFILE_SELECT)
+    .eq("id", restaurantId)
+    .single();
+  if (!error && data) return mapProfile(data as Record<string, unknown>);
+
+  if (error && isMissingBusinessProfileColumn(error.message)) {
+    const fallback = await supabase
+      .from("restaurants")
+      .select(BASIC_PROFILE_SELECT)
+      .eq("id", restaurantId)
+      .single();
+    if (fallback.error || !fallback.data) {
+      throw new Error(fallback.error?.message ?? error.message);
+    }
+    return mapProfile(fallback.data as Record<string, unknown>);
+  }
+
+  throw new Error(error?.message ?? "Could not load business profile.");
+}
+
 export async function saveDashboardBusinessProfile(
   profile: DashboardBusinessProfile,
 ): Promise<void> {
@@ -80,26 +95,42 @@ export async function saveDashboardBusinessProfile(
   }
 
   const optional = (value: string) => value.trim() || null;
+  const fullPatch = {
+    name,
+    legal_name: optional(profile.legalName),
+    address: optional(profile.address),
+    city: optional(profile.city),
+    postal_code: optional(profile.postalCode),
+    country: optional(profile.country),
+    phone: optional(profile.phone),
+    business_email: optional(profile.email),
+    website: optional(profile.website),
+    tax_number: optional(profile.taxNumber),
+    vat_number: optional(profile.vatNumber),
+    default_vat_rate: profile.defaultVatRate,
+    currency: profile.currency,
+    language: profile.language,
+    timezone: profile.timezone,
+    business_profile_updated_at: new Date().toISOString(),
+  };
   const { error } = await supabase
+    .from("restaurants")
+    .update(fullPatch)
+    .eq("id", profile.id);
+  if (!error) return;
+  if (!isMissingBusinessProfileColumn(error.message)) {
+    throw new Error(error.message);
+  }
+
+  const { error: basicError } = await supabase
     .from("restaurants")
     .update({
       name,
-      legal_name: optional(profile.legalName),
       address: optional(profile.address),
-      city: optional(profile.city),
-      postal_code: optional(profile.postalCode),
-      country: optional(profile.country),
       phone: optional(profile.phone),
-      business_email: optional(profile.email),
-      website: optional(profile.website),
-      tax_number: optional(profile.taxNumber),
-      vat_number: optional(profile.vatNumber),
-      default_vat_rate: profile.defaultVatRate,
       currency: profile.currency,
       language: profile.language,
-      timezone: profile.timezone,
-      business_profile_updated_at: new Date().toISOString(),
     })
     .eq("id", profile.id);
-  if (error) throw new Error(error.message);
+  if (basicError) throw new Error(basicError.message);
 }

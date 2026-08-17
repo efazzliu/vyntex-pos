@@ -119,6 +119,7 @@ export default function App() {
               <Route path="billing" element={<DashboardBillingPage />} />
               <Route path="team-access" element={<DashboardTeamAccessPage />} />
               <Route path="business-settings" element={<DashboardBusinessSettingsPage />} />
+              <Route path="business-settings/:restaurantId" element={<DashboardBusinessSettingsPage />} />
               <Route path="security" element={<DashboardSecurityPage />} />
               <Route path="support" element={<DashboardSupportPage />} />
               <Route path="system-status" element={<DashboardSystemStatusPage />} />
