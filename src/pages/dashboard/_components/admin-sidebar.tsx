@@ -1,56 +1,31 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import {
-  Activity,
-  Bell,
-  Building2,
-  ChevronLeft,
-  CreditCard,
-  KeyRound,
-  LayoutDashboard,
-  LogOut,
-  Settings2,
-  Shield,
-  SlidersHorizontal,
-  UserRound,
-  Users,
-} from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 import { useDashboardLocale } from "./dashboard-locale-context.tsx";
 import { useUserRole } from "@/hooks/use-user-role.ts";
 import { supabase } from "@/lib/supabase.ts";
 import { clearDashboardRestaurantId } from "@/hooks/use-dashboard-restaurant.ts";
+import {
+  ADMIN_PRIMARY_LINKS,
+  adminPathActive,
+  type AdminNavLink,
+} from "../_lib/admin-center-nav.ts";
+import {
+  Bell,
+  ChevronLeft,
+  LogOut,
+  Settings2,
+  Shield,
+  SlidersHorizontal,
+  UserRound,
+} from "lucide-react";
 
-const ADMIN_LINKS = [
-  { href: "/admin-center/overview", key: "ac.nav.overview", icon: LayoutDashboard },
-  { href: "/admin-center/venues", key: "ac.nav.venues", icon: Building2 },
-  { href: "/admin-center/licenses", key: "ac.nav.licenses", icon: KeyRound },
-  { href: "/admin-center/billing", key: "ac.nav.billing", icon: CreditCard },
-  { href: "/admin-center/team-access", key: "ac.nav.team", icon: Users },
-  { href: "/admin-center/activity", key: "ac.nav.activity", icon: Activity },
-] as const;
-
-const ACCOUNT_LINKS = [
+const ACCOUNT_LINKS: AdminNavLink[] = [
   { href: "/admin-center/settings?tab=account", key: "ac.nav.profile", icon: UserRound },
   { href: "/admin-center/settings?tab=security", key: "ac.nav.security", icon: Shield },
   { href: "/admin-center/settings?tab=notifications", key: "ac.nav.notifications", icon: Bell },
   { href: "/admin-center/settings?tab=preferences", key: "ac.nav.preferences", icon: SlidersHorizontal },
-] as const;
-
-function pathActive(pathname: string, search: string, href: string): boolean {
-  const url = new URL(href, "https://vyntex.local");
-  if (href.startsWith("/admin-center/overview")) {
-    return pathname === "/admin-center" || pathname === "/admin-center/overview";
-  }
-  if (url.pathname === "/admin-center/settings") {
-    if (pathname !== "/admin-center/settings") return false;
-    const tab = new URLSearchParams(search).get("tab");
-    const expected = url.searchParams.get("tab");
-    if (!expected) return !tab || tab === "account";
-    return tab === expected;
-  }
-  return pathname === url.pathname || pathname.startsWith(`${url.pathname}/`);
-}
+];
 
 export function AdminSidebar({
   collapsed,
@@ -73,8 +48,8 @@ export function AdminSidebar({
     navigate("/login", { replace: true });
   };
 
-  const renderLink = (link: { href: string; key: string; icon: typeof LayoutDashboard }) => {
-    const active = pathActive(location.pathname, location.search, link.href);
+  const renderLink = (link: AdminNavLink) => {
+    const active = adminPathActive(location.pathname, location.search, link.href);
     return (
       <Link
         key={link.href}
@@ -138,7 +113,7 @@ export function AdminSidebar({
               {t("ac.nav.admin_center")}
             </p>
           ) : null}
-          <div className="space-y-0.5">{ADMIN_LINKS.map(renderLink)}</div>
+          <div className="space-y-0.5">{ADMIN_PRIMARY_LINKS.map(renderLink)}</div>
         </div>
 
         <div className="border-t border-slate-100 pt-4">
