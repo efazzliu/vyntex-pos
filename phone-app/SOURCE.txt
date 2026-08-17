@@ -2,9 +2,10 @@ Kodi React për versionin e telefonit (UI / hook-e / rrugë vetëm për mobile)
 gjendet në: src/phone-app/
 
 Hyrja e dytë Vite (pa site publik): phone.html
-  • Dev: npm run dev  →  http://localhost:5173/phone.html
+  • Dev: npm run dev  →  http://localhost:5173/phone.html  (ose /phone)
   • Në telefon (i njëjti Wi-Fi): http://IP_E_PC:5173/phone.html
-  • Build prod: dist/phone.html (bashkë me dist/index.html)
+  • Prod: https://www.vyntexpos.net/phone.html  (ose /phone)
+  • Build: dist/phone.html (bashkë me dist/index.html)
 
 Rruga (HashRouter): phone.html#/ → login → #/app (dashboard mobil), #/pos, #/admin.
 Shembull: http://localhost:5173/phone.html#/login

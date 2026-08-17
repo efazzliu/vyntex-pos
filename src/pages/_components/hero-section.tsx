@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { motion } from "motion/react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Play } from "lucide-react";
+import { ArrowRight, Play, Smartphone } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
 import { useMarketingPrimaryCtaHref } from "@/hooks/use-marketing-primary-cta-href.ts";
 import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
+import { PHONE_APP_PATH } from "@/lib/guest-menu-url.ts";
 import DemoVideoDialog from "./demo-video-dialog.tsx";
 
 const MOCK_KEYS = [
@@ -120,6 +121,16 @@ export default function HeroSection() {
               {t("home.hero.ctaPrimary")}
               <ArrowRight className="ml-1 size-4" />
             </Link>
+          </Button>
+          <Button
+            size="lg"
+            asChild
+            className="h-12 border-0 bg-white px-8 text-base text-[#0A1628] shadow-lg shadow-black/20 hover:bg-white/90"
+          >
+            <a href={PHONE_APP_PATH} className="inline-flex items-center">
+              <Smartphone className="mr-1 size-4" />
+              {t("home.hero.ctaPhone")}
+            </a>
           </Button>
           <Button
             size="lg"
