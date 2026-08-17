@@ -360,6 +360,12 @@ export default function PhoneWaiterPair() {
           >
             {t("phone.waiter.pairBack")}
           </Link>
+          <Link
+            to="/login"
+            className="text-[13px] font-medium text-white/45 hover:text-white/75"
+          >
+            {t("phone.waiter.managerLogin")}
+          </Link>
         </div>
 
         <motion.div

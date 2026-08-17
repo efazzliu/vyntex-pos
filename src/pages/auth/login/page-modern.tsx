@@ -203,7 +203,7 @@ export default function LoginPageModern({
         </p>
       ) : null}
       {showManagerCodeLink ? (
-        <p className="mt-4 text-sm">
+        <p className="mt-4 text-center text-sm">
           <Link to="/redeem-code" className="text-[#0066FF]">
             {t("auth.login.managerCodeLink")}
           </Link>
