@@ -172,6 +172,11 @@ function invalidateAfterOrderMutation(
     void qc.invalidateQueries({
       queryKey: posQueryKey("pos.orders.getKitchenQueue", { licenseKey }),
     });
+    void qc.invalidateQueries({
+      queryKey: posQueryKey("pos.orders.getWaiterKitchenNotifications", {
+        licenseKey,
+      }),
+    });
   }
 
   if (
@@ -383,7 +388,9 @@ export function useQuery(
   const refetchTables = id === "pos.tables.getTables";
   const refetchMenuItems = id === "pos.menu.getAllItems";
   const refetchCompanyDetails = id === "pos.settings.getCompanyDetails";
-  const refetchKitchenQueue = id === "pos.orders.getKitchenQueue";
+  const refetchKitchenQueue =
+    id === "pos.orders.getKitchenQueue" ||
+    id === "pos.orders.getWaiterKitchenNotifications";
   const refetchDailyDashboard =
     id === "pos.dashboard.getDashboardStats" ||
     (id === "pos.dashboard.getZReport" &&

@@ -135,6 +135,14 @@
     touch-action: manipulation;
     -webkit-tap-highlight-color: rgb(0 102 255 / 0.14);
   }
+
+  /* Phone shell: no pinch / double-tap zoom (native-app feel). */
+  html.phone-app,
+  html.phone-app body.phone-app {
+    touch-action: pan-x pan-y;
+    -ms-touch-action: pan-x pan-y;
+    overscroll-behavior: none;
+  }
 }
 
 /* ── POS Light Theme Overrides ─────────────────────────────── */

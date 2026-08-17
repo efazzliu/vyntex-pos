@@ -2,13 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "convex/react";
-import type { Doc } from "@/convex/_generated/dataModel.d.ts";
 import { motion } from "motion/react";
 import { LogOut, MapPinned, Users, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import {
   clearWaiterSession,
   getWaiterSession,
+  isWaiterDesignPreviewLicense,
 } from "@/phone-app/lib/waiter-session.ts";
 import { uuidOrNull, staffIdsEqual } from "@/lib/supabase-pos/uuid.ts";
 import { cn } from "@/lib/utils.ts";
@@ -23,6 +23,43 @@ type TableOrderSummary = {
   total: number;
 };
 
+type FloorTable = {
+  _id: string;
+  name: string;
+  seats: number;
+  zone: string;
+  status: "available" | "occupied" | "reserved" | "bill-printed";
+};
+
+const DEMO_FLOOR_TABLES: FloorTable[] = [
+  { _id: "demo-t1", name: "T1", seats: 2, zone: "Sala", status: "available" },
+  { _id: "demo-t2", name: "T2", seats: 4, zone: "Sala", status: "occupied" },
+  { _id: "demo-t3", name: "T3", seats: 4, zone: "Sala", status: "available" },
+  { _id: "demo-t4", name: "T4", seats: 6, zone: "Sala", status: "reserved" },
+  { _id: "demo-t5", name: "T5", seats: 2, zone: "Terasë", status: "available" },
+  { _id: "demo-t6", name: "T6", seats: 4, zone: "Terasë", status: "bill-printed" },
+  { _id: "demo-t7", name: "T7", seats: 8, zone: "Terasë", status: "occupied" },
+  { _id: "demo-t8", name: "T8", seats: 2, zone: "Bar", status: "available" },
+];
+
+const DEMO_ORDER_SUMMARIES: Record<string, TableOrderSummary> = {
+  "demo-t2": {
+    staffId: "00000000-0000-4000-8000-000000000001",
+    staffName: "Artes",
+    total: 1850,
+  },
+  "demo-t6": {
+    staffId: "00000000-0000-4000-8000-000000000001",
+    staffName: "Artes",
+    total: 920,
+  },
+  "demo-t7": {
+    staffId: "00000000-0000-4000-8000-000000000099",
+    staffName: "Ana",
+    total: 2400,
+  },
+};
+
 type TableColors = {
   bg: string;
   border: string;
@@ -30,7 +67,7 @@ type TableColors = {
 };
 
 function tableColors(
-  table: Doc<"tables">,
+  table: FloorTable,
   summary: TableOrderSummary | undefined,
   currentStaffId: string | undefined,
   isAdminOrManager: boolean,
@@ -65,15 +102,17 @@ export default function PhoneWaiterFloor() {
   const [activeZone, setActiveZone] = useState<string | null>(null);
 
   const licenseKey = session?.licenseKey ?? "";
-  const waiterCanPay = useWaiterCanPay(licenseKey);
+  const designPreview = isWaiterDesignPreviewLicense(licenseKey);
+  const liveCanPay = useWaiterCanPay(designPreview ? "" : licenseKey);
+  const waiterCanPay = designPreview || liveCanPay;
   const access = usePhoneAccessBranding();
-  const tables = useQuery(
+  const liveTables = useQuery(
     "pos.tables.getTables",
-    licenseKey ? { licenseKey } : "skip",
-  ) as Doc<"tables">[] | undefined;
-  const orderSummaries = useQuery(
+    licenseKey && !designPreview ? { licenseKey } : "skip",
+  ) as FloorTable[] | undefined;
+  const liveOrderSummaries = useQuery(
     "pos.tables.getTableOrderSummaries",
-    licenseKey ? { licenseKey } : "skip",
+    licenseKey && !designPreview ? { licenseKey } : "skip",
   ) as Record<string, TableOrderSummary> | undefined;
 
   useEffect(() => {
@@ -82,7 +121,8 @@ export default function PhoneWaiterFloor() {
     }
   }, [session, navigate]);
 
-  const resolvedTables = tables ?? [];
+  const resolvedTables = designPreview ? DEMO_FLOOR_TABLES : (liveTables ?? []);
+  const orderSummaries = designPreview ? DEMO_ORDER_SUMMARIES : liveOrderSummaries;
   const zones = useMemo(
     () => [...new Set(resolvedTables.map((tb) => tb.zone))].sort(),
     [resolvedTables],
@@ -105,10 +145,16 @@ export default function PhoneWaiterFloor() {
   const signOut = () => {
     // Ends the waiter shift only — phone stays paired until admin disconnects Device ID.
     clearWaiterSession();
-    navigate("/waiter", { replace: true });
+    navigate(designPreview ? "/waiter/preview" : "/waiter", { replace: true });
   };
 
-  const handleTableTap = (table: Doc<"tables">) => {
+  const handleTableTap = (table: FloorTable) => {
+    if (designPreview) {
+      toast.message(t("phone.waiter.subtitle"), {
+        description: table.name,
+      });
+      return;
+    }
     const summary = orderSummaries?.[table._id];
     const hasAssignedWaiter = Boolean(uuidOrNull(summary?.staffId));
     const isMine =
@@ -504,43 +550,40 @@ export default function PhoneWaiterFloor() {
             {displayTables.map((table) => {
               const summary = orderSummaries?.[table._id];
               const colors = tableColors(table, summary, staff.id, isAdminOrManager);
+              const statusLine = summary
+                ? waiterCanPay
+                  ? summary.total.toFixed(0)
+                  : t("phone.waiter.tableOpen")
+                : t("phone.waiter.tableFree");
               return (
                 <button
                   key={table._id}
                   type="button"
                   onClick={() => handleTableTap(table)}
                   className={cn(
-                    "flex flex-col items-center justify-center gap-1 rounded-2xl border-2 px-2 transition active:scale-[0.97]",
-                    access.homeTableCols === 4
-                      ? "py-2"
-                      : access.homeTableCols === 3
-                        ? "py-3"
-                        : "py-5",
+                    "box-border flex h-[7.25rem] w-full shrink-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-2xl border-2 px-2 transition active:scale-[0.97]",
                     colors.bg,
                     colors.border,
                   )}
                 >
-                  <span className="text-base font-bold text-white">
+                  <span className="max-w-full truncate text-base font-bold leading-none text-white">
                     {table.name}
                   </span>
-                  {summary ? (
-                    waiterCanPay ? (
-                      <span className={cn("text-[11px] font-semibold tabular-nums", colors.text)}>
-                        {summary.total.toFixed(0)}
-                      </span>
-                    ) : null
-                  ) : (
-                    <span className={cn("text-[11px] font-medium", colors.text)}>
-                      {t("phone.waiter.tableFree")}
-                    </span>
-                  )}
-                  {table.status === "bill-printed" ? (
-                    <span className="text-[10px] font-medium text-blue-300">
-                      {t("phone.waiter.order.billRequested")}
-                    </span>
-                  ) : null}
-                  <span className="flex items-center gap-1 text-[10px] text-white/35">
-                    <Users className="size-2.5" />
+                  <span
+                    className={cn(
+                      "max-w-full truncate text-[11px] font-semibold leading-none tabular-nums",
+                      colors.text,
+                    )}
+                  >
+                    {statusLine}
+                  </span>
+                  <span className="h-3 max-w-full truncate text-[10px] font-medium leading-none text-blue-300">
+                    {table.status === "bill-printed"
+                      ? t("phone.waiter.order.billRequested")
+                      : "\u00a0"}
+                  </span>
+                  <span className="flex h-3 items-center gap-1 text-[10px] leading-none text-white/35">
+                    <Users className="size-2.5 shrink-0" />
                     {table.seats}
                   </span>
                 </button>

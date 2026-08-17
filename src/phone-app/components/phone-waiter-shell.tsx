@@ -4,6 +4,7 @@ import { getWaiterSession } from "@/phone-app/lib/waiter-session.ts";
 import { PhoneAccessBrandingProvider, usePhoneAccessBranding } from "@/phone-app/hooks/use-phone-access-branding.tsx";
 import { cn } from "@/lib/utils.ts";
 import { phoneAccessThemeTokens, waiterThemeStyle } from "@/lib/phone-access-theme.ts";
+import { useWaiterReadyToasts } from "@/phone-app/hooks/use-waiter-ready-toasts.ts";
 import { PhoneWaiterBottomNav } from "./phone-waiter-bottom-nav.tsx";
 
 function WaiterThemeFrame({ children }: { children: ReactNode }) {
@@ -24,6 +25,7 @@ function WaiterThemeFrame({ children }: { children: ReactNode }) {
 export default function PhoneWaiterShell() {
   const navigate = useNavigate();
   const session = getWaiterSession();
+  useWaiterReadyToasts(session?.licenseKey ?? "");
 
   useEffect(() => {
     if (!session) navigate("/waiter", { replace: true });

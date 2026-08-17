@@ -32,6 +32,7 @@ import {
   clearWaiterPhonePair,
   getWaiterPhonePair,
   getWaiterVenueKey,
+  isWaiterDesignPreviewLicense,
   normalizeWaiterVenueKey,
   setWaiterSession,
   setWaiterVenueKey,
@@ -119,6 +120,7 @@ export default function PhoneWaiterLogin() {
   // Locked to venue until admin disconnects this Device ID.
   useEffect(() => {
     if (!pair?.licenseKey || !pair.deviceId) return;
+    if (isWaiterDesignPreviewLicense(pair.licenseKey)) return;
     let cancelled = false;
     void (async () => {
       const status = await fetchWaiterPhoneBindingStatus(
