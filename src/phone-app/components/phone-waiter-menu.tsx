@@ -12,6 +12,8 @@ import { useWaiterCanPay } from "@/phone-app/hooks/use-waiter-can-pay.ts";
 import { emojiForCategoryName } from "@/lib/pos-category-icons.ts";
 import { buildGuestMenuUrl } from "@/lib/guest-menu-url.ts";
 import { cn } from "@/lib/utils.ts";
+import { usePhoneAccessBranding } from "@/phone-app/hooks/use-phone-access-branding.tsx";
+import { phoneAccessHasBottomNav } from "@/lib/local-db.ts";
 
 export default function PhoneWaiterMenu() {
   const { t } = useTranslation("site");
@@ -39,6 +41,7 @@ export default function PhoneWaiterMenu() {
 
   const restaurantId = company?.id ?? "";
   const waiterCanPay = useWaiterCanPay(licenseKey);
+  const access = usePhoneAccessBranding();
 
   useEffect(() => {
     if (!restaurantId) {
@@ -71,27 +74,155 @@ export default function PhoneWaiterMenu() {
       .sort((a, b) => a.displayOrder - b.displayOrder);
   }, [menuItems, searchQuery, activeCategory]);
 
+  const design = access.menuDesign;
+  const showQr = access.showMenuQr;
+  const modern = design === "modern";
+  const advanced = design === "advanced";
+
+  const openDish = () => {
+    toast.message(t("phone.waiter.menuPickTable"));
+    navigate("/waiter/floor");
+  };
+
   return (
-    <div className="flex min-h-dvh flex-col bg-[#070b14] pb-[5.75rem] text-white">
+    <div
+      className={cn(
+        "flex min-h-dvh flex-col bg-[#070b14] text-white",
+        phoneAccessHasBottomNav(access) ? "pb-[5.75rem]" : "pb-6",
+      )}
+    >
+      {access.showMenuHeader ? (
       <header className="flex items-start justify-between gap-3 px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">
-            {t("phone.waiter.floorEyebrow")}
-          </p>
-          <h1 className="text-xl font-semibold tracking-tight">
+          {advanced ? (
+            <p className="text-[11px] text-white/40">{t("phone.waiter.floorEyebrow")}</p>
+          ) : (
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">
+              {t("phone.waiter.floorEyebrow")}
+            </p>
+          )}
+          <h1
+            className={cn(
+              "font-semibold tracking-tight",
+              modern ? "text-[18px]" : advanced ? "text-[17px]" : "text-xl",
+            )}
+          >
             {t("phone.waiter.navMenu")}
           </h1>
         </div>
-        <button
-          type="button"
-          onClick={() => setQrOpen(true)}
-          className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] text-white/80 active:scale-95"
-          aria-label={t("phone.waiter.menuQrTitle")}
-        >
-          <QrCode className="size-5" />
-        </button>
+        {showQr ? (
+          <button
+            type="button"
+            onClick={() => setQrOpen(true)}
+            className={cn(
+              "flex size-10 shrink-0 items-center justify-center text-white/80 active:scale-95",
+              modern
+                ? "rounded-full bg-white/[0.08]"
+                : "rounded-xl border border-white/10 bg-white/[0.06]",
+            )}
+            aria-label={t("phone.waiter.menuQrTitle")}
+          >
+            <QrCode className="size-5" />
+          </button>
+        ) : null}
       </header>
+      ) : showQr ? (
+        <div className="flex items-center justify-end px-5 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2">
+          <button
+            type="button"
+            onClick={() => setQrOpen(true)}
+            className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] text-white/80 active:scale-95"
+            aria-label={t("phone.waiter.menuQrTitle")}
+          >
+            <QrCode className="size-5" />
+          </button>
+        </div>
+      ) : (
+        <div className="pt-[max(0.75rem,env(safe-area-inset-top))]" />
+      )}
 
+      {modern ? (
+        <div
+          ref={categoryScrollRef}
+          className="waiter-cat-scroll no-scrollbar w-full min-w-0 px-5 pb-3"
+        >
+          <div className="flex w-max gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveCategory("all")}
+              className={cn(
+                "shrink-0 rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition",
+                activeCategory === "all" ? "text-white" : "bg-white/[0.08] text-white/55",
+              )}
+              style={
+                activeCategory === "all"
+                  ? { backgroundColor: access.accentColor }
+                  : undefined
+              }
+            >
+              {t("phone.waiter.menuAll")}
+            </button>
+            {(categories ?? []).map((cat) => {
+              const sel = activeCategory === cat._id;
+              return (
+                <button
+                  key={cat._id}
+                  type="button"
+                  onClick={() => setActiveCategory(cat._id)}
+                  className={cn(
+                    "shrink-0 rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition",
+                    sel ? "text-white" : "bg-white/[0.08] text-white/55",
+                  )}
+                  style={sel ? { backgroundColor: cat.color || access.accentColor } : undefined}
+                >
+                  {cat.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : advanced ? (
+        <div
+          ref={categoryScrollRef}
+          className="waiter-cat-scroll no-scrollbar w-full min-w-0 px-5 pb-3"
+        >
+          <div className="flex w-max gap-4">
+            <button
+              type="button"
+              onClick={() => setActiveCategory("all")}
+              className="shrink-0 pb-1.5 text-[13px] font-medium"
+              style={{
+                color: activeCategory === "all" ? "var(--waiter-fg, #fff)" : "var(--waiter-muted, rgba(255,255,255,0.4))",
+                borderBottom:
+                  activeCategory === "all"
+                    ? `2px solid ${access.accentColor}`
+                    : "2px solid transparent",
+              }}
+            >
+              {t("phone.waiter.menuAll")}
+            </button>
+            {(categories ?? []).map((cat) => {
+              const sel = activeCategory === cat._id;
+              return (
+                <button
+                  key={cat._id}
+                  type="button"
+                  onClick={() => setActiveCategory(cat._id)}
+                  className="shrink-0 pb-1.5 text-[13px] font-medium"
+                  style={{
+                    color: sel ? "var(--waiter-fg, #fff)" : "var(--waiter-muted, rgba(255,255,255,0.4))",
+                    borderBottom: sel
+                      ? `2px solid ${cat.color || access.accentColor}`
+                      : "2px solid transparent",
+                  }}
+                >
+                  {cat.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
       <div
         ref={categoryScrollRef}
         className="waiter-cat-scroll no-scrollbar w-full min-w-0 px-5 pb-3"
@@ -142,6 +273,7 @@ export default function PhoneWaiterMenu() {
           })}
         </div>
       </div>
+      )}
 
       <div className="px-5 pb-3">
         <div className="relative">
@@ -150,7 +282,10 @@ export default function PhoneWaiterMenu() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t("phone.waiter.order.searchPlaceholder")}
-            className="h-10 w-full rounded-xl border border-white/10 bg-white/[0.05] pl-9 pr-3 text-[14px] text-white outline-none placeholder:text-white/30 focus:border-[#0066FF]/60"
+            className={cn(
+              "h-10 w-full border border-white/10 bg-white/[0.05] pl-9 pr-3 text-[14px] text-white outline-none placeholder:text-white/30 focus:border-[#0066FF]/60",
+              modern ? "rounded-full" : advanced ? "rounded-lg" : "rounded-xl",
+            )}
           />
         </div>
       </div>
@@ -161,16 +296,59 @@ export default function PhoneWaiterMenu() {
             <UtensilsCrossed className="size-8 text-white/25" />
             <p className="text-sm text-white/45">{t("phone.waiter.order.noItems")}</p>
           </div>
+        ) : modern ? (
+          <div className="space-y-2 pb-4">
+            {items.map((item) => (
+              <button
+                key={item._id}
+                type="button"
+                onClick={openDish}
+                className="flex w-full items-center justify-between gap-3 rounded-2xl bg-white/[0.05] px-3 py-2.5 text-left active:scale-[0.99]"
+              >
+                <span className="min-w-0 truncate text-[14px] font-semibold">{item.name}</span>
+                {waiterCanPay ? (
+                  <span className="shrink-0 text-[13px] font-semibold tabular-nums text-[#7eb6ff]">
+                    {item.price}
+                  </span>
+                ) : null}
+              </button>
+            ))}
+          </div>
+        ) : advanced ? (
+          <div className="space-y-1.5 pb-4">
+            {items.map((item) => (
+              <button
+                key={item._id}
+                type="button"
+                onClick={openDish}
+                className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left"
+                style={{
+                  background: "rgba(255,255,255,0.04)",
+                  boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.08)",
+                }}
+              >
+                <span
+                  className="h-8 w-1 shrink-0 rounded-full"
+                  style={{ background: access.accentColor }}
+                />
+                <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">
+                  {item.name}
+                </span>
+                {waiterCanPay ? (
+                  <span className="shrink-0 text-[13px] font-bold tabular-nums text-[#7eb6ff]">
+                    {item.price}
+                  </span>
+                ) : null}
+              </button>
+            ))}
+          </div>
         ) : (
           <div className="grid grid-cols-3 gap-2 pb-4">
             {items.map((item) => (
               <button
                 key={item._id}
                 type="button"
-                onClick={() => {
-                  toast.message(t("phone.waiter.menuPickTable"));
-                  navigate("/waiter/floor");
-                }}
+                onClick={openDish}
                 className="flex min-h-[4.75rem] min-w-0 flex-col items-center justify-center gap-1 rounded-2xl border border-white/10 bg-white/[0.04] px-2 py-2.5 text-center active:scale-[0.98]"
               >
                 <span className="line-clamp-2 w-full text-[12px] font-medium leading-tight">
@@ -187,7 +365,7 @@ export default function PhoneWaiterMenu() {
         )}
       </main>
 
-      {qrOpen ? (
+      {qrOpen && showQr ? (
         <div className="fixed inset-0 z-[80] flex flex-col bg-[#070b14] px-6 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-[16px] font-semibold text-white">

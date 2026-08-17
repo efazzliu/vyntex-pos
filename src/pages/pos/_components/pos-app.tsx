@@ -34,6 +34,7 @@ import {
 } from "@/lib/pos-locale-defaults.ts";
 import { LogOut, Menu } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils.ts";
 import {
   canAccessView,
   defaultAdminManagerLandingView,
@@ -282,6 +283,16 @@ function PosAppInner({
     setActiveView("home");
   }, [activeStaff.role, activation.plan, activeView, canViewAuditLog]);
 
+  useEffect(() => {
+    if (
+      activeView !== "floor" &&
+      activeView !== "order" &&
+      activeView !== "tables"
+    ) {
+      setDrawerOpen(false);
+    }
+  }, [activeView]);
+
   const setActiveViewFromPlan = useCallback(
     (view: PosView) => {
       if (view === "kitchen-display" && kitchenDisplayNavState(activation.plan) !== "live") {
@@ -356,10 +367,14 @@ function PosAppInner({
     );
   }
 
-  // ── Admin & Manager: full-screen with logo-triggered drawer ───────
+  // ── Admin & Manager: pinned nav, hidden only on table workspace ───────
   if (activeStaff.role === "admin" || activeStaff.role === "manager") {
     const isFloorOrOrder =
       activeView === "floor" || activeView === "order";
+    const isTableWorkspace =
+      activeView === "floor" ||
+      activeView === "order" ||
+      activeView === "tables";
 
     // Helper: only render a gated view if the plan allows it (and staff permission for audit log)
     const gated = (view: PosView, node: ReactNode) =>
@@ -370,23 +385,43 @@ function PosAppInner({
         ? node
         : null;
 
+    const adminDrawer = (
+      <AdminDrawer
+        pinned={!isTableWorkspace}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        activeView={activeView}
+        onViewChange={setActiveViewFromPlan}
+        businessName={activation.businessName}
+        staffName={activeStaff.name}
+        staffRole={activeStaff.role}
+        plan={activation.plan}
+        onLogout={onLogout}
+        theme={theme}
+        canViewAuditLog={canViewAuditLog}
+      />
+    );
+
     return (
       <OfflineSyncManager>
         <div className="h-screen bg-[#0A0F1E] overflow-hidden flex flex-col" data-pos-theme={theme}>
           <OfflineBanner />
 
-          {/* Top bar for non-floor / non-order views */}
-          {!isFloorOrOrder && (
-            <AdminTopBar
-              businessName={activation.businessName}
-              staffName={activeStaff.name}
-              staffRole={activeStaff.role}
-              onLogoClick={() => setDrawerOpen(true)}
-              onLogout={onLogout}
-            />
-          )}
+          <div className="flex min-h-0 flex-1">
+            {!isTableWorkspace ? adminDrawer : null}
 
-          <div className="flex-1 min-h-0 overflow-auto">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              {activeView === "tables" ? (
+                <AdminTopBar
+                  businessName={activation.businessName}
+                  staffName={activeStaff.name}
+                  staffRole={activeStaff.role}
+                  onLogoClick={() => setDrawerOpen(true)}
+                  onLogout={onLogout}
+                />
+              ) : null}
+
+              <div className={cn("flex-1 min-h-0", isFloorOrOrder || activeView === "tables" ? "overflow-hidden" : "overflow-auto")}>
             <PosViewErrorBoundary key={activeView}>
             {/* Floor — same as waiter, logo opens drawer */}
             {activeView === "floor" && (
@@ -548,22 +583,11 @@ function PosAppInner({
               </div>
             ))}
             </PosViewErrorBoundary>
+              </div>
+            </div>
           </div>
 
-          {/* Slide-out drawer */}
-          <AdminDrawer
-            open={drawerOpen}
-            onOpenChange={setDrawerOpen}
-            activeView={activeView}
-            onViewChange={setActiveViewFromPlan}
-            businessName={activation.businessName}
-            staffName={activeStaff.name}
-            staffRole={activeStaff.role}
-            plan={activation.plan}
-            onLogout={onLogout}
-            theme={theme}
-            canViewAuditLog={canViewAuditLog}
-          />
+          {isTableWorkspace ? adminDrawer : null}
         </div>
       </OfflineSyncManager>
     );

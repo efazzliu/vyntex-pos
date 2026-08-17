@@ -36,6 +36,8 @@ import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 type AdminDrawerProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Persistent left rail. Overlay sheet is used only on table views. */
+  pinned?: boolean;
   activeView: PosView;
   onViewChange: (view: PosView) => void;
   businessName: string;
@@ -69,9 +71,189 @@ const NAV_ITEMS: NavItem[] = [
   { id: "settings", icon: Settings, labelKey: "nav.settings" },
 ];
 
+function AdminNavBody({
+  light,
+  pinned,
+  activeView,
+  businessName,
+  staffName,
+  staffRole,
+  plan,
+  theme,
+  canViewAuditLog,
+  onNav,
+  onLogoClick,
+  onLogout,
+  t,
+}: {
+  light: boolean;
+  pinned: boolean;
+  activeView: PosView;
+  businessName: string;
+  staffName: string;
+  staffRole: string;
+  plan: string;
+  theme: "dark" | "light";
+  canViewAuditLog: boolean;
+  onNav: (view: PosView) => void;
+  onLogoClick: () => void;
+  onLogout: () => void;
+  t: (key: string, options?: Record<string, unknown>) => string;
+}) {
+  const header = (
+    <button
+      type="button"
+      onClick={onLogoClick}
+      className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+    >
+      <img src={VYNTEX_APP_LOGO_SRC} alt="Vyntex POS" className="h-10 w-10 shrink-0" />
+      <div className="min-w-0 text-left">
+        {pinned ? (
+          <>
+            <p
+              className={cn(
+                "text-base font-semibold truncate",
+                light ? "text-slate-900" : "text-white",
+              )}
+            >
+              {businessName}
+            </p>
+            <p className="text-[#0066FF] text-xs font-medium">
+              {staffName} &middot;{" "}
+              {staffRole === "manager"
+                ? t("staff.role_manager")
+                : t("staff.role_admin")}
+            </p>
+          </>
+        ) : (
+          <>
+            <SheetTitle
+              className={cn("text-base truncate", light ? "text-slate-900" : "text-white")}
+            >
+              {businessName}
+            </SheetTitle>
+            <SheetDescription className="text-[#0066FF] text-xs font-medium">
+              {staffName} &middot;{" "}
+              {staffRole === "manager"
+                ? t("staff.role_manager")
+                : t("staff.role_admin")}
+            </SheetDescription>
+          </>
+        )}
+      </div>
+    </button>
+  );
+
+  return (
+    <>
+      {pinned ? (
+        <div
+          className={cn(
+            "p-5 pb-4 border-b",
+            light ? "border-slate-200" : "border-[#1e2a45]",
+          )}
+        >
+          {header}
+        </div>
+      ) : (
+        <SheetHeader
+          className={cn(
+            "p-5 pb-4 border-b",
+            light ? "border-slate-200" : "border-[#1e2a45]",
+          )}
+        >
+          {header}
+        </SheetHeader>
+      )}
+
+      <nav className="flex-1 overflow-auto p-3 space-y-1">
+        {NAV_ITEMS.filter(
+          (item) =>
+            (item.id !== "audit-log" || canViewAuditLog) &&
+            (item.id !== "kitchen-display" || kitchenDisplayNavState(plan) !== "hidden") &&
+            (item.id === "kitchen-display" || canAccessView(plan, item.id)),
+        ).map((item) => {
+          const kds = item.id === "kitchen-display" ? kitchenDisplayNavState(plan) : "live";
+          if (item.id === "kitchen-display" && kds === "coming_soon") {
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => toast.info(t("msg.kitchen_coming_soon"))}
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium transition-colors",
+                  light
+                    ? "cursor-default text-slate-400 hover:bg-slate-50"
+                    : "cursor-default text-[#5a6580] hover:bg-[#1e2a45]/40",
+                )}
+              >
+                <item.icon className="size-5 shrink-0 opacity-60" />
+                <span className="min-w-0 flex-1 text-left">{t(item.labelKey)}</span>
+                <span
+                  className={cn(
+                    "shrink-0 rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                    light ? "bg-slate-200/80 text-slate-600" : "bg-[#1e2a45] text-[#8b93a7]",
+                  )}
+                >
+                  {t("nav.coming_soon_badge")}
+                </span>
+              </button>
+            );
+          }
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => onNav(item.id)}
+              className={cn(
+                "flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer",
+                activeView === item.id
+                  ? "bg-[#0066FF]/15 text-[#0066FF]"
+                  : light
+                    ? "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                    : "text-[#8b93a7] hover:bg-[#1e2a45]/60 hover:text-white",
+              )}
+            >
+              <item.icon className="size-5" />
+              <span className="flex-1 text-left">{t(item.labelKey)}</span>
+            </button>
+          );
+        })}
+        {hasPrioritySupportChat(plan) ? (
+          <div className="pt-1">
+            <PosPrioritySupportNav variant="drawer" theme={theme} />
+          </div>
+        ) : null}
+      </nav>
+
+      <div
+        className={cn(
+          "p-3 border-t",
+          light ? "border-slate-200" : "border-[#1e2a45]",
+        )}
+      >
+        <button
+          type="button"
+          onClick={onLogout}
+          className={cn(
+            "flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer",
+            light
+              ? "text-amber-600 hover:bg-amber-500/10"
+              : "text-amber-400 hover:bg-amber-500/10",
+          )}
+        >
+          <LogOut className="size-5" />
+          {t("nav.logout")}
+        </button>
+      </div>
+    </>
+  );
+}
+
 export default function AdminDrawer({
   open,
   onOpenChange,
+  pinned = false,
   activeView,
   onViewChange,
   businessName,
@@ -99,13 +281,53 @@ export default function AdminDrawer({
       return;
     }
     onViewChange(view);
-    onOpenChange(false);
+    if (!pinned) onOpenChange(false);
   };
 
   const handleLogoClick = () => {
     onViewChange("floor");
-    onOpenChange(false);
+    if (!pinned) onOpenChange(false);
   };
+
+  const handleLogout = () => {
+    if (!pinned) onOpenChange(false);
+    onLogout();
+  };
+
+  const body = (
+    <AdminNavBody
+      light={light}
+      pinned={pinned}
+      activeView={activeView}
+      businessName={businessName}
+      staffName={staffName}
+      staffRole={staffRole}
+      plan={plan}
+      theme={theme}
+      canViewAuditLog={canViewAuditLog}
+      onNav={handleNav}
+      onLogoClick={handleLogoClick}
+      onLogout={handleLogout}
+      t={t}
+    />
+  );
+
+  const panelClass = cn(
+    light ? "border-slate-200 bg-white" : "border-[#1e2a45] bg-[#0D1326]",
+  );
+
+  if (pinned) {
+    return (
+      <aside
+        className={cn(
+          "flex h-full w-72 shrink-0 flex-col border-r",
+          panelClass,
+        )}
+      >
+        {body}
+      </aside>
+    );
+  }
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -113,124 +335,14 @@ export default function AdminDrawer({
         side="left"
         data-pos-theme={theme}
         className={cn(
-          "w-72 p-0",
+          "flex w-72 flex-col p-0",
+          panelClass,
           light
-            ? "border-slate-200 bg-white [&>button:last-of-type]:text-slate-500 [&>button:last-of-type]:hover:text-slate-800"
-            : "border-[#1e2a45] bg-[#0D1326] [&>button:last-of-type]:text-[#8b93a7]",
+            ? "[&>button:last-of-type]:text-slate-500 [&>button:last-of-type]:hover:text-slate-800"
+            : "[&>button:last-of-type]:text-[#8b93a7]",
         )}
       >
-        {/* Header */}
-        <SheetHeader
-          className={cn(
-            "p-5 pb-4 border-b",
-            light ? "border-slate-200" : "border-[#1e2a45]",
-          )}
-        >
-          <button
-            onClick={handleLogoClick}
-            className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
-          >
-            <img src={VYNTEX_APP_LOGO_SRC} alt="Vyntex POS" className="h-10 w-10 shrink-0" />
-            <div className="min-w-0 text-left">
-              <SheetTitle
-                className={cn("text-base truncate", light ? "text-slate-900" : "text-white")}
-              >
-                {businessName}
-              </SheetTitle>
-              <SheetDescription className="text-[#0066FF] text-xs font-medium">
-                {staffName} &middot;{" "}
-                {staffRole === "manager"
-                  ? t("staff.role_manager")
-                  : t("staff.role_admin")}
-              </SheetDescription>
-            </div>
-          </button>
-        </SheetHeader>
-
-        {/* Navigation items */}
-        <nav className="flex-1 overflow-auto p-3 space-y-1">
-          {NAV_ITEMS.filter(
-            (item) =>
-              (item.id !== "audit-log" || canViewAuditLog) &&
-              (item.id !== "kitchen-display" || kitchenDisplayNavState(plan) !== "hidden") &&
-              (item.id === "kitchen-display" || canAccessView(plan, item.id)),
-          ).map((item) => {
-            const kds = item.id === "kitchen-display" ? kitchenDisplayNavState(plan) : "live";
-            if (item.id === "kitchen-display" && kds === "coming_soon") {
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => toast.info(t("msg.kitchen_coming_soon"))}
-                  className={cn(
-                    "flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium transition-colors",
-                    light
-                      ? "cursor-default text-slate-400 hover:bg-slate-50"
-                      : "cursor-default text-[#5a6580] hover:bg-[#1e2a45]/40",
-                  )}
-                >
-                  <item.icon className="size-5 shrink-0 opacity-60" />
-                  <span className="min-w-0 flex-1 text-left">{t(item.labelKey)}</span>
-                  <span
-                    className={cn(
-                      "shrink-0 rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-                      light ? "bg-slate-200/80 text-slate-600" : "bg-[#1e2a45] text-[#8b93a7]",
-                    )}
-                  >
-                    {t("nav.coming_soon_badge")}
-                  </span>
-                </button>
-              );
-            }
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => handleNav(item.id)}
-                className={cn(
-                  "flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer",
-                  activeView === item.id
-                      ? "bg-[#0066FF]/15 text-[#0066FF]"
-                      : light
-                        ? "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                        : "text-[#8b93a7] hover:bg-[#1e2a45]/60 hover:text-white",
-                )}
-              >
-                <item.icon className="size-5" />
-                <span className="flex-1 text-left">{t(item.labelKey)}</span>
-              </button>
-            );
-          })}
-          {hasPrioritySupportChat(plan) ? (
-            <div className="pt-1">
-              <PosPrioritySupportNav variant="drawer" theme={theme} />
-            </div>
-          ) : null}
-        </nav>
-
-        {/* Logout */}
-        <div
-          className={cn(
-            "p-3 border-t",
-            light ? "border-slate-200" : "border-[#1e2a45]",
-          )}
-        >
-          <button
-            onClick={() => {
-              onOpenChange(false);
-              onLogout();
-            }}
-            className={cn(
-              "flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer",
-              light
-                ? "text-amber-600 hover:bg-amber-500/10"
-                : "text-amber-400 hover:bg-amber-500/10",
-            )}
-          >
-            <LogOut className="size-5" />
-            {t("nav.logout")}
-          </button>
-        </div>
+        {body}
       </SheetContent>
     </Sheet>
   );

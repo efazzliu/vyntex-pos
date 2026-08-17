@@ -54,13 +54,15 @@ import {
   MonitorSmartphone,
   SlidersHorizontal,
   ArrowRight,
+  ArrowLeft,
   Smartphone,
   Store,
   Package,
 } from "lucide-react";
 import TemplateManager from "./template-manager.tsx";
-import WaiterPhonePairSection from "./waiter-phone-pair-section.tsx";
+import PhoneAppSettings from "./phone-app-settings.tsx";
 import AppUpdateSection from "./app-update-section.tsx";
+import SettingsCategoryHub from "./settings-category-hub.tsx";
 import type { PosView } from "../_lib/types.ts";
 import {
   type SettingsCategoryId,
@@ -576,6 +578,7 @@ const SETTINGS_NAV: {
   { id: "security", icon: Shield, titleKey: "settings.cat.security", descKey: "settings.cat.security_desc" },
   { id: "print", icon: Receipt, titleKey: "settings.cat.print", descKey: "settings.cat.print_desc" },
   { id: "customerDisplay", icon: MonitorSmartphone, titleKey: "settings.cat.customer_display", descKey: "settings.cat.customer_display_desc" },
+  { id: "phoneApp", icon: Smartphone, titleKey: "settings.cat.phone_app", descKey: "settings.cat.phone_app_desc" },
   { id: "other", icon: SlidersHorizontal, titleKey: "settings.cat.other", descKey: "settings.cat.other_desc" },
 ];
 
@@ -639,7 +642,7 @@ export default function PosSettings({
     useState(false);
   const [scanning, setScanning] = useState(false);
   const [activeCategory, setActiveCategory] =
-    useState<SettingsCategoryId>("general");
+    useState<SettingsCategoryId | null>(null);
   const [savingLocale, setSavingLocale] = useState(false);
   const [paymentSettings, setPaymentSettings] = useState<PosPaymentSettings>(() =>
     readLocalPaymentSettings(licenseKey),
@@ -909,14 +912,14 @@ export default function PosSettings({
     [staffRole],
   );
   const activeNav =
-    visibleSettingsNav.find((c) => c.id === activeCategory) ??
-    visibleSettingsNav[0] ??
-    SETTINGS_NAV[0];
-  const ActiveIcon = activeNav.icon;
+    activeCategory == null
+      ? null
+      : (visibleSettingsNav.find((c) => c.id === activeCategory) ?? null);
+  const ActiveIcon = activeNav?.icon;
 
   useEffect(() => {
     if (staffRole === "waiter" && activeCategory === "payments") {
-      setActiveCategory("general");
+      setActiveCategory(null);
     }
   }, [staffRole, activeCategory]);
 
@@ -1028,42 +1031,30 @@ export default function PosSettings({
     }
   };
 
-  return (
-    <div className="flex flex-col lg:flex-row lg:items-stretch min-h-full">
-      <aside className="lg:w-[280px] shrink-0 border-b lg:border-b-0 lg:border-r border-[#1e2a45] bg-[#0D1326] lg:sticky lg:top-0 lg:max-h-[calc(100vh-3.5rem)] lg:overflow-y-auto">
-        <div className="px-4 pt-5 pb-3 hidden lg:block">
-          <p className="text-xs font-semibold uppercase tracking-wider text-[#5a6580]">
-            {t("settings.title")}
-          </p>
-        </div>
-        <nav className="flex lg:flex-col gap-1 p-2 overflow-x-auto lg:overflow-x-visible">
-          {visibleSettingsNav.map((item) => {
-            const Icon = item.icon;
-            const selected = activeCategory === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setActiveCategory(item.id)}
-                className={cn(
-                  "flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-colors cursor-pointer shrink-0 lg:shrink lg:w-full",
-                  selected
-                    ? "bg-[#0066FF] text-[#ffffff]"
-                    : "text-[#8b93a7] hover:text-white hover:bg-[#1e2a45]",
-                )}
-              >
-                <Icon className="size-4 shrink-0" />
-                <span className="text-sm font-medium whitespace-nowrap">
-                  {t(item.titleKey)}
-                </span>
-              </button>
-            );
-          })}
-        </nav>
-      </aside>
+  if (activeCategory == null || !activeNav || !ActiveIcon) {
+    return (
+      <SettingsCategoryHub
+        items={visibleSettingsNav}
+        t={t}
+        onSelect={setActiveCategory}
+      />
+    );
+  }
 
-      <div className="flex-1 min-w-0 p-6 lg:p-8 space-y-8">
+  return (
+    <div className="min-h-full">
+      <div className="w-full p-5 lg:p-6 space-y-8">
         <div>
+          <button
+            type="button"
+            onClick={() => setActiveCategory(null)}
+            className="mb-4 inline-flex items-center gap-2.5 text-sm font-medium text-[#8b93a7] transition-colors hover:text-white cursor-pointer"
+          >
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-full border border-[#1e2a45] bg-[#131A2E] transition-colors hover:border-[#0066FF]/40">
+              <ArrowLeft className="size-4" />
+            </span>
+            {t("settings.hub_back")}
+          </button>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
             <ActiveIcon className="size-6" />
             {t(activeNav.titleKey)}
@@ -1527,6 +1518,14 @@ export default function PosSettings({
         {activeCategory === "customerDisplay" ? (
           <CategoryPlaceholder description={t("settings.cat.customer_display_desc")} />
         ) : null}
+        {activeCategory === "phoneApp" ? (
+          <PhoneAppSettings
+            licenseKey={licenseKey}
+            canActivate={canActivateDevices}
+            canEditDesign={isAdminStaff}
+            venueName={typeof company?.name === "string" ? company.name : ""}
+          />
+        ) : null}
 
         {activeCategory === "other" ? (
           <>
@@ -1581,11 +1580,6 @@ export default function PosSettings({
 
         {activeCategory === "devices" ? (
           <>
-          <WaiterPhonePairSection
-            licenseKey={licenseKey}
-            canActivate={canActivateDevices}
-          />
-
           {/* ── Printers & Peripherals ── */}
           <section className="rounded-xl border border-[#1e2a45] bg-[#0D1326] p-5 space-y-5">
             <div className="flex items-center justify-between flex-wrap gap-3">

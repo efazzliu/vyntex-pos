@@ -2,6 +2,8 @@ import { useQuery } from "convex/react";
 import { useTranslation } from "react-i18next";
 import { Bell, ChefHat } from "lucide-react";
 import { getWaiterSession } from "@/phone-app/lib/waiter-session.ts";
+import { usePhoneAccessBranding } from "@/phone-app/hooks/use-phone-access-branding.tsx";
+import { phoneAccessHasBottomNav } from "@/lib/local-db.ts";
 
 type KitchenLine = {
   lineId: string;
@@ -18,6 +20,7 @@ export default function PhoneWaiterNotifications() {
   const { t } = useTranslation("site");
   const session = getWaiterSession();
   const licenseKey = session?.licenseKey ?? "";
+  const access = usePhoneAccessBranding();
 
   const queue = useQuery(
     "pos.orders.getKitchenQueue",
@@ -27,7 +30,14 @@ export default function PhoneWaiterNotifications() {
   const lines = queue ?? [];
 
   return (
-    <div className="flex min-h-dvh flex-col bg-[#070b14] pb-[5.75rem] text-white">
+    <div
+      className={
+        phoneAccessHasBottomNav(access)
+          ? "flex min-h-dvh flex-col bg-[#070b14] pb-[5.75rem] text-white"
+          : "flex min-h-dvh flex-col bg-[#070b14] pb-6 text-white"
+      }
+    >
+      {access.showNotificationsHeader ? (
       <header className="px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">
           {t("phone.waiter.floorEyebrow")}
@@ -36,6 +46,9 @@ export default function PhoneWaiterNotifications() {
           {t("phone.waiter.navNotifications")}
         </h1>
       </header>
+      ) : (
+        <div className="pt-[max(0.75rem,env(safe-area-inset-top))]" />
+      )}
 
       <main className="flex-1 overflow-y-auto px-5">
         {lines.length === 0 ? (

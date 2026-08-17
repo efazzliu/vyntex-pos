@@ -22,7 +22,7 @@ import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 export default function PhoneDashboard() {
   const { t } = useTranslation("site");
   const navigate = useNavigate();
-  const { user, isAdmin } = useUserRole();
+  const { user } = useUserRole();
   const [venues, setVenues] = useState<OwnedRestaurantRow[] | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [openingId, setOpeningId] = useState<string | null>(null);
@@ -206,14 +206,12 @@ export default function PhoneDashboard() {
           </>
         )}
 
-        {isAdmin ? (
-          <Button variant="outline" className="mt-2 h-11 w-full justify-start gap-2 rounded-xl" asChild>
-            <Link to="/admin" state={{ from: "/dashboard/settings" }}>
-              <ShieldCheck className="size-5 shrink-0" />
-              {t("phone.venues.admin")}
-            </Link>
-          </Button>
-        ) : null}
+        <Button variant="outline" className="mt-2 h-11 w-full justify-start gap-2 rounded-xl" asChild>
+          <Link to="/admin-center/overview">
+            <ShieldCheck className="size-5 shrink-0" />
+            {t("phone.venues.admin")}
+          </Link>
+        </Button>
 
         <p className="mt-auto pt-4 text-center text-xs leading-relaxed text-slate-400">
           {t("phone.venues.desktopHint")}

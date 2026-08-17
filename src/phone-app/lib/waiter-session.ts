@@ -102,3 +102,40 @@ export function clearWaiterPhonePair(): void {
 export function isWaiterPhonePaired(): boolean {
   return getWaiterPhonePair() != null;
 }
+
+const LICENSE_PENDING_KEY = "vyntex-waiter-license-pending";
+
+export type WaiterLicensePending = {
+  licenseKey: string;
+  deviceId: string;
+  restaurantName: string;
+  expiresAt: string;
+};
+
+export function getWaiterLicensePending(): WaiterLicensePending | null {
+  try {
+    const raw = localStorage.getItem(LICENSE_PENDING_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as WaiterLicensePending;
+    if (!parsed?.licenseKey || !parsed?.deviceId) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function setWaiterLicensePending(pending: WaiterLicensePending): void {
+  try {
+    localStorage.setItem(LICENSE_PENDING_KEY, JSON.stringify(pending));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function clearWaiterLicensePending(): void {
+  try {
+    localStorage.removeItem(LICENSE_PENDING_KEY);
+  } catch {
+    /* ignore */
+  }
+}

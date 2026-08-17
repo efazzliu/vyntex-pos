@@ -31,7 +31,9 @@ export function floorTableFromRow(r: {
   pos_y: number | null;
   shape: string | null;
   table_scale: number | null;
+  table_scale_y?: number | null;
 }) {
+  const tableScale = r.table_scale != null ? Number(r.table_scale) : 1;
   return {
     _id: r.id,
     _creationTime: new Date(r.created_at).getTime(),
@@ -42,7 +44,11 @@ export function floorTableFromRow(r: {
     posX: r.pos_x ?? 100,
     posY: r.pos_y ?? 100,
     shape: (r.shape ?? "square") as "square" | "circle" | "rectangle",
-    tableScale: r.table_scale != null ? Number(r.table_scale) : 1,
+    tableScale,
+    tableScaleY:
+      r.table_scale_y != null && Number.isFinite(Number(r.table_scale_y))
+        ? Number(r.table_scale_y)
+        : undefined,
   };
 }
 

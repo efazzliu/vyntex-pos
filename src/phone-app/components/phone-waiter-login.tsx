@@ -7,13 +7,20 @@ import { motion, AnimatePresence } from "motion/react";
 import { Wifi, WifiOff } from "lucide-react";
 import { useOnlineStatus } from "@/hooks/use-online-status.ts";
 import {
+  DEFAULT_PHONE_ACCESS_BRANDING,
   getDataCache,
   hashString,
+  phoneAccessButtonTextColor,
+  type PhoneAccessBranding,
   verifyLocalStaffPin,
   verifyPin,
 } from "@/lib/local-db.ts";
+import { phoneAccessThemeTokens, waiterThemeGlow, waiterThemeStyle } from "@/lib/phone-access-theme.ts";
 import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
-import { resolvePinLoginBranding } from "@/lib/supabase-pos/license-sync.ts";
+import {
+  resolvePhoneAccessBranding,
+  resolvePinLoginBranding,
+} from "@/lib/supabase-pos/license-sync.ts";
 import { fetchWaiterPhoneBindingStatus } from "@/lib/supabase-pos/waiter-phone-binding.ts";
 import { cn } from "@/lib/utils.ts";
 import type { ActiveStaff, StaffRole } from "@/pages/pos/_lib/types.ts";
@@ -61,9 +68,16 @@ export default function PhoneWaiterLogin() {
   const [verifying, setVerifying] = useState(false);
   const [success, setSuccess] = useState<ActiveStaff | null>(null);
   const [venueLogo, setVenueLogo] = useState<string | null>(null);
+  const [access, setAccess] = useState<PhoneAccessBranding>(
+    DEFAULT_PHONE_ACCESS_BRANDING,
+  );
 
   const paired = Boolean(pair?.licenseKey);
   const licenseKey = normalizeWaiterVenueKey(venueKey);
+  const tokens = phoneAccessThemeTokens(access.theme);
+  const light = tokens.isLight;
+  const accent = access.accentColor;
+  const displayLogo = access.logoDataUrl || venueLogo;
 
   useEffect(() => {
     if (!licenseKey) {
@@ -73,10 +87,17 @@ export default function PhoneWaiterLogin() {
     let cancelled = false;
     void (async () => {
       try {
-        const branding = await resolvePinLoginBranding(licenseKey);
-        if (!cancelled) setVenueLogo(branding.logoDataUrl || null);
+        const [pin, phone] = await Promise.all([
+          resolvePinLoginBranding(licenseKey),
+          resolvePhoneAccessBranding(licenseKey),
+        ]);
+        if (cancelled) return;
+        setVenueLogo(pin.logoDataUrl || null);
+        setAccess(phone);
       } catch {
-        if (!cancelled) setVenueLogo(null);
+        if (!cancelled) {
+          setVenueLogo(null);
+        }
       }
     })();
     return () => {
@@ -225,29 +246,43 @@ export default function PhoneWaiterLogin() {
     !success;
 
   return (
-    <div className="relative flex min-h-dvh flex-col overflow-hidden bg-[#070b14] text-white">
+    <div
+      data-waiter-theme={light ? "light" : "dark"}
+      data-waiter-skin={tokens.id}
+      className={cn(
+        "relative flex min-h-dvh flex-col overflow-hidden",
+        light ? "text-[#0f172a]" : "text-white",
+      )}
+      style={waiterThemeStyle(tokens)}
+    >
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"
         style={{
-          background:
-            "radial-gradient(120% 70% at 50% -10%, rgba(0,102,255,0.45) 0%, transparent 55%), radial-gradient(80% 50% at 90% 100%, rgba(68,204,0,0.12) 0%, transparent 50%), linear-gradient(180deg, #0a1224 0%, #070b14 48%, #05080f 100%)",
+          background: waiterThemeGlow(tokens),
         }}
       />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden opacity-[0.06]"
-      >
-        <img
-          src={VYNTEX_APP_LOGO_SRC}
-          alt=""
-          className="h-[140vw] w-[140vw] max-w-none object-contain sm:h-[90vh] sm:w-[90vh]"
-        />
-      </div>
+      {access.showVyntexMark ? (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden opacity-[0.06]"
+        >
+          <img
+            src={VYNTEX_APP_LOGO_SRC}
+            alt=""
+            className="h-[140vw] w-[140vw] max-w-none object-contain sm:h-[90vh] sm:w-[90vh]"
+          />
+        </div>
+      ) : null}
 
       <div className="relative z-10 flex flex-1 flex-col px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))]">
         <div className="mb-4 flex items-center">
-          <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-white/45">
+          <div
+            className={cn(
+              "flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.14em]",
+              light ? "text-slate-400" : "text-white/45",
+            )}
+          >
             {isOnline ? (
               <>
                 <span className="size-1.5 animate-pulse rounded-full bg-emerald-400" />
@@ -264,6 +299,7 @@ export default function PhoneWaiterLogin() {
           </div>
         </div>
 
+        {access.showVyntexMark ? (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -273,36 +309,49 @@ export default function PhoneWaiterLogin() {
           <img
             src={VYNTEX_APP_LOGO_SRC}
             alt=""
-            className="mb-3 h-14 w-auto object-contain drop-shadow-[0_8px_24px_rgba(0,102,255,0.35)]"
+            className="mb-3 w-auto object-contain drop-shadow-[0_8px_24px_rgba(0,102,255,0.35)]"
+            style={{ height: access.logoHeightPx }}
           />
           <h1
-            className="text-[2.35rem] font-semibold leading-none tracking-tight text-white"
-            style={{ fontFamily: '"Space Grotesk", Geist, system-ui, sans-serif' }}
+            className={cn(
+              "text-[2.35rem] font-semibold leading-none tracking-tight",
+              light ? "text-slate-900" : "text-white",
+            )}
+            style={{
+              fontFamily: '"Space Grotesk", Geist, system-ui, sans-serif',
+              color: access.loginTitleColor,
+            }}
           >
             Vyntex
           </h1>
-          <p className="mt-2 text-[15px] font-medium text-[#7eb6ff]">
+          <p className="mt-2 text-[15px] font-medium" style={{ color: access.loginSubtitleColor }}>
             {t("phone.waiter.subtitle")}
           </p>
-          <p className="mt-1 max-w-[16rem] text-[13px] leading-snug text-white/40">
+          <p
+            className="mt-1 max-w-[16rem] text-[13px] leading-snug"
+            style={{ color: access.loginHintColor }}
+          >
             {t("phone.waiter.hintNameCode")}
           </p>
         </motion.div>
+        ) : null}
 
         <div className="mx-auto mb-5 w-full max-w-[20rem]">
           {paired ? (
             <div className="flex flex-col items-center gap-2">
-              {venueLogo ? (
+              {displayLogo ? (
                 <img
-                  src={venueLogo}
+                  src={displayLogo}
                   alt=""
-                  className="h-12 w-auto max-w-[10rem] object-contain drop-shadow-[0_6px_18px_rgba(0,0,0,0.35)]"
+                  className="w-auto max-w-[10rem] object-contain drop-shadow-[0_6px_18px_rgba(0,0,0,0.35)]"
+                  style={{ height: Math.min(access.logoHeightPx, 72) }}
                 />
               ) : null}
               <p
-                className="text-center text-[1.65rem] font-semibold tracking-tight text-white"
+                className="text-center text-[1.65rem] font-semibold tracking-tight"
                 style={{
                   fontFamily: '"Montserrat", "Space Grotesk", Geist, system-ui, sans-serif',
+                  color: access.loginTitleColor,
                 }}
               >
                 {pair?.restaurantName || licenseKey}
@@ -311,12 +360,26 @@ export default function PhoneWaiterLogin() {
           ) : (
             <Link
               to="/waiter/pair"
-              className="flex w-full flex-col items-center gap-2 rounded-2xl border border-[#0066FF]/35 bg-[#0066FF]/12 px-4 py-5 text-center transition active:scale-[0.99]"
+              className="flex w-full flex-col items-center gap-2 rounded-2xl border px-4 py-5 text-center transition active:scale-[0.99]"
+              style={{
+                borderColor: `${accent}59`,
+                backgroundColor: `${accent}1F`,
+              }}
             >
-              <span className="text-[15px] font-semibold text-white">
+              <span
+                className={cn(
+                  "text-[15px] font-semibold",
+                  light ? "text-slate-900" : "text-white",
+                )}
+              >
                 {t("phone.waiter.activatePhone")}
               </span>
-              <span className="text-[12px] leading-snug text-white/55">
+              <span
+                className={cn(
+                  "text-[12px] leading-snug",
+                  light ? "text-slate-500" : "text-white/55",
+                )}
+              >
                 {t("phone.waiter.activatePhoneHint")}
               </span>
             </Link>
@@ -350,16 +413,22 @@ export default function PhoneWaiterLogin() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="mb-4 text-center text-[15px] font-medium text-white/70"
+                  className="mb-4 text-center text-[15px] font-medium"
+                  style={{ color: access.loginHintColor }}
                 >
                   {t("phone.waiter.enterCredentials")}
                 </motion.p>
               )}
             </AnimatePresence>
 
-            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-white/40">
+            {access.showNameLabel ? (
+            <label
+              className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em]"
+              style={{ color: access.loginFieldColor }}
+            >
               {t("phone.waiter.nameLabel")}
             </label>
+            ) : null}
             <input
               value={waiterName}
               disabled={verifying || !!success}
@@ -371,16 +440,29 @@ export default function PhoneWaiterLogin() {
               autoComplete="name"
               placeholder={t("phone.waiter.namePlaceholder")}
               className={cn(
-                "mb-3 h-12 w-full rounded-2xl border bg-white/[0.06] px-3.5 text-[15px] text-white outline-none placeholder:text-white/25",
-                error
-                  ? "border-red-400/60"
-                  : "border-white/10 focus:border-[#0066FF]/60",
+                "mb-3 h-12 w-full rounded-2xl border px-3.5 text-[15px] outline-none",
+                light
+                  ? "bg-white border-slate-200"
+                  : "bg-white/[0.06] border-white/10",
+                error ? "border-red-400/60" : "",
               )}
+              style={{ color: access.loginFieldColor }}
+              onFocus={(e) => {
+                if (!error) e.currentTarget.style.borderColor = accent;
+              }}
+              onBlur={(e) => {
+                if (!error) e.currentTarget.style.borderColor = "";
+              }}
             />
 
-            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-white/40">
+            {access.showCodeLabel ? (
+            <label
+              className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em]"
+              style={{ color: access.loginFieldColor }}
+            >
               {t("phone.waiter.codeLabel")}
             </label>
+            ) : null}
             <input
               value={waiterCode}
               disabled={verifying || !!success}
@@ -403,11 +485,19 @@ export default function PhoneWaiterLogin() {
               spellCheck={false}
               placeholder={t("phone.waiter.codePlaceholder")}
               className={cn(
-                "mb-3 h-12 w-full rounded-2xl border bg-white/[0.06] px-3.5 font-mono text-[15px] tracking-wide text-white outline-none placeholder:text-white/25",
-                error
-                  ? "border-red-400/60"
-                  : "border-white/10 focus:border-[#0066FF]/60",
+                "mb-3 h-12 w-full rounded-2xl border px-3.5 font-mono text-[15px] tracking-wide outline-none",
+                light
+                  ? "bg-white border-slate-200"
+                  : "bg-white/[0.06] border-white/10",
+                error ? "border-red-400/60" : "",
               )}
+              style={{ color: access.loginFieldColor }}
+              onFocus={(e) => {
+                if (!error) e.currentTarget.style.borderColor = accent;
+              }}
+              onBlur={(e) => {
+                if (!error) e.currentTarget.style.borderColor = "";
+              }}
             />
 
             {(errorMsg || error) && (
@@ -424,14 +514,23 @@ export default function PhoneWaiterLogin() {
               type="button"
               onClick={() => void verifyLogin()}
               disabled={!canSubmit}
-              className="mt-auto h-12 w-full rounded-2xl bg-[#44CC00] text-[15px] font-semibold text-[#06200a] shadow-[0_10px_28px_rgba(68,204,0,0.28)] transition active:scale-[0.98] disabled:opacity-35 disabled:shadow-none"
+              className="mt-auto h-12 w-full rounded-2xl text-[15px] font-semibold shadow-[0_10px_28px_rgba(0,0,0,0.18)] transition active:scale-[0.98] disabled:opacity-35 disabled:shadow-none"
+              style={{
+                backgroundColor: access.signInColor,
+                color: phoneAccessButtonTextColor(access.signInColor),
+              }}
             >
               {verifying ? t("phone.waiter.signingIn") : t("phone.waiter.signIn")}
             </button>
           </motion.div>
         ) : null}
 
-        <p className="pt-3 text-center text-[10px] text-white/25">
+        <p
+          className={cn(
+            "pt-3 text-center text-[10px]",
+            light ? "text-slate-400" : "text-white/25",
+          )}
+        >
           {t("phone.waiter.footer")}
         </p>
       </div>

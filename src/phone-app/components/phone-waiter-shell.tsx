@@ -1,7 +1,25 @@
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { getWaiterSession } from "@/phone-app/lib/waiter-session.ts";
+import { PhoneAccessBrandingProvider, usePhoneAccessBranding } from "@/phone-app/hooks/use-phone-access-branding.tsx";
+import { cn } from "@/lib/utils.ts";
+import { phoneAccessThemeTokens, waiterThemeStyle } from "@/lib/phone-access-theme.ts";
 import { PhoneWaiterBottomNav } from "./phone-waiter-bottom-nav.tsx";
+
+function WaiterThemeFrame({ children }: { children: ReactNode }) {
+  const access = usePhoneAccessBranding();
+  const tokens = phoneAccessThemeTokens(access.theme);
+  return (
+    <div
+      data-waiter-theme={tokens.isLight ? "light" : "dark"}
+      data-waiter-skin={tokens.id}
+      className={cn("relative min-h-dvh", tokens.isLight ? "text-[#0f172a]" : "text-white")}
+      style={waiterThemeStyle(tokens)}
+    >
+      {children}
+    </div>
+  );
+}
 
 export default function PhoneWaiterShell() {
   const navigate = useNavigate();
@@ -14,9 +32,11 @@ export default function PhoneWaiterShell() {
   if (!session) return null;
 
   return (
-    <div className="relative min-h-dvh bg-[#070b14] text-white">
-      <Outlet />
-      <PhoneWaiterBottomNav />
-    </div>
+    <PhoneAccessBrandingProvider>
+      <WaiterThemeFrame>
+        <Outlet />
+        <PhoneWaiterBottomNav />
+      </WaiterThemeFrame>
+    </PhoneAccessBrandingProvider>
   );
 }

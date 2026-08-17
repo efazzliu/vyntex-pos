@@ -4,6 +4,8 @@
  * and offline data (menu, tables, orders, queue) for offline POS access.
  */
 
+import { normalizePhoneAccessTheme } from "@/lib/phone-access-theme.ts";
+
 const DB_NAME = "vyntex-local";
 const DB_VERSION = 4;
 
@@ -816,5 +818,212 @@ export async function savePinLoginBranding(
     CONFIG_STORE,
     pinBrandingKey(licenseKey),
     normalizePinLoginBranding(branding),
+  );
+}
+
+export type PhoneAccessTheme = "midnight" | "pearl" | "noir" | "ocean" | "ember";
+export type PhoneAccessTableDesign = "professional" | "modern" | "advanced";
+export type PhoneAccessMenuDesign = "professional" | "modern" | "advanced";
+export type PhoneAccessFloorDesign = "professional" | "modern" | "advanced";
+
+export type PhoneAccessBranding = {
+  logoDataUrl: string | null;
+  logoHeightPx: number;
+  theme: PhoneAccessTheme;
+  accentColor: string;
+  showVyntexMark: boolean;
+  signInColor: string;
+  loginTitleColor: string;
+  loginSubtitleColor: string;
+  loginHintColor: string;
+  loginFieldColor: string;
+  showNameLabel: boolean;
+  showCodeLabel: boolean;
+  showHomeHeader: boolean;
+  showMenuHeader: boolean;
+  showOrdersHeader: boolean;
+  showNotificationsHeader: boolean;
+  homeTableCols: 2 | 3 | 4;
+  floorDesign: PhoneAccessFloorDesign;
+  tableDesign: PhoneAccessTableDesign;
+  menuDesign: PhoneAccessMenuDesign;
+  showMenuQr: boolean;
+  showNavTables: boolean;
+  showNavMenu: boolean;
+  showNavOrders: boolean;
+  showNavAlerts: boolean;
+};
+
+export const DEFAULT_PHONE_ACCESS_BRANDING: PhoneAccessBranding = {
+  logoDataUrl: null,
+  logoHeightPx: 56,
+  theme: "midnight",
+  accentColor: "#0066FF",
+  showVyntexMark: true,
+  signInColor: "#44CC00",
+  loginTitleColor: "#FFFFFF",
+  loginSubtitleColor: "#0066FF",
+  loginHintColor: "#8B93A7",
+  loginFieldColor: "#94A3B8",
+  showNameLabel: true,
+  showCodeLabel: true,
+  showHomeHeader: true,
+  showMenuHeader: true,
+  showOrdersHeader: true,
+  showNotificationsHeader: true,
+  homeTableCols: 2,
+  floorDesign: "professional",
+  tableDesign: "professional",
+  menuDesign: "professional",
+  showMenuQr: true,
+  showNavTables: true,
+  showNavMenu: true,
+  showNavOrders: true,
+  showNavAlerts: true,
+};
+
+const PHONE_LOGO_HEIGHT_MIN = 32;
+const PHONE_LOGO_HEIGHT_MAX = 120;
+
+function normalizeAccentHex(
+  raw: unknown,
+  fallback: string = DEFAULT_PHONE_ACCESS_BRANDING.accentColor,
+): string {
+  const s = String(raw ?? "").trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(s)) return s.toUpperCase();
+  if (/^#[0-9a-fA-F]{3}$/.test(s)) {
+    const r = s[1];
+    const g = s[2];
+    const b = s[3];
+    return `#${r}${r}${g}${g}${b}${b}`.toUpperCase();
+  }
+  return fallback;
+}
+
+export function normalizePhoneAccessBranding(
+  raw: Partial<PhoneAccessBranding> | null | undefined,
+): PhoneAccessBranding {
+  const merged: PhoneAccessBranding = {
+    ...DEFAULT_PHONE_ACCESS_BRANDING,
+    ...(raw ?? {}),
+  };
+  merged.logoDataUrl =
+    raw?.logoDataUrl === undefined ? merged.logoDataUrl : raw.logoDataUrl ?? null;
+  merged.theme = normalizePhoneAccessTheme(raw?.theme);
+  merged.showVyntexMark = raw?.showVyntexMark !== false;
+  merged.showNameLabel = raw?.showNameLabel !== false;
+  merged.showCodeLabel = raw?.showCodeLabel !== false;
+  merged.showHomeHeader = raw?.showHomeHeader !== false;
+  merged.showMenuHeader = raw?.showMenuHeader !== false;
+  merged.showOrdersHeader = raw?.showOrdersHeader !== false;
+  merged.showNotificationsHeader = raw?.showNotificationsHeader !== false;
+  merged.showNavTables = raw?.showNavTables !== false;
+  merged.showNavMenu = raw?.showNavMenu !== false;
+  merged.showNavOrders = raw?.showNavOrders !== false;
+  merged.showNavAlerts = raw?.showNavAlerts !== false;
+  merged.floorDesign =
+    raw?.floorDesign === "lanes" || raw?.floorDesign === "advanced"
+      ? "advanced"
+      : raw?.floorDesign === "modern"
+        ? "modern"
+        : "professional";
+  merged.tableDesign =
+    raw?.tableDesign === "modern" || raw?.tableDesign === "advanced"
+      ? raw.tableDesign
+      : "professional";
+  merged.menuDesign =
+    raw?.menuDesign === "modern" || raw?.menuDesign === "advanced"
+      ? raw.menuDesign
+      : "professional";
+  merged.showMenuQr = raw?.showMenuQr !== false;
+  const cols = Number(
+    (raw as { homeTableCols?: unknown; homeTableCompact?: boolean } | null | undefined)
+      ?.homeTableCols,
+  );
+  if (cols === 2 || cols === 3 || cols === 4) {
+    merged.homeTableCols = cols;
+  } else if (
+    (raw as { homeTableCompact?: boolean } | null | undefined)?.homeTableCompact === true
+  ) {
+    merged.homeTableCols = 3;
+  } else {
+    merged.homeTableCols = 2;
+  }
+  merged.accentColor = normalizeAccentHex(raw?.accentColor ?? merged.accentColor);
+  merged.signInColor = normalizeAccentHex(
+    raw?.signInColor ?? merged.signInColor,
+    DEFAULT_PHONE_ACCESS_BRANDING.signInColor,
+  );
+  merged.loginTitleColor = normalizeAccentHex(
+    raw?.loginTitleColor ?? merged.loginTitleColor,
+    DEFAULT_PHONE_ACCESS_BRANDING.loginTitleColor,
+  );
+  merged.loginSubtitleColor = normalizeAccentHex(
+    raw?.loginSubtitleColor ?? merged.loginSubtitleColor,
+    DEFAULT_PHONE_ACCESS_BRANDING.loginSubtitleColor,
+  );
+  merged.loginHintColor = normalizeAccentHex(
+    raw?.loginHintColor ?? merged.loginHintColor,
+    DEFAULT_PHONE_ACCESS_BRANDING.loginHintColor,
+  );
+  merged.loginFieldColor = normalizeAccentHex(
+    raw?.loginFieldColor ?? merged.loginFieldColor,
+    DEFAULT_PHONE_ACCESS_BRANDING.loginFieldColor,
+  );
+  const h = Number(raw?.logoHeightPx);
+  if (Number.isFinite(h)) {
+    merged.logoHeightPx = Math.round(
+      Math.min(PHONE_LOGO_HEIGHT_MAX, Math.max(PHONE_LOGO_HEIGHT_MIN, h)),
+    );
+  }
+  return merged;
+}
+
+export function phoneAccessButtonTextColor(bgHex: string): string {
+  const n = bgHex.replace("#", "");
+  if (n.length !== 6) return "#06200a";
+  const r = parseInt(n.slice(0, 2), 16);
+  const g = parseInt(n.slice(2, 4), 16);
+  const b = parseInt(n.slice(4, 6), 16);
+  if (![r, g, b].every((v) => Number.isFinite(v))) return "#06200a";
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.55 ? "#06200a" : "#ffffff";
+}
+
+export function phoneAccessTableGridClass(cols: 2 | 3 | 4): string {
+  if (cols === 4) return "grid-cols-4";
+  if (cols === 3) return "grid-cols-3";
+  return "grid-cols-2";
+}
+
+export function phoneAccessHasBottomNav(b: PhoneAccessBranding): boolean {
+  return b.showNavTables || b.showNavMenu || b.showNavOrders || b.showNavAlerts;
+}
+
+function phoneAccessBrandingKey(licenseKey: string) {
+  return `phoneAccessBranding:${licenseKey}`;
+}
+
+export async function getPhoneAccessBranding(
+  licenseKey: string,
+): Promise<PhoneAccessBranding> {
+  const raw = await dbGet<Partial<PhoneAccessBranding>>(
+    CONFIG_STORE,
+    phoneAccessBrandingKey(licenseKey),
+  );
+  if (!raw) return { ...DEFAULT_PHONE_ACCESS_BRANDING };
+  return normalizePhoneAccessBranding({
+    ...raw,
+    logoDataUrl: raw.logoDataUrl === undefined ? null : raw.logoDataUrl,
+  });
+}
+
+export async function savePhoneAccessBranding(
+  licenseKey: string,
+  branding: PhoneAccessBranding,
+): Promise<void> {
+  await dbPut(
+    CONFIG_STORE,
+    phoneAccessBrandingKey(licenseKey),
+    normalizePhoneAccessBranding(branding),
   );
 }

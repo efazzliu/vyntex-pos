@@ -10,6 +10,7 @@ import { isEmailBanned } from "@/lib/supabase-pos/admin-ops.ts";
 import { registerUrlWithFreeTrial } from "@/lib/free-trial.ts";
 import { toast } from "sonner";
 import AuthTopNav from "@/pages/auth/_components/auth-top-nav.tsx";
+import { SiteLanguageToggle } from "@/components/site-language-toggle.tsx";
 import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 
 function safeReturnPath(from: unknown): string | null {
@@ -26,6 +27,8 @@ type LoginPageProps = {
   showCreateAccountLink?: boolean;
   /** Phone app: link to waiter PIN login. */
   showWaiterLink?: boolean;
+  /** Phone app: only the sign-in form — no marketing nav or hero panel. */
+  formOnly?: boolean;
 };
 
 export default function LoginPageModern({
@@ -33,6 +36,7 @@ export default function LoginPageModern({
   showManagerCodeLink = false,
   showCreateAccountLink = true,
   showWaiterLink = false,
+  formOnly = false,
 }: LoginPageProps) {
   const { t } = useTranslation("site");
   const navigate = useNavigate();
@@ -113,6 +117,121 @@ export default function LoginPageModern({
     }
   };
 
+  const form = (
+    <>
+      {!isSupabaseConfigured ? (
+        <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          {t("auth.login.supabaseNotConfigured")}
+        </p>
+      ) : null}
+      <p className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+        <ShieldCheck className="h-3.5 w-3.5" />
+        {t("auth.login.secureBadge")}
+      </p>
+      <h1 className="mt-4 text-2xl font-bold text-slate-900">{t("auth.login.heading")}</h1>
+      <p className="mt-1 text-sm text-slate-500">{t("auth.login.subtitle")}</p>
+      <form onSubmit={handleLogin} className="mt-6 space-y-5">
+        <div className="space-y-2">
+          <Label htmlFor="email" className="text-slate-800">
+            {t("auth.login.emailLabel")}
+          </Label>
+          <div className="relative">
+            <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="h-11 rounded-xl border-slate-200 bg-white pl-10 text-slate-900 caret-slate-900 shadow-sm placeholder:text-slate-400 focus-visible:ring-[#0066FF]/40"
+            />
+          </div>
+          <div className="flex flex-wrap gap-3 text-xs">
+            <button
+              type="button"
+              onClick={() => void handlePasswordReset()}
+              disabled={sendingReset}
+              className="text-[#0066FF]"
+            >
+              {sendingReset ? t("auth.login.sendingReset") : t("auth.login.forgotPassword")}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleResendVerification()}
+              disabled={sendingVerification}
+              className="text-[#0066FF]"
+            >
+              {sendingVerification
+                ? t("auth.login.sendingVerification")
+                : t("auth.login.resendVerification")}
+            </button>
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="password" className="text-slate-800">
+            {t("auth.login.passwordLabel")}
+          </Label>
+          <div className="relative">
+            <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="h-11 rounded-xl border-slate-200 bg-white pl-10 pr-11 text-slate-900 caret-slate-900 shadow-sm placeholder:text-slate-400 focus-visible:ring-[#0066FF]/40"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-500 hover:text-slate-800"
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+        </div>
+        <Button type="submit" disabled={loading} className="h-11 w-full rounded-xl bg-gradient-to-r from-[#0066FF] to-[#00AACC] text-white shadow-lg shadow-blue-500/30 transition hover:scale-[1.01] hover:from-[#0055DD] hover:to-[#0099BB]">
+          {loading ? t("auth.login.submitLoading") : t("auth.login.submit")}
+        </Button>
+      </form>
+      {showCreateAccountLink ? (
+        <p className="mt-5 text-center text-sm text-slate-600">
+          {t("auth.login.noAccount")}{" "}
+          <Link to={registerUrlWithFreeTrial()} className="font-semibold text-[#0066FF] hover:underline">
+            {t("auth.login.createAccount")}
+          </Link>
+        </p>
+      ) : null}
+      {showManagerCodeLink ? (
+        <p className="mt-4 text-sm">
+          <Link to="/redeem-code" className="text-[#0066FF]">
+            {t("auth.login.managerCodeLink")}
+          </Link>
+        </p>
+      ) : null}
+      {showWaiterLink ? (
+        <p className="mt-4 text-center text-sm">
+          <Link to="/waiter" className="text-[#0066FF]">
+            {t("phone.waiter.loginLink")}
+          </Link>
+        </p>
+      ) : null}
+    </>
+  );
+
+  if (formOnly) {
+    return (
+      <div className="relative min-h-dvh w-full bg-white">
+        <div className="absolute right-4 top-4 z-10">
+          <SiteLanguageToggle triggerClassName="border-slate-200 bg-white" />
+        </div>
+        <div className="flex min-h-dvh w-full items-center justify-center px-6 py-12">
+          <div className="w-full max-w-sm">{form}</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-[#060B18]">
       <AuthTopNav />
@@ -152,105 +271,7 @@ export default function LoginPageModern({
                 </ul>
               </div>
             </section>
-            <section className="bg-white/95 p-8 sm:p-10">
-              {!isSupabaseConfigured ? (
-                <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-                  {t("auth.login.supabaseNotConfigured")}
-                </p>
-              ) : null}
-              <p className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-                <ShieldCheck className="h-3.5 w-3.5" />
-                {t("auth.login.secureBadge")}
-              </p>
-              <h1 className="mt-4 text-2xl font-bold text-slate-900">{t("auth.login.heading")}</h1>
-              <p className="mt-1 text-sm text-slate-500">{t("auth.login.subtitle")}</p>
-              <form onSubmit={handleLogin} className="mt-6 space-y-5">
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-slate-800">
-                    {t("auth.login.emailLabel")}
-                  </Label>
-                  <div className="relative">
-                    <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <Input
-                      id="email"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      className="h-11 rounded-xl border-slate-200 bg-white pl-10 text-slate-900 caret-slate-900 shadow-sm placeholder:text-slate-400 focus-visible:ring-[#0066FF]/40"
-                    />
-                  </div>
-                  <div className="flex flex-wrap gap-3 text-xs">
-                    <button
-                      type="button"
-                      onClick={() => void handlePasswordReset()}
-                      disabled={sendingReset}
-                      className="text-[#0066FF]"
-                    >
-                      {sendingReset ? t("auth.login.sendingReset") : t("auth.login.forgotPassword")}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleResendVerification()}
-                      disabled={sendingVerification}
-                      className="text-[#0066FF]"
-                    >
-                      {sendingVerification
-                        ? t("auth.login.sendingVerification")
-                        : t("auth.login.resendVerification")}
-                    </button>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="text-slate-800">
-                    {t("auth.login.passwordLabel")}
-                  </Label>
-                  <div className="relative">
-                    <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <Input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      className="h-11 rounded-xl border-slate-200 bg-white pl-10 pr-11 text-slate-900 caret-slate-900 shadow-sm placeholder:text-slate-400 focus-visible:ring-[#0066FF]/40"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword((v) => !v)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-500 hover:text-slate-800"
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </div>
-                <Button type="submit" disabled={loading} className="h-11 w-full rounded-xl bg-gradient-to-r from-[#0066FF] to-[#00AACC] text-white shadow-lg shadow-blue-500/30 transition hover:scale-[1.01] hover:from-[#0055DD] hover:to-[#0099BB]">
-                  {loading ? t("auth.login.submitLoading") : t("auth.login.submit")}
-                </Button>
-              </form>
-              {showCreateAccountLink ? (
-                <p className="mt-5 text-center text-sm text-slate-600">
-                  {t("auth.login.noAccount")}{" "}
-                  <Link to={registerUrlWithFreeTrial()} className="font-semibold text-[#0066FF] hover:underline">
-                    {t("auth.login.createAccount")}
-                  </Link>
-                </p>
-              ) : null}
-              {showManagerCodeLink ? (
-                <p className="mt-4 text-sm">
-                  <Link to="/redeem-code" className="text-[#0066FF]">
-                    {t("auth.login.managerCodeLink")}
-                  </Link>
-                </p>
-              ) : null}
-              {showWaiterLink ? (
-                <p className="mt-4 text-center text-sm">
-                  <Link to="/waiter" className="text-[#0066FF]">
-                    {t("phone.waiter.loginLink")}
-                  </Link>
-                </p>
-              ) : null}
-            </section>
+            <section className="bg-white/95 p-8 sm:p-10">{form}</section>
           </div>
         </div>
       </div>

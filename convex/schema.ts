@@ -149,6 +149,7 @@ export default defineSchema({
     posY: v.optional(v.number()),
     shape: v.optional(v.union(v.literal("square"), v.literal("circle"), v.literal("rectangle"))),
     tableScale: v.optional(v.number()),
+    tableScaleY: v.optional(v.number()),
   })
     .index("by_restaurant", ["restaurantId"])
     .index("by_restaurant_and_zone", ["restaurantId", "zone"]),

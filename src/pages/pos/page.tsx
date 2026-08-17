@@ -37,6 +37,7 @@ import { toast } from "sonner";
 import { usePosTheme } from "./_lib/use-pos-theme.ts";
 import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 import { sendPosDeviceHeartbeat } from "@/lib/supabase-pos/device-presence.ts";
+import { switchActivationToDevPlanVenue } from "@/lib/dev-pos-plan-venue.ts";
 
 type LaunchStep =
   | "loading"
@@ -217,7 +218,12 @@ export default function PosLauncher({ accountAuthMode = false }: PosLauncherProp
 
   async function checkLocalState() {
     try {
-      const stored = await getActivation();
+      let stored = await getActivation();
+      try {
+        stored = await switchActivationToDevPlanVenue(stored);
+      } catch (err) {
+        console.warn("[pos] dev plan venue switch failed", err);
+      }
 
       if (!stored) {
         setStep("activation");
