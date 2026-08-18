@@ -6,6 +6,7 @@ import type { Doc } from "@/convex/_generated/dataModel.d.ts";
 import { toast } from "sonner";
 import QRCode from "qrcode";
 import { ChevronRight, QrCode, Search, UtensilsCrossed, LayoutGrid, X } from "lucide-react";
+import PhoneWaiterItemSheet from "@/phone-app/components/phone-waiter-item-sheet.tsx";
 import { getWaiterSession } from "@/phone-app/lib/waiter-session.ts";
 import { useFingerScroll } from "@/phone-app/hooks/use-finger-scroll.ts";
 import { useWaiterCanPay } from "@/phone-app/hooks/use-waiter-can-pay.ts";
@@ -90,11 +91,18 @@ export default function PhoneWaiterMenu() {
     setSelectedItem(item);
   };
 
-  const addToOrder = () => {
+  const addToOrder = (quantity: number) => {
+    const item = selectedItem;
     setSelectedItem(null);
     toast.message(t("phone.waiter.menuPickTable"));
-    navigate("/waiter/floor");
+    navigate("/waiter/floor", {
+      state: item ? { addMenuItemId: item._id, addQuantity: quantity } : undefined,
+    });
   };
+
+  const selectedCategoryName = selectedItem
+    ? (categories ?? []).find((c) => c._id === selectedItem.categoryId)?.name
+    : undefined;
 
   const currency = {
     symbol: (company as { currencySymbol?: string } | undefined)?.currencySymbol ?? "€",
@@ -349,7 +357,9 @@ export default function PhoneWaiterMenu() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[14px] font-semibold">{item.name}</p>
                   {item.description ? (
-                    <p className="truncate text-[11px] text-white/40">{item.description}</p>
+                    <p className="truncate text-[11px]" style={{ color: "var(--waiter-muted)" }}>
+                      {item.description}
+                    </p>
                   ) : null}
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
@@ -391,7 +401,9 @@ export default function PhoneWaiterMenu() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[13px] font-semibold">{item.name}</p>
                   {item.description ? (
-                    <p className="truncate text-[11px] text-white/40">{item.description}</p>
+                    <p className="truncate text-[11px]" style={{ color: "var(--waiter-muted)" }}>
+                      {item.description}
+                    </p>
                   ) : null}
                 </div>
                 {waiterCanPay ? (
@@ -426,77 +438,16 @@ export default function PhoneWaiterMenu() {
       </main>
 
       {selectedItem ? (
-        <>
-          <div
-            className="fixed inset-0 z-[70] bg-black/50 backdrop-blur-sm"
-            onClick={() => setSelectedItem(null)}
-          />
-          <div className="fixed bottom-0 left-0 right-0 z-[80] rounded-t-3xl bg-[#0d1220] pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-2xl">
-            <div className="flex items-center justify-between px-5 pb-1 pt-4">
-              <div className="mx-auto h-1 w-10 rounded-full bg-white/20" />
-            </div>
-
-            {selectedItem.imageUrl ? (
-              <div className="relative mx-5 mb-4 overflow-hidden rounded-2xl" style={{ aspectRatio: "16/9" }}>
-                <img
-                  src={selectedItem.imageUrl}
-                  alt={selectedItem.name}
-                  className="h-full w-full object-cover"
-                />
-              </div>
-            ) : null}
-
-            <div className="px-5">
-              <div className="mb-3 flex items-start justify-between gap-3">
-                <h2 className="text-[20px] font-bold tracking-tight text-white">
-                  {selectedItem.name}
-                </h2>
-                {waiterCanPay ? (
-                  <span
-                    className="shrink-0 text-[20px] font-bold tabular-nums"
-                    style={{ color: access.accentColor }}
-                  >
-                    {fmt(selectedItem.price)}
-                  </span>
-                ) : null}
-              </div>
-
-              {selectedItem.description ? (
-                <p className="mb-4 text-[13px] leading-relaxed text-white/65">
-                  {selectedItem.description}
-                </p>
-              ) : null}
-
-              {(() => {
-                const cat = (categories ?? []).find(
-                  (c) => c._id === selectedItem.categoryId,
-                );
-                return cat ? (
-                  <div className="mb-4 flex items-center gap-2">
-                    <span className="text-[12px] font-semibold uppercase tracking-wide text-white/40">
-                      {t("phone.waiter.menuItemCategory")}
-                    </span>
-                    <span
-                      className="rounded-full px-2.5 py-0.5 text-[12px] font-semibold text-white"
-                      style={{ backgroundColor: cat.color || access.accentColor }}
-                    >
-                      {cat.name}
-                    </span>
-                  </div>
-                ) : null;
-              })()}
-
-              <button
-                type="button"
-                onClick={addToOrder}
-                className="w-full rounded-2xl py-4 text-[15px] font-bold text-white active:scale-[0.99]"
-                style={{ backgroundColor: access.accentColor }}
-              >
-                {t("phone.waiter.menuItemAddToOrder")}
-              </button>
-            </div>
-          </div>
-        </>
+        <PhoneWaiterItemSheet
+          item={selectedItem}
+          categoryName={selectedCategoryName}
+          accent={access.accentColor}
+          tokens={tokens}
+          showPrice
+          formatPrice={fmt}
+          onClose={() => setSelectedItem(null)}
+          onAdd={addToOrder}
+        />
       ) : null}
 
       {qrOpen && showQr ? (
