@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils.ts";
 import { useWaiterCanPay } from "@/phone-app/hooks/use-waiter-can-pay.ts";
 import { usePhoneAccessBranding } from "@/phone-app/hooks/use-phone-access-branding.tsx";
 import { phoneAccessTableGridClass, phoneAccessHasBottomNav } from "@/lib/local-db.ts";
-import { phoneAccessThemeTokens, waiterThemeGlow } from "@/lib/phone-access-theme.ts";
+import { phoneAccessThemeTokens, waiterThemeGlow, waiterIdleChipClass, waiterPageTextClass } from "@/lib/phone-access-theme.ts";
 
 type TableOrderSummary = {
   staffId: string;
@@ -71,28 +71,41 @@ function tableColors(
   summary: TableOrderSummary | undefined,
   currentStaffId: string | undefined,
   isAdminOrManager: boolean,
+  isLight: boolean,
 ): TableColors {
   const status = table.status as string;
   const hasOpenTicket = Boolean(summary);
 
   if (hasOpenTicket || status === "occupied" || status === "bill-printed") {
     if (summary && currentStaffId && staffIdsEqual(summary.staffId, currentStaffId)) {
-      return { bg: "bg-blue-500/15", border: "border-blue-400", text: "text-blue-300" };
+      return isLight
+        ? { bg: "bg-blue-50", border: "border-blue-400", text: "text-blue-700" }
+        : { bg: "bg-blue-500/20", border: "border-blue-400", text: "text-blue-200" };
     }
     if (summary && !uuidOrNull(summary.staffId)) {
-      return { bg: "bg-amber-500/15", border: "border-amber-400/80", text: "text-amber-300" };
+      return isLight
+        ? { bg: "bg-amber-50", border: "border-amber-400", text: "text-amber-800" }
+        : { bg: "bg-amber-500/20", border: "border-amber-400", text: "text-amber-200" };
     }
     if (isAdminOrManager) {
-      return { bg: "bg-amber-500/15", border: "border-amber-400/80", text: "text-amber-300" };
+      return isLight
+        ? { bg: "bg-amber-50", border: "border-amber-400", text: "text-amber-800" }
+        : { bg: "bg-amber-500/20", border: "border-amber-400", text: "text-amber-200" };
     }
-    return { bg: "bg-red-500/15", border: "border-red-400", text: "text-red-300" };
+    return isLight
+      ? { bg: "bg-red-50", border: "border-red-400", text: "text-red-700" }
+      : { bg: "bg-red-500/20", border: "border-red-400", text: "text-red-200" };
   }
 
   if (status === "reserved") {
-    return { bg: "bg-amber-500/15", border: "border-amber-400/80", text: "text-amber-300" };
+    return isLight
+      ? { bg: "bg-amber-50", border: "border-amber-400", text: "text-amber-800" }
+      : { bg: "bg-amber-500/20", border: "border-amber-400", text: "text-amber-200" };
   }
 
-  return { bg: "bg-emerald-500/12", border: "border-emerald-400/70", text: "text-emerald-300" };
+  return isLight
+    ? { bg: "bg-emerald-50", border: "border-emerald-400", text: "text-emerald-700" }
+    : { bg: "bg-emerald-500/20", border: "border-emerald-400", text: "text-emerald-200" };
 }
 
 export default function PhoneWaiterFloor() {
@@ -186,7 +199,12 @@ export default function PhoneWaiterFloor() {
 
   if (advanced) {
     return (
-      <div className="relative flex min-h-dvh flex-col overflow-hidden bg-[#08090c] text-white">
+      <div
+        className={cn(
+          "relative flex min-h-dvh flex-col overflow-hidden",
+          waiterPageTextClass(tokens.isLight),
+        )}
+      >
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0"
@@ -207,7 +225,10 @@ export default function PhoneWaiterFloor() {
               {initial}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-medium tracking-wide text-white/40">
+              <p
+                className="text-[11px] font-medium tracking-wide"
+                style={{ color: "var(--waiter-muted)" }}
+              >
                 {t("phone.waiter.floorEyebrow")}
               </p>
               <h1 className="truncate text-[17px] font-semibold tracking-tight">
@@ -217,7 +238,10 @@ export default function PhoneWaiterFloor() {
             <button
               type="button"
               onClick={signOut}
-              className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-white/70 active:scale-95"
+              className={cn(
+                "flex size-10 shrink-0 items-center justify-center rounded-full active:scale-95",
+                tokens.isLight ? "bg-slate-200 text-slate-700" : "bg-white/[0.08] text-white/75",
+              )}
               aria-label={t("phone.waiter.signOut")}
             >
               <LogOut className="size-4" />
@@ -261,9 +285,12 @@ export default function PhoneWaiterFloor() {
         >
           {resolvedTables.length === 0 ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 py-24 text-center">
-              <MapPinned className="size-7 text-white/30" />
+              <MapPinned className="size-7" style={{ color: "var(--waiter-faint)" }} />
               <p className="text-lg font-semibold">{t("phone.waiter.noTablesTitle")}</p>
-              <p className="max-w-[18rem] text-[13px] leading-relaxed text-white/45">
+              <p
+                className="max-w-[18rem] text-[13px] leading-relaxed"
+                style={{ color: "var(--waiter-muted)" }}
+              >
                 {t("phone.waiter.noTablesBody")}
               </p>
             </div>
@@ -276,7 +303,7 @@ export default function PhoneWaiterFloor() {
             >
               {displayTables.map((table) => {
                 const summary = orderSummaries?.[table._id];
-                const colors = tableColors(table, summary, staff.id, isAdminOrManager);
+                const colors = tableColors(table, summary, staff.id, isAdminOrManager, tokens.isLight);
                 const busy =
                   Boolean(summary) ||
                   table.status === "occupied" ||
@@ -286,7 +313,12 @@ export default function PhoneWaiterFloor() {
                     key={table._id}
                     type="button"
                     onClick={() => handleTableTap(table)}
-                    className="flex items-center gap-3 rounded-2xl bg-white/[0.04] px-3 py-3 text-left ring-1 ring-white/[0.08] transition active:scale-[0.99]"
+                    className={cn(
+                      "flex items-center gap-3 rounded-2xl px-3 py-3 text-left transition active:scale-[0.99]",
+                      tokens.isLight
+                        ? "border border-slate-200 bg-white shadow-sm"
+                        : "bg-white/[0.06] ring-1 ring-white/15",
+                    )}
                   >
                     <span
                       className={cn(
@@ -298,7 +330,10 @@ export default function PhoneWaiterFloor() {
                       <span className="block truncate text-[15px] font-semibold tracking-tight">
                         {table.name}
                       </span>
-                      <span className="mt-0.5 flex items-center gap-1 text-[11px] text-white/40">
+                      <span
+                        className="mt-0.5 flex items-center gap-1 text-[11px]"
+                        style={{ color: "var(--waiter-muted)" }}
+                      >
                         <Users className="size-3" />
                         {table.seats}
                       </span>
@@ -318,7 +353,10 @@ export default function PhoneWaiterFloor() {
                             ? "—"
                             : t("phone.waiter.tableFree")}
                     </span>
-                    <ChevronRight className="size-4 shrink-0 text-white/25" />
+                    <ChevronRight
+                      className="size-4 shrink-0"
+                      style={{ color: "var(--waiter-faint)" }}
+                    />
                   </button>
                 );
               })}
@@ -331,7 +369,12 @@ export default function PhoneWaiterFloor() {
 
   if (modern) {
     return (
-      <div className="relative flex min-h-dvh flex-col overflow-hidden bg-[#070b14] text-white">
+      <div
+        className={cn(
+          "relative flex min-h-dvh flex-col overflow-hidden",
+          waiterPageTextClass(tokens.isLight),
+        )}
+      >
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0"
@@ -346,7 +389,10 @@ export default function PhoneWaiterFloor() {
             <button
               type="button"
               onClick={signOut}
-              className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-white/70 active:scale-95"
+              className={cn(
+                "flex size-10 shrink-0 items-center justify-center rounded-full active:scale-95",
+                tokens.isLight ? "bg-slate-200 text-slate-700" : "bg-white/[0.08] text-white/75",
+              )}
               aria-label={t("phone.waiter.signOut")}
             >
               <LogOut className="size-4" />
@@ -367,7 +413,7 @@ export default function PhoneWaiterFloor() {
                   onClick={() => setActiveZone(zone)}
                   className={cn(
                     "shrink-0 rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition",
-                    isActive ? "text-white" : "bg-white/[0.08] text-white/55",
+                    isActive ? "text-white" : waiterIdleChipClass(tokens.isLight),
                   )}
                   style={
                     isActive ? { backgroundColor: access.accentColor } : undefined
@@ -390,9 +436,12 @@ export default function PhoneWaiterFloor() {
         >
           {resolvedTables.length === 0 ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 py-24 text-center">
-              <MapPinned className="size-7 text-white/30" />
+              <MapPinned className="size-7" style={{ color: "var(--waiter-faint)" }} />
               <p className="text-lg font-semibold">{t("phone.waiter.noTablesTitle")}</p>
-              <p className="max-w-[18rem] text-[13px] leading-relaxed text-white/45">
+              <p
+                className="max-w-[18rem] text-[13px] leading-relaxed"
+                style={{ color: "var(--waiter-muted)" }}
+              >
                 {t("phone.waiter.noTablesBody")}
               </p>
             </div>
@@ -405,7 +454,7 @@ export default function PhoneWaiterFloor() {
             >
               {displayTables.map((table) => {
                 const summary = orderSummaries?.[table._id];
-                const colors = tableColors(table, summary, staff.id, isAdminOrManager);
+                const colors = tableColors(table, summary, staff.id, isAdminOrManager, tokens.isLight);
                 const busy =
                   Boolean(summary) ||
                   table.status === "occupied" ||
@@ -415,13 +464,17 @@ export default function PhoneWaiterFloor() {
                     key={table._id}
                     type="button"
                     onClick={() => handleTableTap(table)}
-                    className="flex flex-col items-center justify-center gap-1 rounded-2xl bg-white/[0.05] px-2 py-3 text-center transition active:scale-[0.98]"
+                    className={cn(
+                      "flex flex-col items-center justify-center gap-1 rounded-2xl border px-2 py-3 text-center transition active:scale-[0.98]",
+                      colors.bg,
+                      colors.border,
+                    )}
                   >
                     <span
                       className={cn("size-2 rounded-full", colors.border.replace("border-", "bg-"))}
                     />
                     <span className="text-[14px] font-semibold tracking-tight">{table.name}</span>
-                    <span className={cn("text-[10px] font-medium", colors.text)}>
+                    <span className={cn("text-[10px] font-semibold", colors.text)}>
                       {summary && waiterCanPay
                         ? summary.total.toFixed(0)
                         : table.status === "bill-printed"
@@ -430,7 +483,10 @@ export default function PhoneWaiterFloor() {
                             ? "—"
                             : t("phone.waiter.tableFree")}
                     </span>
-                    <span className="flex items-center gap-0.5 text-[10px] text-white/35">
+                    <span
+                      className="flex items-center gap-0.5 text-[10px]"
+                      style={{ color: "var(--waiter-muted)" }}
+                    >
                       <Users className="size-2.5" />
                       {table.seats}
                     </span>
@@ -445,7 +501,12 @@ export default function PhoneWaiterFloor() {
   }
 
   return (
-    <div className="relative flex min-h-dvh flex-col overflow-hidden bg-[#070b14] text-white">
+    <div
+      className={cn(
+        "relative flex min-h-dvh flex-col overflow-hidden",
+        waiterPageTextClass(tokens.isLight),
+      )}
+    >
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"
@@ -457,7 +518,10 @@ export default function PhoneWaiterFloor() {
       {access.showHomeHeader ? (
       <header className="relative z-10 flex items-center justify-between px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">
+          <p
+            className="text-[11px] font-semibold uppercase tracking-[0.14em]"
+            style={{ color: "var(--waiter-muted)" }}
+          >
             {t("phone.waiter.floorEyebrow")}
           </p>
           <h1
@@ -470,7 +534,12 @@ export default function PhoneWaiterFloor() {
         <button
           type="button"
           onClick={signOut}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2 text-[12px] font-medium text-white/70 transition active:scale-95"
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[12px] font-medium transition active:scale-95",
+            tokens.isLight
+              ? "border-slate-200 bg-white text-slate-700"
+              : "border-white/10 bg-white/[0.05] text-white/75",
+          )}
         >
           <LogOut className="size-3.5" />
           {t("phone.waiter.signOut")}
@@ -492,9 +561,7 @@ export default function PhoneWaiterFloor() {
                 onClick={() => setActiveZone(zone)}
                 className={cn(
                   "flex h-11 min-w-0 items-center justify-between gap-1.5 rounded-xl px-2.5 text-[13px] font-medium transition-all",
-                  isActive
-                    ? "text-white shadow-lg"
-                    : "border border-white/10 bg-white/[0.05] text-white/60",
+                  isActive ? "text-white shadow-lg" : waiterIdleChipClass(tokens.isLight),
                 )}
                 style={
                   isActive
@@ -509,7 +576,11 @@ export default function PhoneWaiterFloor() {
                 <span
                   className={cn(
                     "flex size-5 shrink-0 items-center justify-center rounded-full text-[11px]",
-                    isActive ? "bg-white/20" : "bg-white/10",
+                    isActive
+                      ? "bg-white/25 text-white"
+                      : tokens.isLight
+                        ? "bg-slate-300/80 text-slate-800"
+                        : "bg-white/15 text-white",
                   )}
                 >
                   {count}
@@ -530,13 +601,23 @@ export default function PhoneWaiterFloor() {
       >
         {resolvedTables.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 py-24 text-center">
-            <div className="flex size-16 items-center justify-center rounded-3xl border border-white/10 bg-white/[0.06]">
+            <div
+              className={cn(
+                "flex size-16 items-center justify-center rounded-3xl border",
+                tokens.isLight
+                  ? "border-slate-200 bg-white"
+                  : "border-white/10 bg-white/[0.06]",
+              )}
+            >
               <MapPinned className="size-7 text-[#7eb6ff]" />
             </div>
             <p className="text-lg font-semibold">
               {t("phone.waiter.noTablesTitle")}
             </p>
-            <p className="max-w-[18rem] text-[13px] leading-relaxed text-white/45">
+            <p
+              className="max-w-[18rem] text-[13px] leading-relaxed"
+              style={{ color: "var(--waiter-muted)" }}
+            >
               {t("phone.waiter.noTablesBody")}
             </p>
           </div>
@@ -549,7 +630,7 @@ export default function PhoneWaiterFloor() {
           >
             {displayTables.map((table) => {
               const summary = orderSummaries?.[table._id];
-              const colors = tableColors(table, summary, staff.id, isAdminOrManager);
+              const colors = tableColors(table, summary, staff.id, isAdminOrManager, tokens.isLight);
               const statusLine = summary
                 ? waiterCanPay
                   ? summary.total.toFixed(0)
@@ -566,7 +647,12 @@ export default function PhoneWaiterFloor() {
                     colors.border,
                   )}
                 >
-                  <span className="max-w-full truncate text-base font-bold leading-none text-white">
+                  <span
+                    className={cn(
+                      "max-w-full truncate text-base font-bold leading-none",
+                      tokens.isLight ? "text-slate-900" : "text-white",
+                    )}
+                  >
                     {table.name}
                   </span>
                   <span
@@ -577,12 +663,20 @@ export default function PhoneWaiterFloor() {
                   >
                     {statusLine}
                   </span>
-                  <span className="h-3 max-w-full truncate text-[10px] font-medium leading-none text-blue-300">
+                  <span
+                    className={cn(
+                      "h-3 max-w-full truncate text-[10px] font-medium leading-none",
+                      tokens.isLight ? "text-blue-700" : "text-blue-200",
+                    )}
+                  >
                     {table.status === "bill-printed"
                       ? t("phone.waiter.order.billRequested")
                       : "\u00a0"}
                   </span>
-                  <span className="flex h-3 items-center gap-1 text-[10px] leading-none text-white/35">
+                  <span
+                    className="flex h-3 items-center gap-1 text-[10px] leading-none"
+                    style={{ color: "var(--waiter-muted)" }}
+                  >
                     <Users className="size-2.5 shrink-0" />
                     {table.seats}
                   </span>
