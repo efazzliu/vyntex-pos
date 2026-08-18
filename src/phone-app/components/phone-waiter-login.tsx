@@ -32,6 +32,7 @@ import {
   clearWaiterPhonePair,
   getWaiterPhonePair,
   getWaiterVenueKey,
+  isOwnerLocalWaiterPair,
   isWaiterDesignPreviewLicense,
   normalizeWaiterVenueKey,
   setWaiterSession,
@@ -121,6 +122,7 @@ export default function PhoneWaiterLogin() {
   useEffect(() => {
     if (!pair?.licenseKey || !pair.deviceId) return;
     if (isWaiterDesignPreviewLicense(pair.licenseKey)) return;
+    if (isOwnerLocalWaiterPair(pair)) return;
     let cancelled = false;
     void (async () => {
       const status = await fetchWaiterPhoneBindingStatus(

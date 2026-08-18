@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { ChevronRight, LogOut, ShieldCheck, Store } from "lucide-react";
+import { ChevronRight, LogOut, ShieldCheck, Store, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button.tsx";
 import { supabase } from "@/lib/supabase.ts";
@@ -205,6 +205,13 @@ export default function PhoneDashboard() {
             )}
           </>
         )}
+
+        <Button variant="outline" className="mt-2 h-11 w-full justify-start gap-2 rounded-xl" asChild>
+          <Link to="/waiter/account">
+            <UserRound className="size-5 shrink-0" />
+            {t("phone.venues.openWaiter")}
+          </Link>
+        </Button>
 
         <Button variant="outline" className="mt-2 h-11 w-full justify-start gap-2 rounded-xl" asChild>
           <Link to="/admin-center/overview">

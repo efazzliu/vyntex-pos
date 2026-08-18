@@ -143,6 +143,11 @@ export function isWaiterPhonePaired(): boolean {
   return getWaiterPhonePair() != null;
 }
 
+/** Local owner bind before SQL RPC is applied — skip server binding checks. */
+export function isOwnerLocalWaiterPair(pair: WaiterPhonePair | null): boolean {
+  return Boolean(pair?.deviceRowId?.startsWith("owner-local-"));
+}
+
 const LICENSE_PENDING_KEY = "vyntex-waiter-license-pending";
 
 export type WaiterLicensePending = {
