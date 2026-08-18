@@ -311,7 +311,10 @@ export type KitchenQueueLine = {
   notes?: string;
   station?: "kitchen" | "bar";
   status: string;
+  /** When the line was sent / created (pressed to kitchen). */
   createdAt: string;
+  /** When kitchen marked the line ready (if tracked). */
+  readyAt?: string;
 };
 
 /**
@@ -452,13 +455,32 @@ export async function getWaiterKitchenNotifications(args: {
     saleRows.map((row) => [String(row.id), row] as const),
   );
 
-  const selectWithStation = supabase
+  let rowsMissingStation = false;
+  let rowsMissingReadyAt = false;
+  const selectCols = (withStation: boolean, withReadyAt: boolean) => {
+    const base = withStation
+      ? "id, sale_id, name, quantity, notes, station, status, created_at"
+      : "id, sale_id, name, quantity, notes, status, created_at";
+    return withReadyAt ? `${base}, ready_at` : base;
+  };
+
+  let itemsRes = await supabase
     .from("sale_items")
-    .select("id, sale_id, name, quantity, notes, station, status, created_at")
+    .select(selectCols(true, true))
     .in("sale_id", saleIds)
     .in("status", ["sent", "preparing", "ready"]);
-  let itemsRes = await selectWithStation;
-  let rowsMissingStation = false;
+
+  if (
+    itemsRes.error &&
+    isMissingPgColumnError(itemsRes.error.message, "ready_at")
+  ) {
+    rowsMissingReadyAt = true;
+    itemsRes = await supabase
+      .from("sale_items")
+      .select(selectCols(true, false))
+      .in("sale_id", saleIds)
+      .in("status", ["sent", "preparing", "ready"]);
+  }
   if (
     itemsRes.error &&
     isMissingPgColumnError(itemsRes.error.message, "station")
@@ -466,9 +488,20 @@ export async function getWaiterKitchenNotifications(args: {
     rowsMissingStation = true;
     itemsRes = await supabase
       .from("sale_items")
-      .select("id, sale_id, name, quantity, notes, status, created_at")
+      .select(selectCols(false, !rowsMissingReadyAt))
       .in("sale_id", saleIds)
       .in("status", ["sent", "preparing", "ready"]);
+    if (
+      itemsRes.error &&
+      isMissingPgColumnError(itemsRes.error.message, "ready_at")
+    ) {
+      rowsMissingReadyAt = true;
+      itemsRes = await supabase
+        .from("sale_items")
+        .select(selectCols(false, false))
+        .in("sale_id", saleIds)
+        .in("status", ["sent", "preparing", "ready"]);
+    }
   }
   assertNoPgError("Waiter kitchen notifications items", itemsRes.error);
   const items = itemsRes.data;
@@ -542,6 +575,14 @@ export async function getWaiterKitchenNotifications(args: {
     // Waiter notifications: kitchen tickets only (never bar).
     if (station !== "kitchen") continue;
 
+    const readyRaw = rowsMissingReadyAt
+      ? null
+      : ((it as { ready_at?: string | null }).ready_at ?? null);
+    const readyAt =
+      readyRaw && String(readyRaw).trim() !== ""
+        ? String(readyRaw)
+        : undefined;
+
     out.push({
       lineId: String(it.id),
       saleId: sid,
@@ -554,6 +595,7 @@ export async function getWaiterKitchenNotifications(args: {
       station: "kitchen",
       status: String(it.status ?? ""),
       createdAt: String(it.created_at ?? ""),
+      readyAt,
     });
   }
 
@@ -562,8 +604,12 @@ export async function getWaiterKitchenNotifications(args: {
     const aReady = a.status === "ready" ? 0 : 1;
     const bReady = b.status === "ready" ? 0 : 1;
     if (aReady !== bReady) return aReady - bReady;
-    const aTs = new Date(a.createdAt).getTime();
-    const bTs = new Date(b.createdAt).getTime();
+    const aTs = new Date(
+      aReady === 0 ? (a.readyAt || a.createdAt) : a.createdAt,
+    ).getTime();
+    const bTs = new Date(
+      bReady === 0 ? (b.readyAt || b.createdAt) : b.createdAt,
+    ).getTime();
     return aReady === 0 ? bTs - aTs : aTs - bTs;
   });
   return out;
@@ -599,11 +645,64 @@ export async function bumpKitchenTicketItem(args: {
     throw new Error("Item is not on the kitchen queue");
   }
 
-  const { error: uErr } = await supabase
+  const readyAt = new Date().toISOString();
+  let { error: uErr } = await supabase
     .from("sale_items")
-    .update({ status: "ready" })
+    .update({ status: "ready", ready_at: readyAt })
     .eq("id", args.lineId);
+  if (uErr && isMissingPgColumnError(uErr.message, "ready_at")) {
+    ({ error: uErr } = await supabase
+      .from("sale_items")
+      .update({ status: "ready" })
+      .eq("id", args.lineId));
+  }
   assertNoPgError("Bump kitchen: update line", uErr);
+}
+
+/**
+ * Waiter optional ack: mark a ready kitchen line as delivered to the table.
+ */
+export async function markWaiterLineDelivered(args: {
+  licenseKey: string;
+  lineId: string;
+  saleId: string;
+}): Promise<void> {
+  const r = await getRestaurantByLicense(args.licenseKey);
+  const { data: sale, error: sErr } = await supabase
+    .from("sales")
+    .select("id, restaurant_id")
+    .eq("id", args.saleId)
+    .single();
+  assertNoPgError("Deliver line: load sale", sErr);
+  if (!sale || String(sale.restaurant_id) !== r.id) {
+    throw new Error("Order not found");
+  }
+
+  const { data: line, error: lErr } = await supabase
+    .from("sale_items")
+    .select("id, sale_id, status")
+    .eq("id", args.lineId)
+    .single();
+  assertNoPgError("Deliver line: load line", lErr);
+  if (!line || String(line.sale_id) !== args.saleId) {
+    throw new Error("Line not found");
+  }
+  if (String(line.status ?? "").toLowerCase() !== "ready") {
+    throw new Error("Item is not ready for delivery");
+  }
+
+  const servedAt = new Date().toISOString();
+  let { error: uErr } = await supabase
+    .from("sale_items")
+    .update({ status: "served", served_at: servedAt })
+    .eq("id", args.lineId);
+  if (uErr && isMissingPgColumnError(uErr.message, "served_at")) {
+    ({ error: uErr } = await supabase
+      .from("sale_items")
+      .update({ status: "served" })
+      .eq("id", args.lineId));
+  }
+  assertNoPgError("Deliver line: update line", uErr);
 }
 
 function saleRowMatchesTable(
