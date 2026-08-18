@@ -46,7 +46,12 @@ export default function PhoneWaiterAccount() {
   const { t } = useTranslation("site");
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const preferredName = params.get("name")?.trim() ?? "";
+  const preferredName = (
+    params.get("name")?.trim() ||
+    new URLSearchParams(window.location.search).get("name")?.trim() ||
+    new URLSearchParams(window.location.search).get("as")?.trim() ||
+    ""
+  );
 
   const [authChecked, setAuthChecked] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
@@ -149,11 +154,16 @@ export default function PhoneWaiterAccount() {
         setStaff(choices);
 
         const want = normalizePersonName(preferredName);
-        if (want && !autoStaffRef.current) {
-          const matches = choices.filter((s) => normalizePersonName(s.name) === want);
-          if (matches.length === 1) {
+        if (!autoStaffRef.current) {
+          const named = want
+            ? choices.filter((s) => normalizePersonName(s.name) === want)
+            : [];
+          const waiters = choices.filter((s) => s.role === "waiter");
+          const auto =
+            named.length === 1 ? named[0] : waiters.length === 1 ? waiters[0] : null;
+          if (auto) {
             autoStaffRef.current = true;
-            enterAsStaff(row, matches[0], bind, deviceId);
+            enterAsStaff(row, auto, bind, deviceId);
             return;
           }
         }
