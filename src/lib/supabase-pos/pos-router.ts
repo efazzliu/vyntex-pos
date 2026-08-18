@@ -60,6 +60,8 @@ export async function runPosQuery(
     case "pos.orders.getWaiterKitchenNotifications":
       return orders.getWaiterKitchenNotifications({
         licenseKey: args.licenseKey as string,
+        staffId:
+          typeof args.staffId === "string" ? args.staffId : undefined,
       });
     case "pos.orders.getNonFiscalOrders":
       return orders.getNonFiscalOrders(args);

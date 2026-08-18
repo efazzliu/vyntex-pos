@@ -25,7 +25,7 @@ function WaiterThemeFrame({ children }: { children: ReactNode }) {
 export default function PhoneWaiterShell() {
   const navigate = useNavigate();
   const session = getWaiterSession();
-  useWaiterReadyToasts(session?.licenseKey ?? "");
+  useWaiterReadyToasts(session?.licenseKey ?? "", session?.staff.id ?? "");
 
   useEffect(() => {
     if (!session) navigate("/waiter", { replace: true });

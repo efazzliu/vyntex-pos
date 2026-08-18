@@ -85,12 +85,13 @@ export default function PhoneWaiterNotifications() {
   const navigate = useNavigate();
   const session = getWaiterSession();
   const licenseKey = session?.licenseKey ?? "";
+  const staffId = session?.staff.id ?? "";
   const access = usePhoneAccessBranding();
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(() => new Set());
 
   const queue = useQuery(
     "pos.orders.getWaiterKitchenNotifications",
-    licenseKey ? { licenseKey } : "skip",
+    licenseKey && staffId ? { licenseKey, staffId } : "skip",
   ) as KitchenLine[] | undefined;
 
   const lines = queue ?? [];

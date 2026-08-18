@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils.ts";
 import { usePhoneAccessBranding } from "@/phone-app/hooks/use-phone-access-branding.tsx";
 import { phoneAccessHasBottomNav } from "@/lib/local-db.ts";
 import { phoneAccessThemeTokens } from "@/lib/phone-access-theme.ts";
+import { getWaiterSession } from "@/phone-app/lib/waiter-session.ts";
 
 const ITEMS = [
   { to: "/waiter/floor", key: "navTables", icon: LayoutGrid, flag: "showNavTables" },
@@ -23,9 +24,10 @@ export function PhoneWaiterBottomNav() {
   const items = ITEMS.filter((item) => access[item.flag]);
   const session = getWaiterSession();
   const licenseKey = session?.licenseKey ?? "";
+  const staffId = session?.staff.id ?? "";
   const queue = useQuery(
     "pos.orders.getWaiterKitchenNotifications",
-    licenseKey ? { licenseKey } : "skip",
+    licenseKey && staffId ? { licenseKey, staffId } : "skip",
   ) as { status?: string; station?: string }[] | undefined;
   const readyCount = (queue ?? []).filter(
     (l) =>

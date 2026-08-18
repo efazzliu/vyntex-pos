@@ -172,11 +172,7 @@ function invalidateAfterOrderMutation(
     void qc.invalidateQueries({
       queryKey: posQueryKey("pos.orders.getKitchenQueue", { licenseKey }),
     });
-    void qc.invalidateQueries({
-      queryKey: posQueryKey("pos.orders.getWaiterKitchenNotifications", {
-        licenseKey,
-      }),
-    });
+    invalidatePosPrefix(qc, "pos.orders.getWaiterKitchenNotifications");
   }
 
   if (
