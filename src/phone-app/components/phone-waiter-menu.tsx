@@ -101,13 +101,17 @@ export default function PhoneWaiterMenu() {
       {access.showMenuHeader ? (
       <header className="flex shrink-0 items-start justify-between gap-3 px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
         <div className="min-w-0">
-          {advanced ? (
-            <p className="text-[11px] text-white/40">{t("phone.waiter.floorEyebrow")}</p>
-          ) : (
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">
-              {t("phone.waiter.floorEyebrow")}
-            </p>
-          )}
+          <p
+            className={cn(
+              "text-[11px]",
+              !advanced && "font-semibold uppercase tracking-[0.14em]",
+            )}
+            style={{ color: "var(--waiter-muted)" }}
+          >
+            {t("phone.waiter.floorEyebrowNamed", {
+              name: session?.staff.name ?? "",
+            })}
+          </p>
           <h1
             className={cn(
               "font-semibold tracking-tight",

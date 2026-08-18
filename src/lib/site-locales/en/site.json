@@ -491,6 +491,7 @@
       "welcome": "Welcome, {{name}}",
       "footer": "Vyntex POS — Waiter",
       "floorEyebrow": "On shift",
+      "floorEyebrowNamed": "On shift {{name}}",
       "floorTitle": "Ready for orders",
       "floorBody": "Table floor and phone ordering come next. You're signed in and ready.",
       "signOut": "Sign out",
