@@ -13,14 +13,14 @@ type KitchenLine = {
 };
 
 /** Toast when kitchen marks a line ready — runs while waiter shell is open. */
-export function useWaiterReadyToasts(licenseKey: string) {
+export function useWaiterReadyToasts(licenseKey: string, staffId = "") {
   const { t } = useTranslation("site");
   const seenReadyIds = useRef<Set<string> | null>(null);
   const primed = useRef(false);
 
   const queue = useQuery(
     "pos.orders.getWaiterKitchenNotifications",
-    licenseKey ? { licenseKey } : "skip",
+    licenseKey && staffId ? { licenseKey, staffId } : "skip",
   ) as KitchenLine[] | undefined;
 
   useEffect(() => {

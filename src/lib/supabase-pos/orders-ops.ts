@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabase.ts";
 import { assertNoPgError, isMissingPgColumnError } from "./db-errors.ts";
 import { getRestaurantByLicense } from "./restaurant.ts";
-import { isLocalDevicePosAdmin, uuidOrNull } from "./uuid.ts";
+import { isLocalDevicePosAdmin, staffIdsEqual, uuidOrNull } from "./uuid.ts";
 import {
   displayOrderNumber,
   saleFloorTableId,
@@ -422,20 +422,29 @@ export async function getKitchenQueue(args: {
 
 /**
  * Waiter phone notifications: kitchen station lines only (sent/preparing/ready)
- * for open tickets (grouped by table in the UI).
+ * for open tickets that belong to this waiter (grouped by table in the UI).
  */
 export async function getWaiterKitchenNotifications(args: {
   licenseKey: string;
+  staffId?: string;
 }): Promise<KitchenQueueLine[]> {
+  const waiterId = uuidOrNull(args.staffId);
+  if (!waiterId) return [];
+
   const r = await getRestaurantByLicense(args.licenseKey);
   const { data: sales, error: sErr } = await supabase
     .from("sales")
-    .select("id, order_number, status, table_id, table_ref, created_at")
+    .select("id, order_number, status, table_id, table_ref, created_at, staff_id")
     .eq("restaurant_id", r.id)
     .in("status", ["open", "sent-to-kitchen"]);
 
   assertNoPgError("Waiter kitchen notifications sales", sErr);
-  const saleRows = sales ?? [];
+  const saleRows = (sales ?? []).filter((row) =>
+    staffIdsEqual(
+      (row as { staff_id?: string | null }).staff_id,
+      waiterId,
+    ),
+  );
   if (saleRows.length === 0) return [];
 
   const saleIds = saleRows.map((x) => String(x.id));
