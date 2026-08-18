@@ -229,10 +229,10 @@ export default function PhoneWaiterFloor() {
                 className="text-[11px] font-medium tracking-wide"
                 style={{ color: "var(--waiter-muted)" }}
               >
-                {t("phone.waiter.floorEyebrow")}
+                {t("phone.waiter.floorEyebrowNamed", { name: staff.name })}
               </p>
               <h1 className="truncate text-[17px] font-semibold tracking-tight">
-                {staff.name}
+                {t("phone.waiter.navTables")}
               </h1>
             </div>
             <button
@@ -383,9 +383,17 @@ export default function PhoneWaiterFloor() {
 
         {access.showHomeHeader ? (
           <header className="relative z-10 flex items-center gap-3 px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
-            <h1 className="min-w-0 flex-1 truncate text-[18px] font-semibold tracking-tight">
-              {staff.name}
-            </h1>
+            <div className="min-w-0 flex-1">
+              <p
+                className="text-[11px] font-semibold uppercase tracking-[0.14em]"
+                style={{ color: "var(--waiter-muted)" }}
+              >
+                {t("phone.waiter.floorEyebrowNamed", { name: staff.name })}
+              </p>
+              <h1 className="truncate text-[18px] font-semibold tracking-tight">
+                {t("phone.waiter.navTables")}
+              </h1>
+            </div>
             <button
               type="button"
               onClick={signOut}
@@ -522,13 +530,13 @@ export default function PhoneWaiterFloor() {
             className="text-[11px] font-semibold uppercase tracking-[0.14em]"
             style={{ color: "var(--waiter-muted)" }}
           >
-            {t("phone.waiter.floorEyebrow")}
+            {t("phone.waiter.floorEyebrowNamed", { name: staff.name })}
           </p>
           <h1
             className="text-xl font-semibold tracking-tight"
             style={{ fontFamily: '"Space Grotesk", Geist, system-ui, sans-serif' }}
           >
-            {staff.name}
+            {t("phone.waiter.navTables")}
           </h1>
         </div>
         <button

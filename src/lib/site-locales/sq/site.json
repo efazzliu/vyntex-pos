@@ -491,6 +491,7 @@
       "welcome": "Mirësevini, {{name}}",
       "footer": "Vyntex POS — Kamarier",
       "floorEyebrow": "Në turn",
+      "floorEyebrowNamed": "Në turn {{name}}",
       "floorTitle": "Gati për porosi",
       "floorBody": "Plani i tavolinave dhe porosite nga telefoni vijnë më pas. Je i identifikuar dhe gati.",
       "signOut": "Dil",

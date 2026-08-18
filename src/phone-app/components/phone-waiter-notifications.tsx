@@ -174,7 +174,9 @@ export default function PhoneWaiterNotifications() {
       {access.showNotificationsHeader ? (
       <header className="px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">
-          {t("phone.waiter.floorEyebrow")}
+          {t("phone.waiter.floorEyebrowNamed", {
+            name: session?.staff.name ?? "",
+          })}
         </p>
         <h1 className="text-xl font-semibold tracking-tight">
           {t("phone.waiter.navNotifications")}
