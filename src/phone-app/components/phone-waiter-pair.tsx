@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { motion } from "motion/react";
-import { Camera, CheckCircle2, KeyRound, Keyboard, Loader2 } from "lucide-react";
+import { Camera, CheckCircle2, KeyRound, Keyboard, Loader2, LogIn } from "lucide-react";
 import { getOrCreateDeviceId } from "@/lib/local-db.ts";
 import { sendPosDeviceHeartbeat } from "@/lib/supabase-pos/device-presence.ts";
 import {
@@ -22,6 +22,7 @@ import {
   getWaiterLicensePending,
   setWaiterLicensePending,
   clearWaiterLicensePending,
+  isOwnerLocalWaiterPair,
 } from "@/phone-app/lib/waiter-session.ts";
 import { fetchWaiterPhoneBindingStatus } from "@/lib/supabase-pos/waiter-phone-binding.ts";
 import { cn } from "@/lib/utils.ts";
@@ -47,6 +48,10 @@ export default function PhoneWaiterPair() {
   useEffect(() => {
     const existing = getWaiterPhonePair();
     if (!existing) return;
+    if (isOwnerLocalWaiterPair(existing)) {
+      navigate("/waiter", { replace: true });
+      return;
+    }
     let cancelled = false;
     void (async () => {
       const status = await fetchWaiterPhoneBindingStatus(
@@ -429,6 +434,23 @@ export default function PhoneWaiterPair() {
           </div>
         ) : (
           <>
+            <Link
+              to="/waiter/account"
+              className="mx-auto mb-5 flex h-auto w-full max-w-[20rem] items-center gap-3 rounded-3xl border border-[#0066FF]/35 bg-[#0066FF]/15 px-4 py-4 text-left transition active:scale-[0.99]"
+            >
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-[#0066FF] text-white">
+                <LogIn className="size-5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-white">
+                  {t("phone.waiter.pairAccountButton")}
+                </span>
+                <span className="mt-0.5 block text-[12px] leading-snug text-white/55">
+                  {t("phone.waiter.pairAccountHint")}
+                </span>
+              </span>
+            </Link>
+
             {phase === "camera" ? (
               <div className="relative mx-auto mb-5 aspect-[3/4] w-full max-w-[20rem] overflow-hidden rounded-3xl border border-white/10 bg-black">
                 <video

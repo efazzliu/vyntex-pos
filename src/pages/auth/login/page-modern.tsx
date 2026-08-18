@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { CheckCircle2, Eye, EyeOff, Lock, Mail, ShieldCheck, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
@@ -41,8 +41,11 @@ export default function LoginPageModern({
   const { t } = useTranslation("site");
   const navigate = useNavigate();
   const location = useLocation();
+  const [params] = useSearchParams();
   const returnTo =
-    safeReturnPath((location.state as { from?: unknown } | null)?.from) ?? defaultAfterLogin;
+    safeReturnPath(params.get("next")) ??
+    safeReturnPath((location.state as { from?: unknown } | null)?.from) ??
+    defaultAfterLogin;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
