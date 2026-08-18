@@ -676,7 +676,16 @@
       "role_inventory": "Inventar",
       "role_accountant": "Kontabilist",
       "role_auditor": "Auditor",
-      "role_kitchen": "Kuzhinë"
+      "role_kitchen": "Kuzhinë",
+      "qrTitle": "QR i kamarierit",
+      "qrHint": "Telefoni tjetër e skanon këtë, ose shkruan kodin me 8 karaktere te Activate phone.",
+      "qrCopy": "Kopjo kodin",
+      "qrCopied": "U kopjua",
+      "qrExpires": "Skadon për {{time}}",
+      "qrErrLicense": "Licenca e këtij lokali nuk është aktive.",
+      "qrErrMigration": "Mungon pairing në server. Admin të ekzekutojë SQL-in e telefonit.",
+      "qrErrServer": "Serveri nuk është i konfiguruar.",
+      "qrErrGeneric": "Nuk u krijua QR-i i kamarierit. Provo përsëri."
     },
     "stock": {
       "title": "Inventari",
@@ -746,7 +755,8 @@
       "navProfile": "Profili",
       "navVenues": "Lokalet",
       "loadError": "Nuk u ngarkua paneli.",
-      "retry": "Provo përsëri"
+      "retry": "Provo përsëri",
+      "waiterQr": "QR i kamarierit"
     },
     "venues": {
       "title": "Lokalet e Mia",

@@ -5,18 +5,26 @@ import {
   AlertTriangle,
   DollarSign,
   Filter,
+  QrCode,
   ShoppingBag,
   TrendingUp,
   UtensilsCrossed,
 } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet.tsx";
 import { useDashboardRestaurant } from "@/hooks/use-dashboard-restaurant.ts";
 import { getDashboardStats, getSoldItemsByDateTimeRange } from "@/lib/supabase-pos/dashboard-ops.ts";
 import { getStockItems } from "@/lib/supabase-pos/stock-ops.ts";
 import { cn } from "@/lib/utils.ts";
 import { toast } from "sonner";
 import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
+import PhoneWaiterQrPanel from "./phone-waiter-qr-panel.tsx";
 
 type StatsBundle = Awaited<ReturnType<typeof getDashboardStats>>;
 
@@ -60,6 +68,7 @@ export default function PhoneVenueHome() {
   const [soldError, setSoldError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!restaurant?.licenseKey) return;
@@ -234,6 +243,15 @@ export default function PhoneVenueHome() {
           </div>
         </div>
 
+        <Button
+          type="button"
+          className="h-12 w-full rounded-xl bg-[#0066FF] text-base font-semibold text-white shadow-sm hover:bg-[#0055DD]"
+          onClick={() => setQrOpen(true)}
+        >
+          <QrCode className="mr-2 size-5" />
+          {t("phone.venueHome.waiterQr")}
+        </Button>
+
         {!loading && lowStockCount > 0 ? (
           <div className="flex gap-3 rounded-2xl border border-orange-200/80 bg-orange-50/90 px-3 py-3 shadow-sm">
             <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-orange-100 text-orange-700">
@@ -338,6 +356,15 @@ export default function PhoneVenueHome() {
           </ul>
         </section>
       </main>
+
+      <Sheet open={qrOpen} onOpenChange={setQrOpen}>
+        <SheetContent side="bottom" className="max-h-[92dvh] overflow-y-auto rounded-t-3xl px-4 pb-8 pt-4">
+          <SheetHeader className="mb-3 text-left">
+            <SheetTitle>{t("phone.venueHome.waiterQr")}</SheetTitle>
+          </SheetHeader>
+          {qrOpen ? <PhoneWaiterQrPanel licenseKey={restaurant.licenseKey} /> : null}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

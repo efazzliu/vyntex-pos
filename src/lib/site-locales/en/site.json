@@ -676,7 +676,16 @@
       "role_inventory": "Inventory",
       "role_accountant": "Accountant",
       "role_auditor": "Auditor",
-      "role_kitchen": "Kitchen"
+      "role_kitchen": "Kitchen",
+      "qrTitle": "Waiter QR code",
+      "qrHint": "The other phone scans this, or types the 8-character code on Activate phone.",
+      "qrCopy": "Copy code",
+      "qrCopied": "Copied",
+      "qrExpires": "Expires in {{time}}",
+      "qrErrLicense": "This venue license is not active.",
+      "qrErrMigration": "Server missing pairing. Ask admin to run the waiter phone SQL.",
+      "qrErrServer": "Server is not configured.",
+      "qrErrGeneric": "Could not create the waiter QR. Try again."
     },
     "stock": {
       "title": "Inventory",
@@ -746,7 +755,8 @@
       "navProfile": "Profile",
       "navVenues": "Venues",
       "loadError": "Could not load dashboard.",
-      "retry": "Retry"
+      "retry": "Retry",
+      "waiterQr": "Waiter QR code"
     },
     "venues": {
       "title": "My venues",
