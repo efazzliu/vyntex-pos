@@ -5,7 +5,7 @@ import { Bell, ClipboardList, LayoutGrid, UtensilsCrossed } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 import { usePhoneAccessBranding } from "@/phone-app/hooks/use-phone-access-branding.tsx";
 import { phoneAccessHasBottomNav } from "@/lib/local-db.ts";
-import { getWaiterSession } from "@/phone-app/lib/waiter-session.ts";
+import { phoneAccessThemeTokens } from "@/lib/phone-access-theme.ts";
 
 const ITEMS = [
   { to: "/waiter/floor", key: "navTables", icon: LayoutGrid, flag: "showNavTables" },
@@ -18,6 +18,7 @@ export function PhoneWaiterBottomNav() {
   const { t } = useTranslation("site");
   const location = useLocation();
   const access = usePhoneAccessBranding();
+  const tokens = phoneAccessThemeTokens(access.theme);
   const accent = access.accentColor;
   const items = ITEMS.filter((item) => access[item.flag]);
   const session = getWaiterSession();
@@ -37,9 +38,13 @@ export function PhoneWaiterBottomNav() {
   return (
     <nav
       className={cn(
-        "fixed bottom-0 left-0 right-0 z-30 border-t border-white/10 bg-[#0a1224]/95 px-1.5 pt-1 backdrop-blur-xl",
+        "fixed bottom-0 left-0 right-0 z-30 border-t px-1.5 pt-1 backdrop-blur-xl",
         "pb-[max(0.4rem,env(safe-area-inset-bottom))]",
       )}
+      style={{
+        backgroundColor: tokens.nav,
+        borderColor: tokens.border,
+      }}
       aria-label={t("phone.waiter.navLabel")}
     >
       <div className="mx-auto flex max-w-lg items-stretch justify-between gap-0.5">
@@ -58,7 +63,7 @@ export function PhoneWaiterBottomNav() {
               to={item.to}
               className={cn(
                 "relative flex flex-1 flex-col items-center justify-center gap-0.5 rounded-xl py-2 transition-colors",
-                active ? undefined : "active:bg-white/5",
+                active ? undefined : tokens.isLight ? "active:bg-slate-100" : "active:bg-white/5",
               )}
               style={
                 active ? { backgroundColor: `${accent}26` } : undefined

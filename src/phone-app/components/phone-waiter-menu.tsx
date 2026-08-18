@@ -14,6 +14,11 @@ import { buildGuestMenuUrl } from "@/lib/guest-menu-url.ts";
 import { cn } from "@/lib/utils.ts";
 import { usePhoneAccessBranding } from "@/phone-app/hooks/use-phone-access-branding.tsx";
 import { phoneAccessHasBottomNav } from "@/lib/local-db.ts";
+import {
+  phoneAccessThemeTokens,
+  waiterIdleChipClass,
+  waiterPageTextClass,
+} from "@/lib/phone-access-theme.ts";
 
 export default function PhoneWaiterMenu() {
   const { t } = useTranslation("site");
@@ -42,6 +47,7 @@ export default function PhoneWaiterMenu() {
   const restaurantId = company?.id ?? "";
   const waiterCanPay = useWaiterCanPay(licenseKey);
   const access = usePhoneAccessBranding();
+  const tokens = phoneAccessThemeTokens(access.theme);
 
   useEffect(() => {
     if (!restaurantId) {
@@ -87,7 +93,8 @@ export default function PhoneWaiterMenu() {
   return (
     <div
       className={cn(
-        "flex min-h-dvh flex-col bg-[#070b14] text-white",
+        "flex min-h-dvh flex-col",
+        waiterPageTextClass(tokens.isLight),
         phoneAccessHasBottomNav(access) ? "pb-[5.75rem]" : "pb-6",
       )}
     >
@@ -152,7 +159,7 @@ export default function PhoneWaiterMenu() {
               onClick={() => setActiveCategory("all")}
               className={cn(
                 "shrink-0 rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition",
-                activeCategory === "all" ? "text-white" : "bg-white/[0.08] text-white/55",
+                activeCategory === "all" ? "text-white" : waiterIdleChipClass(tokens.isLight),
               )}
               style={
                 activeCategory === "all"
@@ -171,7 +178,7 @@ export default function PhoneWaiterMenu() {
                   onClick={() => setActiveCategory(cat._id)}
                   className={cn(
                     "shrink-0 rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition",
-                    sel ? "text-white" : "bg-white/[0.08] text-white/55",
+                    sel ? "text-white" : waiterIdleChipClass(tokens.isLight),
                   )}
                   style={sel ? { backgroundColor: cat.color || access.accentColor } : undefined}
                 >

@@ -173,6 +173,17 @@ export function waiterThemeGlow(tokens: PhoneAccessThemeTokens): string {
   return `radial-gradient(90% 50% at 20% 0%, ${tokens.glow} 0%, transparent 55%), radial-gradient(80% 50% at 90% 100%, ${tokens.glow2} 0%, transparent 50%), linear-gradient(180deg, ${tokens.pageMid} 0%, ${tokens.page} 55%, ${tokens.pageDeep} 100%)`;
 }
 
+/** Inactive pills/chips: dark text on light gray, not white-on-white. */
+export function waiterIdleChipClass(isLight: boolean): string {
+  return isLight
+    ? "bg-slate-200 text-slate-800"
+    : "bg-white/12 text-white/85";
+}
+
+export function waiterPageTextClass(isLight: boolean): string {
+  return isLight ? "text-slate-900" : "text-white";
+}
+
 function loginMatchesPreset(
   b: {
     loginTitleColor: string;
