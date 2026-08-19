@@ -21,6 +21,7 @@ type GuestItem = {
   categoryId: string;
   displayOrder: number;
   available: boolean;
+  imageUrl?: string | null;
 };
 
 type GuestMenu = {
@@ -150,6 +151,14 @@ export default function PhoneGuestMenu() {
                 key={item._id}
                 className="flex min-h-[4.75rem] min-w-0 flex-col items-start justify-center gap-1 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2.5"
               >
+                {item.imageUrl ? (
+                  <img
+                    src={item.imageUrl}
+                    alt=""
+                    className="mb-0.5 h-14 w-full rounded-lg object-cover"
+                    loading="lazy"
+                  />
+                ) : null}
                 <span className="line-clamp-2 w-full text-[13px] font-medium leading-tight">
                   {item.name}
                 </span>

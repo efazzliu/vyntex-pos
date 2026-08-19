@@ -16,6 +16,7 @@ import { Switch } from "@/components/ui/switch.tsx";
 import { cn } from "@/lib/utils.ts";
 import { toast } from "sonner";
 import { errorMessageFromUnknown } from "@/lib/supabase-pos/db-errors.ts";
+import { uploadMenuItemPhoto } from "@/lib/supabase-pos/menu-photo-storage.ts";
 import {
   ChefHat,
   Wine,
@@ -294,7 +295,6 @@ export default function ItemDialog({
   );
   const createItem = useMutation("pos.menu.createItem");
   const updateItem = useMutation("pos.menu.updateItem");
-  const generateUploadUrl = useMutation("pos.menu.generateUploadUrl");
   const ensureSupplyCategory = useMutation("pos.menu.ensureSupplyCategory");
 
   const recipeIngredientOptions = useMemo(() => {
@@ -311,6 +311,7 @@ export default function ItemDialog({
   // Image state
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageRemoved, setImageRemoved] = useState(false);
   const [currentImageStorageId, setCurrentImageStorageId] = useState<
     Id<"_storage"> | undefined
   >(undefined);
@@ -357,6 +358,7 @@ export default function ItemDialog({
         setImagePreview(editing.imageUrl ?? null);
         setCurrentImageStorageId(editing.imageStorageId);
         setImageFile(null);
+        setImageRemoved(false);
         setSelectedCategoryId(nonEmptyCategoryId(editing.categoryId));
         setSupplyVendor(editing.supplyVendor ?? "");
         setSupplyLot(editing.supplyLot ?? "");
@@ -409,6 +411,7 @@ export default function ItemDialog({
         setImagePreview(null);
         setCurrentImageStorageId(undefined);
         setImageFile(null);
+        setImageRemoved(false);
         setSelectedCategoryId(
           nonEmptyCategoryId(categoryId) ??
             nonEmptyCategoryId(categories[0]?._id),
@@ -440,12 +443,14 @@ export default function ItemDialog({
     if (file) {
       setImageFile(file);
       setImagePreview(URL.createObjectURL(file));
+      setImageRemoved(false);
     }
   };
 
   const removeImage = () => {
     setImageFile(null);
     setImagePreview(null);
+    setImageRemoved(true);
     setCurrentImageStorageId(undefined);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -506,20 +511,19 @@ export default function ItemDialog({
 
     setSaving(true);
     try {
-      // Upload image if a new file was selected
-      let finalImageStorageId = currentImageStorageId;
+      let finalImageUrl: string | null | undefined = undefined;
       if (imageFile) {
-        const uploadUrl = await generateUploadUrl({ licenseKey });
-        const result = await fetch(uploadUrl, {
-          method: "POST",
-          headers: { "Content-Type": imageFile.type },
-          body: imageFile,
+        finalImageUrl = await uploadMenuItemPhoto({
+          licenseKey,
+          file: imageFile,
+          itemId: editing?._id ? String(editing._id) : undefined,
         });
-        const json = (await result.json()) as {
-          storageId: Id<"_storage">;
-        };
-        finalImageStorageId = json.storageId;
+      } else if (imageRemoved) {
+        finalImageUrl = null;
+      } else if (imagePreview && !imagePreview.startsWith("blob:")) {
+        finalImageUrl = imagePreview;
       }
+      const finalImageStorageId = currentImageStorageId;
 
       const supplyCreate =
         !editing &&
@@ -577,6 +581,7 @@ export default function ItemDialog({
           menuId,
           station,
           imageStorageId: finalImageStorageId,
+          ...(finalImageUrl !== undefined ? { imageUrl: finalImageUrl } : {}),
           isFavorite,
           staffMealAllowed,
           staffMealPrice: parsedStaffMealPrice,
@@ -608,7 +613,10 @@ export default function ItemDialog({
           menuId,
           station,
           imageStorageId: finalImageStorageId,
-          imageUrl: imagePreview,
+          imageUrl:
+            finalImageUrl === null
+              ? null
+              : finalImageUrl ?? imagePreview,
           isFavorite,
           staffMealAllowed,
           staffMealPrice: parsedStaffMealPrice,
@@ -646,6 +654,7 @@ export default function ItemDialog({
           price: priceNum,
           station: resolvedStation,
           imageStorageId: finalImageStorageId,
+          ...(finalImageUrl !== undefined ? { imageUrl: finalImageUrl } : {}),
           isFavorite,
           staffMealAllowed,
           staffMealPrice: parsedStaffMealPrice,
@@ -668,7 +677,7 @@ export default function ItemDialog({
           menuId,
           station: resolvedStation,
           imageStorageId: finalImageStorageId,
-          imageUrl: imagePreview,
+          imageUrl: finalImageUrl ?? null,
           isFavorite,
           staffMealAllowed,
           staffMealPrice: parsedStaffMealPrice,

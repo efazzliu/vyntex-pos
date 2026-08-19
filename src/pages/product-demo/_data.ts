@@ -1,3 +1,5 @@
+import { photoUrlForMenuItem } from "@/lib/menu-item-photo-urls.ts";
+
 export type DemoTableStatus = "available" | "occupied" | "reserved";
 
 export type DemoTable = {
@@ -13,6 +15,7 @@ export type DemoMenuItem = {
   price: number;
   category: string;
   emoji: string;
+  imageUrl: string;
   available: boolean;
 };
 
@@ -41,19 +44,36 @@ export const DEMO_TABLES: DemoTable[] = [
 
 export const DEMO_CATEGORIES = ["Starters", "Mains", "Drinks", "Desserts"] as const;
 
+const demoItem = (
+  id: string,
+  name: string,
+  price: number,
+  category: string,
+  emoji: string,
+  available: boolean,
+): DemoMenuItem => ({
+  id,
+  name,
+  price,
+  category,
+  emoji,
+  imageUrl: photoUrlForMenuItem(name, category),
+  available,
+});
+
 export const DEMO_MENU_ITEMS: DemoMenuItem[] = [
-  { id: "m1", name: "Bruschetta", price: 6.5, category: "Starters", emoji: "🍞", available: true },
-  { id: "m2", name: "Caesar Salad", price: 8, category: "Starters", emoji: "🥗", available: true },
-  { id: "m3", name: "Soup of the Day", price: 5.5, category: "Starters", emoji: "🍲", available: true },
-  { id: "m4", name: "Grilled Salmon", price: 18, category: "Mains", emoji: "🐟", available: true },
-  { id: "m5", name: "Ribeye Steak", price: 24, category: "Mains", emoji: "🥩", available: true },
-  { id: "m6", name: "Margherita Pizza", price: 12, category: "Mains", emoji: "🍕", available: true },
-  { id: "m7", name: "Truffle Pasta", price: 15, category: "Mains", emoji: "🍝", available: false },
-  { id: "m8", name: "Sparkling Water", price: 2.5, category: "Drinks", emoji: "💧", available: true },
-  { id: "m9", name: "House Red Wine", price: 7, category: "Drinks", emoji: "🍷", available: true },
-  { id: "m10", name: "Espresso", price: 2, category: "Drinks", emoji: "☕", available: true },
-  { id: "m11", name: "Tiramisu", price: 6, category: "Desserts", emoji: "🍰", available: true },
-  { id: "m12", name: "Gelato", price: 5, category: "Desserts", emoji: "🍨", available: true },
+  demoItem("m1", "Bruschetta", 6.5, "Starters", "🍞", true),
+  demoItem("m2", "Caesar Salad", 8, "Starters", "🥗", true),
+  demoItem("m3", "Soup of the Day", 5.5, "Starters", "🍲", true),
+  demoItem("m4", "Grilled Salmon", 18, "Mains", "🐟", true),
+  demoItem("m5", "Ribeye Steak", 24, "Mains", "🥩", true),
+  demoItem("m6", "Margherita Pizza", 12, "Mains", "🍕", true),
+  demoItem("m7", "Truffle Pasta", 15, "Mains", "🍝", false),
+  demoItem("m8", "Sparkling Water", 2.5, "Drinks", "💧", true),
+  demoItem("m9", "House Red Wine", 7, "Drinks", "🍷", true),
+  demoItem("m10", "Espresso", 2, "Drinks", "☕", true),
+  demoItem("m11", "Tiramisu", 6, "Desserts", "🍰", true),
+  demoItem("m12", "Gelato", 5, "Desserts", "🍨", true),
 ];
 
 export const DEMO_STAFF: DemoStaffMember[] = [
