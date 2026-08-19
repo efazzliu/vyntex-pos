@@ -135,7 +135,14 @@ export default function DemoOrderPanel({
                 !item.available && "cursor-not-allowed opacity-40 hover:border-[#1e2a45] hover:bg-[#131A2E]",
               )}
             >
-              <span className="text-xl">{item.emoji}</span>
+              <div className="mb-1 flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg bg-[#0c101c]">
+                <img
+                  src={item.imageUrl}
+                  alt=""
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                />
+              </div>
               <span className="text-xs font-medium text-white">{item.name}</span>
               <span className="text-[11px] font-semibold text-[#0066FF]">${item.price.toFixed(2)}</span>
             </button>

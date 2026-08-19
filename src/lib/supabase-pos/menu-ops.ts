@@ -288,6 +288,16 @@ function assertMenuItemStation(
   }
 }
 
+function resolveMenuItemImageUrl(args: Record<string, unknown>): string | null | undefined {
+  if (args.imageUrl !== undefined) {
+    const url = args.imageUrl;
+    if (url === null) return null;
+    const trimmed = String(url).trim();
+    return trimmed || null;
+  }
+  return undefined;
+}
+
 export async function createItem(args: Record<string, unknown>) {
   const licenseKey = args.licenseKey as string;
   const r = await getRestaurantByLicense(licenseKey);
@@ -323,6 +333,11 @@ export async function createItem(args: Record<string, unknown>) {
     current_stock: (args.currentStock as number) ?? null,
     low_stock_threshold: (args.lowStockThreshold as number) ?? null,
   };
+
+  const imageUrl = resolveMenuItemImageUrl(args);
+  if (imageUrl !== undefined) {
+    payload.image_url = imageUrl;
+  }
 
   const recipeNorm = normalizeSupplyRecipeForDb(args.supplyRecipe);
   if (
@@ -390,6 +405,11 @@ export async function updateItem(args: Record<string, unknown>) {
   };
   if (args.vatRate !== undefined) {
     patch.vat_rate = args.vatRate;
+  }
+
+  const imageUrl = resolveMenuItemImageUrl(args);
+  if (imageUrl !== undefined) {
+    patch.image_url = imageUrl;
   }
 
   const recipeNormUpdate = normalizeSupplyRecipeForDb(args.supplyRecipe);
@@ -508,6 +528,6 @@ export async function updateMenu(args: {
 
 export async function generateUploadUrl(_args: Record<string, unknown>) {
   throw new Error(
-    "Ngarkimi i fotove të menysë nuk është lidhur me Supabase Storage. Hiq foton dhe ruaj artikullin. / Menu photos are not configured; remove the image to save the item.",
+    "Ngarkimi i fotove përdor Supabase Storage direkt. / Menu photos upload directly via Supabase Storage.",
   );
 }

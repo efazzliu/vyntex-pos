@@ -1478,6 +1478,18 @@ export default function OrderScreen({
                       {item.isFavorite && selectedCategory !== "favorites" && (
                         <Star className="absolute bottom-2 right-2 size-3 text-amber-400 fill-amber-400" />
                       )}
+                      {item.imageUrl ? (
+                        <img
+                          src={item.imageUrl}
+                          alt=""
+                          className="mb-2 h-16 w-full rounded-lg object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="mb-2 flex h-16 w-full items-center justify-center rounded-lg bg-[#0c101c] text-lg font-semibold text-[#5a6580]">
+                          {item.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
                       <p className="text-sm font-semibold text-white truncate mt-1">
                         {item.name}
                       </p>

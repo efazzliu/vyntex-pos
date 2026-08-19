@@ -24,7 +24,14 @@ export default function DemoMenu() {
                   key={item.id}
                   className="flex items-center gap-3 rounded-xl border border-[#1e2a45] bg-[#131A2E] px-3 py-2.5"
                 >
-                  <span className="text-xl">{item.emoji}</span>
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#0c101c]">
+                    <img
+                      src={item.imageUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
+                  </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-white">{item.name}</p>
                     <p className="text-xs text-[#8b93a7]">${item.price.toFixed(2)}</p>
