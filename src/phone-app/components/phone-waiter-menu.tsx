@@ -133,10 +133,7 @@ export default function PhoneWaiterMenu() {
       <header className="flex shrink-0 items-start justify-between gap-3 px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
         <div className="min-w-0">
           <p
-            className={cn(
-              "text-[11px]",
-              !advanced && "font-semibold uppercase tracking-[0.14em]",
-            )}
+            className="text-[11px] font-semibold uppercase tracking-[0.14em]"
             style={{ color: "var(--waiter-muted)" }}
           >
             {t("phone.waiter.floorEyebrowNamed", {
