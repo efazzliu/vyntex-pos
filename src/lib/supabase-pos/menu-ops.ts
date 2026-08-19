@@ -16,6 +16,7 @@ import {
   resolvePosCurrencyPosition,
   resolvePosCurrencySymbol,
 } from "@/lib/pos-locale-defaults.ts";
+import { resolveMenuItemImageUrl } from "@/lib/menu-item-photo-urls.ts";
 
 function pgMissingColumnMessage(error: { message?: string }, column: string): boolean {
   const m = String(error.message ?? "").toLowerCase();
@@ -102,6 +103,14 @@ export async function getCategories(licenseKey: string) {
 
 export async function getAllItems(licenseKey: string) {
   const r = await getRestaurantByLicense(licenseKey);
+  const { data: cats } = await supabase
+    .from("menu_categories")
+    .select("id, name")
+    .eq("restaurant_id", r.id);
+  const categoryNameById = new Map(
+    (cats ?? []).map((c) => [String(c.id), String(c.name)]),
+  );
+
   const { data, error } = await supabase
     .from("menu_items")
     .select("*")
@@ -109,9 +118,16 @@ export async function getAllItems(licenseKey: string) {
     .order("display_order", { ascending: true });
 
   if (error) throw error;
-  return (data ?? []).map((row) =>
-    menuItemFromRow(row as Parameters<typeof menuItemFromRow>[0]),
-  );
+  return (data ?? []).map((row) => {
+    const item = menuItemFromRow(row as Parameters<typeof menuItemFromRow>[0]);
+    return {
+      ...item,
+      imageUrl: resolveMenuItemImageUrl(
+        item,
+        categoryNameById.get(item.categoryId) ?? "",
+      ),
+    };
+  });
 }
 
 export async function getGuestMenu(restaurantId: string) {
@@ -161,8 +177,18 @@ export async function getGuestMenu(restaurantId: string) {
       (c) => !SUPPLY_CATEGORY_NAMES.has(normalizeSupplyCategoryName(c.name)),
     );
   const allowedCats = new Set(categories.map((c) => c._id));
+  const categoryNameById = new Map(categories.map((c) => [c._id, c.name]));
   const menuItems = (items ?? [])
-    .map((row) => menuItemFromRow(row as Parameters<typeof menuItemFromRow>[0]))
+    .map((row) => {
+      const item = menuItemFromRow(row as Parameters<typeof menuItemFromRow>[0]);
+      return {
+        ...item,
+        imageUrl: resolveMenuItemImageUrl(
+          item,
+          categoryNameById.get(item.categoryId) ?? "",
+        ),
+      };
+    })
     .filter((i) => i.available && allowedCats.has(i.categoryId));
 
   return {
@@ -288,7 +314,7 @@ function assertMenuItemStation(
   }
 }
 
-function resolveMenuItemImageUrl(args: Record<string, unknown>): string | null | undefined {
+function parseImageUrlArg(args: Record<string, unknown>): string | null | undefined {
   if (args.imageUrl !== undefined) {
     const url = args.imageUrl;
     if (url === null) return null;
@@ -334,7 +360,7 @@ export async function createItem(args: Record<string, unknown>) {
     low_stock_threshold: (args.lowStockThreshold as number) ?? null,
   };
 
-  const imageUrl = resolveMenuItemImageUrl(args);
+  const imageUrl = parseImageUrlArg(args);
   if (imageUrl !== undefined) {
     payload.image_url = imageUrl;
   }
@@ -407,7 +433,7 @@ export async function updateItem(args: Record<string, unknown>) {
     patch.vat_rate = args.vatRate;
   }
 
-  const imageUrl = resolveMenuItemImageUrl(args);
+  const imageUrl = parseImageUrlArg(args);
   if (imageUrl !== undefined) {
     patch.image_url = imageUrl;
   }

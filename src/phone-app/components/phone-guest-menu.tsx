@@ -5,6 +5,7 @@ import { useQuery } from "convex/react";
 import { LayoutGrid, UtensilsCrossed } from "lucide-react";
 import { useFingerScroll } from "@/phone-app/hooks/use-finger-scroll.ts";
 import { emojiForCategoryName } from "@/lib/pos-category-icons.ts";
+import { resolveMenuItemImageUrl } from "@/lib/menu-item-photo-urls.ts";
 import { cn } from "@/lib/utils.ts";
 
 type GuestCategory = {
@@ -53,6 +54,14 @@ export default function PhoneGuestMenu() {
     "pos.menu.getGuestMenu",
     venueId ? { restaurantId: venueId } : "skip",
   ) as GuestMenu | undefined | null;
+
+  const categoryNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const cat of menu?.categories ?? []) {
+      map.set(cat._id, cat.name);
+    }
+    return map;
+  }, [menu?.categories]);
 
   const items = useMemo(() => {
     const list = menu?.items ?? [];
@@ -146,14 +155,19 @@ export default function PhoneGuestMenu() {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-2.5 pb-4">
-            {items.map((item) => (
+            {items.map((item) => {
+              const photoUrl = resolveMenuItemImageUrl(
+                item,
+                categoryNameById.get(item.categoryId) ?? "",
+              );
+              return (
               <div
                 key={item._id}
                 className="flex min-h-[4.75rem] min-w-0 flex-col items-start justify-center gap-1 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2.5"
               >
-                {item.imageUrl ? (
+                {photoUrl ? (
                   <img
-                    src={item.imageUrl}
+                    src={photoUrl}
                     alt=""
                     className="mb-0.5 h-14 w-full rounded-lg object-cover"
                     loading="lazy"
@@ -166,7 +180,8 @@ export default function PhoneGuestMenu() {
                   {formatPrice(item.price)}
                 </span>
               </div>
-            ))}
+            );
+            })}
           </div>
         )}
       </main>

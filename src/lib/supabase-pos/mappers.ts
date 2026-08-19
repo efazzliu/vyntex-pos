@@ -1,5 +1,7 @@
 /** Map Supabase rows to Convex Doc-shaped objects the UI expects. */
 
+import { resolveMenuItemImageUrl } from "@/lib/menu-item-photo-urls.ts";
+
 export function staffFromRow(r: {
   id: string;
   created_at: string;
@@ -124,7 +126,9 @@ export function menuItemFromRow(r: {
     station: (r.station as "kitchen" | "bar" | undefined) ?? undefined,
     vatRate: r.vat_rate != null ? Number(r.vat_rate) : 0.2,
     imageStorageId: undefined,
-    imageUrl: r.image_url ?? undefined,
+    imageUrl: resolveMenuItemImageUrl(
+      { name: r.name, imageUrl: r.image_url ?? undefined },
+    ),
     isFavorite: r.is_favorite ?? false,
     staffMealAllowed: r.staff_meal_allowed !== false,
     totalSold: r.total_sold ?? 0,

@@ -53,6 +53,7 @@ import { usePosLocale } from "./pos-locale-provider.tsx";
 import { verifyAdminPin } from "@/lib/supabase-pos.ts";
 import { errorMessageFromUnknown } from "@/lib/supabase-pos/db-errors.ts";
 import { emojiForCategoryName } from "@/lib/pos-category-icons.ts";
+import { resolveMenuItemImageUrl } from "@/lib/menu-item-photo-urls.ts";
 import { uuidOrNull, staffIdsEqual } from "@/lib/supabase-pos/uuid.ts";
 import { posTablesIndexedDbKey } from "@/lib/supabase-pos/cache-keys.ts";
 import { displayOrderNumber } from "@/lib/supabase-pos/mappers.ts";
@@ -213,6 +214,13 @@ export default function OrderScreen({
 
   const categories = categoriesRaw ?? [];
   const menuItems = menuItemsRaw ?? [];
+  const categoryNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const cat of categories) {
+      map.set(String(cat._id), cat.name);
+    }
+    return map;
+  }, [categories]);
   const activeOrders = activeOrdersRaw ?? [];
   const tablesList = tablesRaw ?? [];
   const printersList = Array.isArray(printersQuery) ? printersQuery : [];
@@ -1446,6 +1454,10 @@ export default function OrderScreen({
                     1,
                     enforceAvailability,
                   );
+                  const photoUrl = resolveMenuItemImageUrl(
+                    item,
+                    categoryNameById.get(String(item.categoryId)) ?? "",
+                  );
                   return (
                     <button
                       key={item._id}
@@ -1478,9 +1490,9 @@ export default function OrderScreen({
                       {item.isFavorite && selectedCategory !== "favorites" && (
                         <Star className="absolute bottom-2 right-2 size-3 text-amber-400 fill-amber-400" />
                       )}
-                      {item.imageUrl ? (
+                      {photoUrl ? (
                         <img
-                          src={item.imageUrl}
+                          src={photoUrl}
                           alt=""
                           className="mb-2 h-16 w-full rounded-lg object-cover"
                           loading="lazy"

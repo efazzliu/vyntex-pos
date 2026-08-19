@@ -11,6 +11,7 @@ import { getWaiterSession } from "@/phone-app/lib/waiter-session.ts";
 import { useFingerScroll } from "@/phone-app/hooks/use-finger-scroll.ts";
 import { useWaiterCanPay } from "@/phone-app/hooks/use-waiter-can-pay.ts";
 import { emojiForCategoryName } from "@/lib/pos-category-icons.ts";
+import { resolveMenuItemImageUrl } from "@/lib/menu-item-photo-urls.ts";
 import { buildGuestMenuUrl } from "@/lib/guest-menu-url.ts";
 import { cn } from "@/lib/utils.ts";
 import { usePhoneAccessBranding } from "@/phone-app/hooks/use-phone-access-branding.tsx";
@@ -69,6 +70,17 @@ export default function PhoneWaiterMenu() {
       cancelled = true;
     };
   }, [restaurantId]);
+
+  const categoryNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const cat of categories ?? []) {
+      map.set(cat._id, cat.name);
+    }
+    return map;
+  }, [categories]);
+
+  const itemPhotoUrl = (item: Doc<"menuItems">) =>
+    resolveMenuItemImageUrl(item, categoryNameById.get(item.categoryId) ?? "");
 
   const items = useMemo(() => {
     const list = (menuItems ?? []).filter((i) => i.available);
@@ -344,9 +356,9 @@ export default function PhoneWaiterMenu() {
                 onClick={() => openItem(item)}
                 className="flex w-full items-center gap-3 rounded-2xl bg-white/[0.05] px-3 py-2.5 text-left active:scale-[0.99]"
               >
-                {item.imageUrl ? (
+                {itemPhotoUrl(item) ? (
                   <img
-                    src={item.imageUrl}
+                    src={itemPhotoUrl(item)}
                     alt={item.name}
                     className="size-10 shrink-0 rounded-xl object-cover"
                   />
@@ -383,9 +395,9 @@ export default function PhoneWaiterMenu() {
                   boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.08)",
                 }}
               >
-                {item.imageUrl ? (
+                {itemPhotoUrl(item) ? (
                   <img
-                    src={item.imageUrl}
+                    src={itemPhotoUrl(item)}
                     alt={item.name}
                     className="size-9 shrink-0 rounded-lg object-cover"
                   />
@@ -420,6 +432,12 @@ export default function PhoneWaiterMenu() {
                 onClick={() => openItem(item)}
                 className="flex min-h-[4.75rem] min-w-0 flex-col items-center justify-center gap-1 rounded-2xl border border-white/10 bg-white/[0.04] px-2 py-2.5 text-center active:scale-[0.98]"
               >
+                <img
+                  src={itemPhotoUrl(item)}
+                  alt=""
+                  className="mb-0.5 h-14 w-full rounded-lg object-cover"
+                  loading="lazy"
+                />
                 <span className="line-clamp-2 w-full text-[12px] font-medium leading-tight">
                   {item.name}
                 </span>

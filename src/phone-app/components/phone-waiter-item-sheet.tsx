@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronLeft, Minus, Plus, UtensilsCrossed } from "lucide-react";
 import type { Doc } from "@/convex/_generated/dataModel.d.ts";
+import { resolveMenuItemImageUrl } from "@/lib/menu-item-photo-urls.ts";
 import { cn } from "@/lib/utils.ts";
 import type { PhoneAccessThemeTokens } from "@/lib/phone-access-theme.ts";
 
@@ -32,6 +33,8 @@ export default function PhoneWaiterItemSheet({
   useEffect(() => {
     setQty(1);
   }, [item._id]);
+
+  const photoUrl = resolveMenuItemImageUrl(item, categoryName ?? "");
 
   return (
     <>
@@ -70,9 +73,9 @@ export default function PhoneWaiterItemSheet({
             className="relative mb-4 overflow-hidden rounded-2xl"
             style={{ aspectRatio: "16 / 10", background: tokens.card }}
           >
-            {item.imageUrl ? (
+            {photoUrl ? (
               <img
-                src={item.imageUrl}
+                src={photoUrl}
                 alt={item.name}
                 className="h-full w-full object-cover"
               />
