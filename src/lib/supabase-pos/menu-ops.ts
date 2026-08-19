@@ -17,6 +17,7 @@ import {
   resolvePosCurrencySymbol,
 } from "@/lib/pos-locale-defaults.ts";
 import { resolveMenuItemImageUrl } from "@/lib/menu-item-photo-urls.ts";
+import { customizationConfigForDb } from "@/lib/menu-customizations.ts";
 
 function pgMissingColumnMessage(error: { message?: string }, column: string): boolean {
   const m = String(error.message ?? "").toLowerCase();
@@ -374,6 +375,13 @@ export async function createItem(args: Record<string, unknown>) {
     payload.supply_recipe = recipeNorm;
   }
 
+  const customizationNorm = customizationConfigForDb(
+    args.customizationConfig as never,
+  );
+  if (customizationNorm !== undefined) {
+    payload.customization_config = customizationNorm;
+  }
+
   let { data, error } = await supabase
     .from("menu_items")
     .insert(payload)
@@ -385,6 +393,15 @@ export async function createItem(args: Record<string, unknown>) {
     ({ data, error } = await supabase
       .from("menu_items")
       .insert(withoutRecipe)
+      .select("id")
+      .single());
+  }
+
+  if (error && pgMissingColumnMessage(error, "customization_config")) {
+    const { customization_config: _cc, ...withoutCustom } = payload;
+    ({ data, error } = await supabase
+      .from("menu_items")
+      .insert(withoutCustom)
       .select("id")
       .single());
   }
@@ -445,6 +462,13 @@ export async function updateItem(args: Record<string, unknown>) {
       : [];
   }
 
+  const customizationNormUpdate = customizationConfigForDb(
+    args.customizationConfig as never,
+  );
+  if (customizationNormUpdate !== undefined) {
+    patch.customization_config = customizationNormUpdate;
+  }
+
   Object.keys(patch).forEach((k) => {
     if (patch[k] === undefined) delete patch[k];
   });
@@ -458,6 +482,14 @@ export async function updateItem(args: Record<string, unknown>) {
     ({ error } = await supabase
       .from("menu_items")
       .update(withoutRecipe)
+      .eq("id", args.itemId as string));
+  }
+
+  if (error && pgMissingColumnMessage(error, "customization_config")) {
+    const { customization_config: _cc, ...withoutCustom } = patch;
+    ({ error } = await supabase
+      .from("menu_items")
+      .update(withoutCustom)
       .eq("id", args.itemId as string));
   }
 

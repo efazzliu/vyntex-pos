@@ -1,6 +1,7 @@
 /** Map Supabase rows to Convex Doc-shaped objects the UI expects. */
 
 import { resolveMenuItemImageUrl } from "@/lib/menu-item-photo-urls.ts";
+import { normalizeCustomizationConfig, normalizeSelectedCustomizations } from "@/lib/menu-customizations.ts";
 
 export function staffFromRow(r: {
   id: string;
@@ -95,6 +96,7 @@ export function menuItemFromRow(r: {
   current_stock: number | string | null;
   low_stock_threshold: number | string | null;
   supply_recipe?: unknown;
+  customization_config?: unknown;
 }) {
   const rawRecipe = r.supply_recipe;
   let supplyRecipe:
@@ -112,6 +114,8 @@ export function menuItemFromRow(r: {
     }
     if (lines.length > 0) supplyRecipe = lines;
   }
+
+  const customizationConfig = normalizeCustomizationConfig(r.customization_config);
 
   return {
     _id: r.id,
@@ -141,6 +145,7 @@ export function menuItemFromRow(r: {
         ? Number(r.low_stock_threshold)
         : undefined,
     supplyRecipe,
+    ...(customizationConfig.length > 0 ? { customizationConfig } : {}),
   };
 }
 

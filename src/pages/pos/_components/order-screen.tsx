@@ -54,6 +54,15 @@ import { verifyAdminPin } from "@/lib/supabase-pos.ts";
 import { errorMessageFromUnknown } from "@/lib/supabase-pos/db-errors.ts";
 import { emojiForCategoryName } from "@/lib/pos-category-icons.ts";
 import { resolveMenuItemImageUrl } from "@/lib/menu-item-photo-urls.ts";
+import MenuItemCustomizationPicker from "@/components/menu-item-customization-picker.tsx";
+import {
+  cartLineKey,
+  formatCustomizationsForDisplay,
+  getMenuItemCustomizationGroups,
+  hasMenuItemCustomizations,
+  resolvedMenuItemUnitPrice,
+  type SelectedCustomization,
+} from "@/lib/menu-customizations.ts";
 import { uuidOrNull, staffIdsEqual } from "@/lib/supabase-pos/uuid.ts";
 import { posTablesIndexedDbKey } from "@/lib/supabase-pos/cache-keys.ts";
 import { displayOrderNumber } from "@/lib/supabase-pos/mappers.ts";
@@ -130,6 +139,11 @@ type CartItem = {
   station?: "kitchen" | "bar";
   notes?: string;
   vatRate?: number;
+  selectedCustomizations?: SelectedCustomization[];
+};
+
+type MenuItemWithCustomizations = Doc<"menuItems"> & {
+  customizationConfig?: unknown;
 };
 
 function MenuCategoryGlyph({
@@ -288,8 +302,10 @@ export default function OrderScreen({
   const [newCustomerName, setNewCustomerName] = useState("");
 
   // Note editing state
-  const [noteItemId, setNoteItemId] = useState<Id<"menuItems"> | null>(null);
+  const [noteCartKey, setNoteCartKey] = useState<string | null>(null);
   const [noteText, setNoteText] = useState("");
+  const [customizationPickerItem, setCustomizationPickerItem] =
+    useState<MenuItemWithCustomizations | null>(null);
 
   const [tableMoveOpen, setTableMoveOpen] = useState(false);
   const [tableMoveMode, setTableMoveMode] = useState<"transfer" | "merge">(
@@ -535,9 +551,18 @@ export default function OrderScreen({
     .filter((i) => i.station === "bar")
     .reduce((sum, i) => sum + i.quantity, 0);
 
-  const addToCart = (item: Doc<"menuItems">) => {
+  const addToCartWithOptions = (
+    item: MenuItemWithCustomizations,
+    selectedCustomizations?: SelectedCustomization[],
+    notes?: string,
+  ) => {
+    const lineKey = cartLineKey({
+      menuItemId: String(item._id),
+      selectedCustomizations,
+      notes,
+    });
     const existingQty =
-      cart.find((c) => c.menuItemId === item._id && !c.notes)?.quantity ?? 0;
+      cart.find((c) => cartLineKey(c) === lineKey)?.quantity ?? 0;
     const blocked = getOrderBlockReason(
       item,
       existingQty + 1,
@@ -547,15 +572,14 @@ export default function OrderScreen({
       toastOrderBlocked(blocked, item.name);
       return;
     }
+    const unitPrice = resolvedMenuItemUnitPrice(item.price, selectedCustomizations);
     setCart((prev) => {
-      const existing = prev.find(
-        (c) => c.menuItemId === item._id && !c.notes
-      );
+      const existing = prev.find((c) => cartLineKey(c) === lineKey);
       if (existing) {
         return prev.map((c) =>
-          c.menuItemId === item._id && !c.notes
+          cartLineKey(c) === lineKey
             ? { ...c, quantity: c.quantity + 1 }
-            : c
+            : c,
         );
       }
       return [
@@ -563,26 +587,32 @@ export default function OrderScreen({
         {
           menuItemId: item._id,
           name: item.name,
-          price: item.price,
+          price: unitPrice,
           quantity: 1,
           station: item.station,
           vatRate: item.vatRate,
+          notes,
+          selectedCustomizations,
         },
       ];
     });
   };
 
+  const addToCart = (item: MenuItemWithCustomizations) => {
+    if (hasMenuItemCustomizations(item)) {
+      setCustomizationPickerItem(item);
+      return;
+    }
+    addToCartWithOptions(item);
+  };
+
   const updateCartQty = (
-    menuItemId: Id<"menuItems">,
+    lineKey: string,
     delta: number,
-    notes?: string
   ) => {
     if (delta > 0) {
-      const item = menuItems.find((i) => i._id === menuItemId);
-      const line = cart.find(
-        (c) =>
-          c.menuItemId === menuItemId && (c.notes ?? "") === (notes ?? ""),
-      );
+      const line = cart.find((c) => cartLineKey(c) === lineKey);
+      const item = menuItems.find((i) => i._id === line?.menuItemId);
       const nextQty = (line?.quantity ?? 0) + delta;
       if (item) {
         const blocked = getOrderBlockReason(item, nextQty, enforceAvailability);
@@ -595,39 +625,33 @@ export default function OrderScreen({
     setCart((prev) =>
       prev
         .map((c) =>
-          c.menuItemId === menuItemId && (c.notes ?? "") === (notes ?? "")
+          cartLineKey(c) === lineKey
             ? { ...c, quantity: c.quantity + delta }
-            : c
+            : c,
         )
-        .filter((c) => c.quantity > 0)
+        .filter((c) => c.quantity > 0),
     );
   };
 
-  const removeFromCart = (menuItemId: Id<"menuItems">, notes?: string) => {
-    setCart((prev) =>
-      prev.filter(
-        (c) =>
-          !(c.menuItemId === menuItemId && (c.notes ?? "") === (notes ?? ""))
-      )
-    );
+  const removeFromCart = (lineKey: string) => {
+    setCart((prev) => prev.filter((c) => cartLineKey(c) !== lineKey));
   };
 
-  const openNoteDialog = (menuItemId: Id<"menuItems">) => {
-    const existing = cart.find((c) => c.menuItemId === menuItemId);
-    setNoteItemId(menuItemId);
-    setNoteText(existing?.notes ?? "");
+  const openNoteDialog = (line: CartItem) => {
+    setNoteCartKey(cartLineKey(line));
+    setNoteText(line.notes ?? "");
   };
 
   const saveNote = () => {
-    if (!noteItemId) return;
+    if (!noteCartKey) return;
     setCart((prev) =>
       prev.map((c) =>
-        c.menuItemId === noteItemId
+        cartLineKey(c) === noteCartKey
           ? { ...c, notes: noteText.trim() || undefined }
-          : c
-      )
+          : c,
+      ),
     );
-    setNoteItemId(null);
+    setNoteCartKey(null);
     setNoteText("");
   };
 
@@ -651,6 +675,7 @@ export default function OrderScreen({
       price: item.price,
       station: item.station,
       vatRate: item.vatRate,
+      selectedCustomizations: item.selectedCustomizations,
     }));
     const ticketLines = lines.map((l) => ({
       name: l.name,
@@ -1773,9 +1798,14 @@ export default function OrderScreen({
                     </p>
                   </div>
                 )}
-                {cart.map((item) => (
+                {cart.map((item) => {
+                  const lineKey = cartLineKey(item);
+                  const customLabel = formatCustomizationsForDisplay(
+                    item.selectedCustomizations,
+                  );
+                  return (
                   <div
-                    key={`${item.menuItemId}-${item.notes ?? ""}`}
+                    key={lineKey}
                     className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#131A2E] border border-[#1e2a45]"
                   >
                     <div className="flex-1 min-w-0">
@@ -1803,6 +1833,11 @@ export default function OrderScreen({
                       <p className="text-xs text-[#5a6580]">
                         {formatPrice(item.price)}
                       </p>
+                      {customLabel ? (
+                        <p className="text-[10px] text-sky-300 mt-0.5">
+                          {customLabel}
+                        </p>
+                      ) : null}
                       {item.notes && (
                         <p className="text-[10px] text-amber-400 mt-0.5 italic">
                           {item.notes}
@@ -1811,7 +1846,7 @@ export default function OrderScreen({
                     </div>
                     <div className="flex items-center gap-1">
                       <button
-                        onClick={() => openNoteDialog(item.menuItemId)}
+                        onClick={() => openNoteDialog(item)}
                         className={cn(
                           "p-1 rounded transition-colors cursor-pointer",
                           item.notes
@@ -1822,9 +1857,7 @@ export default function OrderScreen({
                         <Pencil className="size-3" />
                       </button>
                       <button
-                        onClick={() =>
-                          updateCartQty(item.menuItemId, -1, item.notes)
-                        }
+                        onClick={() => updateCartQty(lineKey, -1)}
                         className="p-1 rounded hover:bg-[#1e2a45] text-[#8b93a7] cursor-pointer"
                       >
                         <Minus className="size-3.5" />
@@ -1833,24 +1866,21 @@ export default function OrderScreen({
                         {item.quantity}
                       </span>
                       <button
-                        onClick={() =>
-                          updateCartQty(item.menuItemId, 1, item.notes)
-                        }
+                        onClick={() => updateCartQty(lineKey, 1)}
                         className="p-1 rounded hover:bg-[#1e2a45] text-[#8b93a7] cursor-pointer"
                       >
                         <Plus className="size-3.5" />
                       </button>
                       <button
-                        onClick={() =>
-                          removeFromCart(item.menuItemId, item.notes)
-                        }
+                        onClick={() => removeFromCart(lineKey)}
                         className="p-1 rounded hover:bg-red-500/10 text-[#5a6580] hover:text-red-400 ml-1 cursor-pointer"
                       >
                         <X className="size-3.5" />
                       </button>
                     </div>
                   </div>
-                ))}
+                );
+                })}
               </>
             )}
 
@@ -2036,11 +2066,51 @@ export default function OrderScreen({
         </DialogContent>
       </Dialog>
 
+      {/* Customization dialog */}
+      <Dialog
+        open={customizationPickerItem !== null}
+        onOpenChange={(open) => {
+          if (!open) setCustomizationPickerItem(null);
+        }}
+      >
+        <DialogContent className="bg-[#131A2E] border-[#1e2a45] max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white">
+              {customizationPickerItem?.name}
+            </DialogTitle>
+            <DialogDescription className="text-[#8b93a7]">
+              {t("order.customization_desc")}
+            </DialogDescription>
+          </DialogHeader>
+          {customizationPickerItem ? (
+            <MenuItemCustomizationPicker
+              groups={getMenuItemCustomizationGroups(customizationPickerItem)}
+              basePrice={customizationPickerItem.price}
+              formatPrice={formatPrice}
+              accentClassName="border-[#0066FF] bg-[#0066FF]/10 text-[#7eb6ff]"
+              labels={{
+                title: t("order.customization_title"),
+                optionalNote: t("order.customization_note"),
+                notePlaceholder: t("order.customization_note_ph"),
+                requiredError: t("order.customization_required"),
+                confirm: t("order.customization_add"),
+                cancel: t("btn.cancel"),
+              }}
+              onCancel={() => setCustomizationPickerItem(null)}
+              onConfirm={(selections, notes) => {
+                addToCartWithOptions(customizationPickerItem, selections, notes);
+                setCustomizationPickerItem(null);
+              }}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
       {/* Note dialog */}
       <Dialog
-        open={noteItemId !== null}
+        open={noteCartKey !== null}
         onOpenChange={(open) => {
-          if (!open) setNoteItemId(null);
+          if (!open) setNoteCartKey(null);
         }}
       >
         <DialogContent className="bg-[#131A2E] border-[#1e2a45] max-w-sm">
@@ -2080,7 +2150,7 @@ export default function OrderScreen({
           <DialogFooter>
             <Button
               variant="ghost"
-              onClick={() => setNoteItemId(null)}
+              onClick={() => setNoteCartKey(null)}
               className="text-[#8b93a7]"
             >
               Cancel

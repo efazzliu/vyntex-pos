@@ -21,6 +21,7 @@ import {
   waiterIdleChipClass,
   waiterPageTextClass,
 } from "@/lib/phone-access-theme.ts";
+import type { SelectedCustomization } from "@/lib/menu-customizations.ts";
 
 export default function PhoneWaiterMenu() {
   const { t } = useTranslation("site");
@@ -103,12 +104,23 @@ export default function PhoneWaiterMenu() {
     setSelectedItem(item);
   };
 
-  const addToOrder = (quantity: number) => {
+  const addToOrder = (
+    quantity: number,
+    selectedCustomizations?: SelectedCustomization[],
+    notes?: string,
+  ) => {
     const item = selectedItem;
     setSelectedItem(null);
     toast.message(t("phone.waiter.menuPickTable"));
     navigate("/waiter/floor", {
-      state: item ? { addMenuItemId: item._id, addQuantity: quantity } : undefined,
+      state: item
+        ? {
+            addMenuItemId: item._id,
+            addQuantity: quantity,
+            addCustomizations: selectedCustomizations,
+            addNotes: notes,
+          }
+        : undefined,
     });
   };
 
