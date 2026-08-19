@@ -1,5 +1,7 @@
 /** Map Supabase rows to Convex Doc-shaped objects the UI expects. */
 
+import { photoUrlForMenuItem } from "@/lib/menu-item-photo-urls.ts";
+
 export function staffFromRow(r: {
   id: string;
   created_at: string;
