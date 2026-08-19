@@ -1,20 +1,30 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronLeft, Minus, Plus, UtensilsCrossed } from "lucide-react";
 import type { Doc } from "@/convex/_generated/dataModel.d.ts";
 import { resolveMenuItemImageUrl } from "@/lib/menu-item-photo-urls.ts";
+import MenuItemCustomizationPicker from "@/components/menu-item-customization-picker.tsx";
+import {
+  getMenuItemCustomizationGroups,
+  hasMenuItemCustomizations,
+  type SelectedCustomization,
+} from "@/lib/menu-customizations.ts";
 import { cn } from "@/lib/utils.ts";
 import type { PhoneAccessThemeTokens } from "@/lib/phone-access-theme.ts";
 
 type Props = {
-  item: Doc<"menuItems">;
+  item: Doc<"menuItems"> & { customizationConfig?: unknown };
   categoryName?: string;
   accent: string;
   tokens: PhoneAccessThemeTokens;
   showPrice: boolean;
   formatPrice: (n: number) => string;
   onClose: () => void;
-  onAdd: (quantity: number) => void;
+  onAdd: (
+    quantity: number,
+    selectedCustomizations?: SelectedCustomization[],
+    notes?: string,
+  ) => void;
 };
 
 export default function PhoneWaiterItemSheet({
@@ -29,6 +39,11 @@ export default function PhoneWaiterItemSheet({
 }: Props) {
   const { t } = useTranslation("site");
   const [qty, setQty] = useState(1);
+  const customizationGroups = useMemo(
+    () => getMenuItemCustomizationGroups(item),
+    [item],
+  );
+  const showCustomization = hasMenuItemCustomizations(item);
 
   useEffect(() => {
     setQty(1);
@@ -121,6 +136,56 @@ export default function PhoneWaiterItemSheet({
             </p>
           ) : null}
 
+          {showCustomization ? (
+            <div className="mb-4 space-y-3 rounded-2xl border p-3" style={{ borderColor: tokens.border }}>
+              <div
+                className="flex h-12 w-fit overflow-hidden rounded-xl border"
+                style={{ borderColor: tokens.border }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setQty((n) => Math.max(1, n - 1))}
+                  className="flex size-12 items-center justify-center active:bg-black/5"
+                  style={{ color: tokens.fg }}
+                  aria-label="-"
+                >
+                  <Minus className="size-4" />
+                </button>
+                <span
+                  className="flex min-w-[2.25rem] items-center justify-center text-[16px] font-semibold tabular-nums"
+                  style={{ color: tokens.fg }}
+                >
+                  {qty}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setQty((n) => Math.min(99, n + 1))}
+                  className="flex size-12 items-center justify-center active:bg-black/5"
+                  style={{ color: tokens.fg }}
+                  aria-label="+"
+                >
+                  <Plus className="size-4" />
+                </button>
+              </div>
+              <MenuItemCustomizationPicker
+                groups={customizationGroups}
+                basePrice={item.price}
+                formatPrice={formatPrice}
+                accentStyle={{ borderColor: accent, backgroundColor: `${accent}22`, color: accent }}
+                labels={{
+                  title: t("phone.waiter.customizationTitle"),
+                  optionalNote: t("phone.waiter.customizationNote"),
+                  notePlaceholder: t("phone.waiter.customizationNotePh"),
+                  requiredError: t("phone.waiter.customizationRequired"),
+                  confirm: t("phone.waiter.menuItemAddToOrder"),
+                  cancel: t("phone.waiter.menuItemClose"),
+                }}
+                onCancel={onClose}
+                onConfirm={(selections, notes) => onAdd(qty, selections, notes)}
+              />
+            </div>
+          ) : null}
+
           {categoryName ? (
             <div
               className="flex items-center justify-between gap-3 border-t py-3.5"
@@ -136,50 +201,52 @@ export default function PhoneWaiterItemSheet({
           ) : null}
         </div>
 
-        <div
-          className="flex shrink-0 items-center gap-3 border-t px-5 pb-[max(1.1rem,env(safe-area-inset-bottom))] pt-3"
-          style={{ borderColor: tokens.border, background: tokens.sheet }}
-        >
+        {!showCustomization ? (
           <div
-            className="flex h-12 shrink-0 overflow-hidden rounded-xl border"
-            style={{ borderColor: tokens.border }}
+            className="flex shrink-0 items-center gap-3 border-t px-5 pb-[max(1.1rem,env(safe-area-inset-bottom))] pt-3"
+            style={{ borderColor: tokens.border, background: tokens.sheet }}
           >
+            <div
+              className="flex h-12 shrink-0 overflow-hidden rounded-xl border"
+              style={{ borderColor: tokens.border }}
+            >
+              <button
+                type="button"
+                onClick={() => setQty((n) => Math.max(1, n - 1))}
+                className="flex size-12 items-center justify-center active:bg-black/5"
+                style={{ color: tokens.fg }}
+                aria-label="-"
+              >
+                <Minus className="size-4" />
+              </button>
+              <span
+                className="flex min-w-[2.25rem] items-center justify-center text-[16px] font-semibold tabular-nums"
+                style={{ color: tokens.fg }}
+              >
+                {qty}
+              </span>
+              <button
+                type="button"
+                onClick={() => setQty((n) => Math.min(99, n + 1))}
+                className="flex size-12 items-center justify-center active:bg-black/5"
+                style={{ color: tokens.fg }}
+                aria-label="+"
+              >
+                <Plus className="size-4" />
+              </button>
+            </div>
             <button
               type="button"
-              onClick={() => setQty((n) => Math.max(1, n - 1))}
-              className="flex size-12 items-center justify-center active:bg-black/5"
-              style={{ color: tokens.fg }}
-              aria-label="-"
+              onClick={() => onAdd(qty)}
+              className={cn(
+                "flex h-12 min-w-0 flex-1 items-center justify-center rounded-xl px-4 text-[15px] font-bold text-white active:scale-[0.99]",
+              )}
+              style={{ backgroundColor: accent }}
             >
-              <Minus className="size-4" />
-            </button>
-            <span
-              className="flex min-w-[2.25rem] items-center justify-center text-[16px] font-semibold tabular-nums"
-              style={{ color: tokens.fg }}
-            >
-              {qty}
-            </span>
-            <button
-              type="button"
-              onClick={() => setQty((n) => Math.min(99, n + 1))}
-              className="flex size-12 items-center justify-center active:bg-black/5"
-              style={{ color: tokens.fg }}
-              aria-label="+"
-            >
-              <Plus className="size-4" />
+              {t("phone.waiter.menuItemAddToOrder")}
             </button>
           </div>
-          <button
-            type="button"
-            onClick={() => onAdd(qty)}
-            className={cn(
-              "flex h-12 min-w-0 flex-1 items-center justify-center rounded-xl px-4 text-[15px] font-bold text-white active:scale-[0.99]",
-            )}
-            style={{ backgroundColor: accent }}
-          >
-            {t("phone.waiter.menuItemAddToOrder")}
-          </button>
-        </div>
+        ) : null}
       </div>
     </>
   );

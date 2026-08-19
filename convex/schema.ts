@@ -129,6 +129,8 @@ export default defineSchema({
         }),
       ),
     ),
+    /** Admin-defined option groups (doneness, sides, removals, etc.). */
+    customizationConfig: v.optional(v.any()),
   })
     .index("by_restaurant", ["restaurantId"])
     .index("by_category", ["categoryId"])

@@ -15,6 +15,12 @@ import {
 } from "./floor-sync.ts";
 import { isOpenSaleStatus, loadOpenSalesForTable } from "./tables-ops.ts";
 import { applySupplyRecipeAfterSale } from "./supply-recipe-ops.ts";
+import {
+  customizationPriceDelta,
+  mergeNotesWithCustomizations,
+  normalizeSelectedCustomizations,
+  type SelectedCustomization,
+} from "@/lib/menu-customizations.ts";
 
 function itemRowToDoc(r: {
   id: string;
@@ -28,7 +34,11 @@ function itemRowToDoc(r: {
   status: string;
   vat_rate: number | string | null;
   created_at?: string | null;
+  selected_customizations?: unknown;
 }) {
+  const selectedCustomizations = normalizeSelectedCustomizations(
+    r.selected_customizations,
+  );
   return {
     _id: r.id,
     orderId: r.sale_id,
@@ -41,6 +51,7 @@ function itemRowToDoc(r: {
     status: r.status,
     vatRate: r.vat_rate != null ? Number(r.vat_rate) : 0.2,
     createdAt: r.created_at ?? undefined,
+    ...(selectedCustomizations.length > 0 ? { selectedCustomizations } : {}),
   };
 }
 
@@ -168,6 +179,7 @@ type SaleItemInsertRow = {
   menu_item_id: string | null;
   station: string | null;
   vat_rate: number;
+  selected_customizations?: SelectedCustomization[];
 };
 
 function saleItemToInsertShapes(args: SaleItemInsertRow) {
@@ -187,6 +199,9 @@ function saleItemToInsertShapes(args: SaleItemInsertRow) {
 
   const full: Record<string, unknown> = { ...withVatStation };
   if (args.menu_item_id) full.menu_item_id = args.menu_item_id;
+  if (args.selected_customizations?.length) {
+    full.selected_customizations = args.selected_customizations;
+  }
   return { minimal, withVatStation, full };
 }
 
@@ -197,6 +212,11 @@ async function insertSaleItemWithSchemaFallback(
   const { minimal, withVatStation, full } = saleItemToInsertShapes(args);
 
   let { error } = await supabase.from("sale_items").insert(full);
+  if (error && isPostgrestExposeOrCacheError(error.message)) {
+    const withoutCustom = { ...full };
+    delete withoutCustom.selected_customizations;
+    ({ error } = await supabase.from("sale_items").insert(withoutCustom));
+  }
   if (error && isPostgrestExposeOrCacheError(error.message)) {
     console.warn("[POS] sale_items full insert (retry without menu_item_id):", error.message);
     ({ error } = await supabase.from("sale_items").insert(withVatStation));
@@ -217,6 +237,14 @@ async function insertSaleItemsBatchWithSchemaFallback(
   const fullRows = shapes.map((s) => s.full);
 
   let { error } = await supabase.from("sale_items").insert(fullRows);
+  if (error && isPostgrestExposeOrCacheError(error.message)) {
+    const withoutCustom = fullRows.map((row) => {
+      const next = { ...row };
+      delete next.selected_customizations;
+      return next;
+    });
+    ({ error } = await supabase.from("sale_items").insert(withoutCustom));
+  }
   if (error && isPostgrestExposeOrCacheError(error.message)) {
     console.warn(
       "[POS] sale_items batch full insert (retry without menu_item_id):",
@@ -873,6 +901,7 @@ export type OrderLineInput = {
   price?: number;
   station?: "kitchen" | "bar";
   vatRate?: number;
+  selectedCustomizations?: SelectedCustomization[];
 };
 
 type MenuItemSnap = {
@@ -890,8 +919,14 @@ function resolveLineToSaleItemRow(
 ): SaleItemInsertRow {
   const mi = menuById.get(line.menuItemId);
   const name = (mi?.name ?? line.name)?.trim();
-  const price =
+  const basePrice =
     mi != null ? Number(mi.price) : line.price != null ? Number(line.price) : NaN;
+  const delta = customizationPriceDelta(line.selectedCustomizations);
+  const resolvedPrice =
+    line.price != null && Number.isFinite(Number(line.price))
+      ? Number(line.price)
+      : basePrice + delta;
+  const price = resolvedPrice;
   if (!name || !Number.isFinite(price)) {
     throw new Error(
       "Menu item not found. Refresh the menu screen (cached items may use old ids after switching to Supabase).",
@@ -902,16 +937,20 @@ function resolveLineToSaleItemRow(
   const vatRate =
     mi?.vat_rate != null ? Number(mi.vat_rate) : (line.vatRate ?? 0.2);
   const menuItemFk = mi?.id ?? uuidOrNull(line.menuItemId);
+  const selected = normalizeSelectedCustomizations(line.selectedCustomizations);
+  const notes =
+    mergeNotesWithCustomizations(selected, line.notes) ?? line.notes ?? null;
 
   return {
     sale_id: orderId,
     name,
     price,
     quantity: line.quantity,
-    notes: line.notes ?? null,
+    notes,
     menu_item_id: menuItemFk,
     station,
     vat_rate: Number.isFinite(vatRate) ? vatRate : 0.2,
+    ...(selected.length > 0 ? { selected_customizations: selected } : {}),
   };
 }
 

@@ -38,6 +38,15 @@ import {
   parseOrderBlockError,
   resolveEnforceOrderAvailability,
 } from "@/lib/pos-order-availability.ts";
+import MenuItemCustomizationPicker from "@/components/menu-item-customization-picker.tsx";
+import {
+  cartLineKey,
+  formatCustomizationsForDisplay,
+  getMenuItemCustomizationGroups,
+  hasMenuItemCustomizations,
+  resolvedMenuItemUnitPrice,
+  type SelectedCustomization,
+} from "@/lib/menu-customizations.ts";
 
 type CartItem = {
   menuItemId: string;
@@ -46,6 +55,8 @@ type CartItem = {
   quantity: number;
   station?: "kitchen" | "bar";
   vatRate?: number;
+  notes?: string;
+  selectedCustomizations?: SelectedCustomization[];
 };
 
 type SentLine = {
@@ -192,6 +203,9 @@ export default function PhoneWaiterOrder() {
   const [centerNotice, setCenterNotice] = useState<string | null>(null);
   const [payOpen, setPayOpen] = useState(false);
   const [payBusy, setPayBusy] = useState(false);
+  const [customizationPickerItem, setCustomizationPickerItem] = useState<
+    (Doc<"menuItems"> & { customizationConfig?: unknown }) | null
+  >(null);
 
   useEffect(() => {
     if (!centerNotice) return;
@@ -289,9 +303,18 @@ export default function PhoneWaiterOrder() {
   const showPrevBar = sentCount > 0 && !cartOpen && !historyOpen && !payOpen;
   const showCartBar = cartCount > 0 && !cartOpen && !historyOpen;
 
-  const addToCart = (item: Doc<"menuItems">) => {
+  const addToCartWithOptions = (
+    item: Doc<"menuItems"> & { customizationConfig?: unknown },
+    selectedCustomizations?: SelectedCustomization[],
+    notes?: string,
+  ) => {
+    const lineKey = cartLineKey({
+      menuItemId: String(item._id),
+      selectedCustomizations,
+      notes,
+    });
     const existingQty =
-      cart.find((c) => c.menuItemId === item._id)?.quantity ?? 0;
+      cart.find((c) => cartLineKey(c) === lineKey)?.quantity ?? 0;
     const blocked = getOrderBlockReason(
       item,
       existingQty + 1,
@@ -305,11 +328,12 @@ export default function PhoneWaiterOrder() {
       );
       return;
     }
+    const unitPrice = resolvedMenuItemUnitPrice(item.price, selectedCustomizations);
     setCart((prev) => {
-      const existing = prev.find((c) => c.menuItemId === item._id);
+      const existing = prev.find((c) => cartLineKey(c) === lineKey);
       if (existing) {
         return prev.map((c) =>
-          c.menuItemId === item._id ? { ...c, quantity: c.quantity + 1 } : c,
+          cartLineKey(c) === lineKey ? { ...c, quantity: c.quantity + 1 } : c,
         );
       }
       return [
@@ -317,19 +341,29 @@ export default function PhoneWaiterOrder() {
         {
           menuItemId: item._id,
           name: item.name,
-          price: item.price,
+          price: unitPrice,
           quantity: 1,
           station: item.station,
           vatRate: item.vatRate,
+          notes,
+          selectedCustomizations,
         },
       ];
     });
   };
 
-  const updateQty = (menuItemId: string, delta: number) => {
+  const addToCart = (item: Doc<"menuItems"> & { customizationConfig?: unknown }) => {
+    if (hasMenuItemCustomizations(item)) {
+      setCustomizationPickerItem(item);
+      return;
+    }
+    addToCartWithOptions(item);
+  };
+
+  const updateQty = (lineKey: string, delta: number) => {
     if (delta > 0) {
-      const item = (menuItems ?? []).find((i) => i._id === menuItemId);
-      const line = cart.find((c) => c.menuItemId === menuItemId);
+      const line = cart.find((c) => cartLineKey(c) === lineKey);
+      const item = (menuItems ?? []).find((i) => i._id === line?.menuItemId);
       const nextQty = (line?.quantity ?? 0) + delta;
       if (item) {
         const blocked = getOrderBlockReason(item, nextQty, enforceAvailability);
@@ -345,7 +379,9 @@ export default function PhoneWaiterOrder() {
     }
     setCart((prev) =>
       prev
-        .map((c) => (c.menuItemId === menuItemId ? { ...c, quantity: c.quantity + delta } : c))
+        .map((c) =>
+          cartLineKey(c) === lineKey ? { ...c, quantity: c.quantity + delta } : c,
+        )
         .filter((c) => c.quantity > 0),
     );
   };
@@ -361,6 +397,8 @@ export default function PhoneWaiterOrder() {
       price: c.price,
       station: c.station,
       vatRate: c.vatRate,
+      notes: c.notes,
+      selectedCustomizations: c.selectedCustomizations,
     }));
     try {
       const result = await submitCartOrder({
@@ -707,7 +745,13 @@ export default function PhoneWaiterOrder() {
         ) : tableDesign === "modern" ? (
           <div className="space-y-2">
             {filteredItems.map((item) => {
-              const inCart = cart.find((c) => c.menuItemId === item._id);
+              const inCart = hasMenuItemCustomizations(item)
+                ? undefined
+                : cart.find(
+                    (c) =>
+                      cartLineKey(c) ===
+                      cartLineKey({ menuItemId: String(item._id) }),
+                  );
               const visualBlock = getOrderBlockReason(item, 1, enforceAvailability);
               return (
                 <button
@@ -761,7 +805,13 @@ export default function PhoneWaiterOrder() {
         ) : tableDesign === "advanced" ? (
           <div className="space-y-1.5">
             {filteredItems.map((item) => {
-              const inCart = cart.find((c) => c.menuItemId === item._id);
+              const inCart = hasMenuItemCustomizations(item)
+                ? undefined
+                : cart.find(
+                    (c) =>
+                      cartLineKey(c) ===
+                      cartLineKey({ menuItemId: String(item._id) }),
+                  );
               const visualBlock = getOrderBlockReason(item, 1, enforceAvailability);
               return (
                 <div
@@ -808,7 +858,12 @@ export default function PhoneWaiterOrder() {
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
-                        onClick={() => updateQty(item._id, -1)}
+                        onClick={() =>
+                          updateQty(
+                            cartLineKey({ menuItemId: String(item._id) }),
+                            -1,
+                          )
+                        }
                         className="flex size-7 items-center justify-center rounded-lg bg-white/[0.08] text-white/70"
                       >
                         <Minus className="size-3.5" />
@@ -816,7 +871,12 @@ export default function PhoneWaiterOrder() {
                       <span className="w-4 text-center text-[13px] font-bold">{inCart.quantity}</span>
                       <button
                         type="button"
-                        onClick={() => updateQty(item._id, 1)}
+                        onClick={() =>
+                          updateQty(
+                            cartLineKey({ menuItemId: String(item._id) }),
+                            1,
+                          )
+                        }
                         className="flex size-7 items-center justify-center rounded-lg bg-white/[0.08] text-white"
                       >
                         <Plus className="size-3.5" />
@@ -840,7 +900,13 @@ export default function PhoneWaiterOrder() {
         ) : (
           <div className="grid grid-cols-2 gap-3">
             {filteredItems.map((item) => {
-              const inCart = cart.find((c) => c.menuItemId === item._id);
+              const inCart = hasMenuItemCustomizations(item)
+                ? undefined
+                : cart.find(
+                    (c) =>
+                      cartLineKey(c) ===
+                      cartLineKey({ menuItemId: String(item._id) }),
+                  );
               const visualBlock = getOrderBlockReason(
                 item,
                 1,
@@ -1015,13 +1081,21 @@ export default function PhoneWaiterOrder() {
                 </p>
               ) : (
                 <div className="space-y-2 pb-2">
-                  {cart.map((item) => (
+                  {cart.map((item) => {
+                    const lineKey = cartLineKey(item);
+                    const customLabel = formatCustomizationsForDisplay(
+                      item.selectedCustomizations,
+                    );
+                    return (
                     <div
-                      key={item.menuItemId}
+                      key={lineKey}
                       className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5"
                     >
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-[13px] font-medium text-white">{item.name}</p>
+                        {customLabel ? (
+                          <p className="text-[11px] text-sky-300">{customLabel}</p>
+                        ) : null}
                         {waiterCanPay ? (
                           <p className="text-[12px] text-white/40">{formatPrice(item.price)}</p>
                         ) : null}
@@ -1029,7 +1103,7 @@ export default function PhoneWaiterOrder() {
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          onClick={() => updateQty(item.menuItemId, -1)}
+                          onClick={() => updateQty(lineKey, -1)}
                           className="flex size-7 items-center justify-center rounded-lg bg-white/[0.06] text-white/70"
                         >
                           <Minus className="size-3.5" />
@@ -1039,14 +1113,15 @@ export default function PhoneWaiterOrder() {
                         </span>
                         <button
                           type="button"
-                          onClick={() => updateQty(item.menuItemId, 1)}
+                          onClick={() => updateQty(lineKey, 1)}
                           className="flex size-7 items-center justify-center rounded-lg bg-white/[0.06] text-white/70"
                         >
                           <Plus className="size-3.5" />
                         </button>
                       </div>
                     </div>
-                  ))}
+                  );
+                  })}
                 </div>
               )}
             </div>
@@ -1241,6 +1316,39 @@ export default function PhoneWaiterOrder() {
                 {t("phone.waiter.order.paying")}
               </p>
             ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      {customizationPickerItem ? (
+        <div className="fixed inset-0 z-[90] flex items-end justify-center bg-black/60 p-4">
+          <div className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl border border-white/10 bg-[#0d1326] p-4">
+            <h3 className="mb-3 text-[16px] font-semibold text-white">
+              {customizationPickerItem.name}
+            </h3>
+            <MenuItemCustomizationPicker
+              groups={getMenuItemCustomizationGroups(customizationPickerItem)}
+              basePrice={customizationPickerItem.price}
+              formatPrice={formatPrice}
+              accentStyle={{
+                borderColor: access.accentColor,
+                backgroundColor: `${access.accentColor}22`,
+                color: access.accentColor,
+              }}
+              labels={{
+                title: t("phone.waiter.customizationTitle"),
+                optionalNote: t("phone.waiter.customizationNote"),
+                notePlaceholder: t("phone.waiter.customizationNotePh"),
+                requiredError: t("phone.waiter.customizationRequired"),
+                confirm: t("phone.waiter.menuItemAddToOrder"),
+                cancel: t("btn.cancel"),
+              }}
+              onCancel={() => setCustomizationPickerItem(null)}
+              onConfirm={(selections, notes) => {
+                addToCartWithOptions(customizationPickerItem, selections, notes);
+                setCustomizationPickerItem(null);
+              }}
+            />
           </div>
         </div>
       ) : null}
