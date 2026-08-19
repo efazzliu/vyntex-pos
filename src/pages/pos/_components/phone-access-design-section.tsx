@@ -694,7 +694,10 @@ function MenuScreenPreview({
         <div className="flex min-h-0 flex-1 flex-col px-3 pt-1">
           <div className="mb-2 flex items-center gap-2">
             <div className="min-w-0 flex-1">
-              <p className="text-[8px]" style={PREVIEW_MUTED}>
+              <p
+                className="text-[8px] font-semibold uppercase tracking-[0.14em]"
+                style={PREVIEW_MUTED}
+              >
                 {t("settings.phone_access_preview_on_shift")}
               </p>
               <p className="text-[12px] font-semibold" style={PREVIEW_FG}>
@@ -908,7 +911,10 @@ function PhoneAccessPreview({
                   K
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[8px]" style={PREVIEW_MUTED}>
+                  <p
+                    className="text-[8px] font-semibold uppercase tracking-[0.14em]"
+                    style={PREVIEW_MUTED}
+                  >
                     {t("settings.phone_access_preview_on_shift")}
                   </p>
                   <p className="text-[12px] font-semibold" style={PREVIEW_FG}>

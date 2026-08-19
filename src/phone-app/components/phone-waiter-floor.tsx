@@ -226,7 +226,7 @@ export default function PhoneWaiterFloor() {
             </div>
             <div className="min-w-0 flex-1">
               <p
-                className="text-[11px] font-medium tracking-wide"
+                className="text-[11px] font-semibold uppercase tracking-[0.14em]"
                 style={{ color: "var(--waiter-muted)" }}
               >
                 {t("phone.waiter.floorEyebrowNamed", { name: staff.name })}
