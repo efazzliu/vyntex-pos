@@ -208,6 +208,8 @@ export default function PhoneWaiterOrder() {
   >(null);
   const [noteCartKey, setNoteCartKey] = useState<string | null>(null);
   const [noteText, setNoteText] = useState("");
+  const [noteApplyQty, setNoteApplyQty] = useState(1);
+  const [noteMaxQty, setNoteMaxQty] = useState(1);
 
   useEffect(() => {
     if (!centerNotice) return;
@@ -391,11 +393,16 @@ export default function PhoneWaiterOrder() {
   const openNoteDialog = (line: CartItem) => {
     setNoteCartKey(cartLineKey(line));
     setNoteText(line.notes ?? "");
+    setNoteMaxQty(line.quantity);
+    // Default to 1 when adding a note to a multi-qty line so only one item is special.
+    setNoteApplyQty(line.notes ? line.quantity : 1);
   };
 
   const closeNoteDialog = () => {
     setNoteCartKey(null);
     setNoteText("");
+    setNoteApplyQty(1);
+    setNoteMaxQty(1);
   };
 
   const noteParts = (text: string) =>
@@ -420,24 +427,45 @@ export default function PhoneWaiterOrder() {
     });
   };
 
+  const foldCartLines = (lines: CartItem[]): CartItem[] => {
+    const folded: CartItem[] = [];
+    for (const line of lines) {
+      const key = cartLineKey(line);
+      const existing = folded.find((f) => cartLineKey(f) === key);
+      if (existing) {
+        existing.quantity += line.quantity;
+      } else {
+        folded.push({ ...line });
+      }
+    }
+    return folded;
+  };
+
   const saveNote = () => {
     if (!noteCartKey) return;
     const nextNotes = noteText.trim() || undefined;
+    const applyQty = Math.min(Math.max(1, noteApplyQty), noteMaxQty);
     setCart((prev) => {
-      const mapped = prev.map((c) =>
-        cartLineKey(c) === noteCartKey ? { ...c, notes: nextNotes } : c,
-      );
-      const folded: CartItem[] = [];
-      for (const line of mapped) {
-        const key = cartLineKey(line);
-        const existing = folded.find((f) => cartLineKey(f) === key);
-        if (existing) {
-          existing.quantity += line.quantity;
-        } else {
-          folded.push({ ...line });
-        }
+      const source = prev.find((c) => cartLineKey(c) === noteCartKey);
+      if (!source) return prev;
+
+      let next: CartItem[];
+      if (applyQty >= source.quantity) {
+        next = prev.map((c) =>
+          cartLineKey(c) === noteCartKey ? { ...c, notes: nextNotes } : c,
+        );
+      } else {
+        // Split: keep remaining with the old note, carve out applyQty with the new note.
+        next = prev.flatMap((c) => {
+          if (cartLineKey(c) !== noteCartKey) return [c];
+          const remaining = c.quantity - applyQty;
+          return [
+            { ...c, quantity: remaining },
+            { ...c, quantity: applyQty, notes: nextNotes },
+          ];
+        });
       }
-      return folded;
+      return foldCartLines(next);
     });
     closeNoteDialog();
   };
@@ -1466,6 +1494,44 @@ export default function PhoneWaiterOrder() {
               autoFocus
               className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-[14px] text-white outline-none placeholder:text-white/35 focus:border-[#0066FF]/60"
             />
+            {noteMaxQty > 1 ? (
+              <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="text-[13px] font-medium text-white">
+                    {t("phone.waiter.order.noteApplyTo")}
+                  </p>
+                  <p className="text-[11px] text-white/45">
+                    {t("phone.waiter.order.noteApplyHint", {
+                      count: noteApplyQty,
+                      total: noteMaxQty,
+                    })}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNoteApplyQty((q) => Math.max(1, q - 1))}
+                    disabled={noteApplyQty <= 1}
+                    className="flex size-8 items-center justify-center rounded-lg bg-white/[0.06] text-white/70 disabled:opacity-35"
+                  >
+                    <Minus className="size-3.5" />
+                  </button>
+                  <span className="w-6 text-center text-[14px] font-semibold text-white">
+                    {noteApplyQty}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setNoteApplyQty((q) => Math.min(noteMaxQty, q + 1))
+                    }
+                    disabled={noteApplyQty >= noteMaxQty}
+                    className="flex size-8 items-center justify-center rounded-lg bg-white/[0.06] text-white/70 disabled:opacity-35"
+                  >
+                    <Plus className="size-3.5" />
+                  </button>
+                </div>
+              </div>
+            ) : null}
             <div className="mt-3 flex flex-wrap gap-2">
               {(
                 [
