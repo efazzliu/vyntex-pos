@@ -398,6 +398,28 @@ export default function PhoneWaiterOrder() {
     setNoteText("");
   };
 
+  const noteParts = (text: string) =>
+    text
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean);
+
+  const noteHasPreset = (text: string, preset: string) =>
+    noteParts(text).some((p) => p.toLowerCase() === preset.toLowerCase());
+
+  const toggleNotePreset = (preset: string) => {
+    setNoteText((prev) => {
+      const parts = noteParts(prev);
+      const idx = parts.findIndex((p) => p.toLowerCase() === preset.toLowerCase());
+      if (idx >= 0) {
+        parts.splice(idx, 1);
+      } else {
+        parts.push(preset);
+      }
+      return parts.join(", ");
+    });
+  };
+
   const saveNote = () => {
     if (!noteCartKey) return;
     const nextNotes = noteText.trim() || undefined;
@@ -1415,7 +1437,7 @@ export default function PhoneWaiterOrder() {
         <div className="fixed inset-0 z-[95] flex items-end justify-center bg-black/60 p-4">
           <button
             type="button"
-            aria-label={t("btn.cancel")}
+            aria-label={t("phone.waiter.order.cancel")}
             className="absolute inset-0"
             onClick={closeNoteDialog}
           />
@@ -1450,18 +1472,27 @@ export default function PhoneWaiterOrder() {
                   "phone.waiter.order.notePresetWellDone",
                   "phone.waiter.order.notePresetMedium",
                   "phone.waiter.order.notePresetNoOnions",
+                  "phone.waiter.order.notePresetNoVeggies",
+                  "phone.waiter.order.notePresetWithSauce",
                   "phone.waiter.order.notePresetExtraSpicy",
                   "phone.waiter.order.notePresetNoCheese",
                   "phone.waiter.order.notePresetAllergy",
                 ] as const
               ).map((presetKey) => {
                 const preset = t(presetKey);
+                const selected = noteHasPreset(noteText, preset);
                 return (
                   <button
                     key={presetKey}
                     type="button"
-                    onClick={() => setNoteText(preset)}
-                    className="rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-[12px] text-white/70 active:scale-95"
+                    onClick={() => toggleNotePreset(preset)}
+                    aria-pressed={selected}
+                    className={cn(
+                      "rounded-lg border px-2.5 py-1.5 text-[12px] active:scale-95",
+                      selected
+                        ? "border-[#0066FF]/50 bg-[#0066FF]/20 text-white"
+                        : "border-white/10 bg-white/[0.04] text-white/70",
+                    )}
                   >
                     {preset}
                   </button>
@@ -1474,7 +1505,7 @@ export default function PhoneWaiterOrder() {
                 onClick={closeNoteDialog}
                 className="flex-1 rounded-xl border border-white/10 py-3 text-[14px] font-semibold text-white/60"
               >
-                {t("btn.cancel")}
+                {t("phone.waiter.order.cancel")}
               </button>
               <button
                 type="button"
