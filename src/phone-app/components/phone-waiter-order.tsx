@@ -210,6 +210,7 @@ export default function PhoneWaiterOrder() {
   const [noteText, setNoteText] = useState("");
   const [noteApplyQty, setNoteApplyQty] = useState(1);
   const [noteMaxQty, setNoteMaxQty] = useState(1);
+  const [noteContinue, setNoteContinue] = useState(false);
 
   useEffect(() => {
     if (!centerNotice) return;
@@ -396,6 +397,7 @@ export default function PhoneWaiterOrder() {
     setNoteMaxQty(line.quantity);
     // Default to 1 when adding a note to a multi-qty line so only one item is special.
     setNoteApplyQty(line.notes ? line.quantity : 1);
+    setNoteContinue(false);
   };
 
   const closeNoteDialog = () => {
@@ -403,6 +405,7 @@ export default function PhoneWaiterOrder() {
     setNoteText("");
     setNoteApplyQty(1);
     setNoteMaxQty(1);
+    setNoteContinue(false);
   };
 
   const noteParts = (text: string) =>
@@ -445,28 +448,47 @@ export default function PhoneWaiterOrder() {
     if (!noteCartKey) return;
     const nextNotes = noteText.trim() || undefined;
     const applyQty = Math.min(Math.max(1, noteApplyQty), noteMaxQty);
-    setCart((prev) => {
-      const source = prev.find((c) => cartLineKey(c) === noteCartKey);
-      if (!source) return prev;
+    const source = cart.find((c) => cartLineKey(c) === noteCartKey);
+    if (!source) {
+      closeNoteDialog();
+      return;
+    }
 
-      let next: CartItem[];
-      if (applyQty >= source.quantity) {
-        next = prev.map((c) =>
-          cartLineKey(c) === noteCartKey ? { ...c, notes: nextNotes } : c,
-        );
-      } else {
-        // Split: keep remaining with the old note, carve out applyQty with the new note.
-        next = prev.flatMap((c) => {
-          if (cartLineKey(c) !== noteCartKey) return [c];
-          const remaining = c.quantity - applyQty;
-          return [
-            { ...c, quantity: remaining },
-            { ...c, quantity: applyQty, notes: nextNotes },
-          ];
-        });
+    let next: CartItem[];
+    if (applyQty >= source.quantity) {
+      next = cart.map((c) =>
+        cartLineKey(c) === noteCartKey ? { ...c, notes: nextNotes } : c,
+      );
+    } else {
+      // Split: keep remaining with the old note, carve out applyQty with the new note.
+      next = cart.flatMap((c) => {
+        if (cartLineKey(c) !== noteCartKey) return [c];
+        const remaining = c.quantity - applyQty;
+        return [
+          { ...c, quantity: remaining },
+          { ...c, quantity: applyQty, notes: nextNotes },
+        ];
+      });
+    }
+
+    const folded = foldCartLines(next);
+    setCart(folded);
+
+    // Keep dialog open on the leftover qty so another different note can be added
+    // (e.g. 4 pizzas → 1 no mushrooms, 1 well done, 1 light, 1 plain).
+    if (applyQty < source.quantity) {
+      const remainingKey = cartLineKey(source);
+      const remaining = folded.find((c) => cartLineKey(c) === remainingKey);
+      if (remaining && remaining.quantity > 0) {
+        setNoteCartKey(cartLineKey(remaining));
+        setNoteText("");
+        setNoteMaxQty(remaining.quantity);
+        setNoteApplyQty(1);
+        setNoteContinue(true);
+        return;
       }
-      return foldCartLines(next);
-    });
+    }
+
     closeNoteDialog();
   };
 
@@ -1473,10 +1495,16 @@ export default function PhoneWaiterOrder() {
             <div className="mb-3 flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h3 className="text-[16px] font-semibold text-white">
-                  {t("phone.waiter.order.noteTitle")}
+                  {noteContinue
+                    ? t("phone.waiter.order.noteTitleContinue")
+                    : t("phone.waiter.order.noteTitle")}
                 </h3>
                 <p className="mt-0.5 text-[12px] text-white/50">
-                  {t("phone.waiter.order.noteDesc")}
+                  {noteContinue
+                    ? t("phone.waiter.order.noteContinueDesc", {
+                        count: noteMaxQty,
+                      })
+                    : t("phone.waiter.order.noteDesc")}
                 </p>
               </div>
               <button
@@ -1536,7 +1564,9 @@ export default function PhoneWaiterOrder() {
               {(
                 [
                   "phone.waiter.order.notePresetWellDone",
+                  "phone.waiter.order.notePresetLight",
                   "phone.waiter.order.notePresetMedium",
+                  "phone.waiter.order.notePresetNoMushrooms",
                   "phone.waiter.order.notePresetNoOnions",
                   "phone.waiter.order.notePresetNoVeggies",
                   "phone.waiter.order.notePresetWithSauce",
