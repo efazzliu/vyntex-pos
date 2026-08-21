@@ -9,6 +9,7 @@ import {
   ChefHat,
   ClipboardList,
   Minus,
+  Pencil,
   Plus,
   Search,
   Send,
@@ -206,6 +207,8 @@ export default function PhoneWaiterOrder() {
   const [customizationPickerItem, setCustomizationPickerItem] = useState<
     (Doc<"menuItems"> & { customizationConfig?: unknown }) | null
   >(null);
+  const [noteCartKey, setNoteCartKey] = useState<string | null>(null);
+  const [noteText, setNoteText] = useState("");
 
   useEffect(() => {
     if (!centerNotice) return;
@@ -384,6 +387,38 @@ export default function PhoneWaiterOrder() {
         )
         .filter((c) => c.quantity > 0),
     );
+  };
+
+  const openNoteDialog = (line: CartItem) => {
+    setNoteCartKey(cartLineKey(line));
+    setNoteText(line.notes ?? "");
+  };
+
+  const closeNoteDialog = () => {
+    setNoteCartKey(null);
+    setNoteText("");
+  };
+
+  const saveNote = () => {
+    if (!noteCartKey) return;
+    const nextNotes = noteText.trim() || undefined;
+    setCart((prev) => {
+      const mapped = prev.map((c) =>
+        cartLineKey(c) === noteCartKey ? { ...c, notes: nextNotes } : c,
+      );
+      const folded: CartItem[] = [];
+      for (const line of mapped) {
+        const key = cartLineKey(line);
+        const existing = folded.find((f) => cartLineKey(f) === key);
+        if (existing) {
+          existing.quantity += line.quantity;
+        } else {
+          folded.push({ ...line });
+        }
+      }
+      return folded;
+    });
+    closeNoteDialog();
   };
 
   const handleSend = async () => {
@@ -1096,11 +1131,33 @@ export default function PhoneWaiterOrder() {
                         {customLabel ? (
                           <p className="text-[11px] text-sky-300">{customLabel}</p>
                         ) : null}
+                        {item.notes ? (
+                          <p className="mt-0.5 truncate text-[11px] italic text-amber-300/90">
+                            {item.notes}
+                          </p>
+                        ) : null}
                         {waiterCanPay ? (
                           <p className="text-[12px] text-white/40">{formatPrice(item.price)}</p>
                         ) : null}
                       </div>
                       <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openNoteDialog(item)}
+                          aria-label={
+                            item.notes
+                              ? t("phone.waiter.order.editNote")
+                              : t("phone.waiter.order.addNote")
+                          }
+                          className={cn(
+                            "flex size-7 items-center justify-center rounded-lg transition active:scale-95",
+                            item.notes
+                              ? "bg-amber-500/20 text-amber-300"
+                              : "bg-white/[0.06] text-white/55",
+                          )}
+                        >
+                          <Pencil className="size-3.5" />
+                        </button>
                         <button
                           type="button"
                           onClick={() => updateQty(lineKey, -1)}
@@ -1349,6 +1406,83 @@ export default function PhoneWaiterOrder() {
                 setCustomizationPickerItem(null);
               }}
             />
+          </div>
+        </div>
+      ) : null}
+
+      {noteCartKey ? (
+        <div className="fixed inset-0 z-[95] flex items-end justify-center bg-black/60 p-4">
+          <button
+            type="button"
+            aria-label={t("btn.cancel")}
+            className="absolute inset-0"
+            onClick={closeNoteDialog}
+          />
+          <div className="relative z-10 w-full max-w-md rounded-2xl border border-white/10 bg-[#0d1326] p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="text-[16px] font-semibold text-white">
+                  {t("phone.waiter.order.noteTitle")}
+                </h3>
+                <p className="mt-0.5 text-[12px] text-white/50">
+                  {t("phone.waiter.order.noteDesc")}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeNoteDialog}
+                className="flex size-8 shrink-0 items-center justify-center rounded-lg text-white/50"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+            <input
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              placeholder={t("phone.waiter.order.notePlaceholder")}
+              autoFocus
+              className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-[14px] text-white outline-none placeholder:text-white/35 focus:border-[#0066FF]/60"
+            />
+            <div className="mt-3 flex flex-wrap gap-2">
+              {(
+                [
+                  "phone.waiter.order.notePresetWellDone",
+                  "phone.waiter.order.notePresetMedium",
+                  "phone.waiter.order.notePresetNoOnions",
+                  "phone.waiter.order.notePresetExtraSpicy",
+                  "phone.waiter.order.notePresetNoCheese",
+                  "phone.waiter.order.notePresetAllergy",
+                ] as const
+              ).map((presetKey) => {
+                const preset = t(presetKey);
+                return (
+                  <button
+                    key={presetKey}
+                    type="button"
+                    onClick={() => setNoteText(preset)}
+                    className="rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-[12px] text-white/70 active:scale-95"
+                  >
+                    {preset}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={closeNoteDialog}
+                className="flex-1 rounded-xl border border-white/10 py-3 text-[14px] font-semibold text-white/60"
+              >
+                {t("btn.cancel")}
+              </button>
+              <button
+                type="button"
+                onClick={saveNote}
+                className="flex-1 rounded-xl bg-[#0066FF] py-3 text-[14px] font-semibold text-white active:scale-[0.98]"
+              >
+                {t("phone.waiter.order.saveNote")}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
