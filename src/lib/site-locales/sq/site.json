@@ -529,6 +529,8 @@
         "notePlaceholder": "p.sh. mirë e pjekur, pa qepë, alergji…",
         "saveNote": "Ruaj shënimin",
         "cancel": "Anulo",
+        "noteApplyTo": "Për sa copë?",
+        "noteApplyHint": "{{count}} nga {{total}} — të tjerat mbeten pa këtë shënim",
         "notePresetWellDone": "Mirë e pjekur",
         "notePresetMedium": "Mesatare",
         "notePresetNoOnions": "Pa qepë",
