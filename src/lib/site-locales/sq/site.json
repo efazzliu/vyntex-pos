@@ -522,6 +522,8 @@
         "sendFailed": "Porosia nuk u dërgua. Provo përsëri.",
         "addNote": "Shto shënim përgatitjeje",
         "editNote": "Ndrysho shënimin e përgatitjes",
+        "addNoteBtn": "Shënim",
+        "editNoteBtn": "Ndrysho",
         "noteTitle": "Si ta përgatisim",
         "noteDesc": "Thuaji kuzhinës ose barit si ta bëjë këtë artikull.",
         "notePlaceholder": "p.sh. mirë e pjekur, pa qepë, alergji…",

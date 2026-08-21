@@ -522,6 +522,8 @@
         "sendFailed": "Could not send the order. Try again.",
         "addNote": "Add preparation note",
         "editNote": "Edit preparation note",
+        "addNoteBtn": "Note",
+        "editNoteBtn": "Edit",
         "noteTitle": "How to prepare",
         "noteDesc": "Tell the kitchen or bar how to make this item.",
         "notePlaceholder": "e.g. well done, no onions, allergy…",
