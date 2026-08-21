@@ -529,6 +529,8 @@
         "notePlaceholder": "e.g. well done, no onions, allergy…",
         "saveNote": "Save note",
         "cancel": "Cancel",
+        "noteApplyTo": "Apply to how many?",
+        "noteApplyHint": "{{count}} of {{total}} — the rest stay without this note",
         "notePresetWellDone": "Well done",
         "notePresetMedium": "Medium",
         "notePresetNoOnions": "No onions",
