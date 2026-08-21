@@ -9,7 +9,6 @@ import {
   ChefHat,
   ClipboardList,
   Minus,
-  Pencil,
   Plus,
   Search,
   Send,
@@ -1150,13 +1149,15 @@ export default function PhoneWaiterOrder() {
                               : t("phone.waiter.order.addNote")
                           }
                           className={cn(
-                            "flex size-7 items-center justify-center rounded-lg transition active:scale-95",
+                            "rounded-lg px-2 py-1.5 text-[11px] font-semibold transition active:scale-95",
                             item.notes
                               ? "bg-amber-500/20 text-amber-300"
                               : "bg-white/[0.06] text-white/55",
                           )}
                         >
-                          <Pencil className="size-3.5" />
+                          {item.notes
+                            ? t("phone.waiter.order.editNoteBtn")
+                            : t("phone.waiter.order.addNoteBtn")}
                         </button>
                         <button
                           type="button"
