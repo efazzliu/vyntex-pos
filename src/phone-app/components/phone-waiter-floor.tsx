@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "convex/react";
 import { motion } from "motion/react";
-import { LogOut, MapPinned, Users, ChevronRight } from "lucide-react";
+import { Bell, ChevronRight, LogOut, MapPinned, Users } from "lucide-react";
 import { toast } from "sonner";
 import {
   clearWaiterSession,
@@ -127,6 +127,24 @@ export default function PhoneWaiterFloor() {
     "pos.tables.getTableOrderSummaries",
     licenseKey && !designPreview ? { licenseKey } : "skip",
   ) as Record<string, TableOrderSummary> | undefined;
+  const kitchenNotifs = useQuery(
+    "pos.orders.getWaiterKitchenNotifications",
+    licenseKey && !designPreview ? { licenseKey } : "skip",
+  ) as
+    | { tableId?: string; status?: string; station?: string }[]
+    | undefined;
+
+  const readyCountByTableId = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const line of kitchenNotifs ?? []) {
+      if (line.station !== "kitchen") continue;
+      if (String(line.status ?? "").toLowerCase() !== "ready") continue;
+      const tid = String(line.tableId ?? "").trim();
+      if (!tid) continue;
+      map.set(tid, (map.get(tid) ?? 0) + 1);
+    }
+    return map;
+  }, [kitchenNotifs]);
 
   useEffect(() => {
     if (!session) {
@@ -644,17 +662,33 @@ export default function PhoneWaiterFloor() {
                   ? summary.total.toFixed(0)
                   : t("phone.waiter.tableOpen")
                 : t("phone.waiter.tableFree");
+              const readyCount = readyCountByTableId.get(table._id) ?? 0;
               return (
                 <button
                   key={table._id}
                   type="button"
                   onClick={() => handleTableTap(table)}
                   className={cn(
-                    "box-border flex h-[7.25rem] w-full shrink-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-2xl border-2 px-2 transition active:scale-[0.97]",
+                    // Fixed phone tile size — never grows with content or viewport columns.
+                    "relative box-border flex h-[7.25rem] w-full shrink-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-2xl border-2 px-2 transition active:scale-[0.97]",
                     colors.bg,
                     colors.border,
+                    readyCount > 0 && "border-red-500/80",
                   )}
                 >
+                  {readyCount > 0 ? (
+                    <span
+                      className="absolute right-1.5 top-1.5 z-10 flex items-center gap-0.5 rounded-full bg-red-500 px-1.5 py-0.5 shadow-[0_0_0_2px_rgba(7,11,20,0.85)]"
+                      aria-label={t("phone.waiter.tableReadyBell", {
+                        count: readyCount,
+                      })}
+                    >
+                      <Bell className="size-3 text-white" strokeWidth={2.5} />
+                      <span className="text-[10px] font-bold tabular-nums text-white">
+                        {readyCount > 9 ? "9+" : readyCount}
+                      </span>
+                    </span>
+                  ) : null}
                   <span
                     className={cn(
                       "max-w-full truncate text-base font-bold leading-none",

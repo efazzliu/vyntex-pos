@@ -499,6 +499,7 @@
       "noTablesBody": "Add rooms and tables in POS → Floor plan on the restaurant computer. They will appear here automatically.",
       "tableFree": "Free",
       "tableOpen": "Open",
+      "tableReadyBell": "{{count}} ready from kitchen",
       "tableTakenBy": "This table is taken by {{name}}.",
       "anotherWaiter": "another waiter",
       "orderingSoon": "Ordering for {{table}} is coming soon.",

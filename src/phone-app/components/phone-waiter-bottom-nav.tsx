@@ -78,7 +78,7 @@ export function PhoneWaiterBottomNav() {
                   strokeWidth={active ? 2.25 : 1.75}
                 />
                 {showReadyBadge ? (
-                  <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-500 px-1 text-[9px] font-bold text-[#06200a]">
+                  <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
                     {readyCount > 9 ? "9+" : readyCount}
                   </span>
                 ) : null}
