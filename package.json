@@ -50,6 +50,7 @@
     "deploy:site": "node scripts/deploy-site.mjs",
     "deploy:vercel": "node scripts/deploy-vercel.mjs",
     "deploy:vercel:git": "cross-env VERCEL_DEPLOY=git node scripts/deploy-vercel.mjs",
+    "apply:supabase-missing": "node scripts/apply-missing-supabase.mjs",
     "dist:win:skip-clean": "npm run dist:win",
     "postdist:win": "node scripts/copy-windows-installers-to-public.mjs && node scripts/sync-public-build-meta.mjs",
     "copy-installers": "node scripts/copy-windows-installers-to-public.mjs && node scripts/sync-public-build-meta.mjs",
