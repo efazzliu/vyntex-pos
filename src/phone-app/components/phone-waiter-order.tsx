@@ -1126,15 +1126,17 @@ export default function PhoneWaiterOrder() {
                                 : t("phone.waiter.order.addNote")
                             }
                             className={cn(
-                              "flex size-6 items-center justify-center rounded-lg transition active:scale-95",
+                              "flex size-7 items-center justify-center rounded-lg transition active:scale-95",
                               item.notes
                                 ? light
                                   ? "bg-amber-100 text-amber-700"
-                                  : "bg-amber-500/20 text-amber-300"
-                                : "bg-white/[0.06] text-white/55",
+                                  : "bg-amber-500/25 text-amber-300"
+                                : light
+                                  ? "bg-slate-100 text-slate-700 ring-1 ring-slate-200"
+                                  : "bg-white/[0.08] text-white/80",
                             )}
                           >
-                            <Pencil className="size-3" />
+                            <Pencil className="size-3.5" strokeWidth={2.25} />
                           </button>
                           <button
                             type="button"
@@ -1300,8 +1302,10 @@ export default function PhoneWaiterOrder() {
                             item.notes
                               ? light
                                 ? "bg-amber-100 text-amber-700"
-                                : "bg-amber-500/20 text-amber-300"
-                              : "bg-white/[0.06] text-white/55",
+                                : "bg-amber-500/25 text-amber-300"
+                              : light
+                                ? "bg-slate-100 text-slate-700 ring-1 ring-slate-200"
+                                : "bg-white/[0.08] text-white/80",
                           )}
                         >
                           {item.notes
