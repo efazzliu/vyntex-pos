@@ -839,7 +839,7 @@ export default function PhoneWaiterOrder() {
             : showPrevBar
               ? "pb-52"
               : showCartBar
-                ? "pb-56"
+                ? "pb-60"
                 : "pb-8",
         )}
       >
@@ -1080,9 +1080,7 @@ export default function PhoneWaiterOrder() {
           />
           <div className="relative space-y-2 px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
             {showCartBar ? (
-              <div
-                className="overflow-hidden rounded-2xl border border-white/12 bg-[#121a2e] shadow-lg"
-              >
+              <div className="overflow-hidden rounded-2xl border border-white/12 bg-[#121a2e] shadow-lg">
                 <div className="flex items-center justify-between border-b border-white/10 px-3.5 py-2.5">
                   <p className="text-[13px] font-semibold text-white">
                     {t("phone.waiter.order.currentOrder")}
@@ -1093,78 +1091,70 @@ export default function PhoneWaiterOrder() {
                     </p>
                   ) : null}
                 </div>
-                <div className="max-h-36 overflow-y-auto no-scrollbar px-2 py-2">
-                  <div className="space-y-1.5">
-                    {cart.map((item) => {
-                      const lineKey = cartLineKey(item);
-                      const customLabel = formatCustomizationsForDisplay(
-                        item.selectedCustomizations,
-                      );
-                      return (
-                        <div
-                          key={lineKey}
-                          className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-2"
-                        >
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-[12px] font-medium text-white">
-                              {item.name}
+                <div className="h-32 overflow-y-auto no-scrollbar divide-y divide-white/10">
+                  {cart.map((item) => {
+                    const lineKey = cartLineKey(item);
+                    const customLabel = formatCustomizationsForDisplay(
+                      item.selectedCustomizations,
+                    );
+                    return (
+                      <div
+                        key={lineKey}
+                        className="flex items-center gap-2 px-3.5 py-2.5"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[12px] font-medium text-white">
+                            {item.name}
+                          </p>
+                          {customLabel ? (
+                            <p className="truncate text-[10px] text-sky-300">{customLabel}</p>
+                          ) : null}
+                          {item.notes ? (
+                            <p className="truncate text-[10px] italic text-amber-300/90">
+                              {item.notes}
                             </p>
-                            {customLabel ? (
-                              <p className="truncate text-[10px] text-sky-300">{customLabel}</p>
-                            ) : null}
-                            {item.notes ? (
-                              <p className="truncate text-[10px] italic text-amber-300/90">
-                                {item.notes}
-                              </p>
-                            ) : null}
-                          </div>
-                          <div className="flex shrink-0 items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => updateQty(lineKey, -1)}
-                              className="flex size-6 items-center justify-center rounded-lg bg-white/[0.06] text-white/70 active:scale-95"
-                            >
-                              <Minus className="size-3" />
-                            </button>
-                            <span className="w-4 text-center text-[12px] font-semibold text-white">
-                              {item.quantity}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => updateQty(lineKey, 1)}
-                              className="flex size-6 items-center justify-center rounded-lg bg-white/[0.06] text-white/70 active:scale-95"
-                            >
-                              <Plus className="size-3" />
-                            </button>
-                          </div>
+                          ) : null}
                         </div>
-                      );
-                    })}
-                  </div>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => updateQty(lineKey, -1)}
+                            className="flex size-6 items-center justify-center rounded-lg bg-white/[0.06] text-white/70 active:scale-95"
+                          >
+                            <Minus className="size-3" />
+                          </button>
+                          <span className="w-4 text-center text-[12px] font-semibold text-white">
+                            {item.quantity}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => updateQty(lineKey, 1)}
+                            className="flex size-6 items-center justify-center rounded-lg bg-white/[0.06] text-white/70 active:scale-95"
+                          >
+                            <Plus className="size-3" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setCartOpen(true)}
+                  className="flex w-full items-center justify-between border-t border-white/10 px-4 py-3.5 text-white active:scale-[0.99]"
+                  style={{
+                    backgroundColor: tableDesign === "professional" ? "#0066FF" : accent,
+                  }}
+                >
+                  <span className="flex items-center gap-2 text-[14px] font-semibold text-white">
+                    <ShoppingBag className="size-4" />
+                    {t("phone.waiter.order.itemsInCart", { count: cartCount })}
+                  </span>
+                  {waiterCanPay ? (
+                    <span className="text-[14px] font-bold text-white">{formatPrice(cartTotal)}</span>
+                  ) : null}
+                </button>
               </div>
-            ) : null}
-            {showCartBar ? (
-              <button
-                type="button"
-                onClick={() => setCartOpen(true)}
-                className={cn(
-                  "flex w-full items-center justify-between px-4 py-3.5 text-white shadow-xl active:scale-[0.98]",
-                  tableDesign === "modern" ? "rounded-full" : "rounded-2xl",
-                )}
-                style={{
-                  backgroundColor: tableDesign === "professional" ? "#0066FF" : accent,
-                  boxShadow: `0 12px 28px -10px ${tableDesign === "professional" ? "#0066FF" : accent}80`,
-                }}
-              >
-                <span className="flex items-center gap-2 text-[14px] font-semibold text-white">
-                  <ShoppingBag className="size-4" />
-                  {t("phone.waiter.order.itemsInCart", { count: cartCount })}
-                </span>
-                {waiterCanPay ? (
-                  <span className="text-[14px] font-bold text-white">{formatPrice(cartTotal)}</span>
-                ) : null}
-              </button>
             ) : null}
             {showPrevBar ? (
               <div
