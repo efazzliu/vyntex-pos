@@ -3,7 +3,6 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import type { Doc } from "@/convex/_generated/dataModel.d.ts";
 import { cn } from "@/lib/utils.ts";
-import { FlagAL, FlagUS } from "@/components/flag-icons.tsx";
 import {
   getDesktopSystemPrintersInvoker,
   hasElectronSilentPrintIpc,
@@ -30,18 +29,10 @@ import {
   Plus,
   TestTube2,
   Building2,
-  CreditCard,
-  MapPin,
-  Phone,
-  Coins,
-  ShieldCheck,
   Receipt,
   Sun,
   Moon,
-  Globe,
-  CircleDollarSign,
   ImageIcon,
-  Pencil,
   Wallet,
   UtensilsCrossed,
   Users,
@@ -63,6 +54,7 @@ import TemplateManager from "./template-manager.tsx";
 import PhoneAppSettings from "./phone-app-settings.tsx";
 import AppUpdateSection from "./app-update-section.tsx";
 import SettingsCategoryHub from "./settings-category-hub.tsx";
+import SettingsGeneralPanel from "./settings-general-panel.tsx";
 import type { PosView } from "../_lib/types.ts";
 import {
   type SettingsCategoryId,
@@ -600,15 +592,6 @@ const ROLE_COLORS = {
   bar: "bg-violet-500/15 text-violet-400 border-violet-500/30",
 } as const;
 
-const CURRENCY_OPTIONS = [
-  { value: "Lek", label: "Lek (Albanian Lek)" },
-  { value: "€", label: "€ (Euro)" },
-  { value: "$", label: "$ (US Dollar)" },
-  { value: "£", label: "£ (British Pound)" },
-  { value: "CHF", label: "CHF (Swiss Franc)" },
-  { value: "din", label: "din (Serbian Dinar)" },
-];
-
 export default function PosSettings({
   licenseKey,
   plan,
@@ -1043,7 +1026,8 @@ export default function PosSettings({
 
   return (
     <div className="min-h-full">
-      <div className="w-full p-5 lg:p-6 space-y-8">
+      <div className="flex-1 min-w-0 p-6 lg:p-8 space-y-8">
+        {activeCategory !== "general" ? (
         <div>
           <button
             type="button"
@@ -1063,314 +1047,42 @@ export default function PosSettings({
             {t(activeNav.descKey)}
           </p>
         </div>
+        ) : null}
 
         {activeCategory === "print" ? (
           <TemplateManager licenseKey={licenseKey} />
         ) : null}
 
         {activeCategory === "general" ? (
-          <>
-          {!isAdminStaff ? (
-            <p className="text-xs text-amber-400/90 -mt-1">
-              {t("settings.manager_general_hint")}
-            </p>
-          ) : null}
-          {/* ── Company Details ── */}
-          {company && (
-            <section className="rounded-xl border border-[#1e2a45] bg-[#0D1326] p-5 space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                  <Building2 className="size-5 text-[#0066FF]" />
-                  {t("settings.company_details")}
-                </h2>
-                {canEditBusinessIdentity ? (
-                editingCompany ? (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="border-[#2a3a5a] text-[#8b93a7] hover:text-white"
-                      onClick={() => setEditingCompany(false)}
-                      disabled={savingCompany}
-                    >
-                      {t("settings.company_cancel")}
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="bg-[#0066FF] hover:bg-[#0052CC]"
-                      onClick={() => void saveCompany()}
-                      disabled={savingCompany}
-                    >
-                      {savingCompany ? "…" : t("settings.company_save")}
-                    </Button>
-                  </div>
-                ) : (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="border-[#2a3a5a] text-[#8b93a7] hover:text-white shrink-0"
-                    onClick={startEditCompany}
-                  >
-                    <Pencil className="size-3.5 mr-1.5" />
-                    {t("settings.company_edit")}
-                  </Button>
-                )
-                ) : null}
-              </div>
-
-              {editingCompany && canEditBusinessIdentity ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2 sm:col-span-2">
-                    <Label className="text-[#8b93a7] text-xs uppercase tracking-wider">
-                      {t("settings.business_name")}
-                    </Label>
-                    <Input
-                      value={draftName}
-                      onChange={(e) => setDraftName(e.target.value)}
-                      className="bg-[#0A0F1E] border-[#1e2a45] text-white h-11"
-                      autoComplete="organization"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[#8b93a7] text-xs uppercase tracking-wider">
-                      {t("settings.address")}
-                    </Label>
-                    <Input
-                      value={draftAddress}
-                      onChange={(e) => setDraftAddress(e.target.value)}
-                      className="bg-[#0A0F1E] border-[#1e2a45] text-white h-11"
-                      autoComplete="street-address"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[#8b93a7] text-xs uppercase tracking-wider">
-                      {t("settings.phone")}
-                    </Label>
-                    <Input
-                      value={draftPhone}
-                      onChange={(e) => setDraftPhone(e.target.value)}
-                      className="bg-[#0A0F1E] border-[#1e2a45] text-white h-11"
-                      inputMode="tel"
-                      autoComplete="tel"
-                    />
-                  </div>
-                </div>
-              ) : null}
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {editingCompany && canEditBusinessIdentity ? null : (
-                  <>
-                    <DetailCard icon={Building2} label={t("settings.business_name")} value={company.name} />
-                    <DetailCard icon={MapPin} label={t("settings.address")} value={company.address || t("settings.not_set")} />
-                    <DetailCard icon={Phone} label={t("settings.phone")} value={company.phone || t("settings.not_set")} />
-                  </>
-                )}
-                <DetailCard icon={Coins} label={t("settings.currency")} value={company.currency} />
-                <DetailCard
-                  icon={CreditCard}
-                  label={t("settings.plan")}
-                  value={planTierDisplay(company.plan)}
-                  hint={t("settings.plan_cannot_change_here")}
-                />
-                <DetailCard
-                  icon={ShieldCheck}
-                  label={t("settings.license")}
-                  value={licenseStatusDisplay(String(company.licenseStatus ?? ""))}
-                  valueColor={
-                    company.licenseStatus === "active" ? "text-emerald-400" : "text-red-400"
-                  }
-                  subline={licenseExpiryLine?.text}
-                  sublineClassName={licenseExpiryLine?.lineClass}
-                />
-              </div>
-            </section>
-          )}
-
-          {/* ── Language & Currency ── */}
-          {company && (
-            <section className="rounded-xl border border-[#1e2a45] bg-[#0D1326] p-5 space-y-5">
-              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                <Globe className="size-5 text-[#0066FF]" />
-                {t("settings.language_currency")}
-              </h2>
-
-              {/* Language */}
-              <SettingRow
-                label={t("settings.language")}
-                description={t("settings.language_desc")}
-              >
-                <div className="flex rounded-lg overflow-hidden border border-[#1e2a45]">
-                  <button
-                    type="button"
-                    onClick={() => handleLocaleChange("language", "en")}
-                    disabled={savingLocale || !canEditLanguageCurrency}
-                    className={cn(
-                      "flex items-center gap-1.5 px-4 py-2 text-xs font-medium transition-colors",
-                      company.language === "en"
-                        ? "bg-[#0066FF] text-white"
-                        : "bg-[#131A2E] text-[#5a6580] hover:text-white",
-                      canEditLanguageCurrency
-                        ? "cursor-pointer"
-                        : "cursor-not-allowed opacity-70",
-                    )}
-                  >
-                    <FlagUS className="h-3 w-4" />
-                    English
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleLocaleChange("language", "sq")}
-                    disabled={savingLocale || !canEditLanguageCurrency}
-                    className={cn(
-                      "flex items-center gap-1.5 px-4 py-2 text-xs font-medium transition-colors",
-                      company.language === "sq"
-                        ? "bg-[#0066FF] text-white"
-                        : "bg-[#131A2E] text-[#5a6580] hover:text-white",
-                      canEditLanguageCurrency
-                        ? "cursor-pointer"
-                        : "cursor-not-allowed opacity-70",
-                    )}
-                  >
-                    <FlagAL className="h-3 w-4" />
-                    Albanian
-                  </button>
-                </div>
-              </SettingRow>
-
-              <SettingRow
-                label={t("settings.timezone")}
-                description={t("settings.timezone_desc")}
-              >
-                <Select
-                  value={companyTimezone}
-                  onValueChange={(val) => handleLocaleChange("timezone", val)}
-                  disabled={savingLocale || !canEditTimezone}
-                >
-                  <SelectTrigger className="w-56 bg-[#131A2E] border-[#1e2a45] text-white text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {timezoneOptions.map((tz) => (
-                      <SelectItem key={tz} value={tz}>
-                        {tz}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </SettingRow>
-
-              {/* Currency Symbol */}
-              <SettingRow
-                label={t("settings.currency_symbol")}
-                description={t("settings.currency_symbol_desc")}
-              >
-                <Select
-                  value={company.currencySymbol}
-                  onValueChange={(val) =>
-                    handleLocaleChange("currencySymbol", val)
-                  }
-                  disabled={savingLocale || !canEditLanguageCurrency}
-                >
-                  <SelectTrigger className="w-48 bg-[#131A2E] border-[#1e2a45] text-white text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CURRENCY_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </SettingRow>
-
-              {/* Currency Position */}
-              <SettingRow
-                label={t("settings.currency_position")}
-                description={t("settings.currency_position_desc")}
-              >
-                <div className="flex rounded-lg overflow-hidden border border-[#1e2a45]">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleLocaleChange("currencyPosition", "prefix")
-                    }
-                    disabled={savingLocale || !canEditLanguageCurrency}
-                    className={cn(
-                      "flex items-center gap-1.5 px-4 py-2 text-xs font-medium transition-colors",
-                      company.currencyPosition === "prefix"
-                        ? "bg-[#0066FF] text-white"
-                        : "bg-[#131A2E] text-[#5a6580] hover:text-white",
-                      canEditLanguageCurrency
-                        ? "cursor-pointer"
-                        : "cursor-not-allowed opacity-70",
-                    )}
-                  >
-                    <CircleDollarSign className="size-3.5" />
-                    {t("settings.position_prefix")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleLocaleChange("currencyPosition", "suffix")
-                    }
-                    disabled={savingLocale || !canEditLanguageCurrency}
-                    className={cn(
-                      "flex items-center gap-1.5 px-4 py-2 text-xs font-medium transition-colors",
-                      company.currencyPosition === "suffix"
-                        ? "bg-[#0066FF] text-white"
-                        : "bg-[#131A2E] text-[#5a6580] hover:text-white",
-                      canEditLanguageCurrency
-                        ? "cursor-pointer"
-                        : "cursor-not-allowed opacity-70",
-                    )}
-                  >
-                    {t("settings.position_suffix")}
-                    <CircleDollarSign className="size-3.5" />
-                  </button>
-                </div>
-              </SettingRow>
-
-              {/* Decimals */}
-              <SettingRow
-                label={t("settings.decimals")}
-                description={t("settings.decimals_desc")}
-              >
-                <Select
-                  value={String(company.currencyDecimals)}
-                  onValueChange={(val) =>
-                    handleLocaleChange("currencyDecimals", Number(val))
-                  }
-                  disabled={savingLocale || !canEditLanguageCurrency}
-                >
-                  <SelectTrigger className="w-32 bg-[#131A2E] border-[#1e2a45] text-white text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0">0 (100)</SelectItem>
-                    <SelectItem value="1">1 (100.0)</SelectItem>
-                    <SelectItem value="2">2 (100.00)</SelectItem>
-                    <SelectItem value="3">3 (100.000)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </SettingRow>
-
-              {/* Live preview */}
-              <div className="p-3 rounded-lg bg-[#131A2E]/60 border border-[#1e2a45]/50">
-                <p className="text-[10px] text-[#5a6580] uppercase tracking-wider mb-1">
-                  Preview
-                </p>
-                <p className="text-lg font-bold text-white">
-                  {formatPrice(1234.56)}
-                </p>
-              </div>
-            </section>
-          )}
-          <AppUpdateSection />
-          </>
+          <SettingsGeneralPanel
+            t={t}
+            formatPrice={formatPrice}
+            company={company}
+            companyTimezone={companyTimezone}
+            timezoneOptions={timezoneOptions}
+            isAdminStaff={isAdminStaff}
+            canEditBusinessIdentity={canEditBusinessIdentity}
+            canEditLanguageCurrency={canEditLanguageCurrency}
+            canEditTimezone={canEditTimezone}
+            editingCompany={editingCompany}
+            savingCompany={savingCompany}
+            savingLocale={savingLocale}
+            draftName={draftName}
+            draftAddress={draftAddress}
+            draftPhone={draftPhone}
+            planTierDisplay={planTierDisplay}
+            licenseStatusDisplay={licenseStatusDisplay}
+            licenseExpiryLine={licenseExpiryLine}
+            onDraftName={setDraftName}
+            onDraftAddress={setDraftAddress}
+            onDraftPhone={setDraftPhone}
+            onStartEdit={startEditCompany}
+            onCancelEdit={() => setEditingCompany(false)}
+            onSaveCompany={() => void saveCompany()}
+            onLocaleChange={(field, value) => void handleLocaleChange(field, value)}
+            onNavigate={onNavigate}
+            onOpenCategory={setActiveCategory}
+          />
         ) : null}
 
         {activeCategory === "payments" ? (
@@ -2018,51 +1730,6 @@ function SettingRow({
         ) : null}
       </div>
       {children}
-    </div>
-  );
-}
-
-// ── Detail card ───────────────────────────────────────────
-
-function DetailCard({
-  icon: Icon,
-  label,
-  value,
-  valueColor,
-  subline,
-  sublineClassName,
-  hint,
-}: {
-  icon: typeof Building2;
-  label: string;
-  value: string;
-  valueColor?: string;
-  subline?: string;
-  sublineClassName?: string;
-  hint?: string;
-}) {
-  return (
-    <div className="flex items-start gap-3 p-3 rounded-lg bg-[#131A2E]/60 border border-[#1e2a45]/50">
-      <div className="p-2 rounded-lg bg-[#1e2a45]/60 shrink-0">
-        <Icon className="size-4 text-[#5a6580]" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-[10px] text-[#5a6580] uppercase tracking-wider">{label}</p>
-        <p className={cn("text-sm font-medium text-white", valueColor)}>{value}</p>
-        {subline ? (
-          <p
-            className={cn(
-              "text-xs mt-1 leading-snug",
-              sublineClassName ?? "text-[#8b93a7]",
-            )}
-          >
-            {subline}
-          </p>
-        ) : null}
-        {hint ? (
-          <p className="text-[10px] text-[#5a6580] mt-1.5 leading-snug">{hint}</p>
-        ) : null}
-      </div>
     </div>
   );
 }
