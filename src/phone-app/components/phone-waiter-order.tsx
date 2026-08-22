@@ -22,6 +22,8 @@ import {
   X,
 } from "lucide-react";
 import { getWaiterSession } from "@/phone-app/lib/waiter-session.ts";
+import { usePhoneAccessBranding } from "@/phone-app/hooks/use-phone-access-branding.tsx";
+import { phoneAccessThemeTokens, waiterThemeGlow, waiterThemeStyle } from "@/lib/phone-access-theme.ts";
 import { emojiForCategoryName } from "@/lib/pos-category-icons.ts";
 import { uuidOrNull, staffIdsEqual } from "@/lib/supabase-pos/uuid.ts";
 import { cn } from "@/lib/utils.ts";
@@ -36,6 +38,15 @@ import {
   parseOrderBlockError,
   resolveEnforceOrderAvailability,
 } from "@/lib/pos-order-availability.ts";
+import MenuItemCustomizationPicker from "@/components/menu-item-customization-picker.tsx";
+import {
+  cartLineKey,
+  formatCustomizationsForDisplay,
+  getMenuItemCustomizationGroups,
+  hasMenuItemCustomizations,
+  resolvedMenuItemUnitPrice,
+  type SelectedCustomization,
+} from "@/lib/menu-customizations.ts";
 
 type CartItem = {
   menuItemId: string;
@@ -44,6 +55,8 @@ type CartItem = {
   quantity: number;
   station?: "kitchen" | "bar";
   vatRate?: number;
+  notes?: string;
+  selectedCustomizations?: SelectedCustomization[];
 };
 
 type SentLine = {
@@ -102,6 +115,8 @@ export default function PhoneWaiterOrder() {
   const tableId = params.tableId ?? "";
   const session = getWaiterSession();
   const licenseKey = session?.licenseKey ?? "";
+  const access = usePhoneAccessBranding();
+  const tableDesign = access.tableDesign;
   const routeState = (location.state as { from?: unknown; openOrderSheet?: unknown } | null) ?? null;
   const backTo =
     typeof routeState?.from === "string" ? String(routeState.from) : "/waiter/floor";
@@ -188,6 +203,14 @@ export default function PhoneWaiterOrder() {
   const [centerNotice, setCenterNotice] = useState<string | null>(null);
   const [payOpen, setPayOpen] = useState(false);
   const [payBusy, setPayBusy] = useState(false);
+  const [customizationPickerItem, setCustomizationPickerItem] = useState<
+    (Doc<"menuItems"> & { customizationConfig?: unknown }) | null
+  >(null);
+  const [noteCartKey, setNoteCartKey] = useState<string | null>(null);
+  const [noteText, setNoteText] = useState("");
+  const [noteApplyQty, setNoteApplyQty] = useState(1);
+  const [noteMaxQty, setNoteMaxQty] = useState(1);
+  const [noteContinue, setNoteContinue] = useState(false);
 
   useEffect(() => {
     if (!centerNotice) return;
@@ -285,9 +308,18 @@ export default function PhoneWaiterOrder() {
   const showPrevBar = sentCount > 0 && !cartOpen && !historyOpen && !payOpen;
   const showCartBar = cartCount > 0 && !cartOpen && !historyOpen;
 
-  const addToCart = (item: Doc<"menuItems">) => {
+  const addToCartWithOptions = (
+    item: Doc<"menuItems"> & { customizationConfig?: unknown },
+    selectedCustomizations?: SelectedCustomization[],
+    notes?: string,
+  ) => {
+    const lineKey = cartLineKey({
+      menuItemId: String(item._id),
+      selectedCustomizations,
+      notes,
+    });
     const existingQty =
-      cart.find((c) => c.menuItemId === item._id)?.quantity ?? 0;
+      cart.find((c) => cartLineKey(c) === lineKey)?.quantity ?? 0;
     const blocked = getOrderBlockReason(
       item,
       existingQty + 1,
@@ -301,11 +333,12 @@ export default function PhoneWaiterOrder() {
       );
       return;
     }
+    const unitPrice = resolvedMenuItemUnitPrice(item.price, selectedCustomizations);
     setCart((prev) => {
-      const existing = prev.find((c) => c.menuItemId === item._id);
+      const existing = prev.find((c) => cartLineKey(c) === lineKey);
       if (existing) {
         return prev.map((c) =>
-          c.menuItemId === item._id ? { ...c, quantity: c.quantity + 1 } : c,
+          cartLineKey(c) === lineKey ? { ...c, quantity: c.quantity + 1 } : c,
         );
       }
       return [
@@ -313,19 +346,29 @@ export default function PhoneWaiterOrder() {
         {
           menuItemId: item._id,
           name: item.name,
-          price: item.price,
+          price: unitPrice,
           quantity: 1,
           station: item.station,
           vatRate: item.vatRate,
+          notes,
+          selectedCustomizations,
         },
       ];
     });
   };
 
-  const updateQty = (menuItemId: string, delta: number) => {
+  const addToCart = (item: Doc<"menuItems"> & { customizationConfig?: unknown }) => {
+    if (hasMenuItemCustomizations(item)) {
+      setCustomizationPickerItem(item);
+      return;
+    }
+    addToCartWithOptions(item);
+  };
+
+  const updateQty = (lineKey: string, delta: number) => {
     if (delta > 0) {
-      const item = (menuItems ?? []).find((i) => i._id === menuItemId);
-      const line = cart.find((c) => c.menuItemId === menuItemId);
+      const line = cart.find((c) => cartLineKey(c) === lineKey);
+      const item = (menuItems ?? []).find((i) => i._id === line?.menuItemId);
       const nextQty = (line?.quantity ?? 0) + delta;
       if (item) {
         const blocked = getOrderBlockReason(item, nextQty, enforceAvailability);
@@ -341,9 +384,112 @@ export default function PhoneWaiterOrder() {
     }
     setCart((prev) =>
       prev
-        .map((c) => (c.menuItemId === menuItemId ? { ...c, quantity: c.quantity + delta } : c))
+        .map((c) =>
+          cartLineKey(c) === lineKey ? { ...c, quantity: c.quantity + delta } : c,
+        )
         .filter((c) => c.quantity > 0),
     );
+  };
+
+  const openNoteDialog = (line: CartItem) => {
+    setNoteCartKey(cartLineKey(line));
+    setNoteText(line.notes ?? "");
+    setNoteMaxQty(line.quantity);
+    // Default to 1 when adding a note to a multi-qty line so only one item is special.
+    setNoteApplyQty(line.notes ? line.quantity : 1);
+    setNoteContinue(false);
+  };
+
+  const closeNoteDialog = () => {
+    setNoteCartKey(null);
+    setNoteText("");
+    setNoteApplyQty(1);
+    setNoteMaxQty(1);
+    setNoteContinue(false);
+  };
+
+  const noteParts = (text: string) =>
+    text
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean);
+
+  const noteHasPreset = (text: string, preset: string) =>
+    noteParts(text).some((p) => p.toLowerCase() === preset.toLowerCase());
+
+  const toggleNotePreset = (preset: string) => {
+    setNoteText((prev) => {
+      const parts = noteParts(prev);
+      const idx = parts.findIndex((p) => p.toLowerCase() === preset.toLowerCase());
+      if (idx >= 0) {
+        parts.splice(idx, 1);
+      } else {
+        parts.push(preset);
+      }
+      return parts.join(", ");
+    });
+  };
+
+  const foldCartLines = (lines: CartItem[]): CartItem[] => {
+    const folded: CartItem[] = [];
+    for (const line of lines) {
+      const key = cartLineKey(line);
+      const existing = folded.find((f) => cartLineKey(f) === key);
+      if (existing) {
+        existing.quantity += line.quantity;
+      } else {
+        folded.push({ ...line });
+      }
+    }
+    return folded;
+  };
+
+  const saveNote = () => {
+    if (!noteCartKey) return;
+    const nextNotes = noteText.trim() || undefined;
+    const applyQty = Math.min(Math.max(1, noteApplyQty), noteMaxQty);
+    const source = cart.find((c) => cartLineKey(c) === noteCartKey);
+    if (!source) {
+      closeNoteDialog();
+      return;
+    }
+
+    let next: CartItem[];
+    if (applyQty >= source.quantity) {
+      next = cart.map((c) =>
+        cartLineKey(c) === noteCartKey ? { ...c, notes: nextNotes } : c,
+      );
+    } else {
+      // Split: keep remaining with the old note, carve out applyQty with the new note.
+      next = cart.flatMap((c) => {
+        if (cartLineKey(c) !== noteCartKey) return [c];
+        const remaining = c.quantity - applyQty;
+        return [
+          { ...c, quantity: remaining },
+          { ...c, quantity: applyQty, notes: nextNotes },
+        ];
+      });
+    }
+
+    const folded = foldCartLines(next);
+    setCart(folded);
+
+    // Keep dialog open on the leftover qty so another different note can be added
+    // (e.g. 4 pizzas → 1 no mushrooms, 1 well done, 1 light, 1 plain).
+    if (applyQty < source.quantity) {
+      const remainingKey = cartLineKey(source);
+      const remaining = folded.find((c) => cartLineKey(c) === remainingKey);
+      if (remaining && remaining.quantity > 0) {
+        setNoteCartKey(cartLineKey(remaining));
+        setNoteText("");
+        setNoteMaxQty(remaining.quantity);
+        setNoteApplyQty(1);
+        setNoteContinue(true);
+        return;
+      }
+    }
+
+    closeNoteDialog();
   };
 
   const handleSend = async () => {
@@ -357,6 +503,8 @@ export default function PhoneWaiterOrder() {
       price: c.price,
       station: c.station,
       vatRate: c.vatRate,
+      notes: c.notes,
+      selectedCustomizations: c.selectedCustomizations,
     }));
     try {
       const result = await submitCartOrder({
@@ -434,14 +582,31 @@ export default function PhoneWaiterOrder() {
 
   if (!session) return null;
 
+  const glow =
+    tableDesign === "advanced"
+      ? "rgba(212,175,55,0.18)"
+      : tableDesign === "modern"
+        ? "rgba(99,102,241,0.26)"
+        : "rgba(0,102,255,0.22)";
+  const accent = access.accentColor;
+  const tokens = phoneAccessThemeTokens(access.theme);
+  const light = tokens.isLight;
+
   return (
-    <div className="relative flex min-h-dvh flex-col overflow-hidden bg-[#070b14] text-white">
+    <div
+      data-waiter-theme={light ? "light" : "dark"}
+      data-waiter-skin={tokens.id}
+      className={cn(
+        "relative flex min-h-dvh flex-col overflow-hidden",
+        light ? "text-[#0f172a]" : "text-white",
+      )}
+      style={waiterThemeStyle(tokens)}
+    >
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"
         style={{
-          background:
-            "radial-gradient(90% 40% at 20% 0%, rgba(0,102,255,0.22) 0%, transparent 55%), linear-gradient(180deg, #0a1224 0%, #070b14 100%)",
+          background: waiterThemeGlow({ ...tokens, glow }),
         }}
       />
 
@@ -450,69 +615,192 @@ export default function PhoneWaiterOrder() {
           type="button"
           onClick={() => navigate(backTo)}
           aria-label={t("phone.waiter.order.closeOrder")}
-          className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.05] text-white/70 active:scale-95"
+          className={cn(
+            "flex size-9 shrink-0 items-center justify-center text-white/70 active:scale-95",
+            tableDesign === "modern"
+              ? "rounded-full bg-white/[0.08]"
+              : tableDesign === "advanced"
+                ? "rounded-lg border border-white/10 bg-white/[0.04]"
+                : "rounded-xl border border-white/10 bg-white/[0.05]",
+          )}
         >
           <ArrowLeft className="size-4" />
         </button>
-        <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/40">
-            {currentTable?.zone ?? ""}
-          </p>
-          <h1 className="truncate text-lg font-semibold tracking-tight">
-            {currentTable?.name ?? t("phone.waiter.order.title")}
-            {existingOrder ? (
-              <span className="ml-2 text-[13px] font-medium text-[#7eb6ff]">
-                #{existingOrder.orderNumber}
+        {tableDesign === "advanced" ? (
+          <>
+            <span
+              className="flex size-9 shrink-0 items-center justify-center rounded-lg text-[12px] font-bold text-[#0a0a0a]"
+              style={{
+                background: `linear-gradient(145deg, ${accent}, #d4af37)`,
+              }}
+            >
+              {(currentTable?.name ?? "T").slice(0, 3)}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[11px] text-white/40">{currentTable?.zone ?? ""}</p>
+              <h1 className="truncate text-[15px] font-semibold tracking-tight">
+                {currentTable?.name ?? t("phone.waiter.order.title")}
+                {existingOrder ? (
+                  <span className="ml-2 text-[12px] font-medium text-[#d4af37]">
+                    #{existingOrder.orderNumber}
+                  </span>
+                ) : null}
+              </h1>
+            </div>
+          </>
+        ) : tableDesign === "modern" ? (
+          <>
+            <h1 className="min-w-0 flex-1 truncate text-[18px] font-semibold tracking-tight">
+              {currentTable?.name ?? t("phone.waiter.order.title")}
+            </h1>
+            {currentTable?.zone ? (
+              <span
+                className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold"
+                style={{ background: `${accent}33`, color: accent }}
+              >
+                {currentTable.zone}
               </span>
             ) : null}
-          </h1>
-        </div>
+          </>
+        ) : (
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/40">
+              {currentTable?.zone ?? ""}
+            </p>
+            <h1 className="truncate text-lg font-semibold tracking-tight">
+              {currentTable?.name ?? t("phone.waiter.order.title")}
+              {existingOrder ? (
+                <span className="ml-2 text-[13px] font-medium text-[#7eb6ff]">
+                  #{existingOrder.orderNumber}
+                </span>
+              ) : null}
+            </h1>
+          </div>
+        )}
       </header>
 
       <div className="relative z-10 px-4 pb-3">
-        <div className="waiter-cat-scroll-y no-scrollbar max-h-[8.2rem]">
-        <div className="grid grid-cols-5 gap-2">
-        <button
-          type="button"
-          onClick={() => setActiveCategory("favorites")}
-          className={cn(
-            "flex h-[3.85rem] min-w-0 flex-col items-center justify-center gap-1 rounded-xl border px-1 py-1.5 text-center transition",
-            selectedCategory === "favorites"
-              ? "border-transparent bg-amber-500 text-white"
-              : "border-white/10 bg-white/[0.05] text-white/60",
-          )}
-        >
-          <span className="flex size-5 items-center justify-center">
-            <Star className="size-4" />
-          </span>
-          <span className="w-full truncate text-[10px] font-medium leading-tight">
-            {t("phone.waiter.order.favorites")}
-          </span>
-        </button>
-        {(categories ?? []).map((cat) => {
-          const sel = selectedCategory === cat._id;
-          return (
+        {tableDesign === "modern" ? (
+          <div className="flex gap-2 overflow-x-auto no-scrollbar">
             <button
-              key={cat._id}
               type="button"
-              onClick={() => setActiveCategory(cat._id)}
+              onClick={() => setActiveCategory("favorites")}
               className={cn(
-                "flex h-[3.85rem] min-w-0 flex-col items-center justify-center gap-1 rounded-xl border px-1 py-1.5 text-center transition",
-                sel ? "text-white border-transparent" : "border-white/10 bg-white/[0.05] text-white/60",
+                "shrink-0 rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition",
+                selectedCategory === "favorites"
+                  ? "text-white"
+                  : "bg-white/[0.08] text-white/55",
               )}
-              style={sel ? { backgroundColor: cat.color } : undefined}
+              style={
+                selectedCategory === "favorites" ? { backgroundColor: accent } : undefined
+              }
             >
-              <span className="flex size-5 items-center justify-center text-[15px] leading-none">
-                {(cat.icon && cat.icon.trim()) || emojiForCategoryName(cat.name) || (
-                  <UtensilsCrossed className="size-4" />
-                )}
-              </span>
-              <span className="w-full truncate text-[10px] font-medium leading-tight">{cat.name}</span>
+              {t("phone.waiter.order.favorites")}
             </button>
-          );
-        })}
-        </div>
-        </div>
+            {(categories ?? []).map((cat) => {
+              const sel = selectedCategory === cat._id;
+              return (
+                <button
+                  key={cat._id}
+                  type="button"
+                  onClick={() => setActiveCategory(cat._id)}
+                  className={cn(
+                    "shrink-0 rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition",
+                    sel ? "text-white" : "bg-white/[0.08] text-white/55",
+                  )}
+                  style={sel ? { backgroundColor: cat.color || accent } : undefined}
+                >
+                  {cat.name}
+                </button>
+              );
+            })}
+          </div>
+        ) : tableDesign === "advanced" ? (
+          <div className="flex gap-4 overflow-x-auto no-scrollbar">
+            <button
+              type="button"
+              onClick={() => setActiveCategory("favorites")}
+              className="shrink-0 pb-1.5 text-[13px] font-medium"
+              style={{
+                color: selectedCategory === "favorites" ? "var(--waiter-fg)" : "var(--waiter-muted)",
+                borderBottom:
+                  selectedCategory === "favorites"
+                    ? `2px solid ${accent}`
+                    : "2px solid transparent",
+              }}
+            >
+              {t("phone.waiter.order.favorites")}
+            </button>
+            {(categories ?? []).map((cat) => {
+              const sel = selectedCategory === cat._id;
+              return (
+                <button
+                  key={cat._id}
+                  type="button"
+                  onClick={() => setActiveCategory(cat._id)}
+                  className="shrink-0 pb-1.5 text-[13px] font-medium"
+                  style={{
+                    color: sel ? "var(--waiter-fg)" : "var(--waiter-muted)",
+                    borderBottom: sel
+                      ? `2px solid ${cat.color || accent}`
+                      : "2px solid transparent",
+                  }}
+                >
+                  {cat.name}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="waiter-cat-scroll-y no-scrollbar max-h-[8.2rem]">
+            <div className="grid grid-cols-5 gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveCategory("favorites")}
+                className={cn(
+                  "flex h-[3.85rem] min-w-0 flex-col items-center justify-center gap-1 rounded-xl border px-1 py-1.5 text-center transition",
+                  selectedCategory === "favorites"
+                    ? "border-transparent bg-amber-500 text-white"
+                    : "border-white/10 bg-white/[0.05] text-white/60",
+                )}
+              >
+                <span className="flex size-5 items-center justify-center">
+                  <Star className="size-4" />
+                </span>
+                <span className="w-full truncate text-[10px] font-medium leading-tight">
+                  {t("phone.waiter.order.favorites")}
+                </span>
+              </button>
+              {(categories ?? []).map((cat) => {
+                const sel = selectedCategory === cat._id;
+                return (
+                  <button
+                    key={cat._id}
+                    type="button"
+                    onClick={() => setActiveCategory(cat._id)}
+                    className={cn(
+                      "flex h-[3.85rem] min-w-0 flex-col items-center justify-center gap-1 rounded-xl border px-1 py-1.5 text-center transition",
+                      sel
+                        ? "text-white border-transparent"
+                        : "border-white/10 bg-white/[0.05] text-white/60",
+                    )}
+                    style={sel ? { backgroundColor: cat.color } : undefined}
+                  >
+                    <span className="flex size-5 items-center justify-center text-[15px] leading-none">
+                      {(cat.icon && cat.icon.trim()) ||
+                        emojiForCategoryName(cat.name) || (
+                          <UtensilsCrossed className="size-4" />
+                        )}
+                    </span>
+                    <span className="w-full truncate text-[10px] font-medium leading-tight">
+                      {cat.name}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="relative z-10 px-4 pb-3">
@@ -522,7 +810,14 @@ export default function PhoneWaiterOrder() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t("phone.waiter.order.searchPlaceholder")}
-            className="h-10 w-full rounded-xl border border-white/10 bg-white/[0.05] pl-9 pr-8 text-[14px] text-white outline-none placeholder:text-white/30 focus:border-[#0066FF]/60"
+            className={cn(
+              "h-10 w-full border border-white/10 bg-white/[0.05] pl-9 pr-8 text-[14px] text-white outline-none placeholder:text-white/30 focus:border-[#0066FF]/60",
+              tableDesign === "modern"
+                ? "rounded-full"
+                : tableDesign === "advanced"
+                  ? "h-9 rounded-lg"
+                  : "rounded-xl",
+            )}
           />
           {searchQuery ? (
             <button
@@ -553,10 +848,171 @@ export default function PhoneWaiterOrder() {
             <UtensilsCrossed className="size-8" />
             <p className="text-sm">{t("phone.waiter.order.noItems")}</p>
           </div>
+        ) : tableDesign === "modern" ? (
+          <div className="space-y-2">
+            {filteredItems.map((item) => {
+              const inCart = hasMenuItemCustomizations(item)
+                ? undefined
+                : cart.find(
+                    (c) =>
+                      cartLineKey(c) ===
+                      cartLineKey({ menuItemId: String(item._id) }),
+                  );
+              const visualBlock = getOrderBlockReason(item, 1, enforceAvailability);
+              return (
+                <button
+                  key={item._id}
+                  type="button"
+                  onClick={() => addToCart(item)}
+                  disabled={Boolean(visualBlock)}
+                  className={cn(
+                    "flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition active:scale-[0.99]",
+                    visualBlock
+                      ? "bg-white/[0.03] opacity-55"
+                      : inCart
+                        ? "bg-white/[0.08]"
+                        : "bg-white/[0.05]",
+                  )}
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[14px] font-semibold text-white">
+                      {item.name}
+                    </span>
+                    {waiterCanPay ? (
+                      <span className="text-[12px] text-white/45">{formatPrice(item.price)}</span>
+                    ) : null}
+                    {visualBlock ? (
+                      <span className="block text-[10px] font-semibold text-amber-400">
+                        {visualBlock === "stock"
+                          ? t("phone.waiter.order.outOfStock")
+                          : t("phone.waiter.order.stopped")}
+                      </span>
+                    ) : null}
+                  </span>
+                  {inCart && !visualBlock ? (
+                    <span
+                      className="flex size-7 items-center justify-center rounded-full text-[12px] font-bold text-white"
+                      style={{ backgroundColor: accent }}
+                    >
+                      {inCart.quantity}
+                    </span>
+                  ) : (
+                    <span
+                      className="flex size-7 items-center justify-center rounded-full text-white"
+                      style={{ backgroundColor: visualBlock ? "var(--waiter-card)" : accent }}
+                    >
+                      <Plus className="size-3.5" />
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        ) : tableDesign === "advanced" ? (
+          <div className="space-y-1.5">
+            {filteredItems.map((item) => {
+              const inCart = hasMenuItemCustomizations(item)
+                ? undefined
+                : cart.find(
+                    (c) =>
+                      cartLineKey(c) ===
+                      cartLineKey({ menuItemId: String(item._id) }),
+                  );
+              const visualBlock = getOrderBlockReason(item, 1, enforceAvailability);
+              return (
+                <div
+                  key={item._id}
+                  className={cn(
+                    "flex items-center gap-2 rounded-xl px-2 py-2",
+                    visualBlock ? "opacity-55" : "",
+                  )}
+                  style={{
+                    background: "var(--waiter-card)",
+                    boxShadow: "inset 0 0 0 1px var(--waiter-border)",
+                  }}
+                >
+                  <span
+                    className="h-8 w-1 shrink-0 rounded-full"
+                    style={{
+                      background:
+                        item.station === "bar"
+                          ? "#a78bfa"
+                          : item.station === "kitchen"
+                            ? "#fb923c"
+                            : accent,
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => addToCart(item)}
+                    disabled={Boolean(visualBlock)}
+                    className="min-w-0 flex-1 text-left"
+                  >
+                    <p className="truncate text-[13px] font-semibold text-white">{item.name}</p>
+                    <p className="text-[11px] text-white/40">
+                      {waiterCanPay ? formatPrice(item.price) : item.station === "bar" ? "Bar" : "Kitchen"}
+                    </p>
+                    {visualBlock ? (
+                      <p className="text-[10px] font-semibold text-amber-400">
+                        {visualBlock === "stock"
+                          ? t("phone.waiter.order.outOfStock")
+                          : t("phone.waiter.order.stopped")}
+                      </p>
+                    ) : null}
+                  </button>
+                  {inCart && !visualBlock ? (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateQty(
+                            cartLineKey({ menuItemId: String(item._id) }),
+                            -1,
+                          )
+                        }
+                        className="flex size-7 items-center justify-center rounded-lg bg-white/[0.08] text-white/70"
+                      >
+                        <Minus className="size-3.5" />
+                      </button>
+                      <span className="w-4 text-center text-[13px] font-bold">{inCart.quantity}</span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateQty(
+                            cartLineKey({ menuItemId: String(item._id) }),
+                            1,
+                          )
+                        }
+                        className="flex size-7 items-center justify-center rounded-lg bg-white/[0.08] text-white"
+                      >
+                        <Plus className="size-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => addToCart(item)}
+                      disabled={Boolean(visualBlock)}
+                      className="flex size-7 items-center justify-center rounded-lg text-[13px] font-bold"
+                      style={{ background: `${accent}33`, color: accent }}
+                    >
+                      +
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         ) : (
           <div className="grid grid-cols-2 gap-3">
             {filteredItems.map((item) => {
-              const inCart = cart.find((c) => c.menuItemId === item._id);
+              const inCart = hasMenuItemCustomizations(item)
+                ? undefined
+                : cart.find(
+                    (c) =>
+                      cartLineKey(c) ===
+                      cartLineKey({ menuItemId: String(item._id) }),
+                  );
               const visualBlock = getOrderBlockReason(
                 item,
                 1,
@@ -616,7 +1072,10 @@ export default function PhoneWaiterOrder() {
       {(showPrevBar || showCartBar) ? (
         <div className="fixed inset-x-0 bottom-0 z-20">
           <div
-            className="pointer-events-none absolute inset-0 bg-[#070b14]"
+            className={cn(
+              "pointer-events-none absolute inset-0",
+              light ? "bg-[#f4f6fa]" : "bg-[#070b14]",
+            )}
             aria-hidden
           />
           <div className="relative space-y-2 px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
@@ -624,7 +1083,14 @@ export default function PhoneWaiterOrder() {
               <button
                 type="button"
                 onClick={() => setCartOpen(true)}
-                className="flex w-full items-center justify-between rounded-2xl bg-[#0066FF] px-4 py-3.5 shadow-xl shadow-[#0066FF]/30 active:scale-[0.98]"
+                className={cn(
+                  "flex w-full items-center justify-between px-4 py-3.5 text-white shadow-xl active:scale-[0.98]",
+                  tableDesign === "modern" ? "rounded-full" : "rounded-2xl",
+                )}
+                style={{
+                  backgroundColor: tableDesign === "professional" ? "#0066FF" : accent,
+                  boxShadow: `0 12px 28px -10px ${tableDesign === "professional" ? "#0066FF" : accent}80`,
+                }}
               >
                 <span className="flex items-center gap-2 text-[14px] font-semibold text-white">
                   <ShoppingBag className="size-4" />
@@ -636,7 +1102,12 @@ export default function PhoneWaiterOrder() {
               </button>
             ) : null}
             {showPrevBar ? (
-              <div className="flex w-full items-center gap-2 rounded-2xl border border-white/12 bg-[#121a2e] px-3 py-2.5">
+              <div
+                className={cn(
+                  "flex w-full items-center gap-2 border border-white/12 bg-[#121a2e] px-3 py-2.5",
+                  tableDesign === "modern" ? "rounded-full" : "rounded-2xl",
+                )}
+              >
                 <button
                   type="button"
                   onClick={() => setHistoryOpen(true)}
@@ -716,13 +1187,26 @@ export default function PhoneWaiterOrder() {
                 </p>
               ) : (
                 <div className="space-y-2 pb-2">
-                  {cart.map((item) => (
+                  {cart.map((item) => {
+                    const lineKey = cartLineKey(item);
+                    const customLabel = formatCustomizationsForDisplay(
+                      item.selectedCustomizations,
+                    );
+                    return (
                     <div
-                      key={item.menuItemId}
+                      key={lineKey}
                       className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5"
                     >
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-[13px] font-medium text-white">{item.name}</p>
+                        {customLabel ? (
+                          <p className="text-[11px] text-sky-300">{customLabel}</p>
+                        ) : null}
+                        {item.notes ? (
+                          <p className="mt-0.5 truncate text-[11px] italic text-amber-300/90">
+                            {item.notes}
+                          </p>
+                        ) : null}
                         {waiterCanPay ? (
                           <p className="text-[12px] text-white/40">{formatPrice(item.price)}</p>
                         ) : null}
@@ -730,7 +1214,26 @@ export default function PhoneWaiterOrder() {
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          onClick={() => updateQty(item.menuItemId, -1)}
+                          onClick={() => openNoteDialog(item)}
+                          aria-label={
+                            item.notes
+                              ? t("phone.waiter.order.editNote")
+                              : t("phone.waiter.order.addNote")
+                          }
+                          className={cn(
+                            "rounded-lg px-2 py-1.5 text-[11px] font-semibold transition active:scale-95",
+                            item.notes
+                              ? "bg-amber-500/20 text-amber-300"
+                              : "bg-white/[0.06] text-white/55",
+                          )}
+                        >
+                          {item.notes
+                            ? t("phone.waiter.order.editNoteBtn")
+                            : t("phone.waiter.order.addNoteBtn")}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateQty(lineKey, -1)}
                           className="flex size-7 items-center justify-center rounded-lg bg-white/[0.06] text-white/70"
                         >
                           <Minus className="size-3.5" />
@@ -740,14 +1243,15 @@ export default function PhoneWaiterOrder() {
                         </span>
                         <button
                           type="button"
-                          onClick={() => updateQty(item.menuItemId, 1)}
+                          onClick={() => updateQty(lineKey, 1)}
                           className="flex size-7 items-center justify-center rounded-lg bg-white/[0.06] text-white/70"
                         >
                           <Plus className="size-3.5" />
                         </button>
                       </div>
                     </div>
-                  ))}
+                  );
+                  })}
                 </div>
               )}
             </div>
@@ -942,6 +1446,171 @@ export default function PhoneWaiterOrder() {
                 {t("phone.waiter.order.paying")}
               </p>
             ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      {customizationPickerItem ? (
+        <div className="fixed inset-0 z-[90] flex items-end justify-center bg-black/60 p-4">
+          <div className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl border border-white/10 bg-[#0d1326] p-4">
+            <h3 className="mb-3 text-[16px] font-semibold text-white">
+              {customizationPickerItem.name}
+            </h3>
+            <MenuItemCustomizationPicker
+              groups={getMenuItemCustomizationGroups(customizationPickerItem)}
+              basePrice={customizationPickerItem.price}
+              formatPrice={formatPrice}
+              accentStyle={{
+                borderColor: access.accentColor,
+                backgroundColor: `${access.accentColor}22`,
+                color: access.accentColor,
+              }}
+              labels={{
+                title: t("phone.waiter.customizationTitle"),
+                optionalNote: t("phone.waiter.customizationNote"),
+                notePlaceholder: t("phone.waiter.customizationNotePh"),
+                requiredError: t("phone.waiter.customizationRequired"),
+                confirm: t("phone.waiter.menuItemAddToOrder"),
+                cancel: t("btn.cancel"),
+              }}
+              onCancel={() => setCustomizationPickerItem(null)}
+              onConfirm={(selections, notes) => {
+                addToCartWithOptions(customizationPickerItem, selections, notes);
+                setCustomizationPickerItem(null);
+              }}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {noteCartKey ? (
+        <div className="fixed inset-0 z-[95] flex items-end justify-center bg-black/60 p-4">
+          <button
+            type="button"
+            aria-label={t("phone.waiter.order.cancel")}
+            className="absolute inset-0"
+            onClick={closeNoteDialog}
+          />
+          <div className="relative z-10 w-full max-w-md rounded-2xl border border-white/10 bg-[#0d1326] p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="text-[16px] font-semibold text-white">
+                  {noteContinue
+                    ? t("phone.waiter.order.noteTitleContinue")
+                    : t("phone.waiter.order.noteTitle")}
+                </h3>
+                <p className="mt-0.5 text-[12px] text-white/50">
+                  {noteContinue
+                    ? t("phone.waiter.order.noteContinueDesc", {
+                        count: noteMaxQty,
+                      })
+                    : t("phone.waiter.order.noteDesc")}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeNoteDialog}
+                className="flex size-8 shrink-0 items-center justify-center rounded-lg text-white/50"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+            <input
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              placeholder={t("phone.waiter.order.notePlaceholder")}
+              autoFocus
+              className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-[14px] text-white outline-none placeholder:text-white/35 focus:border-[#0066FF]/60"
+            />
+            {noteMaxQty > 1 ? (
+              <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="text-[13px] font-medium text-white">
+                    {t("phone.waiter.order.noteApplyTo")}
+                  </p>
+                  <p className="text-[11px] text-white/45">
+                    {t("phone.waiter.order.noteApplyHint", {
+                      count: noteApplyQty,
+                      total: noteMaxQty,
+                    })}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNoteApplyQty((q) => Math.max(1, q - 1))}
+                    disabled={noteApplyQty <= 1}
+                    className="flex size-8 items-center justify-center rounded-lg bg-white/[0.06] text-white/70 disabled:opacity-35"
+                  >
+                    <Minus className="size-3.5" />
+                  </button>
+                  <span className="w-6 text-center text-[14px] font-semibold text-white">
+                    {noteApplyQty}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setNoteApplyQty((q) => Math.min(noteMaxQty, q + 1))
+                    }
+                    disabled={noteApplyQty >= noteMaxQty}
+                    className="flex size-8 items-center justify-center rounded-lg bg-white/[0.06] text-white/70 disabled:opacity-35"
+                  >
+                    <Plus className="size-3.5" />
+                  </button>
+                </div>
+              </div>
+            ) : null}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {(
+                [
+                  "phone.waiter.order.notePresetWellDone",
+                  "phone.waiter.order.notePresetLight",
+                  "phone.waiter.order.notePresetMedium",
+                  "phone.waiter.order.notePresetNoMushrooms",
+                  "phone.waiter.order.notePresetNoOnions",
+                  "phone.waiter.order.notePresetNoVeggies",
+                  "phone.waiter.order.notePresetWithSauce",
+                  "phone.waiter.order.notePresetExtraSpicy",
+                  "phone.waiter.order.notePresetNoCheese",
+                  "phone.waiter.order.notePresetAllergy",
+                ] as const
+              ).map((presetKey) => {
+                const preset = t(presetKey);
+                const selected = noteHasPreset(noteText, preset);
+                return (
+                  <button
+                    key={presetKey}
+                    type="button"
+                    onClick={() => toggleNotePreset(preset)}
+                    aria-pressed={selected}
+                    className={cn(
+                      "rounded-lg border px-2.5 py-1.5 text-[12px] active:scale-95",
+                      selected
+                        ? "border-[#0066FF]/50 bg-[#0066FF]/20 text-white"
+                        : "border-white/10 bg-white/[0.04] text-white/70",
+                    )}
+                  >
+                    {preset}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={closeNoteDialog}
+                className="flex-1 rounded-xl border border-white/10 py-3 text-[14px] font-semibold text-white/60"
+              >
+                {t("phone.waiter.order.cancel")}
+              </button>
+              <button
+                type="button"
+                onClick={saveNote}
+                className="flex-1 rounded-xl bg-[#0066FF] py-3 text-[14px] font-semibold text-white active:scale-[0.98]"
+              >
+                {t("phone.waiter.order.saveNote")}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

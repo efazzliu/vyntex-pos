@@ -5,7 +5,8 @@
     "pricing": "Pricing",
     "about": "About",
     "contact": "Contact",
-    "dashboard": "Dashboard"
+    "dashboard": "Dashboard",
+    "phoneApp": "Phone app"
   },
   "footer": {
     "tagline": "Enterprise-grade POS platform for modern restaurants. Streamline your operations with elegance.",
@@ -28,6 +29,7 @@
       "line2": "Point-of-Sale",
       "subtitle": "Enterprise-grade POS for modern restaurants. Start with 1 month free on Professional — then streamline orders, payments, and operations in one place.",
       "ctaPrimary": "Get Started Free",
+      "ctaPhone": "Open phone app",
       "ctaDemo": "Watch Demo",
       "demoToast": "Coming soon in a future milestone!",
       "mockOrders": "Orders",
@@ -273,7 +275,10 @@
       }
     },
     "milestones": [
-      { "year": "2026", "event": "Vyntex POS development begins — building the product and writing what's next for hospitality" }
+      {
+        "year": "2026",
+        "event": "Vyntex POS development begins — building the product and writing what's next for hospitality"
+      }
     ]
   },
   "legal": {
@@ -486,6 +491,7 @@
       "welcome": "Welcome, {{name}}",
       "footer": "Vyntex POS — Waiter",
       "floorEyebrow": "On shift",
+      "floorEyebrowNamed": "On shift {{name}}",
       "floorTitle": "Ready for orders",
       "floorBody": "Table floor and phone ordering come next. You're signed in and ready.",
       "signOut": "Sign out",
@@ -515,6 +521,29 @@
         "sending": "Sending…",
         "sent": "Order sent.",
         "sendFailed": "Could not send the order. Try again.",
+        "addNote": "Add preparation note",
+        "editNote": "Edit preparation note",
+        "addNoteBtn": "Note",
+        "editNoteBtn": "Edit",
+        "noteTitle": "How to prepare",
+        "noteTitleContinue": "Next item",
+        "noteDesc": "Tell the kitchen or bar how to make this item.",
+        "noteContinueDesc": "{{count}} left — add another note, or cancel to leave them plain.",
+        "notePlaceholder": "e.g. well done, no mushrooms…",
+        "saveNote": "Save note",
+        "cancel": "Cancel",
+        "noteApplyTo": "Apply to how many?",
+        "noteApplyHint": "{{count}} of {{total}} — the rest stay without this note",
+        "notePresetWellDone": "Well done",
+        "notePresetLight": "Light / rare",
+        "notePresetMedium": "Medium",
+        "notePresetNoMushrooms": "No mushrooms",
+        "notePresetNoOnions": "No onions",
+        "notePresetNoVeggies": "No vegetables",
+        "notePresetWithSauce": "With sauce",
+        "notePresetExtraSpicy": "Extra spicy",
+        "notePresetNoCheese": "No cheese",
+        "notePresetAllergy": "Allergy",
         "blockedStock": "{{name}} is out of stock.",
         "blockedStopped": "{{name}} is unavailable — the kitchen stopped it.",
         "outOfStock": "Out of stock",
@@ -565,11 +594,20 @@
       "nameMismatch": "Name does not match this code.",
       "invalidCredentials": "Name or code is wrong. Try again.",
       "pairTitle": "Activate phone",
-      "pairHint": "Scan the QR shown in POS Settings, or type the 8-character code.",
+      "pairHint": "Scan the QR in POS Settings, type the 8-character code, or enter the venue license (admin must approve).",
       "pairBack": "Back",
       "pairScan": "Scan QR code",
       "pairOrType": "Or type the code",
       "pairActivate": "Activate",
+      "pairOrLicense": "Or enter license",
+      "pairLicenseHint": "The POS administrator must approve this phone in Settings.",
+      "pairLicenseSend": "Request",
+      "pairLicenseWaiting": "Waiting for approval",
+      "pairLicenseWaitingHint": "Open POS → Settings → Devices on the restaurant computer and approve this phone.",
+      "pairLicenseCancel": "Cancel request",
+      "pairInvalidLicense": "Invalid license key. Check and try again.",
+      "pairLicenseRejected": "This phone was not approved. Ask the administrator.",
+      "pairLicenseWaitExpired": "The request expired. Send it again.",
       "pairClaiming": "Registering this phone…",
       "pairSuccess": "Phone activated",
       "pairInvalidCode": "Invalid code. Check and try again.",
@@ -583,6 +621,17 @@
       "pairNoCamera": "Camera is not available on this device.",
       "pairCameraDenied": "Camera permission denied. Type the code instead.",
       "pairScanFallback": "Live QR scan is limited on this browser — type the code below, or open the QR link from the camera app.",
+      "pairAccountButton": "Sign in with venue account",
+      "pairAccountHint": "Owners can activate this phone and work as a waiter — no QR needed.",
+      "accountTitle": "Work as waiter",
+      "accountPickVenue": "Choose the venue, then pick the waiter.",
+      "accountPickStaff": "Who are you working as?",
+      "accountBinding": "Activating this phone…",
+      "accountNoVenues": "No venues on this account.",
+      "accountNoStaff": "No waiters on this venue yet. Add staff in POS → Staff.",
+      "accountNeedSignIn": "Sign in with the venue account first.",
+      "accountNotOwner": "This account cannot activate waiter phones for that venue.",
+      "accountLoadFailed": "Could not load venues for this account.",
       "navLabel": "Waiter navigation",
       "navTables": "Tables",
       "navMenu": "Menu",
@@ -590,6 +639,13 @@
       "navNotifications": "Notifications",
         "menuAll": "All",
         "menuPickTable": "Choose a table first to add items.",
+        "menuItemAddToOrder": "Add to Order",
+        "customizationTitle": "Customization",
+        "customizationNote": "Extra note",
+        "customizationNotePh": "e.g. allergy…",
+        "customizationRequired": "Choose",
+        "menuItemCategory": "Category",
+        "menuItemClose": "Close",
         "menuQrTitle": "Menu QR",
         "menuQrHint": "Show this code to the guest so they can open the menu.",
         "menuQrClose": "Close",
@@ -598,6 +654,13 @@
       "notifEmpty": "No kitchen updates right now.",
       "notifKitchen": "In kitchen",
       "notifReady": "Ready — pick up",
+      "notifReadyTapDeliver": "Ready — tap when delivered to table",
+      "notifDelivering": "Marking delivered…",
+      "notifDeliverHint": "Tap a ready item to mark it delivered to the table.",
+      "notifDeliveredToast": "Delivered: {{item}}",
+      "notifDeliverFailed": "Could not mark as delivered.",
+      "notifSentAt": "Sent {{time}}",
+      "notifReadyAt": "Ready {{time}}",
       "notifReadyCount": "{{count}} ready for pickup",
       "notifReadyBadge": "{{count}} ready",
       "notifTableHeading": "Table {{table}}",
@@ -652,7 +715,16 @@
       "role_inventory": "Inventory",
       "role_accountant": "Accountant",
       "role_auditor": "Auditor",
-      "role_kitchen": "Kitchen"
+      "role_kitchen": "Kitchen",
+      "qrTitle": "Waiter QR code",
+      "qrHint": "The other phone scans this, or types the 8-character code on Activate phone.",
+      "qrCopy": "Copy code",
+      "qrCopied": "Copied",
+      "qrExpires": "Expires in {{time}}",
+      "qrErrLicense": "This venue license is not active.",
+      "qrErrMigration": "Server missing pairing. Ask admin to run the waiter phone SQL.",
+      "qrErrServer": "Server is not configured.",
+      "qrErrGeneric": "Could not create the waiter QR. Try again."
     },
     "stock": {
       "title": "Inventory",
@@ -722,7 +794,8 @@
       "navProfile": "Profile",
       "navVenues": "Venues",
       "loadError": "Could not load dashboard.",
-      "retry": "Retry"
+      "retry": "Retry",
+      "waiterQr": "Waiter QR code"
     },
     "venues": {
       "title": "My venues",
@@ -734,6 +807,7 @@
       "loadError": "Could not load your venues.",
       "opening": "Opening…",
       "admin": "Admin",
+      "openWaiter": "Work as waiter",
       "desktopHint": "Installers and full settings are on the web dashboard (computer).",
       "loading": "Loading…",
       "signOut": "Sign out"
@@ -799,5 +873,23 @@
       "toastAlreadyRegistered": "This email is already registered. Verification email was sent again.",
       "toastSuccess": "Registration successful. Please verify your email first."
     }
+  },
+  "demoVideo": {
+    "title": "See Vyntex POS in action",
+    "subtitle": "A 2-minute walkthrough of taking an order, managing tables, and getting paid.",
+    "fallback": "Your browser does not support embedded video.",
+    "tryHint": "Prefer to click around yourself?",
+    "tryButton": "Try the interactive demo"
+  },
+  "productDemo": {
+    "badge": "Interactive demo · sample data",
+    "title": "Try Vyntex POS right now",
+    "subtitle": "No sign-up needed. Seat a table, build an order, and charge it — just like the real app.",
+    "tabFloor": "Floor Plan",
+    "tabMenu": "Menu",
+    "tabStaff": "Staff",
+    "tabAnalytics": "Analytics",
+    "liveBadge": "Demo mode",
+    "ctaHint": "Ready to run this at your restaurant?"
   }
 }

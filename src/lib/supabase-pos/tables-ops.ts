@@ -219,6 +219,7 @@ export async function updateTable(args: {
   zone?: string;
   shape?: string;
   tableScale?: number;
+  tableScaleY?: number;
 }) {
   await getRestaurantByLicense(args.licenseKey);
   const patch: Record<string, unknown> = {};
@@ -227,11 +228,24 @@ export async function updateTable(args: {
   if (args.zone != null) patch.zone = args.zone;
   if (args.shape != null) patch.shape = args.shape;
   if (args.tableScale != null) patch.table_scale = args.tableScale;
+  if (args.tableScaleY != null) patch.table_scale_y = args.tableScaleY;
 
-  const { error } = await supabase
+  let { error } = await supabase
     .from("pos_floor_tables")
     .update(patch)
     .eq("id", args.tableId);
+
+  if (
+    error &&
+    args.tableScaleY != null &&
+    isMissingPgColumnError(error.message ?? "", "table_scale_y")
+  ) {
+    delete patch.table_scale_y;
+    ({ error } = await supabase
+      .from("pos_floor_tables")
+      .update(patch)
+      .eq("id", args.tableId));
+  }
   if (error) throw error;
 }
 

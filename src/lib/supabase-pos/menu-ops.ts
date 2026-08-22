@@ -16,6 +16,8 @@ import {
   resolvePosCurrencyPosition,
   resolvePosCurrencySymbol,
 } from "@/lib/pos-locale-defaults.ts";
+import { resolveMenuItemImageUrl } from "@/lib/menu-item-photo-urls.ts";
+import { customizationConfigForDb } from "@/lib/menu-customizations.ts";
 
 function pgMissingColumnMessage(error: { message?: string }, column: string): boolean {
   const m = String(error.message ?? "").toLowerCase();
@@ -102,6 +104,14 @@ export async function getCategories(licenseKey: string) {
 
 export async function getAllItems(licenseKey: string) {
   const r = await getRestaurantByLicense(licenseKey);
+  const { data: cats } = await supabase
+    .from("menu_categories")
+    .select("id, name")
+    .eq("restaurant_id", r.id);
+  const categoryNameById = new Map(
+    (cats ?? []).map((c) => [String(c.id), String(c.name)]),
+  );
+
   const { data, error } = await supabase
     .from("menu_items")
     .select("*")
@@ -109,9 +119,16 @@ export async function getAllItems(licenseKey: string) {
     .order("display_order", { ascending: true });
 
   if (error) throw error;
-  return (data ?? []).map((row) =>
-    menuItemFromRow(row as Parameters<typeof menuItemFromRow>[0]),
-  );
+  return (data ?? []).map((row) => {
+    const item = menuItemFromRow(row as Parameters<typeof menuItemFromRow>[0]);
+    return {
+      ...item,
+      imageUrl: resolveMenuItemImageUrl(
+        item,
+        categoryNameById.get(item.categoryId) ?? "",
+      ),
+    };
+  });
 }
 
 export async function getGuestMenu(restaurantId: string) {
@@ -161,8 +178,18 @@ export async function getGuestMenu(restaurantId: string) {
       (c) => !SUPPLY_CATEGORY_NAMES.has(normalizeSupplyCategoryName(c.name)),
     );
   const allowedCats = new Set(categories.map((c) => c._id));
+  const categoryNameById = new Map(categories.map((c) => [c._id, c.name]));
   const menuItems = (items ?? [])
-    .map((row) => menuItemFromRow(row as Parameters<typeof menuItemFromRow>[0]))
+    .map((row) => {
+      const item = menuItemFromRow(row as Parameters<typeof menuItemFromRow>[0]);
+      return {
+        ...item,
+        imageUrl: resolveMenuItemImageUrl(
+          item,
+          categoryNameById.get(item.categoryId) ?? "",
+        ),
+      };
+    })
     .filter((i) => i.available && allowedCats.has(i.categoryId));
 
   return {
@@ -288,6 +315,16 @@ function assertMenuItemStation(
   }
 }
 
+function parseImageUrlArg(args: Record<string, unknown>): string | null | undefined {
+  if (args.imageUrl !== undefined) {
+    const url = args.imageUrl;
+    if (url === null) return null;
+    const trimmed = String(url).trim();
+    return trimmed || null;
+  }
+  return undefined;
+}
+
 export async function createItem(args: Record<string, unknown>) {
   const licenseKey = args.licenseKey as string;
   const r = await getRestaurantByLicense(licenseKey);
@@ -324,6 +361,11 @@ export async function createItem(args: Record<string, unknown>) {
     low_stock_threshold: (args.lowStockThreshold as number) ?? null,
   };
 
+  const imageUrl = parseImageUrlArg(args);
+  if (imageUrl !== undefined) {
+    payload.image_url = imageUrl;
+  }
+
   const recipeNorm = normalizeSupplyRecipeForDb(args.supplyRecipe);
   if (
     recipeNorm !== undefined &&
@@ -331,6 +373,13 @@ export async function createItem(args: Record<string, unknown>) {
     recipeNorm.length > 0
   ) {
     payload.supply_recipe = recipeNorm;
+  }
+
+  const customizationNorm = customizationConfigForDb(
+    args.customizationConfig as never,
+  );
+  if (customizationNorm !== undefined) {
+    payload.customization_config = customizationNorm;
   }
 
   let { data, error } = await supabase
@@ -344,6 +393,15 @@ export async function createItem(args: Record<string, unknown>) {
     ({ data, error } = await supabase
       .from("menu_items")
       .insert(withoutRecipe)
+      .select("id")
+      .single());
+  }
+
+  if (error && pgMissingColumnMessage(error, "customization_config")) {
+    const { customization_config: _cc, ...withoutCustom } = payload;
+    ({ data, error } = await supabase
+      .from("menu_items")
+      .insert(withoutCustom)
       .select("id")
       .single());
   }
@@ -392,11 +450,23 @@ export async function updateItem(args: Record<string, unknown>) {
     patch.vat_rate = args.vatRate;
   }
 
+  const imageUrl = parseImageUrlArg(args);
+  if (imageUrl !== undefined) {
+    patch.image_url = imageUrl;
+  }
+
   const recipeNormUpdate = normalizeSupplyRecipeForDb(args.supplyRecipe);
   if (recipeNormUpdate !== undefined) {
     patch.supply_recipe = hasEnterpriseSupplyRecipe(r.plan)
       ? recipeNormUpdate
       : [];
+  }
+
+  const customizationNormUpdate = customizationConfigForDb(
+    args.customizationConfig as never,
+  );
+  if (customizationNormUpdate !== undefined) {
+    patch.customization_config = customizationNormUpdate;
   }
 
   Object.keys(patch).forEach((k) => {
@@ -412,6 +482,14 @@ export async function updateItem(args: Record<string, unknown>) {
     ({ error } = await supabase
       .from("menu_items")
       .update(withoutRecipe)
+      .eq("id", args.itemId as string));
+  }
+
+  if (error && pgMissingColumnMessage(error, "customization_config")) {
+    const { customization_config: _cc, ...withoutCustom } = patch;
+    ({ error } = await supabase
+      .from("menu_items")
+      .update(withoutCustom)
       .eq("id", args.itemId as string));
   }
 
@@ -508,6 +586,6 @@ export async function updateMenu(args: {
 
 export async function generateUploadUrl(_args: Record<string, unknown>) {
   throw new Error(
-    "Ngarkimi i fotove të menysë nuk është lidhur me Supabase Storage. Hiq foton dhe ruaj artikullin. / Menu photos are not configured; remove the image to save the item.",
+    "Ngarkimi i fotove përdor Supabase Storage direkt. / Menu photos upload directly via Supabase Storage.",
   );
 }

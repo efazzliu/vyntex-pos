@@ -9,6 +9,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { createClient } from "@supabase/supabase-js";
+import { photoUrlForMenuItem } from "./menu-item-photo-urls.mjs";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const OWNER_EMAIL = "endfazzliu@outlook.com";
@@ -404,13 +405,44 @@ async function seedStaff(restaurantId, plan) {
   console.log(`    staff ${rows.length}`);
 }
 
+async function backfillMenuPhotos(restaurantId) {
+  const { data: categories, error: catErr } = await supabase
+    .from("menu_categories")
+    .select("id, name")
+    .eq("restaurant_id", restaurantId);
+  must(catErr, "categories for photo backfill");
+  const catById = new Map((categories ?? []).map((c) => [c.id, c.name]));
+
+  const { data: items, error } = await supabase
+    .from("menu_items")
+    .select("id, name, category_id, image_url")
+    .eq("restaurant_id", restaurantId)
+    .is("image_url", null);
+  if (error) throw error;
+  if (!items?.length) return 0;
+
+  let updated = 0;
+  for (const row of items) {
+    const categoryName = catById.get(row.category_id) ?? "";
+    const imageUrl = photoUrlForMenuItem(row.name, categoryName);
+    const { error: upErr } = await supabase
+      .from("menu_items")
+      .update({ image_url: imageUrl })
+      .eq("id", row.id);
+    must(upErr, `photo ${row.name}`);
+    updated += 1;
+  }
+  return updated;
+}
+
 async function seedMenu(restaurantId, plan) {
   const { count } = await supabase
     .from("menu_categories")
     .select("*", { count: "exact", head: true })
     .eq("restaurant_id", restaurantId);
   if ((count ?? 0) > 0) {
-    console.log(`    menu already has ${count} categories`);
+    const filled = await backfillMenuPhotos(restaurantId);
+    console.log(`    menu already has ${count} categories — backfilled ${filled} photos`);
     return;
   }
 
@@ -449,6 +481,7 @@ async function seedMenu(restaurantId, plan) {
       is_favorite: Boolean(fav),
       staff_meal_allowed: true,
       track_stock: false,
+      image_url: photoUrlForMenuItem(name, cat.name),
     }));
     const { error: itemErr } = await supabase.from("menu_items").insert(items);
     must(itemErr, `items ${cat.name}`);

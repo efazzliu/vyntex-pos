@@ -1,5 +1,8 @@
 /** Map Supabase rows to Convex Doc-shaped objects the UI expects. */
 
+import { resolveMenuItemImageUrl } from "@/lib/menu-item-photo-urls.ts";
+import { normalizeCustomizationConfig, normalizeSelectedCustomizations } from "@/lib/menu-customizations.ts";
+
 export function staffFromRow(r: {
   id: string;
   created_at: string;
@@ -31,7 +34,9 @@ export function floorTableFromRow(r: {
   pos_y: number | null;
   shape: string | null;
   table_scale: number | null;
+  table_scale_y?: number | null;
 }) {
+  const tableScale = r.table_scale != null ? Number(r.table_scale) : 1;
   return {
     _id: r.id,
     _creationTime: new Date(r.created_at).getTime(),
@@ -42,7 +47,11 @@ export function floorTableFromRow(r: {
     posX: r.pos_x ?? 100,
     posY: r.pos_y ?? 100,
     shape: (r.shape ?? "square") as "square" | "circle" | "rectangle",
-    tableScale: r.table_scale != null ? Number(r.table_scale) : 1,
+    tableScale,
+    tableScaleY:
+      r.table_scale_y != null && Number.isFinite(Number(r.table_scale_y))
+        ? Number(r.table_scale_y)
+        : undefined,
   };
 }
 
@@ -87,6 +96,7 @@ export function menuItemFromRow(r: {
   current_stock: number | string | null;
   low_stock_threshold: number | string | null;
   supply_recipe?: unknown;
+  customization_config?: unknown;
 }) {
   const rawRecipe = r.supply_recipe;
   let supplyRecipe:
@@ -105,6 +115,8 @@ export function menuItemFromRow(r: {
     if (lines.length > 0) supplyRecipe = lines;
   }
 
+  const customizationConfig = normalizeCustomizationConfig(r.customization_config);
+
   return {
     _id: r.id,
     _creationTime: new Date(r.created_at).getTime(),
@@ -118,7 +130,9 @@ export function menuItemFromRow(r: {
     station: (r.station as "kitchen" | "bar" | undefined) ?? undefined,
     vatRate: r.vat_rate != null ? Number(r.vat_rate) : 0.2,
     imageStorageId: undefined,
-    imageUrl: r.image_url ?? undefined,
+    imageUrl: resolveMenuItemImageUrl(
+      { name: r.name, imageUrl: r.image_url ?? undefined },
+    ),
     isFavorite: r.is_favorite ?? false,
     staffMealAllowed: r.staff_meal_allowed !== false,
     totalSold: r.total_sold ?? 0,
@@ -131,6 +145,7 @@ export function menuItemFromRow(r: {
         ? Number(r.low_stock_threshold)
         : undefined,
     supplyRecipe,
+    ...(customizationConfig.length > 0 ? { customizationConfig } : {}),
   };
 }
 

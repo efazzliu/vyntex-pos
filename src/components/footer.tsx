@@ -5,6 +5,7 @@ import {
   VYNTEX_APP_LOGO_SRC,
   VYNTEX_INSTAGRAM_URL,
 } from "@/lib/site-constants.ts";
+import { PHONE_APP_PATH } from "@/lib/guest-menu-url.ts";
 
 export default function Footer() {
   const { t } = useTranslation("site");
@@ -17,6 +18,7 @@ export default function Footer() {
           { labelKey: "footer.features", href: "/" },
           { labelKey: "nav.vynTypes", href: "/vyn-types" },
           { labelKey: "nav.pricing", href: "/pricing" },
+          { labelKey: "nav.phoneApp", href: PHONE_APP_PATH },
         ],
       },
       {
@@ -58,14 +60,15 @@ export default function Footer() {
               <ul className="space-y-2.5">
                 {col.links.map((link) => (
                   <li key={link.href + link.labelKey}>
-                    {link.href.startsWith("http") ? (
+                    {link.href.startsWith("http") || link.href.endsWith(".html") ? (
                       <a
                         href={link.href}
-                        target="_blank"
-                        rel="noreferrer"
+                        {...(link.href.startsWith("http")
+                          ? { target: "_blank", rel: "noreferrer" }
+                          : {})}
                         className="text-sm text-white/40 hover:text-white/70 transition-colors"
                       >
-                        {link.labelKey}
+                        {link.href.startsWith("http") ? link.labelKey : t(link.labelKey)}
                       </a>
                     ) : (
                       <Link

@@ -25,13 +25,24 @@ import PhoneProfileDisplayPage from "@/phone-app/components/phone-profile-displa
 import PhoneWaiterLogin from "@/phone-app/components/phone-waiter-login.tsx";
 import PhoneWaiterFloor from "@/phone-app/components/phone-waiter-floor.tsx";
 import PhoneWaiterPair from "@/phone-app/components/phone-waiter-pair.tsx";
+import PhoneWaiterAccount from "@/phone-app/components/phone-waiter-account.tsx";
 import PhoneWaiterPreview from "@/phone-app/components/phone-waiter-preview.tsx";
 import PhoneWaiterOrder from "@/phone-app/components/phone-waiter-order.tsx";
 import PhoneWaiterShell from "@/phone-app/components/phone-waiter-shell.tsx";
+import { PhoneAccessBrandingProvider } from "@/phone-app/hooks/use-phone-access-branding.tsx";
 import PhoneWaiterMenu from "@/phone-app/components/phone-waiter-menu.tsx";
 import PhoneWaiterOrders from "@/phone-app/components/phone-waiter-orders.tsx";
 import PhoneWaiterNotifications from "@/phone-app/components/phone-waiter-notifications.tsx";
 import PhoneGuestMenu from "@/phone-app/components/phone-guest-menu.tsx";
+import PhoneRedeemCodePage from "@/phone-app/components/phone-redeem-code-page.tsx";
+import AdminCenterLayout from "@/pages/admin-center/layout.tsx";
+import AdminCenterOverview from "@/pages/admin-center/overview.tsx";
+import AdminCenterVenues from "@/pages/admin-center/venues.tsx";
+import AdminCenterLicenses from "@/pages/admin-center/licenses.tsx";
+import AdminCenterBilling from "@/pages/admin-center/billing.tsx";
+import AdminCenterTeamAccess from "@/pages/admin-center/team-access.tsx";
+import AdminCenterActivity from "@/pages/admin-center/activity.tsx";
+import AdminCenterSettings from "@/pages/admin-center/settings.tsx";
 
 /**
  * Rrugë vetëm për shell-in mobil (phone.html).
@@ -49,6 +60,8 @@ export default function PhoneApp() {
           {/* Waiters: PIN login for phone orders (no Supabase account). */}
           <Route path="/waiter" element={<PhoneWaiterLogin />} />
           <Route path="/waiter/pair" element={<PhoneWaiterPair />} />
+          {/* Owner/manager: sign in and work as a venue waiter (no POS QR). */}
+          <Route path="/waiter/account" element={<PhoneWaiterAccount />} />
           {/* Design preview: skip QR/code when testing on phone only. */}
           <Route path="/waiter/preview" element={<PhoneWaiterPreview />} />
           <Route path="/m/:venueId" element={<PhoneGuestMenu />} />
@@ -58,11 +71,21 @@ export default function PhoneApp() {
             <Route path="/waiter/orders" element={<PhoneWaiterOrders />} />
             <Route path="/waiter/notifications" element={<PhoneWaiterNotifications />} />
           </Route>
-          <Route path="/waiter/table/:tableId" element={<PhoneWaiterOrder />} />
-          {/* Phone app is login-only: no self-serve register / invite redeem. */}
+          <Route
+            path="/waiter/table/:tableId"
+            element={
+              <PhoneAccessBrandingProvider>
+                <PhoneWaiterOrder />
+              </PhoneAccessBrandingProvider>
+            }
+          />
+          {/* Phone app: no public register. Managers still join with an invite code. */}
           <Route path="/register" element={<Navigate to="/login" replace />} />
-          <Route path="/redeem-code" element={<Navigate to="/login" replace />} />
-          <Route path="/app/redeem-code" element={<Navigate to="/login" replace />} />
+          <Route path="/redeem-code" element={<PhoneRedeemCodePage />} />
+          <Route
+            path="/app/redeem-code"
+            element={<Navigate to="/redeem-code" replace />}
+          />
           <Route element={<RedirectIfAuthed redirectTo="/app" />}>
             <Route
               path="/login"
@@ -70,13 +93,24 @@ export default function PhoneApp() {
                 <LoginPage
                   defaultAfterLogin="/app"
                   showCreateAccountLink={false}
-                  showManagerCodeLink={false}
+                  showManagerCodeLink
                   showWaiterLink
+                  formOnly
                 />
               }
             />
           </Route>
           <Route element={<RequireSupabaseAuth />}>
+            <Route path="/admin-center" element={<AdminCenterLayout />}>
+              <Route index element={<Navigate to="overview" replace />} />
+              <Route path="overview" element={<AdminCenterOverview />} />
+              <Route path="venues" element={<AdminCenterVenues />} />
+              <Route path="licenses" element={<AdminCenterLicenses />} />
+              <Route path="billing" element={<AdminCenterBilling />} />
+              <Route path="team-access" element={<AdminCenterTeamAccess />} />
+              <Route path="activity" element={<AdminCenterActivity />} />
+              <Route path="settings" element={<AdminCenterSettings />} />
+            </Route>
             <Route element={<PhoneMobileAccessGate />}>
               <Route element={<PhoneShellLayout />}>
                 <Route path="/app/venue" element={<PhoneVenueHome />} />

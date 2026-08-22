@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Navigate, Outlet } from "react-router-dom";
+import { Navigate, Outlet, useSearchParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase.ts";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 
@@ -8,10 +8,17 @@ type RedirectIfAuthedProps = {
   redirectTo?: string;
 };
 
+function safeNextPath(raw: string | null, fallback: string): string {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return fallback;
+  return raw;
+}
+
 /**
  * For /login and /register: if already signed in, send user to the dashboard.
  */
 export function RedirectIfAuthed({ redirectTo = "/dashboard" }: RedirectIfAuthedProps) {
+  const [params] = useSearchParams();
+  const destination = safeNextPath(params.get("next"), redirectTo);
   const [state, setState] = useState<"loading" | "authed" | "anon">("loading");
 
   useEffect(() => {
@@ -47,7 +54,7 @@ export function RedirectIfAuthed({ redirectTo = "/dashboard" }: RedirectIfAuthed
   }
 
   if (state === "authed") {
-    return <Navigate to={redirectTo} replace />;
+    return <Navigate to={destination} replace />;
   }
 
   return <Outlet />;

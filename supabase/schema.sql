@@ -128,7 +128,9 @@ create table if not exists public.sale_items (
   quantity numeric(12,3) not null default 1,
   notes text,
   status text not null default 'pending' check (status in ('pending', 'sent', 'preparing', 'ready', 'served', 'cancelled', 'voided')),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  ready_at timestamptz,
+  served_at timestamptz
 );
 
 -- ── Indexes ──────────────────────────────────────────────────────────────────

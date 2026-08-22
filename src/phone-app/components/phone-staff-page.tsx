@@ -9,6 +9,7 @@ import { clearRestaurantCache } from "@/lib/supabase-pos/restaurant.ts";
 import { fetchPhoneStaffBundle } from "@/lib/supabase-pos/phone-staff-ops.ts";
 import { deleteStaff } from "@/lib/supabase-pos/staff-ops.ts";
 import { PhoneStaffEditSheet } from "./phone-staff-edit-sheet.tsx";
+import PhoneWaiterQrPanel from "./phone-waiter-qr-panel.tsx";
 import { cn } from "@/lib/utils.ts";
 import { toast } from "sonner";
 
@@ -195,6 +196,8 @@ export default function PhoneStaffPage() {
             {t("phone.staff.loadError")}
           </p>
         ) : null}
+
+        <PhoneWaiterQrPanel licenseKey={restaurant.licenseKey} />
 
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-2xl bg-gradient-to-br from-emerald-600 to-emerald-500 px-3 py-4 shadow-md">

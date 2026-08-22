@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { useTranslation } from "react-i18next";
 import {
   Bell,
@@ -12,6 +12,8 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils.ts";
 import { getWaiterSession } from "@/phone-app/lib/waiter-session.ts";
+import { usePhoneAccessBranding } from "@/phone-app/hooks/use-phone-access-branding.tsx";
+import { phoneAccessHasBottomNav } from "@/lib/local-db.ts";
 
 type KitchenLine = {
   lineId: string;
@@ -23,6 +25,8 @@ type KitchenLine = {
   quantity: number;
   station?: "kitchen" | "bar";
   status: string;
+  createdAt?: string;
+  readyAt?: string;
 };
 
 type TableGroup = {
@@ -40,6 +44,16 @@ function isReadyStatus(status: string): boolean {
 /** Notifications list is kitchen-only (exclude bar). */
 function isKitchenStation(station: KitchenLine["station"]): boolean {
   return station === "kitchen";
+}
+
+function formatClock(iso: string | undefined, locale: string): string | null {
+  if (!iso || !String(iso).trim()) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleTimeString(locale, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function groupByTable(lines: KitchenLine[]): TableGroup[] {
@@ -79,15 +93,19 @@ function groupByTable(lines: KitchenLine[]): TableGroup[] {
 }
 
 export default function PhoneWaiterNotifications() {
-  const { t } = useTranslation("site");
+  const { t, i18n } = useTranslation("site");
   const navigate = useNavigate();
   const session = getWaiterSession();
   const licenseKey = session?.licenseKey ?? "";
+  const staffId = session?.staff.id ?? "";
+  const access = usePhoneAccessBranding();
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(() => new Set());
+  const [deliveringId, setDeliveringId] = useState<string | null>(null);
+  const markDelivered = useMutation("pos.orders.markWaiterLineDelivered");
 
   const queue = useQuery(
     "pos.orders.getWaiterKitchenNotifications",
-    licenseKey ? { licenseKey } : "skip",
+    licenseKey && staffId ? { licenseKey, staffId } : "skip",
   ) as KitchenLine[] | undefined;
 
   const lines = queue ?? [];
@@ -120,11 +138,45 @@ export default function PhoneWaiterNotifications() {
     });
   };
 
+  const onLinePress = async (line: KitchenLine, tableId?: string) => {
+    if (isReadyStatus(line.status)) {
+      if (!licenseKey || deliveringId) return;
+      setDeliveringId(line.lineId);
+      try {
+        await markDelivered({
+          licenseKey,
+          lineId: line.lineId,
+          saleId: line.saleId,
+        });
+        toast.success(t("phone.waiter.notifDeliveredToast", { item: line.name }));
+      } catch (err) {
+        const msg =
+          err instanceof Error && err.message
+            ? err.message
+            : t("phone.waiter.notifDeliverFailed");
+        toast.error(msg);
+      } finally {
+        setDeliveringId(null);
+      }
+      return;
+    }
+    openTableOrder(line.tableId || tableId);
+  };
+
   return (
-    <div className="flex min-h-dvh flex-col bg-[#070b14] pb-[5.75rem] text-white">
+    <div
+      className={
+        phoneAccessHasBottomNav(access)
+          ? "flex min-h-dvh flex-col bg-[#070b14] pb-[5.75rem] text-white"
+          : "flex min-h-dvh flex-col bg-[#070b14] pb-6 text-white"
+      }
+    >
+      {access.showNotificationsHeader ? (
       <header className="px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">
-          {t("phone.waiter.floorEyebrow")}
+          {t("phone.waiter.floorEyebrowNamed", {
+            name: session?.staff.name ?? "",
+          })}
         </p>
         <h1 className="text-xl font-semibold tracking-tight">
           {t("phone.waiter.navNotifications")}
@@ -134,7 +186,13 @@ export default function PhoneWaiterNotifications() {
             {t("phone.waiter.notifReadyCount", { count: readyCount })}
           </p>
         ) : null}
+        <p className="mt-1 text-[12px] text-white/35">
+          {t("phone.waiter.notifDeliverHint")}
+        </p>
       </header>
+      ) : (
+        <div className="pt-[max(0.75rem,env(safe-area-inset-top))]" />
+      )}
 
       <main className="flex-1 overflow-y-auto px-5">
         {groups.length === 0 ? (
@@ -194,14 +252,24 @@ export default function PhoneWaiterNotifications() {
                     <ul className="divide-y divide-white/8">
                       {group.lines.map((line) => {
                         const ready = isReadyStatus(line.status);
+                        const sentClock = formatClock(
+                          line.createdAt,
+                          i18n.language,
+                        );
+                        const readyClock = formatClock(
+                          line.readyAt,
+                          i18n.language,
+                        );
+                        const busy = deliveringId === line.lineId;
                         return (
                           <li key={line.lineId}>
                             <button
                               type="button"
+                              disabled={busy}
                               onClick={() =>
-                                openTableOrder(line.tableId || group.tableId)
+                                void onLinePress(line, group.tableId)
                               }
-                              className="flex w-full items-start gap-2.5 px-3.5 py-3 text-left transition active:bg-white/[0.04]"
+                              className="flex w-full items-start gap-2.5 px-3.5 py-3 text-left transition active:bg-white/[0.04] disabled:opacity-60"
                             >
                               {ready ? (
                                 <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-400" />
@@ -214,6 +282,12 @@ export default function PhoneWaiterNotifications() {
                                 </p>
                                 <p className="mt-0.5 text-[11px] text-white/40">
                                   #{line.orderNumber}
+                                  {sentClock
+                                    ? ` · ${t("phone.waiter.notifSentAt", { time: sentClock })}`
+                                    : null}
+                                  {ready && readyClock
+                                    ? ` · ${t("phone.waiter.notifReadyAt", { time: readyClock })}`
+                                    : null}
                                 </p>
                                 <p
                                   className={cn(
@@ -224,7 +298,9 @@ export default function PhoneWaiterNotifications() {
                                   )}
                                 >
                                   {ready
-                                    ? t("phone.waiter.notifReady")
+                                    ? busy
+                                      ? t("phone.waiter.notifDelivering")
+                                      : t("phone.waiter.notifReadyTapDeliver")
                                     : t("phone.waiter.notifKitchen")}
                                 </p>
                               </div>

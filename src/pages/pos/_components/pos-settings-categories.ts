@@ -12,6 +12,7 @@ export const SETTINGS_CATEGORY_IDS = [
   "security",
   "print",
   "customerDisplay",
+  "phoneApp",
   "other",
 ] as const;
 

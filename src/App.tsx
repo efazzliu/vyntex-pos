@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { BrowserRouter, HashRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { PHONE_APP_PATH } from "./lib/guest-menu-url.ts";
 import { DefaultProviders } from "./components/providers/default.tsx";
 import { Toaster } from "./components/ui/sonner.tsx";
 import { RedirectIfAuthed } from "./components/redirect-if-authed.tsx";
@@ -10,6 +12,7 @@ import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import PublicLayout from "./components/public-layout.tsx";
 import VynTypes from "./pages/vyn-types/page.tsx";
+import ProductDemo from "./pages/product-demo/page.tsx";
 import Pricing from "./pages/pricing/page.tsx";
 import About from "./pages/about/page.tsx";
 import Contact from "./pages/contact/page.tsx";
@@ -49,6 +52,15 @@ import AdminContacts from "./pages/admin/support-center/page.tsx";
 import AdminFinance from "./pages/admin/finance-legacy/page.tsx";
 import AdminSettings from "./pages/admin/settings-hub/page.tsx";
 import PosLauncher from "./pages/pos/page.tsx";
+
+/** Marketing SPA fallback: `/phone` is rewritten to phone.html on Vercel/Vite; this covers hosts that still serve index.html. */
+function PhoneAppEntryRedirect() {
+  useEffect(() => {
+    const { search, hash } = window.location;
+    window.location.replace(`${PHONE_APP_PATH}${search}${hash}`);
+  }, []);
+  return null;
+}
 
 function DesktopHomeRoute() {
   const isElectron =
@@ -99,6 +111,7 @@ export default function App() {
           <Route element={<PublicLayout />}>
             <Route path="/" element={<DesktopHomeRoute />} />
             <Route path="/vyn-types" element={<VynTypes />} />
+            <Route path="/product-demo" element={<ProductDemo />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
@@ -117,6 +130,7 @@ export default function App() {
               <Route path="billing" element={<DashboardBillingPage />} />
               <Route path="team-access" element={<DashboardTeamAccessPage />} />
               <Route path="business-settings" element={<DashboardBusinessSettingsPage />} />
+              <Route path="business-settings/:restaurantId" element={<DashboardBusinessSettingsPage />} />
               <Route path="security" element={<DashboardSecurityPage />} />
               <Route path="support" element={<DashboardSupportPage />} />
               <Route path="system-status" element={<DashboardSystemStatusPage />} />
@@ -146,6 +160,8 @@ export default function App() {
             </Route>
           </Route>
           <Route path="/pos" element={<PosLauncher />} />
+          <Route path="/phone" element={<PhoneAppEntryRedirect />} />
+          <Route path="/phone/" element={<PhoneAppEntryRedirect />} />
           <Route path="*" element={<NotFound />} />
             </>
           )}

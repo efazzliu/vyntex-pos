@@ -2,18 +2,32 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { motion } from "motion/react";
-import { Camera, CheckCircle2, Keyboard, Loader2 } from "lucide-react";
+import { Camera, CheckCircle2, KeyRound, Keyboard, Loader2, LogIn } from "lucide-react";
 import { getOrCreateDeviceId } from "@/lib/local-db.ts";
 import { sendPosDeviceHeartbeat } from "@/lib/supabase-pos/device-presence.ts";
 import {
   claimWaiterPhone,
   extractWaiterPairCode,
 } from "@/lib/supabase-pos/waiter-phone-pair.ts";
-import { setWaiterPhonePair, getWaiterPhonePair } from "@/phone-app/lib/waiter-session.ts";
+import {
+  cancelWaiterLicenseRequest,
+  fetchWaiterLicenseRequestStatus,
+  formatWaiterLicenseInput,
+  normalizeWaiterLicenseKey,
+  requestWaiterPhoneByLicense,
+} from "@/lib/supabase-pos/waiter-phone-license-request.ts";
+import {
+  setWaiterPhonePair,
+  getWaiterPhonePair,
+  getWaiterLicensePending,
+  setWaiterLicensePending,
+  clearWaiterLicensePending,
+  isOwnerLocalWaiterPair,
+} from "@/phone-app/lib/waiter-session.ts";
 import { fetchWaiterPhoneBindingStatus } from "@/lib/supabase-pos/waiter-phone-binding.ts";
 import { cn } from "@/lib/utils.ts";
 
-type ScanPhase = "idle" | "camera" | "claiming" | "done";
+type ScanPhase = "idle" | "camera" | "claiming" | "pending" | "done";
 
 export default function PhoneWaiterPair() {
   const { t } = useTranslation("site");
@@ -24,14 +38,20 @@ export default function PhoneWaiterPair() {
   const scanningRef = useRef(false);
 
   const [manual, setManual] = useState("");
+  const [licenseInput, setLicenseInput] = useState("");
   const [phase, setPhase] = useState<ScanPhase>("idle");
   const [error, setError] = useState("");
   const [venueName, setVenueName] = useState("");
   const claimedOnce = useRef(false);
+  const licenseKeyLen = normalizeWaiterLicenseKey(licenseInput).length;
 
   useEffect(() => {
     const existing = getWaiterPhonePair();
     if (!existing) return;
+    if (isOwnerLocalWaiterPair(existing)) {
+      navigate("/waiter", { replace: true });
+      return;
+    }
     let cancelled = false;
     void (async () => {
       const status = await fetchWaiterPhoneBindingStatus(
@@ -55,6 +75,29 @@ export default function PhoneWaiterPair() {
     if (videoRef.current) videoRef.current.srcObject = null;
   }, []);
 
+  const finishPair = useCallback(
+    (args: {
+      licenseKey: string;
+      restaurantName: string;
+      deviceId: string;
+      deviceRowId: string;
+    }) => {
+      setWaiterPhonePair({
+        licenseKey: args.licenseKey,
+        restaurantName: args.restaurantName,
+        deviceId: args.deviceId,
+        deviceRowId: args.deviceRowId,
+        pairedAt: Date.now(),
+      });
+      clearWaiterLicensePending();
+      void sendPosDeviceHeartbeat(args.licenseKey, args.deviceId);
+      setVenueName(args.restaurantName);
+      setPhase("done");
+      setTimeout(() => navigate("/waiter", { replace: true }), 900);
+    },
+    [navigate],
+  );
+
   const claim = useCallback(
     async (rawCode: string) => {
       const code = extractWaiterPairCode(rawCode);
@@ -74,17 +117,12 @@ export default function PhoneWaiterPair() {
           phoneDeviceId: deviceId,
           displayName: undefined,
         });
-        setWaiterPhonePair({
+        finishPair({
           licenseKey: result.licenseKey,
           restaurantName: result.restaurantName,
           deviceId,
           deviceRowId: result.deviceRowId,
-          pairedAt: Date.now(),
         });
-        void sendPosDeviceHeartbeat(result.licenseKey, deviceId);
-        setVenueName(result.restaurantName);
-        setPhase("done");
-        setTimeout(() => navigate("/waiter", { replace: true }), 900);
       } catch (err) {
         claimedOnce.current = false;
         const msg = err instanceof Error ? err.message : "unknown";
@@ -102,8 +140,133 @@ export default function PhoneWaiterPair() {
         setPhase("idle");
       }
     },
-    [navigate, stopCamera, t],
+    [finishPair, stopCamera, t],
   );
+
+  const requestByLicense = useCallback(async () => {
+    const key = normalizeWaiterLicenseKey(licenseInput);
+    if (key.length < 12) {
+      setError(t("phone.waiter.pairInvalidLicense", { defaultValue: "Invalid license key. Check and try again." }));
+      return;
+    }
+    if (claimedOnce.current) return;
+    claimedOnce.current = true;
+    setPhase("claiming");
+    setError("");
+    stopCamera();
+    try {
+      const deviceId = await getOrCreateDeviceId();
+      const result = await requestWaiterPhoneByLicense({
+        licenseKey: key,
+        phoneDeviceId: deviceId,
+      });
+      if (result.status === "already_bound" && result.deviceRowId) {
+        finishPair({
+          licenseKey: result.licenseKey,
+          restaurantName: result.restaurantName,
+          deviceId,
+          deviceRowId: result.deviceRowId,
+        });
+        return;
+      }
+      setWaiterLicensePending({
+        licenseKey: result.licenseKey,
+        deviceId,
+        restaurantName: result.restaurantName,
+        expiresAt: result.expiresAt ?? "",
+      });
+      setVenueName(result.restaurantName);
+      claimedOnce.current = false;
+      setPhase("pending");
+    } catch (err) {
+      claimedOnce.current = false;
+      const msg = err instanceof Error ? err.message : "unknown";
+      const map: Record<string, string> = {
+        invalid_license: t("phone.waiter.pairInvalidLicense", {
+          defaultValue: "Invalid license key. Check and try again.",
+        }),
+        license_inactive: t("phone.waiter.pairLicense"),
+        license_expired: t("phone.waiter.pairLicense"),
+        phone_limit: t("phone.waiter.pairLimit"),
+        migration_missing: t("phone.waiter.pairMigration"),
+        no_supabase: t("phone.waiter.pairServer"),
+      };
+      setError(map[msg] ?? t("phone.waiter.pairFailed"));
+      setPhase("idle");
+    }
+  }, [finishPair, licenseInput, stopCamera, t]);
+
+  const cancelPending = useCallback(async () => {
+    const pending = getWaiterLicensePending();
+    if (pending) {
+      try {
+        await cancelWaiterLicenseRequest(pending.licenseKey, pending.deviceId);
+      } catch {
+        /* still clear locally */
+      }
+    }
+    clearWaiterLicensePending();
+    setPhase("idle");
+    setVenueName("");
+  }, []);
+
+  useEffect(() => {
+    const pending = getWaiterLicensePending();
+    if (!pending) return;
+    setVenueName(pending.restaurantName);
+    setPhase("pending");
+  }, []);
+
+  useEffect(() => {
+    if (phase !== "pending") return;
+    const pending = getWaiterLicensePending();
+    if (!pending) {
+      setPhase("idle");
+      return;
+    }
+    let cancelled = false;
+    const tick = async () => {
+      const status = await fetchWaiterLicenseRequestStatus(
+        pending.licenseKey,
+        pending.deviceId,
+      );
+      if (cancelled || !status) return;
+      if (status.status === "approved" && status.licenseKey && status.deviceRowId) {
+        finishPair({
+          licenseKey: status.licenseKey,
+          restaurantName: status.restaurantName ?? pending.restaurantName,
+          deviceId: pending.deviceId,
+          deviceRowId: status.deviceRowId,
+        });
+        return;
+      }
+      if (status.status === "rejected") {
+        clearWaiterLicensePending();
+        setError(t("phone.waiter.pairLicenseRejected", {
+          defaultValue: "This phone was not approved. Ask the administrator.",
+        }));
+        setPhase("idle");
+        return;
+      }
+      if (
+        status.status === "expired" ||
+        status.status === "cancelled" ||
+        status.status === "none"
+      ) {
+        clearWaiterLicensePending();
+        setError(t("phone.waiter.pairLicenseWaitExpired", {
+          defaultValue: "The request expired. Send it again.",
+        }));
+        setPhase("idle");
+      }
+    };
+    void tick();
+    const id = window.setInterval(() => void tick(), 2500);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [finishPair, phase, t]);
 
   useEffect(() => {
     const fromUrl = params.get("c") ?? params.get("code");
@@ -194,13 +357,19 @@ export default function PhoneWaiterPair() {
         }}
       />
 
-      <div className="relative z-10 flex flex-1 flex-col px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))]">
+      <div className="relative z-10 flex min-w-0 flex-1 flex-col overflow-x-hidden px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))]">
         <div className="mb-6 flex items-center justify-between">
           <Link
             to="/waiter"
             className="text-[13px] font-medium text-white/45 hover:text-white/75"
           >
             {t("phone.waiter.pairBack")}
+          </Link>
+          <Link
+            to="/login?next=/waiter/account"
+            className="text-[13px] font-medium text-white/45 hover:text-white/75"
+          >
+            {t("phone.waiter.managerLogin")}
           </Link>
         </div>
 
@@ -216,7 +385,10 @@ export default function PhoneWaiterPair() {
             {t("phone.waiter.pairTitle")}
           </h1>
           <p className="mt-2 text-sm text-white/45 leading-relaxed">
-            {t("phone.waiter.pairHint")}
+            {t("phone.waiter.pairHint", {
+              defaultValue:
+                "Scan the QR in POS Settings, type the 8-character code, or enter the venue license (admin must approve).",
+            })}
           </p>
         </motion.div>
 
@@ -235,8 +407,50 @@ export default function PhoneWaiterPair() {
             <Loader2 className="size-10 animate-spin text-[#0066FF]" />
             <p className="text-sm text-white/60">{t("phone.waiter.pairClaiming")}</p>
           </div>
+        ) : phase === "pending" ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 px-4 text-center">
+            <Loader2 className="size-10 animate-spin text-[#0066FF]" />
+            <p className="text-lg font-semibold text-white">
+              {t("phone.waiter.pairLicenseWaiting", {
+                defaultValue: "Waiting for approval",
+              })}
+            </p>
+            {venueName ? (
+              <p className="text-sm text-white/50">{venueName}</p>
+            ) : null}
+            <p className="max-w-[18rem] text-sm text-white/40 leading-relaxed">
+              {t("phone.waiter.pairLicenseWaitingHint", {
+                defaultValue:
+                  "Open POS → Settings → Devices on the restaurant computer and approve this phone.",
+              })}
+            </p>
+            <button
+              type="button"
+              onClick={() => void cancelPending()}
+              className="mt-2 text-[13px] font-medium text-white/45 hover:text-white/75"
+            >
+              {t("phone.waiter.pairLicenseCancel", { defaultValue: "Cancel request" })}
+            </button>
+          </div>
         ) : (
           <>
+            <Link
+              to="/waiter/account"
+              className="mx-auto mb-5 flex h-auto w-full max-w-[20rem] items-center gap-3 rounded-3xl border border-[#0066FF]/35 bg-[#0066FF]/15 px-4 py-4 text-left transition active:scale-[0.99]"
+            >
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-[#0066FF] text-white">
+                <LogIn className="size-5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-white">
+                  {t("phone.waiter.pairAccountButton")}
+                </span>
+                <span className="mt-0.5 block text-[12px] leading-snug text-white/55">
+                  {t("phone.waiter.pairAccountHint")}
+                </span>
+              </span>
+            </Link>
+
             {phase === "camera" ? (
               <div className="relative mx-auto mb-5 aspect-[3/4] w-full max-w-[20rem] overflow-hidden rounded-3xl border border-white/10 bg-black">
                 <video
@@ -260,26 +474,26 @@ export default function PhoneWaiterPair() {
               </button>
             )}
 
-            <div className="mx-auto w-full max-w-[20rem] space-y-3">
+            <div className="mx-auto w-full max-w-[20rem] min-w-0 space-y-3">
               <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-white/35">
                 <Keyboard className="size-3.5" />
                 {t("phone.waiter.pairOrType")}
               </div>
-              <div className="flex gap-2">
+              <div className="flex w-full min-w-0 items-center gap-2">
                 <input
                   value={manual}
                   onChange={(e) =>
                     setManual(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8))
                   }
                   placeholder="ABC12XYZ"
-                  className="h-12 flex-1 rounded-2xl border border-white/10 bg-white/[0.06] px-3.5 font-mono text-center text-lg tracking-[0.2em] text-white outline-none placeholder:text-white/20 focus:border-[#0066FF]/60"
+                  className="h-12 min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/[0.06] px-3 font-mono text-center text-base tracking-[0.12em] text-white outline-none placeholder:text-white/20 focus:border-[#0066FF]/60"
                 />
                 <button
                   type="button"
                   disabled={manual.length < 6 || phase === "claiming"}
                   onClick={() => void claim(manual)}
                   className={cn(
-                    "h-12 shrink-0 rounded-2xl bg-[#44CC00] px-4 text-sm font-semibold text-[#06200a] transition active:scale-[0.97] disabled:opacity-35",
+                    "h-12 w-[5.75rem] shrink-0 rounded-2xl bg-[#44CC00] px-2 text-sm font-semibold text-[#06200a] transition active:scale-[0.97] disabled:opacity-35",
                   )}
                 >
                   {t("phone.waiter.pairActivate")}
@@ -288,6 +502,36 @@ export default function PhoneWaiterPair() {
               {error ? (
                 <p className="text-center text-xs font-medium text-red-400">{error}</p>
               ) : null}
+
+              <div className="flex items-center gap-2 pt-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-white/35">
+                <KeyRound className="size-3.5" />
+                {t("phone.waiter.pairOrLicense", { defaultValue: "Or enter license" })}
+              </div>
+              <p className="text-[11px] leading-relaxed text-white/35">
+                {t("phone.waiter.pairLicenseHint", {
+                  defaultValue: "The POS administrator must approve this phone in Settings.",
+                })}
+              </p>
+              <div className="flex w-full min-w-0 items-center gap-2">
+                <input
+                  value={licenseInput}
+                  onChange={(e) => setLicenseInput(formatWaiterLicenseInput(e.target.value))}
+                  placeholder="XXXX-XXXX-XXXX-XXXX"
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  className="h-12 min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/[0.06] px-3 font-mono text-center text-sm tracking-[0.08em] text-white outline-none placeholder:text-white/20 focus:border-[#0066FF]/60"
+                />
+                <button
+                  type="button"
+                  disabled={licenseKeyLen < 12 || phase === "claiming"}
+                  onClick={() => void requestByLicense()}
+                  className={cn(
+                    "h-12 w-[5.75rem] shrink-0 rounded-2xl bg-[#0066FF] px-2 text-sm font-semibold text-white transition active:scale-[0.97] disabled:opacity-35",
+                  )}
+                >
+                  {t("phone.waiter.pairLicenseSend", { defaultValue: "Request" })}
+                </button>
+              </div>
             </div>
           </>
         )}

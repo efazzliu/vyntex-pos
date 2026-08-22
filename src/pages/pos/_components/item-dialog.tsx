@@ -16,6 +16,7 @@ import { Switch } from "@/components/ui/switch.tsx";
 import { cn } from "@/lib/utils.ts";
 import { toast } from "sonner";
 import { errorMessageFromUnknown } from "@/lib/supabase-pos/db-errors.ts";
+import { uploadMenuItemPhoto } from "@/lib/supabase-pos/menu-photo-storage.ts";
 import {
   ChefHat,
   Wine,
@@ -66,6 +67,11 @@ import {
 } from "lucide-react";
 import { getDataCache, saveDataCache } from "@/lib/local-db.ts";
 import { usePosLocale } from "./pos-locale-provider.tsx";
+import { MenuItemCustomizationEditor } from "@/components/menu-item-customization-picker.tsx";
+import {
+  normalizeCustomizationConfig,
+  type MenuCustomizationGroup,
+} from "@/lib/menu-customizations.ts";
 
 type StationValue = "kitchen" | "bar" | undefined;
 type StockUnit = "pc" | "lt" | "kg" | "g" | "ml" | "bottle" | "box";
@@ -167,6 +173,7 @@ export type EditingItem = {
   /** Per 1 sold unit: deduct `qtyPerUnit` from each supply row (same unit as that row’s stock). */
   supplyRecipe?: { supplyMenuItemId: Id<"menuItems">; qtyPerUnit: number }[];
   vatRate?: number;
+  customizationConfig?: MenuCustomizationGroup[];
 };
 
 /** DB / mappers sometimes emit "" for null category_id; `??` does not treat "" as missing. */
@@ -294,7 +301,6 @@ export default function ItemDialog({
   );
   const createItem = useMutation("pos.menu.createItem");
   const updateItem = useMutation("pos.menu.updateItem");
-  const generateUploadUrl = useMutation("pos.menu.generateUploadUrl");
   const ensureSupplyCategory = useMutation("pos.menu.ensureSupplyCategory");
 
   const recipeIngredientOptions = useMemo(() => {
@@ -311,10 +317,12 @@ export default function ItemDialog({
   // Image state
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageRemoved, setImageRemoved] = useState(false);
   const [currentImageStorageId, setCurrentImageStorageId] = useState<
     Id<"_storage"> | undefined
   >(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [customizationGroups, setCustomizationGroups] = useState<MenuCustomizationGroup[]>([]);
 
   useEffect(() => {
     if (open) {
@@ -357,6 +365,10 @@ export default function ItemDialog({
         setImagePreview(editing.imageUrl ?? null);
         setCurrentImageStorageId(editing.imageStorageId);
         setImageFile(null);
+        setImageRemoved(false);
+        setCustomizationGroups(
+          normalizeCustomizationConfig(editing.customizationConfig),
+        );
         setSelectedCategoryId(nonEmptyCategoryId(editing.categoryId));
         setSupplyVendor(editing.supplyVendor ?? "");
         setSupplyLot(editing.supplyLot ?? "");
@@ -409,6 +421,8 @@ export default function ItemDialog({
         setImagePreview(null);
         setCurrentImageStorageId(undefined);
         setImageFile(null);
+        setImageRemoved(false);
+        setCustomizationGroups([]);
         setSelectedCategoryId(
           nonEmptyCategoryId(categoryId) ??
             nonEmptyCategoryId(categories[0]?._id),
@@ -440,12 +454,14 @@ export default function ItemDialog({
     if (file) {
       setImageFile(file);
       setImagePreview(URL.createObjectURL(file));
+      setImageRemoved(false);
     }
   };
 
   const removeImage = () => {
     setImageFile(null);
     setImagePreview(null);
+    setImageRemoved(true);
     setCurrentImageStorageId(undefined);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -506,20 +522,19 @@ export default function ItemDialog({
 
     setSaving(true);
     try {
-      // Upload image if a new file was selected
-      let finalImageStorageId = currentImageStorageId;
+      let finalImageUrl: string | null | undefined = undefined;
       if (imageFile) {
-        const uploadUrl = await generateUploadUrl({ licenseKey });
-        const result = await fetch(uploadUrl, {
-          method: "POST",
-          headers: { "Content-Type": imageFile.type },
-          body: imageFile,
+        finalImageUrl = await uploadMenuItemPhoto({
+          licenseKey,
+          file: imageFile,
+          itemId: editing?._id ? String(editing._id) : undefined,
         });
-        const json = (await result.json()) as {
-          storageId: Id<"_storage">;
-        };
-        finalImageStorageId = json.storageId;
+      } else if (imageRemoved) {
+        finalImageUrl = null;
+      } else if (imagePreview && !imagePreview.startsWith("blob:")) {
+        finalImageUrl = imagePreview;
       }
+      const finalImageStorageId = currentImageStorageId;
 
       const supplyCreate =
         !editing &&
@@ -564,6 +579,20 @@ export default function ItemDialog({
       const vatRatePayload = canEditVat
         ? Number(vatPct) / 100
         : undefined;
+      const customizationSavePayload = !supplyMallContext
+        ? customizationGroups
+            .map((group) => ({
+              ...group,
+              name: group.name.trim(),
+              options: group.options
+                .map((option) => ({
+                  ...option,
+                  name: option.name.trim(),
+                }))
+                .filter((option) => option.name),
+            }))
+            .filter((group) => group.name && group.options.length > 0)
+        : [];
 
       if (editing) {
         await updateItem({
@@ -577,6 +606,7 @@ export default function ItemDialog({
           menuId,
           station,
           imageStorageId: finalImageStorageId,
+          ...(finalImageUrl !== undefined ? { imageUrl: finalImageUrl } : {}),
           isFavorite,
           staffMealAllowed,
           staffMealPrice: parsedStaffMealPrice,
@@ -591,6 +621,7 @@ export default function ItemDialog({
           ...(recipeSavePayload !== undefined
             ? { supplyRecipe: recipeSavePayload }
             : {}),
+          customizationConfig: customizationSavePayload,
         });
         const nextCurrentStock = trackStock
           ? isSupplyMallEdit
@@ -608,7 +639,10 @@ export default function ItemDialog({
           menuId,
           station,
           imageStorageId: finalImageStorageId,
-          imageUrl: imagePreview,
+          imageUrl:
+            finalImageUrl === null
+              ? null
+              : finalImageUrl ?? imagePreview,
           isFavorite,
           staffMealAllowed,
           staffMealPrice: parsedStaffMealPrice,
@@ -621,6 +655,7 @@ export default function ItemDialog({
           ...(recipeSavePayload !== undefined
             ? { supplyRecipe: recipeSavePayload }
             : {}),
+          customizationConfig: customizationSavePayload,
         };
         const cached = (await getDataCache<EditingItem[]>(`menuItems:${licenseKey}`)) ?? [];
         await saveDataCache(
@@ -646,6 +681,7 @@ export default function ItemDialog({
           price: priceNum,
           station: resolvedStation,
           imageStorageId: finalImageStorageId,
+          ...(finalImageUrl !== undefined ? { imageUrl: finalImageUrl } : {}),
           isFavorite,
           staffMealAllowed,
           staffMealPrice: parsedStaffMealPrice,
@@ -655,6 +691,7 @@ export default function ItemDialog({
           ...(recipeSavePayload !== undefined
             ? { supplyRecipe: recipeSavePayload }
             : {}),
+          customizationConfig: customizationSavePayload,
         });
         const cached = (await getDataCache<EditingItem[]>(`menuItems:${licenseKey}`)) ?? [];
         const newItem: EditingItem = {
@@ -668,7 +705,7 @@ export default function ItemDialog({
           menuId,
           station: resolvedStation,
           imageStorageId: finalImageStorageId,
-          imageUrl: imagePreview,
+          imageUrl: finalImageUrl ?? null,
           isFavorite,
           staffMealAllowed,
           staffMealPrice: parsedStaffMealPrice,
@@ -681,6 +718,7 @@ export default function ItemDialog({
           ...(recipeSavePayload !== undefined
             ? { supplyRecipe: recipeSavePayload }
             : {}),
+          customizationConfig: customizationSavePayload,
         };
         await saveDataCache(`menuItems:${licenseKey}`, [...cached, newItem]);
         onSaved?.(newItem, "create");
@@ -876,6 +914,24 @@ export default function ItemDialog({
               </div>
             </div>
           )}
+
+          {!supplyMallContext ? (
+            <MenuItemCustomizationEditor
+              groups={customizationGroups}
+              onChange={setCustomizationGroups}
+              labels={{
+                title: t("menu.customization_title"),
+                addGroup: t("menu.customization_add_group"),
+                groupName: t("menu.customization_group_name"),
+                required: t("menu.customization_required"),
+                multi: t("menu.customization_multi"),
+                addOption: t("menu.customization_add_option"),
+                optionName: t("menu.customization_option_name"),
+                priceDelta: t("menu.customization_price_delta"),
+                defaultOption: t("menu.customization_default"),
+              }}
+            />
+          ) : null}
 
           {/* Image upload */}
           {!supplyMallContext && (

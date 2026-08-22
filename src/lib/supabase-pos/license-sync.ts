@@ -1,10 +1,13 @@
 import {
   DEFAULT_PIN_LOGIN_BRANDING,
+  normalizePhoneAccessBranding,
   normalizePinLoginBranding,
   saveDataCache,
+  savePhoneAccessBranding,
   savePinLoginBranding,
   saveStaffCache,
   type LocalStaff,
+  type PhoneAccessBranding,
   type PinLoginBranding,
 } from "@/lib/local-db.ts";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase.ts";
@@ -12,8 +15,10 @@ import { getRestaurantByLicense } from "@/lib/supabase-pos/restaurant.ts";
 import { posTablesIndexedDbKey } from "@/lib/supabase-pos/cache-keys.ts";
 import { runPosQuery } from "@/lib/supabase-pos/pos-router.ts";
 import {
+  fetchPhoneAccessBrandingFromCloud,
   fetchPinBrandingFromCloud,
   fetchPosThemeFromCloud,
+  savePhoneAccessBrandingToCloud,
   savePinBrandingToCloud,
   savePosThemeToCloud,
 } from "@/lib/supabase-pos/settings-ops.ts";
@@ -67,6 +72,39 @@ export async function resolvePinLoginBranding(
   }
   const { getPinLoginBranding } = await import("@/lib/local-db.ts");
   return getPinLoginBranding(licenseKey);
+}
+
+export async function resolvePhoneAccessBranding(
+  licenseKey: string,
+): Promise<PhoneAccessBranding> {
+  if (isSupabaseConfigured) {
+    try {
+      const fromCloud = await fetchPhoneAccessBrandingFromCloud(licenseKey);
+      if (fromCloud) {
+        await savePhoneAccessBranding(licenseKey, fromCloud);
+        return fromCloud;
+      }
+    } catch {
+      /* fall through to local */
+    }
+  }
+  const { getPhoneAccessBranding } = await import("@/lib/local-db.ts");
+  return getPhoneAccessBranding(licenseKey);
+}
+
+export async function persistPhoneAccessBranding(
+  licenseKey: string,
+  branding: PhoneAccessBranding,
+): Promise<void> {
+  const normalized = normalizePhoneAccessBranding(branding);
+  await savePhoneAccessBranding(licenseKey, normalized);
+  if (isSupabaseConfigured) {
+    try {
+      await savePhoneAccessBrandingToCloud(licenseKey, normalized);
+    } catch (err) {
+      console.warn("[license-sync] phone access branding cloud save failed", err);
+    }
+  }
 }
 
 /** Save to cloud (when configured) and local IndexedDB. */
@@ -199,6 +237,19 @@ export async function hydratePosLicenseData(licenseKey: string): Promise<void> {
       try {
         const theme = await fetchPosThemeFromCloud(licenseKey);
         applyPosThemeFromCloud(theme);
+      } catch {
+        /* optional column */
+      }
+    })(),
+  );
+
+  tasks.push(
+    (async () => {
+      try {
+        const branding = await fetchPhoneAccessBrandingFromCloud(licenseKey);
+        if (branding) {
+          await savePhoneAccessBranding(licenseKey, branding);
+        }
       } catch {
         /* optional column */
       }

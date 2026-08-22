@@ -213,6 +213,7 @@ export const updateTable = mutation({
     status: TABLE_STATUS,
     shape: TABLE_SHAPE,
     tableScale: v.optional(v.number()),
+    tableScaleY: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     await getRestaurantByLicense(ctx, args.licenseKey);
@@ -231,6 +232,7 @@ export const updateTable = mutation({
       status: args.status,
       shape: args.shape,
       tableScale: args.tableScale,
+      tableScaleY: args.tableScaleY,
     });
   },
 });

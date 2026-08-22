@@ -5,7 +5,8 @@
     "pricing": "Çmimet",
     "about": "Rreth nesh",
     "contact": "Kontakt",
-    "dashboard": "Paneli"
+    "dashboard": "Paneli",
+    "phoneApp": "Aplikacioni"
   },
   "footer": {
     "tagline": "Platformë POS për restorante moderne. Thjeshtoni operacionet me stil.",
@@ -28,6 +29,7 @@
       "line2": "pikës së shitjes",
       "subtitle": "POS për restorante moderne. Filloni me 1 muaj falas në Professional — pastaj menaxhoni porositë, pagesat dhe operacionet në një vend.",
       "ctaPrimary": "Fillo falas",
+      "ctaPhone": "Hap aplikacionin",
       "ctaDemo": "Shiko demo",
       "demoToast": "Së shpejti në një përditësim të ardhshëm!",
       "mockOrders": "Porosi",
@@ -273,7 +275,10 @@
       }
     },
     "milestones": [
-      { "year": "2026", "event": "Fillon zhvillimi i Vyntex POS — po ndërtojmë produktin dhe po shkruajmë të ardhmen e hospitalitetit" }
+      {
+        "year": "2026",
+        "event": "Fillon zhvillimi i Vyntex POS — po ndërtojmë produktin dhe po shkruajmë të ardhmen e hospitalitetit"
+      }
     ]
   },
   "legal": {
@@ -486,6 +491,7 @@
       "welcome": "Mirësevini, {{name}}",
       "footer": "Vyntex POS — Kamarier",
       "floorEyebrow": "Në turn",
+      "floorEyebrowNamed": "Në turn {{name}}",
       "floorTitle": "Gati për porosi",
       "floorBody": "Plani i tavolinave dhe porosite nga telefoni vijnë më pas. Je i identifikuar dhe gati.",
       "signOut": "Dil",
@@ -515,6 +521,29 @@
         "sending": "Duke dërguar…",
         "sent": "Porosia u dërgua.",
         "sendFailed": "Porosia nuk u dërgua. Provo përsëri.",
+        "addNote": "Shto shënim përgatitjeje",
+        "editNote": "Ndrysho shënimin e përgatitjes",
+        "addNoteBtn": "Shënim",
+        "editNoteBtn": "Ndrysho",
+        "noteTitle": "Si ta përgatisim",
+        "noteTitleContinue": "Artikulli tjetër",
+        "noteDesc": "Thuaji kuzhinës ose barit si ta bëjë këtë artikull.",
+        "noteContinueDesc": "Kanë mbetur {{count}} — shto shënim tjetër, ose anulo për t’i lënë pa shënim.",
+        "notePlaceholder": "p.sh. pjek shumë, pa këpurdha…",
+        "saveNote": "Ruaj shënimin",
+        "cancel": "Anulo",
+        "noteApplyTo": "Për sa copë?",
+        "noteApplyHint": "{{count}} nga {{total}} — të tjerat mbeten pa këtë shënim",
+        "notePresetWellDone": "Pjek shumë",
+        "notePresetLight": "Pjek pak",
+        "notePresetMedium": "Mesatare",
+        "notePresetNoMushrooms": "Pa këpurdha",
+        "notePresetNoOnions": "Pa qepë",
+        "notePresetNoVeggies": "Pa perime",
+        "notePresetWithSauce": "Me sos",
+        "notePresetExtraSpicy": "Ekstra pikante",
+        "notePresetNoCheese": "Pa djathë",
+        "notePresetAllergy": "Alergji",
         "blockedStock": "{{name}} nuk ka stok.",
         "blockedStopped": "{{name}} nuk mund të porositët — kuzhina e ka ndaluar.",
         "outOfStock": "Pa stok",
@@ -565,11 +594,20 @@
       "nameMismatch": "Emri nuk përputhet me këtë kod.",
       "invalidCredentials": "Emri ose kodi është gabim. Provo përsëri.",
       "pairTitle": "Aktivizo telefonin",
-      "pairHint": "Skano QR-in në POS Settings, ose shkruaj kodin me 8 karaktere.",
+      "pairHint": "Skano QR-in në POS Settings, shkruaj kodin me 8 karaktere, ose fut licencën e lokalit (admini duhet ta aprovojë).",
       "pairBack": "Mbrapa",
       "pairScan": "Skano kodin QR",
       "pairOrType": "Ose shkruaj kodin",
       "pairActivate": "Aktivizo",
+      "pairOrLicense": "Ose fut licencën",
+      "pairLicenseHint": "Administratori në POS duhet ta aprovojë këtë telefon te Settings.",
+      "pairLicenseSend": "Kërko",
+      "pairLicenseWaiting": "Në pritje të aprovimit",
+      "pairLicenseWaitingHint": "Hap POS → Settings → Devices në kompjuterin e lokalit dhe aprovo këtë telefon.",
+      "pairLicenseCancel": "Anulo kërkesën",
+      "pairInvalidLicense": "Licencë e pavlefshme. Kontrollo dhe provo përsëri.",
+      "pairLicenseRejected": "Ky telefon nuk u aprovua. Pyet administratorin.",
+      "pairLicenseWaitExpired": "Kërkesa skadoi. Dërgoje përsëri.",
       "pairClaiming": "Duke regjistruar telefonin…",
       "pairSuccess": "Telefoni u aktivizua",
       "pairInvalidCode": "Kod i pavlefshëm. Kontrollo dhe provo përsëri.",
@@ -583,6 +621,17 @@
       "pairNoCamera": "Kamera nuk është e disponueshme.",
       "pairCameraDenied": "Leja e kamerës u refuzua. Shkruaj kodin.",
       "pairScanFallback": "Skanimi live është i kufizuar në këtë shfletues — shkruaj kodin, ose hap lidhjen e QR nga kamera.",
+      "pairAccountButton": "Hyr me llogarinë e lokalit",
+      "pairAccountHint": "Pronari mund ta aktivizojë telefonin dhe të punojë si kamarier — pa QR.",
+      "accountTitle": "Punoni si kamarier",
+      "accountPickVenue": "Zgjidh lokalun, pastaj kamarierin.",
+      "accountPickStaff": "Si kush po punon?",
+      "accountBinding": "Duke aktivizuar telefonin…",
+      "accountNoVenues": "Nuk ka lokacione në këtë llogari.",
+      "accountNoStaff": "Nuk ka kamarierë në këtë lokal. Shto staf te POS → Staff.",
+      "accountNeedSignIn": "Hyr fillimisht me llogarinë e lokalit.",
+      "accountNotOwner": "Kjo llogari nuk mund t’i aktivizojë telefonat e kamarierëve për këtë lokal.",
+      "accountLoadFailed": "Nuk u ngarkuan lokacionet e kësaj llogarie.",
       "navLabel": "Navigimi i kamarierit",
       "navTables": "Tavolina",
       "navMenu": "Meny",
@@ -590,6 +639,13 @@
       "navNotifications": "Njoftime",
         "menuAll": "Të gjitha",
         "menuPickTable": "Zgjidh fillimisht një tavolinë për të shtuar artikuj.",
+        "menuItemAddToOrder": "Shto në porosi",
+        "customizationTitle": "Personalizimi",
+        "customizationNote": "Shënim shtesë",
+        "customizationNotePh": "p.sh. alergji…",
+        "customizationRequired": "Zgjidh",
+        "menuItemCategory": "Kategoria",
+        "menuItemClose": "Mbyll",
         "menuQrTitle": "QR e menysë",
         "menuQrHint": "Tregoja këtë kod klientit që ta hapë menynë në telefonin e tij.",
         "menuQrClose": "Mbyll",
@@ -598,6 +654,13 @@
       "notifEmpty": "Nuk ka njoftime nga kuzhina tani.",
       "notifKitchen": "Në kuzhinë",
       "notifReady": "Gati — merre",
+      "notifReadyTapDeliver": "Gati — prek kur e dërgon te tavolina",
+      "notifDelivering": "Po shënohet si e dërguar…",
+      "notifDeliverHint": "Prek një artikull gati për ta shënuar si të dërguar te tavolina.",
+      "notifDeliveredToast": "U dërgua: {{item}}",
+      "notifDeliverFailed": "Nuk u shënua si e dërguar.",
+      "notifSentAt": "Dërguar {{time}}",
+      "notifReadyAt": "Gati {{time}}",
       "notifReadyCount": "{{count}} gati për t’u marrë",
       "notifReadyBadge": "{{count}} gati",
       "notifTableHeading": "Tavolina {{table}}",
@@ -652,7 +715,16 @@
       "role_inventory": "Inventar",
       "role_accountant": "Kontabilist",
       "role_auditor": "Auditor",
-      "role_kitchen": "Kuzhinë"
+      "role_kitchen": "Kuzhinë",
+      "qrTitle": "QR i kamarierit",
+      "qrHint": "Telefoni tjetër e skanon këtë, ose shkruan kodin me 8 karaktere te Activate phone.",
+      "qrCopy": "Kopjo kodin",
+      "qrCopied": "U kopjua",
+      "qrExpires": "Skadon për {{time}}",
+      "qrErrLicense": "Licenca e këtij lokali nuk është aktive.",
+      "qrErrMigration": "Mungon pairing në server. Admin të ekzekutojë SQL-in e telefonit.",
+      "qrErrServer": "Serveri nuk është i konfiguruar.",
+      "qrErrGeneric": "Nuk u krijua QR-i i kamarierit. Provo përsëri."
     },
     "stock": {
       "title": "Inventari",
@@ -722,7 +794,8 @@
       "navProfile": "Profili",
       "navVenues": "Lokalet",
       "loadError": "Nuk u ngarkua paneli.",
-      "retry": "Provo përsëri"
+      "retry": "Provo përsëri",
+      "waiterQr": "QR i kamarierit"
     },
     "venues": {
       "title": "Lokalet e Mia",
@@ -734,6 +807,7 @@
       "loadError": "Nuk u ngarkuan lokacionet.",
       "opening": "Duke hapur…",
       "admin": "Admin",
+      "openWaiter": "Punoni si kamarier",
       "desktopHint": "Instaluesi dhe cilësimet e plota janë në panelin në web (kompjuter).",
       "loading": "Duke ngarkuar…",
       "signOut": "Dil"
@@ -799,5 +873,23 @@
       "toastAlreadyRegistered": "Ky email është tashmë i regjistruar. Email-i i verifikimit u ridërgua.",
       "toastSuccess": "Regjistrimi u krye. Verifiko fillimisht email-in."
     }
+  },
+  "demoVideo": {
+    "title": "Shiko Vyntex POS në veprim",
+    "subtitle": "Një video 2-minutëshe se si merret një porosi, menaxhohen tavolinat dhe bëhet pagesa.",
+    "fallback": "Shfletuesi juaj nuk mbështet video të inkorporuar.",
+    "tryHint": "Preferon ta provosh vetë?",
+    "tryButton": "Provo demo interaktive"
+  },
+  "productDemo": {
+    "badge": "Demo interaktive · të dhëna shembull",
+    "title": "Provo Vyntex POS tani",
+    "subtitle": "Nuk kërkohet regjistrim. Ul një tavolinë, krijo një porosi dhe merr pagesën — njësoj si në aplikacionin real.",
+    "tabFloor": "Tavolinat",
+    "tabMenu": "Menu",
+    "tabStaff": "Stafi",
+    "tabAnalytics": "Analitika",
+    "liveBadge": "Modalitet demo",
+    "ctaHint": "Gati të përdorësh këtë në restorantin tënd?"
   }
 }

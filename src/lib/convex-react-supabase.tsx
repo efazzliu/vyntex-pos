@@ -158,7 +158,8 @@ function invalidateAfterOrderMutation(
     mutationId === "pos.orders.logBulkFiscalization" ||
     mutationId === "pos.orders.transferOrdersToTable" ||
     mutationId === "pos.orders.mergeTableOrders" ||
-    mutationId === "pos.orders.bumpKitchenTicketItem"
+    mutationId === "pos.orders.bumpKitchenTicketItem" ||
+    mutationId === "pos.orders.markWaiterLineDelivered"
   ) {
     invalidatePosAuditLogs(qc);
   }
@@ -167,16 +168,13 @@ function invalidateAfterOrderMutation(
     mutationId === "pos.orders.sendOrder" ||
     mutationId === "pos.orders.submitCartOrder" ||
     mutationId === "pos.orders.payOrder" ||
-    mutationId === "pos.orders.bumpKitchenTicketItem"
+    mutationId === "pos.orders.bumpKitchenTicketItem" ||
+    mutationId === "pos.orders.markWaiterLineDelivered"
   ) {
     void qc.invalidateQueries({
       queryKey: posQueryKey("pos.orders.getKitchenQueue", { licenseKey }),
     });
-    void qc.invalidateQueries({
-      queryKey: posQueryKey("pos.orders.getWaiterKitchenNotifications", {
-        licenseKey,
-      }),
-    });
+    invalidatePosPrefix(qc, "pos.orders.getWaiterKitchenNotifications");
   }
 
   if (

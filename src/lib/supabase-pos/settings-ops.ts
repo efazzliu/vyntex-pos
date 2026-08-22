@@ -11,7 +11,9 @@ import {
   parsePosPaymentSettings,
 } from "@/lib/pos-payment-handling.ts";
 import {
+  normalizePhoneAccessBranding,
   normalizePinLoginBranding,
+  type PhoneAccessBranding,
   type PinLoginBranding,
 } from "@/lib/local-db.ts";
 import { assertNoPgError } from "./db-errors.ts";
@@ -22,6 +24,7 @@ function isMissingPosPinBrandingColumn(err: { message?: string }): boolean {
   return (
     msg.includes("pos_pin_branding") ||
     msg.includes("pos_theme") ||
+    msg.includes("phone_access_branding") ||
     (msg.includes("schema cache") && msg.includes("column"))
   );
 }
@@ -53,6 +56,40 @@ export async function savePinBrandingToCloud(
     if (isMissingPosPinBrandingColumn(error)) {
       throw new Error(
         "Mungon kolona pos_pin_branding. Ekzekuto supabase/migrations/028_restaurants_pos_license_sync.sql në Supabase SQL Editor.",
+      );
+    }
+    throw error;
+  }
+  clearRestaurantCache(licenseKey);
+}
+
+function phoneAccessFromRow(raw: unknown): PhoneAccessBranding | null {
+  if (!raw || typeof raw !== "object") return null;
+  return normalizePhoneAccessBranding(raw as Partial<PhoneAccessBranding>);
+}
+
+export async function fetchPhoneAccessBrandingFromCloud(
+  licenseKey: string,
+): Promise<PhoneAccessBranding | null> {
+  const r = await getRestaurantByLicense(licenseKey);
+  if (r.phone_access_branding == null) return null;
+  return phoneAccessFromRow(r.phone_access_branding);
+}
+
+export async function savePhoneAccessBrandingToCloud(
+  licenseKey: string,
+  branding: PhoneAccessBranding,
+): Promise<void> {
+  const r = await getRestaurantByLicense(licenseKey);
+  const payload = normalizePhoneAccessBranding(branding);
+  const { error } = await supabase
+    .from("restaurants")
+    .update({ phone_access_branding: payload })
+    .eq("id", r.id);
+  if (error) {
+    if (isMissingPosPinBrandingColumn(error)) {
+      throw new Error(
+        "Mungon kolona phone_access_branding. Ekzekuto supabase/ensure_phone_access_branding.sql në Supabase SQL Editor.",
       );
     }
     throw error;

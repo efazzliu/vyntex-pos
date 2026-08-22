@@ -60,6 +60,8 @@ export async function runPosQuery(
     case "pos.orders.getWaiterKitchenNotifications":
       return orders.getWaiterKitchenNotifications({
         licenseKey: args.licenseKey as string,
+        staffId:
+          typeof args.staffId === "string" ? args.staffId : undefined,
       });
     case "pos.orders.getNonFiscalOrders":
       return orders.getNonFiscalOrders(args);
@@ -228,6 +230,10 @@ export async function runPosMutation(
     case "pos.orders.bumpKitchenTicketItem":
       return orders.bumpKitchenTicketItem(
         args as Parameters<typeof orders.bumpKitchenTicketItem>[0],
+      );
+    case "pos.orders.markWaiterLineDelivered":
+      return orders.markWaiterLineDelivered(
+        args as Parameters<typeof orders.markWaiterLineDelivered>[0],
       );
     case "pos.orders.voidItem":
       return orders.voidItem(args);

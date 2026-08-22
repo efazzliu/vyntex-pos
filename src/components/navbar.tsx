@@ -4,11 +4,12 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
 import { SiteLanguageToggle } from "@/components/site-language-toggle.tsx";
 import { cn } from "@/lib/utils.ts";
-import { Menu, Moon, Sun, X } from "lucide-react";
+import { Menu, Moon, Smartphone, Sun, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useTheme } from "next-themes";
 import { supabase } from "@/lib/supabase.ts";
 import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
+import { PHONE_APP_PATH } from "@/lib/guest-menu-url.ts";
 
 const navItems = [
   { key: "home", href: "/" },
@@ -144,6 +145,22 @@ export default function Navbar() {
           <div className="hidden md:flex items-center gap-2">
             <Button
               size="sm"
+              variant="outline"
+              asChild
+              className={cn(
+                "h-10 rounded-full px-4 text-sm font-semibold",
+                isTransparent
+                  ? "border-white/25 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+                  : "",
+              )}
+            >
+              <a href={PHONE_APP_PATH} className="inline-flex items-center gap-1.5">
+                <Smartphone className="size-3.5" />
+                {t("nav.phoneApp")}
+              </a>
+            </Button>
+            <Button
+              size="sm"
               onClick={() => navigate(ctaPath)}
               className="h-10 rounded-full bg-gradient-to-r from-[#0066FF] to-[#00AACC] px-6 text-sm font-bold text-white shadow-lg shadow-blue-600/30 transition-all hover:scale-[1.02] hover:from-[#0055DD] hover:to-[#0099BB]"
             >
@@ -192,9 +209,16 @@ export default function Navbar() {
                   {t(`nav.${link.key}`)}
                 </button>
               ))}
-              <div className="pt-3 mt-2 border-t border-border">
+              <div className="pt-3 mt-2 border-t border-border space-y-2">
+                <Button size="sm" className="w-full" asChild>
+                  <a href={PHONE_APP_PATH} className="inline-flex items-center justify-center gap-1.5">
+                    <Smartphone className="size-4" />
+                    {t("nav.phoneApp")}
+                  </a>
+                </Button>
                 <Button
                   size="sm"
+                  variant="outline"
                   className="w-full"
                   onClick={() => navigate(ctaPath)}
                 >

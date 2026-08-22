@@ -285,6 +285,128 @@
   }
 }
 
+/* Waiter phone preview inside POS must keep its own colors (light POS remaps .text-white). */
+[data-phone-preview],
+[data-waiter-theme="dark"] {
+  --waiter-fg: #ffffff;
+  --waiter-muted: rgba(255, 255, 255, 0.42);
+  --waiter-soft: rgba(255, 255, 255, 0.7);
+  --waiter-faint: rgba(255, 255, 255, 0.3);
+  --waiter-card: rgba(255, 255, 255, 0.05);
+  --waiter-border: rgba(255, 255, 255, 0.1);
+  --waiter-page: #070b14;
+}
+
+[data-pos-theme="light"] [data-phone-preview]:not([data-waiter-theme="light"]) {
+  color: #ffffff;
+  .text-white { color: #ffffff !important; }
+  .text-white\/70 { color: rgb(255 255 255 / 0.7) !important; }
+  .text-white\/60 { color: rgb(255 255 255 / 0.6) !important; }
+  .text-white\/45 { color: rgb(255 255 255 / 0.45) !important; }
+  .text-white\/40 { color: rgb(255 255 255 / 0.4) !important; }
+  .text-white\/35 { color: rgb(255 255 255 / 0.35) !important; }
+  .text-white\/30 { color: rgb(255 255 255 / 0.3) !important; }
+  .text-emerald-300 { color: #6ee7b7 !important; }
+  .text-emerald-400 { color: #34d399 !important; }
+  .text-blue-300 { color: #93c5fd !important; }
+  .bg-white\/5 { background-color: rgb(255 255 255 / 5%) !important; }
+  .bg-white\/10 { background-color: rgb(255 255 255 / 10%) !important; }
+  .bg-white\/20 { background-color: rgb(255 255 255 / 20%) !important; }
+  .bg-white\/\[0\.05\] { background-color: rgb(255 255 255 / 5%) !important; }
+  .bg-white\/\[0\.06\] { background-color: rgb(255 255 255 / 6%) !important; }
+  .bg-white\/\[0\.04\] { background-color: rgb(255 255 255 / 4%) !important; }
+  .bg-\[\#070b14\] { background-color: #070b14 !important; }
+  .bg-\[\#0a1224\] { background-color: #0a1224 !important; }
+  .border-white\/10 { border-color: rgb(255 255 255 / 0.1) !important; }
+}
+
+/* Waiter phone Light Mode — all screens (login, floor, table, menu, orders). */
+[data-waiter-theme="light"] {
+  --waiter-fg: #0f172a;
+  --waiter-muted: rgba(15, 23, 42, 0.45);
+  --waiter-soft: rgba(15, 23, 42, 0.7);
+  --waiter-faint: rgba(15, 23, 42, 0.35);
+  --waiter-card: rgba(15, 23, 42, 0.04);
+  --waiter-border: rgba(15, 23, 42, 0.1);
+  --waiter-page: #f4f6fa;
+  color: #0f172a;
+
+  .text-white { color: #0f172a !important; }
+  .text-white\/80 { color: rgb(15 23 42 / 0.8) !important; }
+  .text-white\/70 { color: rgb(15 23 42 / 0.7) !important; }
+  .text-white\/60 { color: rgb(15 23 42 / 0.55) !important; }
+  .text-white\/50 { color: rgb(15 23 42 / 0.5) !important; }
+  .text-white\/45 { color: rgb(15 23 42 / 0.45) !important; }
+  .text-white\/40 { color: rgb(15 23 42 / 0.42) !important; }
+  .text-white\/35 { color: rgb(15 23 42 / 0.38) !important; }
+  .text-white\/30 { color: rgb(15 23 42 / 0.35) !important; }
+  .text-white\/25 { color: rgb(15 23 42 / 0.3) !important; }
+  .placeholder\:text-white\/30::placeholder { color: rgb(15 23 42 / 0.35) !important; }
+
+  .bg-\[\#070b14\] { background-color: #f4f6fa !important; }
+  .bg-\[\#070b14\]\/95,
+  .bg-\[\#0a1224\] { background-color: #eef2f7 !important; }
+  .bg-\[\#0a1224\]\/95 { background-color: rgb(255 255 255 / 0.92) !important; }
+  .bg-\[\#08090c\] { background-color: #f4f6fa !important; }
+  .bg-\[\#0d1326\] { background-color: #ffffff !important; }
+  .bg-\[\#121a2e\] { background-color: #ffffff !important; }
+  .bg-\[\#101218\] { background-color: #eef2f7 !important; }
+
+  .bg-white\/\[0\.02\] { background-color: rgb(15 23 42 / 0.03) !important; }
+  .bg-white\/\[0\.04\] { background-color: rgb(15 23 42 / 0.04) !important; }
+  .bg-white\/\[0\.05\] { background-color: rgb(15 23 42 / 0.05) !important; }
+  .bg-white\/\[0\.06\] { background-color: rgb(15 23 42 / 0.06) !important; }
+  .bg-white\/\[0\.08\] { background-color: rgb(15 23 42 / 0.07) !important; }
+  .bg-white\/5 { background-color: rgb(15 23 42 / 0.05) !important; }
+  .bg-white\/10 { background-color: rgb(15 23 42 / 0.08) !important; }
+  .bg-white\/20 { background-color: rgb(15 23 42 / 0.1) !important; }
+
+  .border-white\/8 { border-color: rgb(15 23 42 / 0.08) !important; }
+  .border-white\/10 { border-color: rgb(15 23 42 / 0.1) !important; }
+  .border-white\/12 { border-color: rgb(15 23 42 / 0.12) !important; }
+  .border-white\/15 { border-color: rgb(15 23 42 / 0.12) !important; }
+  .ring-white\/\[0\.08\] { --tw-ring-color: rgb(15 23 42 / 0.1) !important; }
+
+  .bg-\[\#0066FF\],
+  .bg-amber-500,
+  .bg-emerald-600,
+  .bg-\[\#0066FF\].text-white,
+  .bg-amber-500.text-white,
+  .bg-emerald-600.text-white {
+    color: #ffffff !important;
+  }
+}
+
+[data-waiter-skin="noir"] {
+  .bg-\[\#070b14\] { background-color: #070707 !important; }
+  .bg-\[\#0a1224\] { background-color: #111111 !important; }
+  .bg-\[\#0a1224\]\/95 { background-color: rgb(14 14 14 / 0.94) !important; }
+  .bg-\[\#08090c\] { background-color: #070707 !important; }
+  .bg-\[\#0d1326\] { background-color: #141414 !important; }
+  .bg-\[\#121a2e\] { background-color: #161616 !important; }
+  .bg-\[\#101218\] { background-color: #111111 !important; }
+}
+
+[data-waiter-skin="ocean"] {
+  .bg-\[\#070b14\] { background-color: #04151c !important; }
+  .bg-\[\#0a1224\] { background-color: #07232d !important; }
+  .bg-\[\#0a1224\]\/95 { background-color: rgb(6 32 40 / 0.94) !important; }
+  .bg-\[\#08090c\] { background-color: #04151c !important; }
+  .bg-\[\#0d1326\] { background-color: #0a2a35 !important; }
+  .bg-\[\#121a2e\] { background-color: #0c303c !important; }
+  .bg-\[\#101218\] { background-color: #07232d !important; }
+}
+
+[data-waiter-skin="ember"] {
+  .bg-\[\#070b14\] { background-color: #120e0c !important; }
+  .bg-\[\#0a1224\] { background-color: #1c1510 !important; }
+  .bg-\[\#0a1224\]\/95 { background-color: rgb(24 18 14 / 0.94) !important; }
+  .bg-\[\#08090c\] { background-color: #120e0c !important; }
+  .bg-\[\#0d1326\] { background-color: #221a14 !important; }
+  .bg-\[\#121a2e\] { background-color: #261c16 !important; }
+  .bg-\[\#101218\] { background-color: #1c1510 !important; }
+}
+
 /* ── Phone app dark-mode polish (manager/admin dashboards) ────────────────── */
 .dark .phone-app-shell .bg-white,
 .dark .phone-app-shell .bg-white\/80,

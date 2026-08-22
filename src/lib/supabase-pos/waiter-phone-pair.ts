@@ -24,6 +24,10 @@ function rpcErrorCode(err: { message?: string; details?: string } | null): strin
   if (raw.includes("license_inactive")) return "license_inactive";
   if (raw.includes("license_expired")) return "license_expired";
   if (raw.includes("phone_limit")) return "phone_limit";
+  if (raw.includes("invalid_license")) return "invalid_license";
+  if (raw.includes("request_not_found")) return "request_not_found";
+  if (raw.includes("request_not_pending")) return "request_not_pending";
+  if (raw.includes("request_expired")) return "request_expired";
   if (raw.includes("missing_params")) return "missing_params";
   if (raw.includes("could not find the function") || raw.includes("schema cache")) {
     return "migration_missing";

@@ -31,7 +31,7 @@
         }
         document.documentElement.classList.add(theme);
       } catch (e) {}
-      // Phone chat apps often strip #hash — allow ?preview=1 entry.
+      // Phone chat apps often strip #hash — allow ?preview=1 and ?waiter=1 entry.
       try {
         const q = new URLSearchParams(window.location.search);
         if (q.get("preview") === "1" && !window.location.hash.includes("/waiter/preview")) {
@@ -44,6 +44,15 @@
           window.location.replace(
             window.location.pathname + "?" + keep.toString() + "#/waiter/preview",
           );
+        } else if (
+          (q.get("waiter") === "1" || q.get("as")) &&
+          !window.location.hash.includes("/waiter/account")
+        ) {
+          const name = (q.get("name") || q.get("as") || "").trim();
+          const hash = name
+            ? "#/waiter/account?name=" + encodeURIComponent(name)
+            : "#/waiter/account";
+          window.location.replace(window.location.pathname + hash);
         }
       } catch (e) {}
     </script>

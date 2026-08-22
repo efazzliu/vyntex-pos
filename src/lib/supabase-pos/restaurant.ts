@@ -26,6 +26,7 @@ export type RestaurantRow = {
   /** SHA-256 hex; synced from device for close-day when staff PIN differs */
   pos_device_close_pin_hash?: string | null;
   pos_pin_branding?: unknown;
+  phone_access_branding?: unknown;
   pos_theme?: string | null;
   pos_payment_settings?: unknown;
   pos_enforce_availability?: boolean | null;

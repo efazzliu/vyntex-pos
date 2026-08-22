@@ -16,8 +16,15 @@ create table if not exists public.pos_floor_tables (
   pos_y int default 100,
   shape text default 'square' check (shape in ('square', 'circle', 'rectangle')),
   table_scale numeric(6,2) default 1,
+  table_scale_y numeric(6,2),
   created_at timestamptz not null default now()
 );
+
+alter table public.pos_floor_tables
+  add column if not exists table_scale numeric(6,2) default 1;
+
+alter table public.pos_floor_tables
+  add column if not exists table_scale_y numeric(6,2);
 
 create index if not exists idx_pos_floor_tables_restaurant on public.pos_floor_tables(restaurant_id);
 create index if not exists idx_pos_floor_tables_zone on public.pos_floor_tables(restaurant_id, zone);

@@ -6,6 +6,34 @@ import react from "@vitejs/plugin-react-swc";
 import { defineConfig, type Plugin } from "vite";
 import { createInstallerMiddleware } from "./scripts/vite-installer-middleware.ts";
 
+/** Serve the phone MPA at `/phone` (same as production rewrite to phone.html). */
+function phoneAppAliasPlugin(): Plugin {
+  const rewritePhonePath = (url: string | undefined) => {
+    if (!url) return url;
+    const q = url.indexOf("?");
+    const pathOnly = q === -1 ? url : url.slice(0, q);
+    if (pathOnly !== "/phone" && pathOnly !== "/phone/") return url;
+    return `/phone.html${q === -1 ? "" : url.slice(q)}`;
+  };
+  return {
+    name: "vyntex-phone-app-alias",
+    configureServer(server) {
+      server.middlewares.use((req, _res, next) => {
+        const nextUrl = rewritePhonePath(req.url);
+        if (nextUrl && nextUrl !== req.url) req.url = nextUrl;
+        next();
+      });
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use((req, _res, next) => {
+        const nextUrl = rewritePhonePath(req.url);
+        if (nextUrl && nextUrl !== req.url) req.url = nextUrl;
+        next();
+      });
+    },
+  };
+}
+
 function viteInstallerPlugin(): Plugin {
   return {
     name: "vite-installer-middleware",
@@ -47,7 +75,17 @@ function copyVersionedInstallerToDistPlugin(): Plugin {
       const distDir = path.resolve(__dirname, outDir);
       for (const name of fs.readdirSync(distDir)) {
         if (/^(Restaurant|Vyntex|Fitness|Bar|Hotel)POSSetup.*\.exe$/i.test(name)) {
-          fs.unlinkSync(path.join(distDir, name));
+          const full = path.join(distDir, name);
+          try {
+            fs.unlinkSync(full);
+          } catch (err) {
+            const code = err && typeof err === "object" && "code" in err ? String(err.code) : "";
+            if (code === "EBUSY" || code === "EPERM") {
+              console.warn(`[vyntex] Locked installer left in place: ${name}`);
+              continue;
+            }
+            throw err;
+          }
         }
       }
       const pairs = [
@@ -65,7 +103,16 @@ function copyVersionedInstallerToDistPlugin(): Plugin {
       for (const { src, dest } of pairs) {
         if (!fs.existsSync(src) || fs.statSync(src).size < 50_000) continue;
         const outPath = path.join(distDir, dest);
-        fs.copyFileSync(src, outPath);
+        try {
+          fs.copyFileSync(src, outPath);
+        } catch (err) {
+          const code = err && typeof err === "object" && "code" in err ? String(err.code) : "";
+          if (code === "EBUSY" || code === "EPERM") {
+            console.warn(`[vyntex] Could not copy installer (locked): ${dest}`);
+            continue;
+          }
+          throw err;
+        }
         console.log(`[vyntex] Copied installer -> ${path.relative(__dirname, outPath)}`);
       }
     },
@@ -155,6 +202,7 @@ export default defineConfig(() => {
       },
     },
     plugins: [
+      phoneAppAliasPlugin(),
       viteInstallerPlugin(),
       writeBuildMetaJsonPlugin(),
       copyVersionedInstallerToDistPlugin(),

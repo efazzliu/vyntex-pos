@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase.ts";
 import { fetchPhoneManagerRestaurantId } from "@/lib/supabase-pos/phone-manager-session.ts";
-import { fetchRestaurantOwnedBySession } from "@/lib/supabase-pos/phone-pos-session.ts";
+import {
+  fetchAllRestaurantsOwnedBySession,
+  fetchRestaurantOwnedBySession,
+} from "@/lib/supabase-pos/phone-pos-session.ts";
 import {
   effectiveMaxTerminals,
   parseRegisteredDeviceIds,
@@ -88,19 +91,20 @@ export function useDashboardRestaurant(): UseDashboardRestaurantResult {
     } = await supabase.auth.getUser();
 
     if (user) {
-      const owned = await fetchRestaurantOwnedBySession();
-      if (owned) {
-        const storedId = localStorage.getItem(RESTAURANT_ID_KEY);
-        if (storedId && storedId !== owned.id) {
-          clearDashboardRestaurantId();
-        }
-        setDashboardRestaurantId(owned.id);
+      const ownedList = await fetchAllRestaurantsOwnedBySession();
+      const storedId = localStorage.getItem(RESTAURANT_ID_KEY);
+      const chosenOwned =
+        ownedList.find((row) => row.id === storedId) ??
+        ownedList[0] ??
+        (await fetchRestaurantOwnedBySession());
+      if (chosenOwned) {
+        setDashboardRestaurantId(chosenOwned.id);
         const { data: ownedRow, error: ownedErr } = await supabase
           .from("restaurants")
           .select(
             "id, name, type, address, phone, currency, plan, license_key, license_expiry, license_status, device_id, registered_devices, max_terminals, last_pos_sync_at",
           )
-          .eq("id", owned.id)
+          .eq("id", chosenOwned.id)
           .maybeSingle();
         if (!ownedErr && ownedRow) {
           setRestaurant(mapRow(ownedRow));

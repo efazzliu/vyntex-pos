@@ -25,6 +25,14 @@
   ],
   "rewrites": [
     {
+      "source": "/phone",
+      "destination": "/phone.html"
+    },
+    {
+      "source": "/phone/",
+      "destination": "/phone.html"
+    },
+    {
       "source": "/RestaurantPOSSetup-:version-x64.exe",
       "destination": "/RestaurantPOSSetup.exe"
     },
