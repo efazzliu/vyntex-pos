@@ -22,7 +22,9 @@ import {
   getWaiterLicensePending,
   setWaiterLicensePending,
   clearWaiterLicensePending,
+  clearWaiterPhonePair,
   isOwnerLocalWaiterPair,
+  isWaiterDesignPreviewLicense,
 } from "@/phone-app/lib/waiter-session.ts";
 import { fetchWaiterPhoneBindingStatus } from "@/lib/supabase-pos/waiter-phone-binding.ts";
 import { cn } from "@/lib/utils.ts";
@@ -46,8 +48,16 @@ export default function PhoneWaiterPair() {
   const licenseKeyLen = normalizeWaiterLicenseKey(licenseInput).length;
 
   useEffect(() => {
+    if (params.get("reset") === "1") {
+      clearWaiterPhonePair();
+      clearWaiterLicensePending();
+    }
+    const prefill = params.get("license");
+    if (prefill) setLicenseInput(formatWaiterLicenseInput(prefill));
+
     const existing = getWaiterPhonePair();
     if (!existing) return;
+    if (isWaiterDesignPreviewLicense(existing.licenseKey)) return;
     if (isOwnerLocalWaiterPair(existing)) {
       navigate("/waiter", { replace: true });
       return;
@@ -66,7 +76,7 @@ export default function PhoneWaiterPair() {
     return () => {
       cancelled = true;
     };
-  }, [navigate]);
+  }, [navigate, params]);
 
   const stopCamera = useCallback(() => {
     scanningRef.current = false;

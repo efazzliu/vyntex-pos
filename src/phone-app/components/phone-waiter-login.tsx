@@ -28,13 +28,16 @@ import {
   isValidStaffPinLength,
   sanitizeStaffPinInput,
 } from "@/pages/pos/_lib/staff-pin.ts";
+import { getRestaurantByLicense } from "@/lib/supabase-pos/restaurant.ts";
 import {
   clearWaiterPhonePair,
+  clearWaiterSession,
   getWaiterPhonePair,
   getWaiterVenueKey,
   isOwnerLocalWaiterPair,
   isWaiterDesignPreviewLicense,
   normalizeWaiterVenueKey,
+  setWaiterPhonePair,
   setWaiterSession,
   setWaiterVenueKey,
 } from "@/phone-app/lib/waiter-session.ts";
@@ -117,6 +120,25 @@ export default function PhoneWaiterLogin() {
     if (!licenseKey) return;
     void queryClient.invalidateQueries({ queryKey: ["pos", "pos.staff.getStaff"] });
   }, [licenseKey, queryClient]);
+
+  // Real licenses: always show the restaurant name from the server (not a stale
+  // local label like "Enterprise" from the design preview).
+  useEffect(() => {
+    if (!pair?.licenseKey || isWaiterDesignPreviewLicense(pair.licenseKey)) return;
+    let cancelled = false;
+    void getRestaurantByLicense(pair.licenseKey, { fresh: true })
+      .then((row) => {
+        const name = String(row.name ?? "").trim();
+        if (cancelled || !name || name === pair.restaurantName) return;
+        const next = { ...pair, restaurantName: name };
+        setWaiterPhonePair(next);
+        setPair(next);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [pair]);
 
   // Locked to venue until admin disconnects this Device ID.
   useEffect(() => {
@@ -360,6 +382,22 @@ export default function PhoneWaiterLogin() {
               >
                 {pair?.restaurantName || licenseKey}
               </p>
+              <button
+                type="button"
+                onClick={() => {
+                  clearWaiterSession();
+                  clearWaiterPhonePair();
+                  setWaiterVenueKey("");
+                  setPair(null);
+                  navigate("/waiter/pair?reset=1", { replace: true });
+                }}
+                className={cn(
+                  "text-[12px] font-medium underline-offset-4 hover:underline",
+                  light ? "text-slate-500" : "text-white/45",
+                )}
+              >
+                {t("phone.waiter.changeVenue")}
+              </button>
             </div>
           ) : (
             <Link
