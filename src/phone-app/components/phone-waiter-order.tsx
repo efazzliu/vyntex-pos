@@ -9,6 +9,7 @@ import {
   ChefHat,
   ClipboardList,
   Minus,
+  Pencil,
   Plus,
   Search,
   Send,
@@ -1118,6 +1119,25 @@ export default function PhoneWaiterOrder() {
                         <div className="flex shrink-0 items-center gap-1.5">
                           <button
                             type="button"
+                            onClick={() => openNoteDialog(item)}
+                            aria-label={
+                              item.notes
+                                ? t("phone.waiter.order.editNote")
+                                : t("phone.waiter.order.addNote")
+                            }
+                            className={cn(
+                              "flex size-6 items-center justify-center rounded-lg transition active:scale-95",
+                              item.notes
+                                ? light
+                                  ? "bg-amber-100 text-amber-700"
+                                  : "bg-amber-500/20 text-amber-300"
+                                : "bg-white/[0.06] text-white/55",
+                            )}
+                          >
+                            <Pencil className="size-3" />
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => updateQty(lineKey, -1)}
                             className="flex size-6 items-center justify-center rounded-lg bg-white/[0.06] text-white/70 active:scale-95"
                           >
@@ -1278,7 +1298,9 @@ export default function PhoneWaiterOrder() {
                           className={cn(
                             "rounded-lg px-2 py-1.5 text-[11px] font-semibold transition active:scale-95",
                             item.notes
-                              ? "bg-amber-500/20 text-amber-300"
+                              ? light
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-amber-500/20 text-amber-300"
                               : "bg-white/[0.06] text-white/55",
                           )}
                         >
