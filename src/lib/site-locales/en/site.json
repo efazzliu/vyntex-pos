@@ -6,6 +6,7 @@
     "about": "About",
     "contact": "Contact",
     "dashboard": "Dashboard",
+    "software": "Software",
     "phoneApp": "Phone app"
   },
   "footer": {
@@ -29,6 +30,7 @@
       "line2": "Point-of-Sale",
       "subtitle": "Enterprise-grade POS for modern restaurants. Start with 1 month free on Professional — then streamline orders, payments, and operations in one place.",
       "ctaPrimary": "Get Started Free",
+      "ctaSoftware": "Open software",
       "ctaPhone": "Open phone app",
       "ctaDemo": "Watch Demo",
       "demoToast": "Coming soon in a future milestone!",

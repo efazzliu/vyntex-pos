@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   APP_VERSION_LABEL,
+  POS_SOFTWARE_PATH,
   VYNTEX_APP_LOGO_SRC,
   VYNTEX_INSTAGRAM_URL,
 } from "@/lib/site-constants.ts";
@@ -18,6 +19,7 @@ export default function Footer() {
           { labelKey: "footer.features", href: "/" },
           { labelKey: "nav.vynTypes", href: "/vyn-types" },
           { labelKey: "nav.pricing", href: "/pricing" },
+          { labelKey: "nav.software", href: POS_SOFTWARE_PATH },
           { labelKey: "nav.phoneApp", href: PHONE_APP_PATH },
         ],
       },
