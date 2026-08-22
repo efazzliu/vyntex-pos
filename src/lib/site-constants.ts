@@ -62,6 +62,9 @@ function resolveVyntexAppLogoSrc(): string {
 
 export const VYNTEX_APP_LOGO_SRC = resolveVyntexAppLogoSrc();
 
+/** Web/desktop POS shell — same product as the Windows software (`/pos`). */
+export const POS_SOFTWARE_PATH = "/pos";
+
 function formatInstallerMtimeForUi(iso: string | undefined): string | null {
   if (!iso || !String(iso).trim()) return null;
   const d = new Date(iso);

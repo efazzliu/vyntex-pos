@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { motion } from "motion/react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Play, Smartphone } from "lucide-react";
+import { ArrowRight, Monitor, Play, Smartphone } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
 import { useMarketingPrimaryCtaHref } from "@/hooks/use-marketing-primary-cta-href.ts";
-import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
+import { POS_SOFTWARE_PATH, VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 import { PHONE_APP_PATH } from "@/lib/guest-menu-url.ts";
 import DemoVideoDialog from "./demo-video-dialog.tsx";
 
@@ -120,6 +120,16 @@ export default function HeroSection() {
             <Link to={primaryCtaHref} className="inline-flex items-center">
               {t("home.hero.ctaPrimary")}
               <ArrowRight className="ml-1 size-4" />
+            </Link>
+          </Button>
+          <Button
+            size="lg"
+            asChild
+            className="h-12 border border-white/30 bg-white/10 px-8 text-base text-white shadow-lg shadow-black/20 hover:bg-white/20"
+          >
+            <Link to={POS_SOFTWARE_PATH} className="inline-flex items-center">
+              <Monitor className="mr-1 size-4" />
+              {t("home.hero.ctaSoftware")}
             </Link>
           </Button>
           <Button
