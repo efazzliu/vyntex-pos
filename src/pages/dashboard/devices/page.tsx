@@ -49,7 +49,9 @@ import {
   effectiveMaxTerminals,
   parseRegisteredDeviceIds,
 } from "@/lib/dashboard-overview-data.ts";
+import { dashboardDateLocale } from "@/lib/dashboard-i18n.ts";
 import { cn } from "@/lib/utils.ts";
+import { useDashboardLocale } from "@/pages/dashboard/_components/dashboard-locale-context.tsx";
 
 type DeviceWithVenue = DashboardPosDevice & {
   venue: OwnedRestaurantRow;
@@ -64,21 +66,28 @@ function isOnline(device: DashboardPosDevice): boolean {
   );
 }
 
-function relativeTime(iso: string | null): string {
-  if (!iso) return "Never";
+function relativeTime(
+  iso: string | null,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): string {
+  if (!iso) return t("devices.time_never");
   const diff = Math.max(0, Date.now() - new Date(iso).getTime());
-  if (diff < 60_000) return "Now";
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} min`;
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h`;
-  return `${Math.floor(diff / 86_400_000)}d`;
+  if (diff < 60_000) return t("devices.time_now");
+  if (diff < 3_600_000)
+    return t("devices.time_min", { count: Math.floor(diff / 60_000) });
+  if (diff < 86_400_000)
+    return t("devices.time_hours", { count: Math.floor(diff / 3_600_000) });
+  return t("devices.time_days", { count: Math.floor(diff / 86_400_000) });
 }
 
-function exactTime(iso: string | null): string {
+function exactTime(iso: string | null, locale: string): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleString();
+  return new Date(iso).toLocaleString(locale);
 }
 
 export default function DashboardDevicesPage() {
+  const { t, lang } = useDashboardLocale();
+  const dateLocale = dashboardDateLocale(lang);
   const [licenses, setLicenses] = useState<OwnedRestaurantRow[] | null>(null);
   const [devices, setDevices] = useState<DashboardPosDevice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -154,11 +163,13 @@ export default function DashboardDevicesPage() {
     setSaving(true);
     try {
       await renameDashboardPosDevice(renaming.id, name, locationName);
-      toast.success("Device renamed");
+      toast.success(t("devices.toast_renamed"));
       setRenaming(null);
       await load(true);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not rename device.");
+      toast.error(
+        error instanceof Error ? error.message : t("devices.toast_rename_failed"),
+      );
     } finally {
       setSaving(false);
     }
@@ -172,12 +183,14 @@ export default function DashboardDevicesPage() {
         disconnecting.restaurant_id,
         disconnecting.device_id,
       );
-      toast.success("Device disconnected");
+      toast.success(t("devices.toast_disconnected"));
       setDisconnecting(null);
       setSelected(null);
       await load(true);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not disconnect device.");
+      toast.error(
+        error instanceof Error ? error.message : t("devices.toast_disconnect_failed"),
+      );
     } finally {
       setSaving(false);
     }
@@ -198,16 +211,16 @@ export default function DashboardDevicesPage() {
         <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-600">
-              Management
+              {t("nav.section_management")}
             </p>
             <h1 className="mt-2 flex items-center gap-3 text-2xl font-bold tracking-tight sm:text-3xl">
               <span className="flex size-10 items-center justify-center rounded-2xl bg-sky-600 text-white shadow-lg shadow-sky-200">
                 <Laptop className="size-5" />
               </span>
-              Devices
+              {t("nav.devices")}
             </h1>
             <p className="mt-2 text-sm text-slate-500">
-              Monitor every terminal connected to your Vyntex POS licenses.
+              {t("devices.page_subtitle")}
             </p>
           </div>
           <Button
@@ -217,29 +230,29 @@ export default function DashboardDevicesPage() {
             className="rounded-xl bg-white"
           >
             <RefreshCw className={cn("mr-2 size-4", refreshing && "animate-spin")} />
-            Refresh
+            {t("devices.refresh")}
           </Button>
         </header>
 
         <section className="grid gap-4 sm:grid-cols-3">
           <Metric
-            label="Devices connected"
+            label={t("devices.title")}
             value={`${rows.length} / ${maximum}`}
-            hint="License capacity"
+            hint={t("devices.metric_capacity_hint")}
             icon={Monitor}
             tone="sky"
           />
           <Metric
-            label="Online now"
+            label={t("devices.metric_online")}
             value={`${connected}`}
-            hint="Seen in the last 2 minutes"
+            hint={t("devices.metric_online_hint")}
             icon={Activity}
             tone="emerald"
           />
           <Metric
-            label="Offline"
+            label={t("devices.metric_offline")}
             value={`${Math.max(0, rows.length - connected)}`}
-            hint="Needs attention"
+            hint={t("devices.metric_offline_hint")}
             icon={CircleOff}
             tone="slate"
           />
@@ -247,9 +260,9 @@ export default function DashboardDevicesPage() {
 
         <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_24px_70px_-48px_rgba(15,23,42,0.4)]">
           <div className="border-b border-slate-100 px-5 py-4">
-            <h2 className="text-sm font-semibold">Connected terminals</h2>
+            <h2 className="text-sm font-semibold">{t("devices.table_title")}</h2>
             <p className="mt-1 text-xs text-slate-500">
-              Live status, location, operating system, and last activity.
+              {t("devices.table_subtitle")}
             </p>
           </div>
 
@@ -257,10 +270,10 @@ export default function DashboardDevicesPage() {
             <div className="flex min-h-52 flex-col items-center justify-center p-8 text-center">
               <Monitor className="size-8 text-slate-300" />
               <p className="mt-3 text-sm font-medium text-slate-700">
-                No devices connected
+                {t("devices.empty_title")}
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                A device appears here after Vyntex POS is activated.
+                {t("devices.empty_hint")}
               </p>
             </div>
           ) : (
@@ -268,12 +281,12 @@ export default function DashboardDevicesPage() {
               <table className="w-full min-w-[900px] text-left">
                 <thead className="bg-slate-50 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                   <tr>
-                    <th className="px-5 py-3">Device</th>
-                    <th className="px-5 py-3">Location</th>
-                    <th className="px-5 py-3">OS</th>
-                    <th className="px-5 py-3">Status</th>
-                    <th className="px-5 py-3">Last seen</th>
-                    <th className="px-5 py-3 text-right">Actions</th>
+                    <th className="px-5 py-3">{t("devices.col_device")}</th>
+                    <th className="px-5 py-3">{t("devices.col_location")}</th>
+                    <th className="px-5 py-3">{t("devices.col_os")}</th>
+                    <th className="px-5 py-3">{t("devices.col_status")}</th>
+                    <th className="px-5 py-3">{t("devices.col_last_seen")}</th>
+                    <th className="px-5 py-3 text-right">{t("devices.col_actions")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-sm">
@@ -309,7 +322,7 @@ export default function DashboardDevicesPage() {
                           {device.location_name ?? device.venue.name}
                         </td>
                         <td className="px-5 py-4 text-slate-600">
-                          {device.os ?? "Unknown"}
+                          {device.os ?? t("devices.unknown")}
                         </td>
                         <td className="px-5 py-4">
                           <span
@@ -326,18 +339,20 @@ export default function DashboardDevicesPage() {
                                 online ? "bg-emerald-500" : "bg-slate-400",
                               )}
                             />
-                            {online ? "Online" : "Offline"}
+                            {online
+                              ? t("devices.status_online")
+                              : t("devices.status_offline")}
                           </span>
                         </td>
                         <td className="px-5 py-4 text-slate-600">
-                          {relativeTime(device.last_seen_at)}
+                          {relativeTime(device.last_seen_at, t)}
                         </td>
                         <td className="px-5 py-4">
                           <div className="flex justify-end gap-1">
                             <Button
                               variant="ghost"
                               size="icon"
-                              title="View details"
+                              title={t("devices.action_view")}
                               onClick={() => setSelected(device)}
                               className="size-8 rounded-lg"
                             >
@@ -346,7 +361,7 @@ export default function DashboardDevicesPage() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              title="Rename"
+                              title={t("devices.action_rename")}
                               onClick={() => {
                                 setName(device.display_name);
                                 setLocationName(device.location_name ?? device.venue.name);
@@ -359,7 +374,7 @@ export default function DashboardDevicesPage() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              title="Disconnect"
+                              title={t("devices.action_disconnect")}
                               onClick={() => setDisconnecting(device)}
                               className="size-8 rounded-lg text-red-500 hover:bg-red-50 hover:text-red-600"
                             >
@@ -384,26 +399,58 @@ export default function DashboardDevicesPage() {
               <Monitor className="size-5 text-sky-600" />
               {selected?.display_name}
             </DialogTitle>
-            <DialogDescription>Device connection and license details.</DialogDescription>
+            <DialogDescription>{t("devices.details_description")}</DialogDescription>
           </DialogHeader>
           {selected && (
             <div className="grid gap-3 py-2 sm:grid-cols-2">
-              <DeviceDetail label="Device ID" value={selected.device_id} mono />
-              <DeviceDetail label="OS" value={selected.os ?? "Unknown"} />
-              <DeviceDetail label="Vyntex version" value={selected.app_version ?? "Unknown"} />
-              <DeviceDetail label="IP address" value={selected.ip_address ?? "Unavailable"} mono />
-              <DeviceDetail label="Last sync" value={exactTime(selected.last_sync_at)} />
-              <DeviceDetail label="Last active" value={exactTime(selected.last_seen_at)} />
               <DeviceDetail
-                label="Location"
+                iconKey="device_id"
+                label={t("devices.detail_device_id")}
+                value={selected.device_id}
+                mono
+              />
+              <DeviceDetail
+                iconKey="os"
+                label={t("devices.detail_os")}
+                value={selected.os ?? t("devices.unknown")}
+              />
+              <DeviceDetail
+                iconKey="version"
+                label={t("devices.detail_version")}
+                value={selected.app_version ?? t("devices.unknown")}
+              />
+              <DeviceDetail
+                iconKey="ip"
+                label={t("devices.detail_ip")}
+                value={selected.ip_address ?? t("devices.unavailable")}
+                mono
+              />
+              <DeviceDetail
+                iconKey="last_sync"
+                label={t("devices.detail_last_sync")}
+                value={exactTime(selected.last_sync_at, dateLocale)}
+              />
+              <DeviceDetail
+                iconKey="last_active"
+                label={t("devices.detail_last_active")}
+                value={exactTime(selected.last_seen_at, dateLocale)}
+              />
+              <DeviceDetail
+                iconKey="location"
+                label={t("devices.detail_location")}
                 value={selected.location_name ?? selected.venue.name}
               />
-              <DeviceDetail label="License assigned" value={selected.venue.license_key} mono />
+              <DeviceDetail
+                iconKey="license"
+                label={t("devices.detail_license")}
+                value={selected.venue.license_key}
+                mono
+              />
             </div>
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setSelected(null)}>
-              Close
+              {t("devices.close")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -412,14 +459,14 @@ export default function DashboardDevicesPage() {
       <Dialog open={Boolean(renaming)} onOpenChange={(open) => !open && setRenaming(null)}>
         <DialogContent className="rounded-2xl sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Rename device</DialogTitle>
-            <DialogDescription>
-              Use a clear name such as Main Counter, Bar, or Kitchen.
-            </DialogDescription>
+            <DialogTitle>{t("devices.rename_title")}</DialogTitle>
+            <DialogDescription>{t("devices.rename_hint")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <label className="block space-y-1.5">
-              <span className="text-xs font-medium text-slate-600">Device name</span>
+              <span className="text-xs font-medium text-slate-600">
+                {t("devices.device_name")}
+              </span>
               <Input
                 value={name}
                 onChange={(event) => setName(event.target.value)}
@@ -428,12 +475,14 @@ export default function DashboardDevicesPage() {
               />
             </label>
             <label className="block space-y-1.5">
-              <span className="text-xs font-medium text-slate-600">Location</span>
+              <span className="text-xs font-medium text-slate-600">
+                {t("devices.location_label")}
+              </span>
               <Input
                 value={locationName}
                 onChange={(event) => setLocationName(event.target.value)}
                 maxLength={80}
-                placeholder="Main Counter, Bar, Kitchen..."
+                placeholder={t("devices.location_placeholder")}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") void saveRename();
                 }}
@@ -442,10 +491,10 @@ export default function DashboardDevicesPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRenaming(null)}>
-              Cancel
+              {t("devices.cancel")}
             </Button>
             <Button onClick={() => void saveRename()} disabled={saving || !name.trim()}>
-              Save name
+              {t("devices.save_name")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -457,14 +506,15 @@ export default function DashboardDevicesPage() {
       >
         <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Disconnect {disconnecting?.display_name}?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t("devices.disconnect_title", { name: disconnecting?.display_name ?? "" })}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              The POS session on this device will be revoked. The license key must be entered
-              again before it can reconnect.
+              {t("devices.disconnect_description")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={saving}>{t("devices.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={(event) => {
                 event.preventDefault();
@@ -473,7 +523,7 @@ export default function DashboardDevicesPage() {
               disabled={saving}
               className="bg-red-600 text-white hover:bg-red-700"
             >
-              Disconnect
+              {t("devices.disconnect_action")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -517,21 +567,23 @@ function Metric({
 }
 
 function DeviceDetail({
+  iconKey,
   label,
   value,
   mono = false,
 }: {
+  iconKey: string;
   label: string;
   value: string;
   mono?: boolean;
 }) {
-  const icons = {
-    "Device ID": Router,
-    Location: MapPin,
-    "Last sync": RefreshCw,
-    "Last active": Clock3,
+  const icons: Record<string, typeof Monitor> = {
+    device_id: Router,
+    location: MapPin,
+    last_sync: RefreshCw,
+    last_active: Clock3,
   };
-  const Icon = icons[label as keyof typeof icons] ?? Monitor;
+  const Icon = icons[iconKey] ?? Monitor;
   return (
     <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
       <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">

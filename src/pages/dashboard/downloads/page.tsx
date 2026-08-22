@@ -10,6 +10,7 @@ import {
   formatInstallerDisplayFromIso,
 } from "@/lib/site-constants.ts";
 import { useLiveBuildMeta } from "@/hooks/use-live-build-meta.ts";
+import { useDashboardLocale } from "@/pages/dashboard/_components/dashboard-locale-context.tsx";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button.tsx";
 import {
@@ -26,6 +27,7 @@ import {
 } from "lucide-react";
 
 export default function DashboardDownloadsPage() {
+  const { t } = useDashboardLocale();
   const live = useLiveBuildMeta();
   const versionLabel = live?.appVersion ?? APP_VERSION_LABEL;
   const installerFileMtime =
@@ -40,7 +42,7 @@ export default function DashboardDownloadsPage() {
     arch: "x64" | "arm64",
   ) => {
     triggerInstallerDownload(url, arch, versionLabel);
-    toast.success("Download started");
+    toast.success(t("downloads.toast_started"));
   };
 
   return (
@@ -49,19 +51,18 @@ export default function DashboardDownloadsPage() {
         <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-600">
-              Download center
+              {t("downloads.eyebrow")}
             </p>
             <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
-              Get Vyntex POS for Windows
+              {t("downloads.title")}
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-500">
-              Download the latest secure release for your terminal. Choose the build that matches
-              your Windows device.
+              {t("downloads.subtitle")}
             </p>
           </div>
           <div className="inline-flex self-start items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700">
             <CheckCircle2 className="size-3.5" />
-            Latest version: {versionLabel}
+            {t("downloads.latest_version", { version: versionLabel })}
           </div>
         </header>
 
@@ -75,26 +76,32 @@ export default function DashboardDownloadsPage() {
                 </span>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wider text-sky-600">
-                    Recommended download
+                    {t("downloads.recommended")}
                   </p>
-                  <h2 className="mt-1 text-xl font-bold">Restaurant POS Setup</h2>
+                  <h2 className="mt-1 text-xl font-bold">{t("downloads.setup_name")}</h2>
                   <p className="mt-1 text-sm text-slate-500">
-                    Windows 64-bit for Intel and AMD processors
+                    {t("downloads.x64_hint")}
                   </p>
                 </div>
               </div>
 
               <div className="mt-6 grid gap-3 sm:grid-cols-3">
                 <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3">
-                  <p className="text-[10px] uppercase tracking-wider text-slate-400">Version</p>
+                  <p className="text-[10px] uppercase tracking-wider text-slate-400">
+                    {t("downloads.version")}
+                  </p>
                   <p className="mt-1 text-sm font-semibold">v{versionLabel}</p>
                 </div>
                 <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3">
-                  <p className="text-[10px] uppercase tracking-wider text-slate-400">Platform</p>
+                  <p className="text-[10px] uppercase tracking-wider text-slate-400">
+                    {t("downloads.platform")}
+                  </p>
                   <p className="mt-1 text-sm font-semibold">Windows 10 / 11</p>
                 </div>
                 <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3">
-                  <p className="text-[10px] uppercase tracking-wider text-slate-400">Architecture</p>
+                  <p className="text-[10px] uppercase tracking-wider text-slate-400">
+                    {t("downloads.architecture")}
+                  </p>
                   <p className="mt-1 text-sm font-semibold">x64 (Intel / AMD)</p>
                 </div>
               </div>
@@ -105,7 +112,7 @@ export default function DashboardDownloadsPage() {
                 className="mt-6 h-12 w-full rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-base font-semibold text-white shadow-lg shadow-blue-200/70 hover:from-blue-700 hover:to-cyan-600 sm:w-auto sm:min-w-72"
               >
                 <Download className="mr-2 size-5" />
-                Download for Windows
+                {t("downloads.download_windows")}
               </Button>
 
               <p className="mt-3 flex flex-wrap items-center gap-x-2 text-xs text-slate-400">
@@ -114,31 +121,30 @@ export default function DashboardDownloadsPage() {
                 {installerFileMtime ? (
                   <>
                     <span>•</span>
-                    <span>Updated {installerFileMtime}</span>
+                    <span>{t("downloads.updated", { date: installerFileMtime })}</span>
                   </>
                 ) : null}
               </p>
             </div>
 
             <aside className="rounded-2xl border border-slate-200 bg-slate-50/80 p-5">
-              <p className="text-sm font-semibold">System requirements</p>
+              <p className="text-sm font-semibold">{t("downloads.requirements")}</p>
               <ul className="mt-4 space-y-3">
                 <li className="flex items-center gap-3 text-sm text-slate-600">
                   <Laptop className="size-4 text-sky-600" />
-                  Windows 10 or Windows 11
+                  {t("downloads.req_os")}
                 </li>
                 <li className="flex items-center gap-3 text-sm text-slate-600">
                   <Cpu className="size-4 text-sky-600" />
-                  Intel or AMD 64-bit processor
+                  {t("downloads.req_cpu")}
                 </li>
                 <li className="flex items-center gap-3 text-sm text-slate-600">
                   <Monitor className="size-4 text-sky-600" />
-                  4 GB RAM and 500 MB storage
+                  {t("downloads.req_ram")}
                 </li>
               </ul>
               <div className="mt-5 rounded-xl border border-sky-100 bg-sky-50 p-3 text-xs leading-relaxed text-sky-800">
-                Internet is required for activation and cloud synchronization. POS continues to
-                support offline operation after setup.
+                {t("downloads.offline_note")}
               </div>
             </aside>
           </div>
@@ -152,8 +158,8 @@ export default function DashboardDownloadsPage() {
                   <Cpu className="size-5" />
                 </span>
                 <div>
-                  <h3 className="text-sm font-semibold">Windows ARM64</h3>
-                  <p className="text-xs text-slate-500">For Surface and Snapdragon devices</p>
+                  <h3 className="text-sm font-semibold">{t("downloads.arm_title")}</h3>
+                  <p className="text-xs text-slate-500">{t("downloads.arm_hint")}</p>
                 </div>
               </div>
               <Button
@@ -163,22 +169,22 @@ export default function DashboardDownloadsPage() {
                 className="mt-5 w-full rounded-xl border-violet-200 text-violet-700 hover:bg-violet-50"
               >
                 <Download className="mr-2 size-4" />
-                Download ARM64 build
+                {t("downloads.arm_cta")}
               </Button>
             </section>
           ) : null}
 
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm font-semibold">Need help installing?</p>
+            <p className="text-sm font-semibold">{t("downloads.help_title")}</p>
             <p className="mt-1 text-xs leading-relaxed text-slate-500">
-              Open the setup guide or contact support if Windows blocks the installer.
+              {t("downloads.help_hint")}
             </p>
             <div className="mt-4 grid gap-2 sm:grid-cols-2">
               <Link
                 to="/dashboard/restaurant-pos"
                 className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
               >
-                Installation guide
+                {t("downloads.install_guide")}
                 <ArrowUpRight className="size-3.5 text-slate-400" />
               </Link>
               <Link
@@ -187,7 +193,7 @@ export default function DashboardDownloadsPage() {
               >
                 <span className="flex items-center gap-2">
                   <ShieldAlert className="size-3.5 text-amber-500" />
-                  Contact support
+                  {t("downloads.contact_support")}
                 </span>
                 <ArrowUpRight className="size-3.5 text-slate-400" />
               </Link>
@@ -198,8 +204,7 @@ export default function DashboardDownloadsPage() {
         <section className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-xs text-slate-500 shadow-sm">
           <CalendarClock className="mt-0.5 size-4 shrink-0 text-sky-600" />
           <p>
-            Keep Vyntex POS updated for the latest security fixes, printer compatibility, and
-            synchronization improvements.
+            {t("downloads.keep_updated")}
           </p>
         </section>
       </div>

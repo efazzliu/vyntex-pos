@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTheme } from "next-themes";
 import { Languages, Monitor, Moon, Palette, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
@@ -22,21 +22,21 @@ function setReducedMotion(enabled: boolean): void {
 }
 
 const THEME_OPTIONS = [
-  { id: "light" as const, label: "Light", Icon: Sun, preview: "from-slate-100 to-white" },
-  { id: "dark" as const, label: "Dark", Icon: Moon, preview: "from-slate-800 to-slate-950" },
-  { id: "system" as const, label: "System", Icon: Monitor, preview: "from-slate-200 via-slate-100 to-slate-800" },
+  { id: "light" as const, labelKey: "settings.appearance.theme_light", Icon: Sun, preview: "from-slate-100 to-white" },
+  { id: "dark" as const, labelKey: "settings.appearance.theme_dark", Icon: Moon, preview: "from-slate-800 to-slate-950" },
+  { id: "system" as const, labelKey: "settings.appearance.theme_system", Icon: Monitor, preview: "from-slate-200 via-slate-100 to-slate-800" },
 ] as const;
 
 type ThemeId = (typeof THEME_OPTIONS)[number]["id"];
 
-const LANG_OPTIONS: { id: DashboardLang; label: string; native: string }[] = [
-  { id: "en", label: "English", native: "English" },
-  { id: "sq", label: "Albanian", native: "Shqip" },
+const LANG_OPTIONS: { id: DashboardLang; labelKey: string; nativeKey: string; toastKey: string }[] = [
+  { id: "en", labelKey: "settings.appearance.lang_en", nativeKey: "settings.appearance.lang_native_en", toastKey: "settings.appearance.lang_toast_en" },
+  { id: "sq", labelKey: "settings.appearance.lang_sq", nativeKey: "settings.appearance.lang_native_sq", toastKey: "settings.appearance.lang_toast_sq" },
 ];
 
 export function DashboardAppearanceSection() {
   const { theme, setTheme, resolvedTheme } = useTheme();
-  const { lang, setLang } = useDashboardLocale();
+  const { lang, setLang, t } = useDashboardLocale();
   const [mounted, setMounted] = useState(false);
   const [reducedMotion, setReducedMotionState] = useState(false);
 
@@ -52,24 +52,25 @@ export function DashboardAppearanceSection() {
 
   const handleThemeSelect = (id: ThemeId) => {
     setTheme(id);
-    const label = THEME_OPTIONS.find((o) => o.id === id)?.label ?? id;
+    const option = THEME_OPTIONS.find((o) => o.id === id);
+    const label = option ? t(option.labelKey) : id;
     toast.success(
       id === "system"
-        ? "Theme follows your system settings"
-        : `${label} theme applied`,
+        ? t("settings.appearance.toast_system")
+        : t("settings.appearance.toast_theme", { theme: label }),
     );
   };
 
-  const statusLine = (() => {
-    if (!mounted) return "Choose how the dashboard looks on this device.";
+  const statusLine = useMemo(() => {
+    if (!mounted) return t("settings.appearance.status_choose");
     if (activeTheme === "system") {
-      const mode = resolvedTheme === "dark" ? "dark" : "light";
-      return `Following system settings · currently ${mode} mode.`;
+      const mode = resolvedTheme === "dark" ? t("settings.appearance.mode_dark") : t("settings.appearance.mode_light");
+      return t("settings.appearance.status_system", { mode });
     }
     return activeTheme === "dark"
-      ? "Dark mode is active across the dashboard."
-      : "Light mode is active across the dashboard.";
-  })();
+      ? t("settings.appearance.status_dark")
+      : t("settings.appearance.status_light");
+  }, [activeTheme, mounted, resolvedTheme, t]);
 
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_20px_50px_-30px_rgba(2,6,23,0.28)] dark:border-slate-700/80 dark:bg-slate-900/90">
@@ -78,23 +79,28 @@ export function DashboardAppearanceSection() {
           <Palette className="size-4" />
         </div>
         <div>
-          <h2 className="text-base font-semibold text-slate-900 dark:text-white">Appearance</h2>
+          <h2 className="text-base font-semibold text-slate-900 dark:text-white">
+            {t("settings.appearance.title")}
+          </h2>
           <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-            Theme, language, and display preferences for your dashboard.
+            {t("settings.appearance.subtitle")}
           </p>
         </div>
       </div>
 
       <div className="space-y-8">
         <div>
-          <p className="mb-3 text-sm font-medium text-slate-900 dark:text-white">Color theme</p>
+          <p className="mb-3 text-sm font-medium text-slate-900 dark:text-white">
+            {t("settings.appearance.color_theme")}
+          </p>
           <div
             className="grid max-w-3xl gap-3 sm:grid-cols-3"
             role="radiogroup"
-            aria-label="Color theme"
+            aria-label={t("settings.appearance.color_theme_aria")}
           >
-            {THEME_OPTIONS.map(({ id, label, Icon, preview }) => {
+            {THEME_OPTIONS.map(({ id, labelKey, Icon, preview }) => {
               const selected = mounted && activeTheme === id;
+              const label = t(labelKey);
               return (
                 <button
                   key={id}
@@ -139,7 +145,7 @@ export function DashboardAppearanceSection() {
                     </span>
                     {selected ? (
                       <span className="rounded-full bg-[#0066FF]/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#0066FF] dark:bg-cyan-500/15 dark:text-cyan-400">
-                        Active
+                        {t("settings.appearance.active")}
                       </span>
                     ) : null}
                   </div>
@@ -153,10 +159,10 @@ export function DashboardAppearanceSection() {
         <div>
           <p className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-900 dark:text-white">
             <Languages className="size-4 text-[#0066FF] dark:text-cyan-400" />
-            Dashboard language
+            {t("settings.appearance.dashboard_language")}
           </p>
           <div className="flex flex-wrap gap-2">
-            {LANG_OPTIONS.map(({ id, label, native }) => (
+            {LANG_OPTIONS.map(({ id, labelKey, nativeKey, toastKey }) => (
               <Button
                 key={id}
                 type="button"
@@ -169,30 +175,34 @@ export function DashboardAppearanceSection() {
                 )}
                 onClick={() => {
                   setLang(id);
-                  toast.success(id === "sq" ? "Gjuha: Shqip" : "Language: English");
+                  toast.success(t(toastKey));
                 }}
               >
-                <span className="font-medium">{native}</span>
-                <span className="ml-1.5 text-xs opacity-80">({label})</span>
+                <span className="font-medium">{t(nativeKey)}</span>
+                <span className="ml-1.5 text-xs opacity-80">({t(labelKey)})</span>
               </Button>
             ))}
           </div>
           <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-            Sidebar labels and dashboard text update immediately. POS desktop uses its own locale.
+            {t("settings.appearance.lang_hint")}
           </p>
         </div>
 
         <div className="divide-y divide-slate-100 rounded-2xl border border-slate-200 dark:divide-slate-800 dark:border-slate-700/80">
           <SettingsRow
-            label="Reduce motion"
-            hint="Minimize animations in the dashboard for accessibility."
+            label={t("settings.appearance.reduce_motion")}
+            hint={t("settings.appearance.reduce_motion_hint")}
           >
             <Switch
               checked={reducedMotion}
               onCheckedChange={(checked) => {
                 setReducedMotion(checked);
                 setReducedMotionState(checked);
-                toast.success(checked ? "Reduced motion on" : "Reduced motion off");
+                toast.success(
+                  checked
+                    ? t("settings.appearance.reduce_motion_on")
+                    : t("settings.appearance.reduce_motion_off"),
+                );
               }}
             />
           </SettingsRow>

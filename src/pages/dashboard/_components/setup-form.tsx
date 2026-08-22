@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { Building2, CheckCircle2, Sparkles } from "lucide-react";
@@ -20,6 +20,8 @@ import { planTerminalFloor } from "@/pages/pos/_lib/plan-features.ts";
 import { defaultSelfServeTrialExpiry, FREE_TRIAL_QUERY_VALUE } from "@/lib/free-trial.ts";
 import { POS_LICENSE_LOCALE_INSERT, localeFieldsFromCurrencyCode } from "@/lib/pos-locale-defaults.ts";
 import { APP_VERSION_LABEL, VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
+import { dashboardTypeLabel } from "@/lib/dashboard-i18n.ts";
+import { useDashboardLocale } from "@/pages/dashboard/_components/dashboard-locale-context.tsx";
 import { cn } from "@/lib/utils.ts";
 
 const currencies = [
@@ -35,46 +37,47 @@ const CAROUSEL_INTERVAL_MS = 5500;
 const ACTIVATION_PLAN_SLIDES = [
   {
     key: "starter" as const,
-    label: "Starter plan",
-    bullets: [
-      "1 terminal",
-      "Floor plan & live orders",
-      "Menu management",
-      "Order history",
-      "Inventory management",
-      "Table management",
-      "Staff permissions & roles",
-      "Receipt & device settings",
+    labelKey: "activate.plan.starter.label",
+    bulletKeys: [
+      "activate.plan.starter.f1",
+      "activate.plan.starter.f2",
+      "activate.plan.starter.f3",
+      "activate.plan.starter.f4",
+      "activate.plan.starter.f5",
+      "activate.plan.starter.f6",
+      "activate.plan.starter.f7",
+      "activate.plan.starter.f8",
     ],
   },
   {
     key: "professional" as const,
-    label: "Professional plan",
-    bullets: [
-      "Everything in Starter",
-      "Up to 5 terminals",
-      "Kitchen display workflow",
-      "Split bills",
-      "Advanced analytics",
-      "Priority chat support",
+    labelKey: "activate.plan.professional.label",
+    bulletKeys: [
+      "activate.plan.professional.f1",
+      "activate.plan.professional.f2",
+      "activate.plan.professional.f3",
+      "activate.plan.professional.f4",
+      "activate.plan.professional.f5",
+      "activate.plan.professional.f6",
     ],
   },
   {
     key: "enterprise" as const,
-    label: "Enterprise plan",
-    bullets: [
-      "Everything in Professional",
-      "Kitchen & bar supply inventory (mall) in Menu & Stock",
-      "Supply recipe (ingredients per portion) with automatic stock deduction",
-      "Higher terminal limits",
-      "Priority & dedicated support",
-      "SLA-style options & onboarding",
-      "Multi-location & API roadmap (coming soon)",
+    labelKey: "activate.plan.enterprise.label",
+    bulletKeys: [
+      "activate.plan.enterprise.f1",
+      "activate.plan.enterprise.f2",
+      "activate.plan.enterprise.f3",
+      "activate.plan.enterprise.f4",
+      "activate.plan.enterprise.f5",
+      "activate.plan.enterprise.f6",
+      "activate.plan.enterprise.f7",
     ],
   },
 ] as const;
 
 function PlanTierFeatureCarousel() {
+  const { t } = useDashboardLocale();
   const [index, setIndex] = useState(0);
   const slides = ACTIVATION_PLAN_SLIDES;
 
@@ -86,21 +89,22 @@ function PlanTierFeatureCarousel() {
   }, [slides.length]);
 
   const slide = slides[index];
+  const slideLabel = t(slide.labelKey);
 
   return (
     <div className="relative z-10 mt-auto space-y-4 lg:mt-8">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <p className="text-xs font-semibold uppercase tracking-wider text-white/45">
-          What each plan includes
+          {t("activate.carousel.title")}
         </p>
-        <div className="flex items-center gap-1.5" role="tablist" aria-label="Plan tier preview">
+        <div className="flex items-center gap-1.5" role="tablist" aria-label={t("activate.carousel.aria")}>
           {slides.map((s, i) => (
             <button
               key={s.key}
               type="button"
               role="tab"
               aria-selected={i === index}
-              aria-label={`Show ${s.label}`}
+              aria-label={t("activate.carousel.show_plan", { plan: t(s.labelKey) })}
               onClick={() => setIndex(i)}
               className={cn(
                 "h-1.5 rounded-full transition-all duration-300 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-[#44CC00]/70",
@@ -120,12 +124,12 @@ function PlanTierFeatureCarousel() {
           transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
           className="max-w-md"
         >
-          <p className="mb-3 text-sm font-semibold tracking-tight text-white">{slide.label}</p>
+          <p className="mb-3 text-sm font-semibold tracking-tight text-white">{slideLabel}</p>
           <ul className="space-y-3.5">
-            {slide.bullets.map((line) => (
-              <li key={line} className="flex gap-3 text-sm leading-snug text-white/88">
+            {slide.bulletKeys.map((key) => (
+              <li key={key} className="flex gap-3 text-sm leading-snug text-white/88">
                 <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[#44CC00]" aria-hidden />
-                <span>{line}</span>
+                <span>{t(key)}</span>
               </li>
             ))}
           </ul>
@@ -136,6 +140,7 @@ function PlanTierFeatureCarousel() {
 }
 
 export default function SetupForm() {
+  const { t, lang } = useDashboardLocale();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const trialFromMarketing = searchParams.get("trial") === FREE_TRIAL_QUERY_VALUE;
@@ -146,6 +151,11 @@ export default function SetupForm() {
   const [phone, setPhone] = useState("");
   const [currency, setCurrency] = useState("EUR");
   const [plan] = useState<"professional">("professional");
+
+  const professionalPlanLabel = useMemo(
+    () => t("activate.brand.plan_professional"),
+    [t],
+  );
 
   const generateLicenseKey = () => {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -159,7 +169,7 @@ export default function SetupForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      toast.error("Please enter your business name");
+      toast.error(t("activate.error.business_name"));
       return;
     }
     setLoading(true);
@@ -196,7 +206,7 @@ export default function SetupForm() {
         .single();
 
       if (error || !data) {
-        throw error ?? new Error("Failed to create restaurant");
+        throw error ?? new Error(t("activate.error.activate_failed"));
       }
 
       setDashboardRestaurantId(data.id);
@@ -211,26 +221,22 @@ export default function SetupForm() {
         console.warn("[setup-form] plan sync update failed", planSyncError);
       }
 
-      toast.success("Welcome to Vyntex POS! Your 1-month free license has been activated.");
+      toast.success(t("activate.success.welcome"));
       navigate("/dashboard/restaurant-pos", { replace: true });
     } catch (error) {
-      const message = errorMessageFromUnknown(error, "Failed to activate license");
+      const message = errorMessageFromUnknown(error, t("activate.error.activate_failed"));
       const lower = message.toLowerCase();
 
       if (lower.includes("duplicate key")) {
-        toast.error("License creation failed. Please try again.");
+        toast.error(t("activate.error.duplicate_key"));
       } else if (
         lower.includes("could not find") &&
         lower.includes("column") &&
         lower.includes("restaurants")
       ) {
-        toast.error(
-          "Database is missing required columns. Run Supabase migration 006 (or ensure_dashboard_restaurants.sql) in the SQL Editor, then try again.",
-        );
+        toast.error(t("activate.error.migration"));
       } else if (lower.includes("row-level security") || lower.includes("rls")) {
-        toast.error(
-          "Permission denied (row security). Ensure restaurants RLS allows inserts for signed-in users, or apply migration 003 policies.",
-        );
+        toast.error(t("activate.error.rls"));
       } else {
         toast.error(message);
       }
@@ -260,7 +266,7 @@ export default function SetupForm() {
           <div className="mb-8 flex flex-col items-start gap-6 lg:mb-10">
             <img
               src={VYNTEX_APP_LOGO_SRC}
-              alt="Vyntex POS"
+              alt={t("activate.logo_alt")}
               className="h-20 w-20 object-contain drop-shadow-[0_12px_40px_rgba(0,102,255,0.45)] sm:h-24 sm:w-24 lg:h-28 lg:w-28 xl:h-32 xl:w-32"
             />
             <div>
@@ -270,9 +276,7 @@ export default function SetupForm() {
                 </span>
               </h1>
               <p className="mt-3 max-w-md text-sm leading-relaxed text-white/60 sm:text-base">
-                Cloud-native point of sale built for busy dining rooms. You are onboarding the{" "}
-                <span className="font-semibold text-white/85">Professional</span> workspace — full
-                Restaurant POS with a one-month trial license before renewal.
+                {t("activate.brand.tagline", { plan: professionalPlanLabel })}
               </p>
             </div>
           </div>
@@ -280,16 +284,14 @@ export default function SetupForm() {
           {/* VYN Type — flat, no card */}
           <div className="relative z-10 mb-6 w-full max-w-md lg:mb-8">
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/45">
-              VYN Type
+              {t("activate.vyn_type")}
             </p>
             <p className="mt-2 inline-flex items-center gap-2 text-lg font-semibold leading-snug text-white sm:text-xl">
               <Sparkles className="size-5 shrink-0 text-[#7EC8FF]" aria-hidden />
-              Restaurant POS
+              {dashboardTypeLabel(type, lang)}
             </p>
             <p className="mt-2 max-w-md text-xs leading-relaxed text-white/60 sm:text-sm">
-              Starter, Professional, and Enterprise below describe this product line — your trial
-              runs on <span className="font-medium text-white/85">Professional</span> (full
-              feature access); you can move to another tier when you subscribe.
+              {t("activate.vyn_type_hint", { plan: professionalPlanLabel })}
             </p>
           </div>
 
@@ -299,7 +301,7 @@ export default function SetupForm() {
             <span className="font-medium tabular-nums text-white/45">v{APP_VERSION_LABEL}</span>
             <span className="hidden sm:inline">
               {" "}
-              · Secure activation · Encrypted session · License key issued after this step
+              · {t("activate.footer.security")}
             </span>
           </p>
         </div>
@@ -310,11 +312,10 @@ export default function SetupForm() {
         <div className="flex w-full flex-1 flex-col px-5 py-8 sm:px-8 sm:py-10 lg:px-10 lg:py-12 xl:px-14 xl:py-14 2xl:px-20">
           <header className="mb-8 shrink-0 border-b border-slate-200/90 pb-8 dark:border-white/[0.08] lg:mb-10 lg:pb-10">
             <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-3xl lg:text-4xl">
-              Activate your license
+              {t("activate.title")}
             </h2>
             <p className="mt-3 max-w-3xl text-pretty text-sm leading-relaxed text-slate-600 dark:text-white/55 sm:text-base lg:text-lg">
-              Tell us how your venue should appear in Vyntex. We will generate your license key and
-              unlock the POS — use the full width below; this is your trial workspace setup.
+              {t("activate.subtitle")}
             </p>
           </header>
 
@@ -325,12 +326,11 @@ export default function SetupForm() {
             {trialFromMarketing ? (
               <div className="rounded-xl border border-emerald-700/20 bg-emerald-50 px-4 py-3.5 text-sm leading-relaxed text-emerald-950 sm:px-5 sm:text-base dark:border-emerald-400/35 dark:bg-emerald-950/60 dark:text-emerald-50">
                 <strong className="font-semibold text-emerald-900 dark:text-emerald-100">
-                  1 month free
+                  {t("activate.trial.banner_strong")}
                 </strong>
                 <span className="text-emerald-900/95 dark:text-emerald-100/90">
                   {" "}
-                  — completing this step activates your Professional trial (same offer as on the
-                  website).
+                  {t("activate.trial.banner_text")}
                 </span>
               </div>
             ) : null}
@@ -338,29 +338,29 @@ export default function SetupForm() {
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
               <div className="space-y-2">
                 <Label className="text-sm font-medium text-slate-700 dark:text-white/80">
-                  Selected plan
+                  {t("activate.selected_plan")}
                 </Label>
                 <div className="rounded-xl border border-[#0066FF]/25 bg-[#0066FF]/[0.06] p-4 sm:p-5 dark:border-[#0066FF]/35 dark:bg-[#0066FF]/10">
                   <p className="text-lg font-semibold text-slate-900 dark:text-white">
-                    Professional plan
+                    {t("activate.professional_plan")}
                   </p>
                   <p className="mt-1 text-sm font-bold text-[#0066FF] dark:text-[#66B3FF] sm:text-base">
-                    1 month free trial
+                    {t("activate.trial_label")}
                   </p>
                   <p className="mt-2 text-sm leading-snug text-slate-600 dark:text-white/50">
-                    Billing tier for this activation · 30 days full access · then renew or upgrade
+                    {t("activate.trial_hint")}
                   </p>
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="type" className="text-sm font-medium text-slate-700 dark:text-white/80">
-                  VYN type
+                  {t("activate.vyn_type_label")}
                 </Label>
                 <div className="flex min-h-[4.75rem] items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-white/10 dark:bg-[#0b162b] sm:px-5">
                   <Building2 className="size-5 shrink-0 text-slate-500 dark:text-white/45" />
                   <span className="text-base font-medium text-slate-800 dark:text-white/90">
-                    Restaurant POS
+                    {dashboardTypeLabel(type, lang)}
                   </span>
                 </div>
               </div>
@@ -368,11 +368,11 @@ export default function SetupForm() {
 
             <div className="space-y-2">
               <Label htmlFor="name" className="text-sm font-medium text-slate-700 dark:text-white/80">
-                Business name *
+                {t("activate.business_name")}
               </Label>
               <Input
                 id="name"
-                placeholder={"Mario's Italian Kitchen"}
+                placeholder={t("activate.business_name_placeholder")}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
@@ -383,11 +383,11 @@ export default function SetupForm() {
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-12 lg:gap-8">
               <div className="space-y-2 lg:col-span-5">
                 <Label htmlFor="address" className="text-sm font-medium text-slate-700 dark:text-white/80">
-                  Address
+                  {t("activate.address")}
                 </Label>
                 <Input
                   id="address"
-                  placeholder="123 Main St"
+                  placeholder={t("activate.address_placeholder")}
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   className="h-12 rounded-xl border-slate-200 bg-white text-base dark:border-white/10 dark:bg-[#0b162b]"
@@ -395,11 +395,11 @@ export default function SetupForm() {
               </div>
               <div className="space-y-2 lg:col-span-4">
                 <Label htmlFor="phone" className="text-sm font-medium text-slate-700 dark:text-white/80">
-                  Phone
+                  {t("activate.phone")}
                 </Label>
                 <Input
                   id="phone"
-                  placeholder="+1 (555) 000-0000"
+                  placeholder={t("activate.phone_placeholder")}
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   className="h-12 rounded-xl border-slate-200 bg-white text-base dark:border-white/10 dark:bg-[#0b162b]"
@@ -407,7 +407,7 @@ export default function SetupForm() {
               </div>
               <div className="space-y-2 lg:col-span-3">
                 <Label htmlFor="currency" className="text-sm font-medium text-slate-700 dark:text-white/80">
-                  Currency
+                  {t("activate.currency")}
                 </Label>
                 <Select value={currency} onValueChange={setCurrency}>
                   <SelectTrigger
@@ -429,15 +429,14 @@ export default function SetupForm() {
 
             <div className="mt-auto flex flex-col gap-4 border-t border-slate-200/90 pt-8 dark:border-white/[0.08] sm:flex-row sm:items-center sm:justify-between lg:pt-10">
               <p className="order-2 text-xs text-slate-500 dark:text-white/40 sm:order-1 sm:max-w-md">
-                By activating you accept that license and usage are governed by your agreement with
-                Vyntex. You can change venue details later in dashboard settings.
+                {t("activate.terms")}
               </p>
               <Button
                 type="submit"
                 className="order-1 h-12 w-full shrink-0 rounded-xl bg-gradient-to-r from-[#0066FF] to-[#00AACC] px-10 text-base font-semibold text-white shadow-lg shadow-blue-500/25 transition hover:from-[#0055DD] hover:to-[#0099BB] sm:order-2 sm:h-14 sm:w-auto sm:min-w-[220px] lg:min-w-[260px] lg:text-lg"
                 disabled={loading}
               >
-                {loading ? "Activating…" : "Activate license"}
+                {loading ? t("activate.submitting") : t("activate.submit")}
               </Button>
             </div>
           </form>

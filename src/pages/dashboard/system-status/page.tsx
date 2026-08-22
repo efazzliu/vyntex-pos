@@ -19,6 +19,8 @@ import {
   type ServiceStatusKey,
   type StatusIncident,
 } from "@/lib/system-status.ts";
+import { dashboardDateLocale } from "@/lib/dashboard-i18n.ts";
+import { useDashboardLocale } from "@/pages/dashboard/_components/dashboard-locale-context.tsx";
 import { cn } from "@/lib/utils.ts";
 
 const SERVICE_ICONS: Record<ServiceStatusKey, typeof Server> = {
@@ -31,6 +33,8 @@ const SERVICE_ICONS: Record<ServiceStatusKey, typeof Server> = {
 };
 
 export default function DashboardSystemStatusPage() {
+  const { t, lang } = useDashboardLocale();
+  const dateLocale = dashboardDateLocale(lang);
   const [services, setServices] = useState<ServiceHealth[] | null>(null);
   const [incidents, setIncidents] = useState<StatusIncident[]>([]);
   const [checking, setChecking] = useState(false);
@@ -96,17 +100,19 @@ export default function DashboardSystemStatusPage() {
               </span>
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-700">
-                  Vyntex System Status
+                  {t("status.eyebrow")}
                 </p>
                 <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
                   {services === null
-                    ? "Checking all systems..."
+                    ? t("status.checking")
                     : allOperational
-                      ? "All systems operational"
-                      : `${affectedCount} service${affectedCount === 1 ? "" : "s"} experiencing issues`}
+                      ? t("status.all_ok")
+                      : affectedCount === 1
+                        ? t("status.issues_one")
+                        : t("status.issues_many", { count: affectedCount })}
                 </h1>
                 <p className="mt-2 text-sm text-slate-500">
-                  Live availability checks for the Vyntex platform and connected services.
+                  {t("status.subtitle")}
                 </p>
               </div>
             </div>
@@ -118,12 +124,14 @@ export default function DashboardSystemStatusPage() {
                 className="rounded-xl bg-white/80"
               >
                 <RefreshCw className={cn("mr-2 size-4", checking && "animate-spin")} />
-                Refresh status
+                {t("status.refresh")}
               </Button>
               <p className="text-[10px] text-slate-400">
                 {lastChecked
-                  ? `Last checked ${lastChecked.toLocaleTimeString()}`
-                  : "Running live checks"}
+                  ? t("status.last_checked", {
+                      time: lastChecked.toLocaleTimeString(dateLocale),
+                    })
+                  : t("status.running_checks")}
               </p>
             </div>
           </div>
@@ -131,9 +139,9 @@ export default function DashboardSystemStatusPage() {
 
         <section>
           <div className="mb-4">
-            <h2 className="text-lg font-bold">Services</h2>
+            <h2 className="text-lg font-bold">{t("status.services")}</h2>
             <p className="mt-1 text-xs text-slate-500">
-              Automatically refreshed every 60 seconds.
+              {t("status.auto_refresh")}
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -156,9 +164,9 @@ export default function DashboardSystemStatusPage() {
               <History className="size-4" />
             </span>
             <div>
-              <h2 className="text-sm font-semibold">Incident History</h2>
+              <h2 className="text-sm font-semibold">{t("status.incident_title")}</h2>
               <p className="text-xs text-slate-500">
-                Maintenance and resolved service interruptions.
+                {t("status.incident_subtitle")}
               </p>
             </div>
           </div>
@@ -167,10 +175,10 @@ export default function DashboardSystemStatusPage() {
             <div className="flex min-h-44 flex-col items-center justify-center p-8 text-center">
               <CheckCircle2 className="size-8 text-emerald-400" />
               <p className="mt-3 text-sm font-semibold text-slate-700">
-                No incidents reported
+                {t("status.no_incidents")}
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                There is no recorded incident history at this time.
+                {t("status.no_incidents_hint")}
               </p>
             </div>
           ) : (
@@ -183,7 +191,7 @@ export default function DashboardSystemStatusPage() {
         </section>
 
         <p className="text-center text-[11px] text-slate-400">
-          Live checks reflect availability from your current network and location.
+          {t("status.footer")}
         </p>
       </div>
     </div>
@@ -191,6 +199,7 @@ export default function DashboardSystemStatusPage() {
 }
 
 function ServiceCard({ service }: { service: ServiceHealth }) {
+  const { t } = useDashboardLocale();
   const Icon = SERVICE_ICONS[service.key];
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -219,18 +228,30 @@ function ServiceCard({ service }: { service: ServiceHealth }) {
               service.operational ? "bg-emerald-500" : "bg-red-500",
             )}
           />
-          {service.operational ? "Operational" : "Service disruption"}
+          {service.operational ? t("status.operational") : t("status.disruption")}
         </span>
       </div>
-      <h3 className="mt-4 text-sm font-semibold">{service.name}</h3>
+      <h3 className="mt-4 text-sm font-semibold">{t(`status.service.${service.key}`)}</h3>
       <p className="mt-1 text-[11px] text-slate-400">
-        {service.latencyMs == null ? "Availability check" : `Response ${service.latencyMs} ms`}
+        {service.latencyMs == null
+          ? t("status.availability_check")
+          : t("status.response_ms", { ms: service.latencyMs })}
       </p>
     </article>
   );
 }
 
+function incidentStatusLabel(
+  status: StatusIncident["status"],
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): string {
+  if (status === "investigating") return t("status.investigating");
+  if (status === "resolved" || status === "completed") return t("status.resolved");
+  return status;
+}
+
 function IncidentRow({ incident }: { incident: StatusIncident }) {
+  const { t } = useDashboardLocale();
   const resolved =
     incident.status === "resolved" || incident.status === "completed";
   return (
@@ -261,7 +282,7 @@ function IncidentRow({ incident }: { incident: StatusIncident }) {
             : "bg-amber-50 text-amber-700",
         )}
       >
-        {incident.status}
+        {incidentStatusLabel(incident.status, t)}
       </span>
     </div>
   );
