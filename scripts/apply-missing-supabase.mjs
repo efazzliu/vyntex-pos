@@ -52,13 +52,22 @@ async function applyViaManagementApi(token, sql) {
 }
 
 async function applyViaPg(dbUrl, sql) {
-  const { default: pg } = await import("pg");
-  const client = new pg.Client({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } });
-  await client.connect();
+  const tmp = path.join(ROOT, ".tmp-apply-missing.sql");
+  const { writeFileSync, unlinkSync } = await import("node:fs");
+  writeFileSync(tmp, sql, "utf8");
   try {
-    await client.query(sql);
+    const r = spawnSync("psql", [dbUrl, "-v", "ON_ERROR_STOP=1", "-f", tmp], {
+      cwd: ROOT,
+      stdio: "inherit",
+      encoding: "utf8",
+    });
+    if (r.status !== 0) throw new Error("psql exited with non-zero status");
   } finally {
-    await client.end();
+    try {
+      unlinkSync(tmp);
+    } catch {
+      /* ignore */
+    }
   }
 }
 
