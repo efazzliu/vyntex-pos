@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   BadgeCheck,
   Building2,
   Check,
+  ChevronLeft,
+  ChevronRight,
   KeyRound,
   Loader2,
   MapPin,
@@ -11,6 +13,7 @@ import {
   RotateCcw,
   Save,
   ShieldCheck,
+  Store,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button.tsx";
@@ -25,30 +28,232 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select.tsx";
-import { useDashboardRestaurant } from "@/hooks/use-dashboard-restaurant.ts";
+import {
+  setDashboardRestaurantId,
+  useDashboardRestaurant,
+} from "@/hooks/use-dashboard-restaurant.ts";
 import { useDashboardLocale } from "@/pages/dashboard/_components/dashboard-locale-context.tsx";
+import {
+  dashboardDateLocale,
+  dashboardPlanLabel,
+  dashboardTypeLabel,
+} from "@/lib/dashboard-i18n.ts";
 import {
   fetchDashboardBusinessProfile,
   saveDashboardBusinessProfile,
   type DashboardBusinessProfile,
 } from "@/lib/supabase-pos/business-profile.ts";
+import {
+  fetchAllRestaurantsOwnedBySession,
+  type OwnedRestaurantRow,
+} from "@/lib/supabase-pos/phone-pos-session.ts";
 import { listTemplates, saveTemplate } from "@/lib/supabase-pos/templates-ops.ts";
 import { cn } from "@/lib/utils.ts";
 
 type ReceiptTemplate = Awaited<ReturnType<typeof listTemplates>>[number];
 
-const CURRENCY_OPTIONS = [
-  { value: "EUR", labelKey: "business.currency.eur" },
-  { value: "ALL", labelKey: "business.currency.all" },
-  { value: "Lek", labelKey: "business.currency.lek" },
-  { value: "USD", labelKey: "business.currency.usd" },
-  { value: "GBP", labelKey: "business.currency.gbp" },
-  { value: "CHF", labelKey: "business.currency.chf" },
-] as const;
+function isLicenseActive(row: OwnedRestaurantRow): boolean {
+  const expiry = row.license_expiry ? new Date(row.license_expiry).getTime() : 0;
+  return row.license_status === "active" && expiry > Date.now();
+}
+
+function formatExpiry(iso: string | null | undefined, locale: string): string {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  if (!Number.isFinite(date.getTime())) return "—";
+  return date.toLocaleDateString(locale, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
 
 export default function DashboardBusinessSettingsPage() {
+  const { restaurantId } = useParams();
+  if (restaurantId) {
+    return <BusinessProfileEditor requestedId={restaurantId} />;
+  }
+  return <BusinessCardsPage />;
+}
+
+function BusinessCardsPage() {
+  const { t, lang } = useDashboardLocale();
+  const navigate = useNavigate();
+  const locale = dashboardDateLocale(lang);
+  const [venues, setVenues] = useState<OwnedRestaurantRow[] | null>(null);
+  const [openingId, setOpeningId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchAllRestaurantsOwnedBySession()
+      .then((rows) => {
+        if (!cancelled) setVenues(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setVenues([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const openBusiness = useCallback(
+    (row: OwnedRestaurantRow) => {
+      setOpeningId(row.id);
+      setDashboardRestaurantId(row.id);
+      navigate("/dashboard/restaurant-pos");
+    },
+    [navigate],
+  );
+
+  if (venues === null) {
+    return (
+      <div className="space-y-4 px-4 pb-12 pt-16 sm:px-6 lg:px-8">
+        <Skeleton className="h-24 rounded-3xl" />
+        <Skeleton className="h-28 rounded-3xl" />
+        <Skeleton className="h-28 rounded-3xl" />
+      </div>
+    );
+  }
+
+  if (venues.length === 0) {
+    return (
+      <div className="flex min-h-full items-center justify-center bg-slate-50 px-4 py-16 dark:bg-[#02040a]">
+        <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-700/80 dark:bg-slate-900/90">
+          <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-sky-50 text-sky-600 dark:bg-sky-500/10 dark:text-sky-300">
+            <Building2 className="size-7" />
+          </div>
+          <h1 className="text-lg font-semibold text-slate-900 dark:text-white">
+            {t("business.empty_title")}
+          </h1>
+          <p className="mt-2 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+            {t("business.empty_body")}
+          </p>
+          <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
+            <Button asChild className="rounded-xl bg-gradient-to-r from-[#0066FF] to-[#00AACC] text-white">
+              <Link to="/dashboard/get-started">
+                <KeyRound className="size-4" />
+                {t("business.activate")}
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="rounded-xl">
+              <Link to="/dashboard/licenses">{t("business.view_licenses")}</Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-full bg-gradient-to-br from-slate-50 via-white to-sky-50/50 px-4 pb-12 pt-16 text-slate-900 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-3xl space-y-5">
+        <header>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-600">
+            {t("business.eyebrow")}
+          </p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight">{t("business.title")}</h1>
+          <p className="mt-1 text-sm text-slate-500">{t("business.subtitle")}</p>
+          <p className="mt-3 text-sm font-medium text-slate-600">
+            {t("business.count", { count: venues.length })}
+          </p>
+        </header>
+
+        <ul className="grid gap-3">
+          {venues.map((row) => {
+            const active = isLicenseActive(row);
+            const busy = openingId === row.id;
+            const address = (row.address ?? "").trim();
+            return (
+              <li
+                key={row.id}
+                className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
+              >
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => openBusiness(row)}
+                  className={cn(
+                    "flex w-full items-center gap-3 p-4 text-left transition-colors",
+                    "hover:bg-sky-50/60",
+                    "disabled:opacity-70",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "flex size-12 shrink-0 items-center justify-center rounded-2xl",
+                      active
+                        ? "bg-sky-50 text-sky-600"
+                        : "bg-slate-100 text-slate-400",
+                    )}
+                  >
+                    <Store className="size-6" strokeWidth={1.75} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-slate-900">{row.name}</span>
+                      <span
+                        className={cn(
+                          "inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                          active
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "bg-slate-100 text-slate-600",
+                        )}
+                      >
+                        {active
+                          ? t("licenses.status_active")
+                          : row.license_status === "suspended"
+                            ? t("licenses.status_suspended")
+                            : t("licenses.status_expired")}
+                      </span>
+                    </span>
+                    <span className="mt-1 block text-sm text-slate-500">
+                      {dashboardTypeLabel(row.type, lang)}
+                      <span className="mx-1.5 text-slate-300">·</span>
+                      {dashboardPlanLabel(row.plan ?? "professional", lang)}
+                    </span>
+                    {address ? (
+                      <span className="mt-0.5 block truncate text-xs text-slate-400">
+                        {address}
+                      </span>
+                    ) : null}
+                    <span className="mt-1.5 block text-xs text-slate-400">
+                      {t("business.license", {
+                        key: row.license_key.trim().toUpperCase(),
+                      })}
+                      <span className="mx-1.5 text-slate-300">·</span>
+                      {t("business.expires", {
+                        date: formatExpiry(row.license_expiry, locale),
+                      })}
+                    </span>
+                    {busy ? (
+                      <span className="mt-1 block text-xs text-sky-600">
+                        {t("business.opening")}
+                      </span>
+                    ) : null}
+                  </span>
+                  <ChevronRight className="size-5 shrink-0 text-slate-300" aria-hidden />
+                </button>
+                <div className="flex justify-end border-t border-slate-100 px-4 py-2">
+                  <Link
+                    to={`/dashboard/business-settings/${row.id}`}
+                    className="text-[11px] font-semibold text-sky-600 hover:text-sky-800"
+                  >
+                    {t("business.details")}
+                  </Link>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+function BusinessProfileEditor({ requestedId }: { requestedId: string }) {
   const { restaurant, refresh } = useDashboardRestaurant();
-  const { t } = useDashboardLocale();
+  const { lang, t } = useDashboardLocale();
   const [profile, setProfile] = useState<DashboardBusinessProfile | null>(null);
   const [initialProfile, setInitialProfile] =
     useState<DashboardBusinessProfile | null>(null);
@@ -59,10 +264,16 @@ export default function DashboardBusinessSettingsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    setDashboardRestaurantId(requestedId);
+    void refresh();
+  }, [requestedId, refresh]);
+
+  useEffect(() => {
     if (!restaurant) {
       if (restaurant === null) setLoading(false);
       return;
     }
+    if (restaurant.id !== requestedId) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -82,7 +293,7 @@ export default function DashboardBusinessSettingsPage() {
       })
       .catch((reason) => {
         if (!cancelled) {
-          setError(reason instanceof Error ? reason.message : t("business.error_load"));
+          setError(reason instanceof Error ? reason.message : "Could not load business profile.");
         }
       })
       .finally(() => {
@@ -91,7 +302,7 @@ export default function DashboardBusinessSettingsPage() {
     return () => {
       cancelled = true;
     };
-  }, [restaurant]);
+  }, [restaurant, requestedId]);
 
   const dirty =
     JSON.stringify(profile) !== JSON.stringify(initialProfile) ||
@@ -160,9 +371,9 @@ export default function DashboardBusinessSettingsPage() {
       setInitialProfile(structuredClone(profile));
       setInitialReceipt(receipt ? structuredClone(receipt) : null);
       await refresh();
-      toast.success(t("business.saved"));
+      toast.success("Business information saved");
     } catch (reason) {
-      toast.error(reason instanceof Error ? reason.message : t("business.error_save"));
+      toast.error(reason instanceof Error ? reason.message : "Could not save changes.");
     } finally {
       setSaving(false);
     }
@@ -173,7 +384,11 @@ export default function DashboardBusinessSettingsPage() {
     setReceipt(initialReceipt ? structuredClone(initialReceipt) : null);
   };
 
-  if (loading || restaurant === undefined) {
+  if (
+    loading ||
+    restaurant === undefined ||
+    (restaurant !== null && restaurant.id !== requestedId)
+  ) {
     return (
       <div className="space-y-5 px-4 pb-12 pt-16 sm:px-6 lg:px-8">
         <Skeleton className="h-28 rounded-3xl" />
@@ -186,6 +401,7 @@ export default function DashboardBusinessSettingsPage() {
   }
 
   if (!restaurant) {
+    const isSq = lang === "sq";
     return (
       <div className="flex min-h-full items-center justify-center bg-slate-50 px-4 py-16 dark:bg-[#02040a]">
         <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-700/80 dark:bg-slate-900/90">
@@ -193,21 +409,21 @@ export default function DashboardBusinessSettingsPage() {
             <Building2 className="size-7" />
           </div>
           <h1 className="text-lg font-semibold text-slate-900 dark:text-white">
-            {t("business.empty_title")}
+            {isSq ? "Nuk ka biznes të lidhur ende" : "No business linked yet"}
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
-            {t("business.empty_desc")}
+            {isSq
+              ? "Aktivizo ose lidh një licencë POS me këtë llogari, pastaj këtu do të shfaqen të dhënat e biznesit, adresa dhe faturat."
+              : "Activate or link a POS license to this account first. Then you can edit venue details, address, and receipt information here."}
           </p>
           <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
             <Button asChild className="rounded-xl bg-gradient-to-r from-[#0066FF] to-[#00AACC] text-white">
-              <Link to="/dashboard/get-started">
-                <KeyRound className="size-4" />
-                {t("business.activate_license")}
-              </Link>
+              <Link to="/dashboard/business-settings">{t("business.back")}</Link>
             </Button>
             <Button asChild variant="outline" className="rounded-xl">
-              <Link to="/dashboard/licenses">
-                {t("business.view_licenses")}
+              <Link to="/dashboard/get-started">
+                <KeyRound className="size-4" />
+                {isSq ? "Aktivizo licencën" : "Activate license"}
               </Link>
             </Button>
           </div>
@@ -220,8 +436,11 @@ export default function DashboardBusinessSettingsPage() {
     return (
       <div className="min-h-full bg-slate-50 px-4 pb-12 pt-16 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-3xl rounded-3xl border border-amber-200 bg-amber-50 p-6">
-          <h1 className="font-semibold text-amber-900">{t("business.error_unavailable")}</h1>
+          <h1 className="font-semibold text-amber-900">Business profile unavailable</h1>
           <p className="mt-2 text-sm text-amber-800">{error}</p>
+          <Button asChild variant="outline" className="mt-4 rounded-xl">
+            <Link to="/dashboard/business-settings">{t("business.back")}</Link>
+          </Button>
         </div>
       </div>
     );
@@ -237,20 +456,24 @@ export default function DashboardBusinessSettingsPage() {
                 <Building2 className="size-6" />
               </span>
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-600">
-                  {t("business.eyebrow")}
-                </p>
+                <Link
+                  to="/dashboard/business-settings"
+                  className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-600 hover:text-sky-800"
+                >
+                  <ChevronLeft className="size-3.5" />
+                  {t("business.back")}
+                </Link>
                 <h1 className="mt-1 text-2xl font-bold tracking-tight">
-                  {t("business.title")}
+                  Business information
                 </h1>
                 <p className="mt-1 text-sm text-slate-500">
-                  {t("business.subtitle")}
+                  Details used across Vyntex POS, receipts, taxes, and reports.
                 </p>
               </div>
             </div>
             <div className="min-w-44 rounded-2xl border border-slate-200 bg-white/80 p-3">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-500">{t("business.profile_completion")}</span>
+                <span className="text-slate-500">Profile completion</span>
                 <span className="font-bold text-sky-700">{completion}%</span>
               </div>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
@@ -267,50 +490,50 @@ export default function DashboardBusinessSettingsPage() {
           <main className="space-y-5">
             <FormSection
               icon={Building2}
-              title={t("business.section.profile_title")}
-              description={t("business.section.profile_desc")}
+              title="Business profile"
+              description="Public and legal identity of your venue."
             >
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label={t("business.field.restaurant_name")} required>
+                <Field label="Restaurant name" required>
                   <Input
                     value={profile.name}
                     onChange={(event) => update("name", event.target.value)}
-                    placeholder={t("business.field.restaurant_name_placeholder")}
+                    placeholder="Restaurant name"
                   />
                 </Field>
-                <Field label={t("business.field.legal_name")}>
+                <Field label="Legal business name">
                   <Input
                     value={profile.legalName}
                     onChange={(event) => update("legalName", event.target.value)}
-                    placeholder={t("business.field.legal_name_placeholder")}
+                    placeholder="Registered company name"
                   />
                 </Field>
-                <Field label={t("business.field.business_type")}>
+                <Field label="Business type">
                   <div className="flex h-9 items-center rounded-md border border-slate-200 bg-slate-50 px-3 text-sm capitalize text-slate-600">
                     {profile.type}
                     <BadgeCheck className="ml-auto size-4 text-sky-500" />
                   </div>
                 </Field>
-                <Field label={t("business.field.phone")}>
+                <Field label="Phone">
                   <Input
                     value={profile.phone}
                     onChange={(event) => update("phone", event.target.value)}
-                    placeholder={t("business.field.phone_placeholder")}
+                    placeholder="+355..."
                   />
                 </Field>
-                <Field label={t("business.field.email")}>
+                <Field label="Business email">
                   <Input
                     type="email"
                     value={profile.email}
                     onChange={(event) => update("email", event.target.value)}
-                    placeholder={t("business.field.email_placeholder")}
+                    placeholder="contact@restaurant.com"
                   />
                 </Field>
-                <Field label={t("business.field.website")}>
+                <Field label="Website">
                   <Input
                     value={profile.website}
                     onChange={(event) => update("website", event.target.value)}
-                    placeholder={t("business.field.website_placeholder")}
+                    placeholder="https://..."
                   />
                 </Field>
               </div>
@@ -318,53 +541,54 @@ export default function DashboardBusinessSettingsPage() {
 
             <FormSection
               icon={MapPin}
-              title={t("business.section.address_title")}
-              description={t("business.section.address_desc")}
+              title="Address & regional"
+              description="Location, language, currency, and reporting timezone."
             >
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label={t("business.field.street")} className="sm:col-span-2">
+                <Field label="Street address" className="sm:col-span-2">
                   <Input
                     value={profile.address}
                     onChange={(event) => update("address", event.target.value)}
-                    placeholder={t("business.field.street_placeholder")}
+                    placeholder="Street and number"
                   />
                 </Field>
-                <Field label={t("business.field.city")}>
+                <Field label="City">
                   <Input
                     value={profile.city}
                     onChange={(event) => update("city", event.target.value)}
-                    placeholder={t("business.field.city_placeholder")}
+                    placeholder="Tirana"
                   />
                 </Field>
-                <Field label={t("business.field.postal_code")}>
+                <Field label="Postal code">
                   <Input
                     value={profile.postalCode}
                     onChange={(event) => update("postalCode", event.target.value)}
-                    placeholder={t("business.field.postal_code_placeholder")}
+                    placeholder="1001"
                   />
                 </Field>
-                <Field label={t("business.field.country")}>
+                <Field label="Country">
                   <Input
                     value={profile.country}
                     onChange={(event) => update("country", event.target.value)}
-                    placeholder={t("business.field.country_placeholder")}
+                    placeholder="Albania"
                   />
                 </Field>
-                <Field label={t("business.field.currency")}>
+                <Field label="Currency">
                   <Select value={profile.currency} onValueChange={(value) => update("currency", value)}>
                     <SelectTrigger className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {CURRENCY_OPTIONS.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>
-                          {t(opt.labelKey)}
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="EUR">EUR — Euro</SelectItem>
+                      <SelectItem value="ALL">ALL — Albanian Lek</SelectItem>
+                      <SelectItem value="Lek">Lek — Albanian Lek (legacy)</SelectItem>
+                      <SelectItem value="USD">USD — US Dollar</SelectItem>
+                      <SelectItem value="GBP">GBP — British Pound</SelectItem>
+                      <SelectItem value="CHF">CHF — Swiss Franc</SelectItem>
                     </SelectContent>
                   </Select>
                 </Field>
-                <Field label={t("business.field.language")}>
+                <Field label="Language">
                   <Select
                     value={profile.language}
                     onValueChange={(value) => update("language", value as "en" | "sq")}
@@ -373,12 +597,12 @@ export default function DashboardBusinessSettingsPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="en">{t("business.lang.en")}</SelectItem>
-                      <SelectItem value="sq">{t("business.lang.sq")}</SelectItem>
+                      <SelectItem value="en">English</SelectItem>
+                      <SelectItem value="sq">Shqip</SelectItem>
                     </SelectContent>
                   </Select>
                 </Field>
-                <Field label={t("business.field.timezone")}>
+                <Field label="Timezone">
                   <Select
                     value={profile.timezone}
                     onValueChange={(value) => update("timezone", value)}
@@ -400,25 +624,25 @@ export default function DashboardBusinessSettingsPage() {
 
             <FormSection
               icon={ShieldCheck}
-              title={t("business.section.tax_title")}
-              description={t("business.section.tax_desc")}
+              title="Tax & VAT"
+              description="Fiscal identifiers and the default product tax rate."
             >
               <div className="grid gap-4 sm:grid-cols-3">
-                <Field label={t("business.field.tax_number")}>
+                <Field label="Tax / fiscal number">
                   <Input
                     value={profile.taxNumber}
                     onChange={(event) => update("taxNumber", event.target.value)}
-                    placeholder={t("business.field.tax_number_placeholder")}
+                    placeholder="Business tax ID"
                   />
                 </Field>
-                <Field label={t("business.field.vat_number")}>
+                <Field label="VAT number">
                   <Input
                     value={profile.vatNumber}
                     onChange={(event) => update("vatNumber", event.target.value)}
-                    placeholder={t("business.field.vat_number_placeholder")}
+                    placeholder="VAT registration ID"
                   />
                 </Field>
-                <Field label={t("business.field.default_vat")}>
+                <Field label="Default VAT rate">
                   <div className="relative">
                     <Input
                       type="number"
@@ -438,18 +662,18 @@ export default function DashboardBusinessSettingsPage() {
                 </Field>
               </div>
               <p className="mt-3 text-xs leading-5 text-amber-700">
-                {t("business.vat_hint")}
+                Changing the default VAT does not overwrite rates already assigned to existing products.
               </p>
             </FormSection>
 
             {receipt && (
               <FormSection
                 icon={ReceiptText}
-                title={t("business.section.receipt_title")}
-                description={t("business.section.receipt_desc")}
+                title="Receipt settings"
+                description="Text and tax visibility on the fiscal receipt."
               >
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label={t("business.field.receipt_header")}>
+                  <Field label="Receipt header">
                     <Textarea
                       value={receipt.labels.headerText}
                       onChange={(event) =>
@@ -458,7 +682,7 @@ export default function DashboardBusinessSettingsPage() {
                       rows={4}
                     />
                   </Field>
-                  <Field label={t("business.field.receipt_footer")}>
+                  <Field label="Receipt footer">
                     <Textarea
                       value={receipt.labels.footerText}
                       onChange={(event) =>
@@ -470,12 +694,12 @@ export default function DashboardBusinessSettingsPage() {
                 </div>
                 <div className="mt-4 flex flex-wrap gap-3">
                   <ToggleCard
-                    label={t("business.toggle.show_logo")}
+                    label="Show logo"
                     checked={receipt.toggles.logo}
                     onChange={(checked) => updateReceiptToggle("logo", checked)}
                   />
                   <ToggleCard
-                    label={t("business.toggle.show_tax")}
+                    label="Show tax details"
                     checked={receipt.toggles.taxDetails}
                     onChange={(checked) => updateReceiptToggle("taxDetails", checked)}
                   />
@@ -488,8 +712,8 @@ export default function DashboardBusinessSettingsPage() {
             <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-semibold">{t("business.preview.title")}</p>
-                  <p className="mt-0.5 text-[11px] text-slate-400">{t("business.preview.subtitle")}</p>
+                  <p className="text-sm font-semibold">Receipt preview</p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">Fiscal receipt</p>
                 </div>
                 <ReceiptText className="size-5 text-sky-600" />
               </div>
@@ -501,30 +725,17 @@ export default function DashboardBusinessSettingsPage() {
                     </div>
                   )}
                   <p className="whitespace-pre-line font-bold">
-                    {receipt?.labels.headerText || t("business.preview.default_header")}
+                    {receipt?.labels.headerText || "FISCAL RECEIPT"}
                   </p>
                   <p className="mt-2 font-bold">{profile.legalName || profile.name}</p>
-                  <p>
-                    {[profile.address, profile.city].filter(Boolean).join(", ") ||
-                      t("business.preview.address_fallback")}
-                  </p>
-                  {profile.taxNumber && (
-                    <p>{t("business.preview.tax_id", { value: profile.taxNumber })}</p>
-                  )}
-                  {profile.vatNumber && (
-                    <p>{t("business.preview.vat", { value: profile.vatNumber })}</p>
-                  )}
+                  <p>{[profile.address, profile.city].filter(Boolean).join(", ") || "Business address"}</p>
+                  {profile.taxNumber && <p>Tax ID: {profile.taxNumber}</p>}
+                  {profile.vatNumber && <p>VAT: {profile.vatNumber}</p>}
                 </div>
                 <div className="my-3 border-t border-dashed border-slate-400" />
                 <div className="space-y-1">
-                  <div className="flex justify-between">
-                    <span>{t("business.preview.product")}</span>
-                    <span>10.00</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>{t("business.preview.product")}</span>
-                    <span>5.00</span>
-                  </div>
+                  <div className="flex justify-between"><span>Product</span><span>10.00</span></div>
+                  <div className="flex justify-between"><span>Product</span><span>5.00</span></div>
                 </div>
                 <div className="my-3 border-t border-dashed border-slate-400" />
                 {receipt?.toggles.taxDetails && (
@@ -534,11 +745,10 @@ export default function DashboardBusinessSettingsPage() {
                   </div>
                 )}
                 <div className="flex justify-between text-xs font-bold">
-                  <span>{t("business.preview.total")}</span>
-                  <span>15.00 {profile.currency}</span>
+                  <span>TOTAL</span><span>15.00 {profile.currency}</span>
                 </div>
                 <p className="mt-4 whitespace-pre-line text-center">
-                  {receipt?.labels.footerText || t("business.preview.thank_you")}
+                  {receipt?.labels.footerText || "Thank you!"}
                 </p>
               </div>
             </div>
@@ -546,10 +756,10 @@ export default function DashboardBusinessSettingsPage() {
             <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-4">
               <p className="flex items-center gap-2 text-xs font-semibold text-emerald-800">
                 <Check className="size-4" />
-                {t("business.synced_title")}
+                Synced with Vyntex POS
               </p>
               <p className="mt-1.5 text-[11px] leading-5 text-emerald-700">
-                {t("business.synced_desc")}
+                Saved business and receipt details follow this license across connected devices.
               </p>
             </div>
           </aside>
@@ -559,16 +769,16 @@ export default function DashboardBusinessSettingsPage() {
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-[0_-12px_35px_-25px_rgba(15,23,42,0.5)] backdrop-blur lg:left-[230px]">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
           <p className="hidden text-xs text-slate-500 sm:block">
-            {dirty ? t("business.unsaved") : t("business.all_saved")}
+            {dirty ? "You have unsaved business changes." : "All business changes are saved."}
           </p>
           <div className="ml-auto flex gap-2">
             <Button variant="outline" onClick={reset} disabled={!dirty || saving} className="rounded-xl">
               <RotateCcw className="mr-2 size-4" />
-              {t("business.reset")}
+              Reset
             </Button>
             <Button onClick={() => void save()} disabled={!dirty || saving} className="rounded-xl bg-sky-600 hover:bg-sky-700">
               {saving ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Save className="mr-2 size-4" />}
-              {t("business.save")}
+              Save Changes
             </Button>
           </div>
         </div>
