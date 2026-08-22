@@ -835,11 +835,11 @@ export default function PhoneWaiterOrder() {
         className={cn(
           "relative z-10 flex-1 overflow-y-auto no-scrollbar px-4",
           showPrevBar && showCartBar
-            ? "pb-64"
+            ? "pb-80"
             : showPrevBar
               ? "pb-52"
               : showCartBar
-                ? "pb-28"
+                ? "pb-56"
                 : "pb-8",
         )}
       >
@@ -1079,6 +1079,71 @@ export default function PhoneWaiterOrder() {
             aria-hidden
           />
           <div className="relative space-y-2 px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            {showCartBar ? (
+              <div
+                className="overflow-hidden rounded-2xl border border-white/12 bg-[#121a2e] shadow-lg"
+              >
+                <div className="flex items-center justify-between border-b border-white/10 px-3.5 py-2.5">
+                  <p className="text-[13px] font-semibold text-white">
+                    {t("phone.waiter.order.currentOrder")}
+                  </p>
+                  {waiterCanPay ? (
+                    <p className="text-[13px] font-bold text-[#7eb6ff]">
+                      {formatPrice(cartTotal)}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="max-h-36 overflow-y-auto no-scrollbar px-2 py-2">
+                  <div className="space-y-1.5">
+                    {cart.map((item) => {
+                      const lineKey = cartLineKey(item);
+                      const customLabel = formatCustomizationsForDisplay(
+                        item.selectedCustomizations,
+                      );
+                      return (
+                        <div
+                          key={lineKey}
+                          className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-2"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[12px] font-medium text-white">
+                              {item.name}
+                            </p>
+                            {customLabel ? (
+                              <p className="truncate text-[10px] text-sky-300">{customLabel}</p>
+                            ) : null}
+                            {item.notes ? (
+                              <p className="truncate text-[10px] italic text-amber-300/90">
+                                {item.notes}
+                              </p>
+                            ) : null}
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => updateQty(lineKey, -1)}
+                              className="flex size-6 items-center justify-center rounded-lg bg-white/[0.06] text-white/70 active:scale-95"
+                            >
+                              <Minus className="size-3" />
+                            </button>
+                            <span className="w-4 text-center text-[12px] font-semibold text-white">
+                              {item.quantity}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => updateQty(lineKey, 1)}
+                              className="flex size-6 items-center justify-center rounded-lg bg-white/[0.06] text-white/70 active:scale-95"
+                            >
+                              <Plus className="size-3" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            ) : null}
             {showCartBar ? (
               <button
                 type="button"
