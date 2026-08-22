@@ -597,7 +597,7 @@ export default function PhoneWaiterOrder() {
       data-waiter-theme={light ? "light" : "dark"}
       data-waiter-skin={tokens.id}
       className={cn(
-        "relative flex min-h-dvh flex-col overflow-hidden",
+        "relative flex h-dvh min-h-0 flex-col overflow-hidden overscroll-none",
         light ? "text-[#0f172a]" : "text-white",
       )}
       style={waiterThemeStyle(tokens)}
@@ -610,7 +610,7 @@ export default function PhoneWaiterOrder() {
         }}
       />
 
-      <header className="relative z-10 flex items-center gap-3 px-4 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
+      <header className="relative z-10 flex shrink-0 items-center gap-3 px-4 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
         <button
           type="button"
           onClick={() => navigate(backTo)}
@@ -679,7 +679,7 @@ export default function PhoneWaiterOrder() {
         )}
       </header>
 
-      <div className="relative z-10 px-4 pb-3">
+      <div className="relative z-10 shrink-0 px-4 pb-3">
         {tableDesign === "modern" ? (
           <div className="flex gap-2 overflow-x-auto no-scrollbar">
             <button
@@ -803,7 +803,7 @@ export default function PhoneWaiterOrder() {
         )}
       </div>
 
-      <div className="relative z-10 px-4 pb-3">
+      <div className="relative z-10 shrink-0 px-4 pb-3">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-white/30" />
           <input
@@ -833,7 +833,7 @@ export default function PhoneWaiterOrder() {
 
       <main
         className={cn(
-          "relative z-10 flex-1 overflow-y-auto no-scrollbar px-4",
+          "relative z-10 min-h-0 flex-1 overflow-y-auto overscroll-contain no-scrollbar px-4",
           showPrevBar && showCartBar
             ? "pb-80"
             : showPrevBar
