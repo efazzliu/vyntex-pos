@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, BookOpen, LifeBuoy, Search, Send, X } from "lucide-react";
+import { ArrowRight, BookOpen, CircleHelp, Search, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import {
@@ -52,7 +52,7 @@ export default function DashboardSupportPage() {
       <div className="mx-auto w-full max-w-6xl space-y-7">
         <section className="relative overflow-hidden rounded-3xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-cyan-50 p-6 text-center shadow-[0_24px_70px_-48px_rgba(14,116,202,0.45)] sm:p-10">
           <span className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-sky-600 text-white shadow-lg shadow-sky-200">
-            <LifeBuoy className="size-6" />
+            <CircleHelp className="size-6" />
           </span>
           <p className="mt-4 text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-600">
             {helpUi("eyebrow", lang)}

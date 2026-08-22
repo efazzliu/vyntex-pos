@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
@@ -21,6 +22,12 @@ type ActivationScreenProps = {
   onActivated: () => void;
 };
 
+function isPhoneShellEntry(): boolean {
+  if (typeof window === "undefined") return false;
+  if (/phone\.html$/i.test(window.location.pathname)) return true;
+  return import.meta.env.VITE_PHONE_STORE_BUILD === "true";
+}
+
 export default function ActivationScreen({ onActivated }: ActivationScreenProps) {
   const { theme: posTheme } = usePosTheme();
   const [segments, setSegments] = useState(["", "", "", ""]);
@@ -28,6 +35,7 @@ export default function ActivationScreen({ onActivated }: ActivationScreenProps)
   const [loading, setLoading] = useState(false);
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const showPhoneBackLink = isPhoneShellEntry();
 
   // Load device ID on mount (never leave the UI stuck on "Generating...")
   useEffect(() => {
@@ -292,6 +300,13 @@ export default function ActivationScreen({ onActivated }: ActivationScreenProps)
           Find your license key in the{" "}
           <span className="text-[#0066FF]">Vyntex POS Web Dashboard</span>
         </p>
+        {showPhoneBackLink ? (
+          <p className="mt-3 text-center text-sm">
+            <Link to="/login" className="text-[#0066FF] hover:underline">
+              Kthehu te kyçja / Back to sign in
+            </Link>
+          </p>
+        ) : null}
         <p
           className="text-center text-[10px] tabular-nums text-[#3a4560] mt-2"
           aria-label={`Version ${APP_VERSION_LABEL}`}

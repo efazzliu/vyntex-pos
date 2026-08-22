@@ -838,6 +838,7 @@
       "verifyEmail": "Please verify your email before continuing.",
       "successToast": "Signed in successfully.",
       "managerCodeLink": "I’m a manager — create account with invite code",
+      "waiterPinLink": "I’m staff — sign in with PIN",
       "supabaseNotConfigured": "Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.local (see .env.example), then restart the dev server.",
       "enterEmailFirst": "Enter your email first.",
       "forgotPassword": "Forgot password?",

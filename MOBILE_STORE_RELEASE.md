@@ -5,7 +5,8 @@ This project now supports shipping the existing phone experience as native Andro
 ## Scope
 
 - Included: `phone.html` + `src/phone-app/*`
-- Excluded: desktop Electron flow and desktop POS routes
+- Included: waiter / staff POS on phone via `#/pos` (license key + PIN login)
+- Excluded: desktop Electron flow
 
 ## One-time setup
 
@@ -54,3 +55,4 @@ Notes:
 4. `Mobile access` gate blocks disabled licenses.
 5. Verify all phone routes work:
    - `/app`, `/app/venue`, `/app/orders`, `/app/stock`, `/app/staff`, `/app/profile*`
+   - `/pos` (license activation + staff PIN login)

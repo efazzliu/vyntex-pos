@@ -1,5 +1,8 @@
 import { supabase, isSupabaseConfigured } from "@/lib/supabase.ts";
-import { errorMessageFromUnknown } from "@/lib/supabase-pos/db-errors.ts";
+import {
+  errorMessageFromUnknown,
+  isMissingPgColumnError,
+} from "@/lib/supabase-pos/db-errors.ts";
 import { licenseKeyLookupVariants } from "@/lib/license-key-variants.ts";
 import { devPosPlanDisplayOverride } from "@/lib/dev-pos-plan-override.ts";
 import {
@@ -45,8 +48,9 @@ function parseRegisteredDevices(
   return [];
 }
 
-const RESTAURANT_ACTIVATION_SELECT =
+const RESTAURANT_ACTIVATION_SELECT_BASE =
   "id, name, type, plan, license_key, license_expiry, license_status, device_id, max_terminals, registered_devices";
+const RESTAURANT_ACTIVATION_SELECT = `${RESTAURANT_ACTIVATION_SELECT_BASE}, mobile_access_enabled`;
 
 type RestaurantActivationRow = {
   id: string;
@@ -59,7 +63,14 @@ type RestaurantActivationRow = {
   device_id: string | null;
   max_terminals: number | null;
   registered_devices: unknown;
+  mobile_access_enabled?: boolean | null;
 };
+
+function isPhoneShellEntry(): boolean {
+  if (typeof window === "undefined") return false;
+  if (/phone\.html$/i.test(window.location.pathname)) return true;
+  return import.meta.env.VITE_PHONE_STORE_BUILD === "true";
+}
 
 function isRlsLikeError(err: { message?: string; code?: string }): boolean {
   const msg = String(err.message ?? "").toLowerCase();
@@ -92,11 +103,24 @@ async function fetchRestaurantRowForActivation(licenseKey: string): Promise<{
   let lastError: { message: string; code?: string } | null = null;
 
   for (const variant of licenseKeyLookupVariants(licenseKey)) {
-    const { data, error } = await supabase
+    let selectCols = RESTAURANT_ACTIVATION_SELECT;
+    let { data, error } = await supabase
       .from("restaurants")
-      .select(RESTAURANT_ACTIVATION_SELECT)
+      .select(selectCols)
       .eq("license_key", variant)
       .maybeSingle();
+
+    if (
+      error &&
+      isMissingPgColumnError(error.message, "mobile_access_enabled")
+    ) {
+      selectCols = RESTAURANT_ACTIVATION_SELECT_BASE;
+      ({ data, error } = await supabase
+        .from("restaurants")
+        .select(selectCols)
+        .eq("license_key", variant)
+        .maybeSingle());
+    }
 
     if (error) {
       lastError = error;
@@ -115,7 +139,7 @@ async function fetchRestaurantRowForActivation(licenseKey: string): Promise<{
     }
 
     if (data) {
-      return { row: data as RestaurantActivationRow, error: null };
+      return { row: data as unknown as RestaurantActivationRow, error: null };
     }
   }
 
@@ -246,6 +270,12 @@ export async function activateLicense(
 
   if (row.license_status !== "active") {
     throw new Error("This license is not active.");
+  }
+
+  if (isPhoneShellEntry() && row.mobile_access_enabled === false) {
+    throw new Error(
+      "Qasja nga telefoni është e çaktivizuar për këtë licencë. / Mobile access is disabled for this license.",
+    );
   }
 
   const expiresAt = row.license_expiry;

@@ -838,6 +838,7 @@
       "verifyEmail": "Verifiko email-in para se të vazhdosh.",
       "successToast": "U kyçët me sukses.",
       "managerCodeLink": "Jam menaxher — krijo llogari me kod ftese",
+      "waiterPinLink": "Jam kamarier — kyçu me PIN",
       "supabaseNotConfigured": "Supabase nuk është konfiguruar. Shto VITE_SUPABASE_URL dhe VITE_SUPABASE_ANON_KEY në .env.local (shiko .env.example), pastaj rifillo dev serverin.",
       "enterEmailFirst": "Shkruaj fillimisht email-in.",
       "forgotPassword": "Harrove fjalëkalimin?",
