@@ -836,11 +836,11 @@ export default function PhoneWaiterOrder() {
         className={cn(
           "relative z-10 min-h-0 flex-1 overflow-y-auto overscroll-contain no-scrollbar px-4",
           showPrevBar && showCartBar
-            ? "pb-80"
+            ? "pb-72"
             : showPrevBar
-              ? "pb-52"
+              ? "pb-36"
               : showCartBar
-                ? "pb-60"
+                ? "pb-56"
                 : "pb-8",
         )}
       >
@@ -1160,72 +1160,93 @@ export default function PhoneWaiterOrder() {
                     );
                   })}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setCartOpen(true)}
-                  className="flex w-full items-center justify-between border-t border-white/10 px-4 py-3.5 text-white active:scale-[0.99]"
-                  style={{
-                    backgroundColor: tableDesign === "professional" ? "#0066FF" : accent,
-                  }}
-                >
-                  <span className="flex items-center gap-2 text-[14px] font-semibold text-white">
-                    <ShoppingBag className="size-4" />
-                    {t("phone.waiter.order.itemsInCart", { count: cartCount })}
-                  </span>
-                  {waiterCanPay ? (
-                    <span className="text-[14px] font-bold text-white">{formatPrice(cartTotal)}</span>
-                  ) : null}
-                </button>
               </div>
             ) : null}
-            {showPrevBar ? (
-              <div
-                className={cn(
-                  "flex w-full items-center gap-2 border border-white/12 bg-[#121a2e] px-3 py-2.5",
-                  tableDesign === "modern" ? "rounded-full" : "rounded-2xl",
-                )}
-              >
-                <button
-                  type="button"
-                  onClick={() => setHistoryOpen(true)}
-                  className="flex min-w-0 flex-1 items-center gap-3 text-left active:scale-[0.99]"
-                >
-                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/18 text-amber-300">
-                    <ClipboardList className="size-5" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[14px] font-semibold text-white">
-                      {t("phone.waiter.order.previousOrders")}
-                    </span>
-                    <span className="block truncate text-[12px] text-white/50">
-                      {t("phone.waiter.order.previousBarHint", { count: sentCount })}
-                    </span>
-                  </span>
-                </button>
-                {existingOrder ? (
-                  waiterCanPay ? (
+
+            {(showPrevBar || showCartBar) ? (
+              <div className="flex items-stretch gap-2">
+                {showPrevBar ? (
+                  <div
+                    className={cn(
+                      "flex min-w-0 items-center gap-1.5 border border-white/12 bg-[#121a2e] px-2.5 py-2",
+                      showCartBar ? "w-1/2" : "w-full",
+                      tableDesign === "modern" ? "rounded-full" : "rounded-2xl",
+                    )}
+                  >
                     <button
                       type="button"
-                      onClick={() => setPayOpen(true)}
-                      disabled={payBusy}
-                      className="shrink-0 rounded-xl bg-emerald-600 px-3 py-2 text-[12px] font-semibold text-white active:scale-95 disabled:opacity-50"
+                      onClick={() => setHistoryOpen(true)}
+                      className="flex min-w-0 flex-1 items-center gap-2 text-left active:scale-[0.99]"
                     >
-                      {t("phone.waiter.order.payment")}
+                      <span
+                        className={cn(
+                          "flex shrink-0 items-center justify-center rounded-xl bg-amber-500/18 text-amber-300",
+                          showCartBar ? "size-9" : "size-10",
+                        )}
+                      >
+                        <ClipboardList className={showCartBar ? "size-4" : "size-5"} />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[13px] font-semibold text-white">
+                          {t("phone.waiter.order.previousOrders")}
+                        </span>
+                        <span className="block truncate text-[11px] text-white/50">
+                          {t("phone.waiter.order.previousBarHint", { count: sentCount })}
+                        </span>
+                      </span>
                     </button>
-                  ) : billRequested ? (
-                    <span className="shrink-0 max-w-[7.5rem] text-right text-[11px] font-semibold leading-tight text-[#7eb6ff]">
-                      {t("phone.waiter.order.billRequested")}
+                    {!showCartBar && existingOrder ? (
+                      waiterCanPay ? (
+                        <button
+                          type="button"
+                          onClick={() => setPayOpen(true)}
+                          disabled={payBusy}
+                          className="shrink-0 rounded-xl bg-emerald-600 px-3 py-2 text-[12px] font-semibold text-white active:scale-95 disabled:opacity-50"
+                        >
+                          {t("phone.waiter.order.payment")}
+                        </button>
+                      ) : billRequested ? (
+                        <span className="shrink-0 max-w-[7.5rem] text-right text-[11px] font-semibold leading-tight text-[#7eb6ff]">
+                          {t("phone.waiter.order.billRequested")}
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => void handleRequestBill()}
+                          disabled={payBusy}
+                          className="shrink-0 rounded-xl bg-[#0066FF] px-3 py-2 text-[12px] font-semibold text-white active:scale-95 disabled:opacity-50"
+                        >
+                          {t("phone.waiter.order.requestBill")}
+                        </button>
+                      )
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {showCartBar ? (
+                  <button
+                    type="button"
+                    onClick={() => setCartOpen(true)}
+                    className={cn(
+                      "flex min-w-0 items-center justify-center gap-2 px-3 py-2.5 text-white active:scale-[0.99]",
+                      showPrevBar ? "w-1/2" : "w-full",
+                      tableDesign === "modern" ? "rounded-full" : "rounded-2xl",
+                    )}
+                    style={{
+                      backgroundColor:
+                        tableDesign === "professional" ? "#0066FF" : accent,
+                    }}
+                  >
+                    <ShoppingBag className="size-4 shrink-0" />
+                    <span className="min-w-0 truncate text-[13px] font-semibold">
+                      {t("phone.waiter.order.itemsInCart", { count: cartCount })}
                     </span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => void handleRequestBill()}
-                      disabled={payBusy}
-                      className="shrink-0 rounded-xl bg-[#0066FF] px-3 py-2 text-[12px] font-semibold text-white active:scale-95 disabled:opacity-50"
-                    >
-                      {t("phone.waiter.order.requestBill")}
-                    </button>
-                  )
+                    {waiterCanPay && !showPrevBar ? (
+                      <span className="shrink-0 text-[13px] font-bold">
+                        {formatPrice(cartTotal)}
+                      </span>
+                    ) : null}
+                  </button>
                 ) : null}
               </div>
             ) : null}
