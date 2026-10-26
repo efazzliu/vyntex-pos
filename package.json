@@ -166,6 +166,7 @@
       "!dist/**/*.exe",
       "!dist/phone.html",
       "!dist/assets/phone-*",
+      "!dist/videos/**",
       "electron/**/*",
       "package.json"
     ],
