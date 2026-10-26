@@ -52,7 +52,7 @@ export default function PhoneProfileLicensesPage() {
       >
         <Link
           to="/app/profile"
-          className="flex size-10 shrink-0 items-center justify-center rounded-xl text-slate-700 hover:bg-[#0066FF]/10"
+          className="flex size-10 shrink-0 items-center justify-center rounded-xl text-slate-700 hover:bg-brand/10"
           aria-label={t("phone.profile.backToProfile")}
         >
           <ChevronLeft className="size-6" strokeWidth={2} />
@@ -69,7 +69,7 @@ export default function PhoneProfileLicensesPage() {
         ) : restaurant === null ? (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-6 text-center">
             <p className="text-sm text-slate-600">{t("phone.profile.noVenueSelected")}</p>
-            <Button className="mt-4 rounded-xl bg-[#0066FF]" asChild>
+            <Button className="mt-4 rounded-xl bg-brand" asChild>
               <Link to="/app">{t("phone.profile.myVenues")}</Link>
             </Button>
           </div>

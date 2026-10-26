@@ -40,7 +40,7 @@ export function DashboardBillingSection({ restaurant, billingCheckoutUrl }: Prop
     <section className="space-y-6">
       <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_20px_50px_-30px_rgba(2,6,23,0.28)] dark:border-slate-700/80 dark:bg-slate-900/90">
         <div className="mb-5 flex items-start gap-3 border-b border-slate-200 pb-4 dark:border-slate-700/80">
-          <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-[#0066FF]/10 to-[#00AACC]/10 p-2.5 text-[#0066FF] dark:border-slate-600 dark:text-cyan-400">
+          <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-brand/10 to-brand-sky/10 p-2.5 text-brand dark:border-slate-600 dark:text-cyan-400">
             <CreditCard className="size-4" />
           </div>
           <div>
@@ -59,7 +59,7 @@ export function DashboardBillingSection({ restaurant, billingCheckoutUrl }: Prop
               {t("settings.billing.current_plan")}
             </p>
             <p className="mt-2 flex items-center gap-2 text-lg font-semibold text-slate-900 dark:text-white">
-              <BadgeEuro className="size-5 text-[#0066FF]" />
+              <BadgeEuro className="size-5 text-brand" />
               {planLabel}
             </p>
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
@@ -89,7 +89,7 @@ export function DashboardBillingSection({ restaurant, billingCheckoutUrl }: Prop
                 type="button"
                 size="sm"
                 disabled={!billingCheckoutUrl}
-                className="rounded-xl bg-gradient-to-r from-[#0066FF] to-[#00AACC] text-white"
+                className="rounded-xl bg-gradient-to-r from-brand to-brand-sky text-white"
                 onClick={() =>
                   billingCheckoutUrl && window.open(billingCheckoutUrl, "_blank", "noopener,noreferrer")
                 }
@@ -121,7 +121,7 @@ export function DashboardBillingSection({ restaurant, billingCheckoutUrl }: Prop
 
       <div className="rounded-3xl border border-slate-200 bg-white p-6 dark:border-slate-700/80 dark:bg-slate-900/90">
         <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
-          <FileText className="size-4 text-[#0066FF]" />
+          <FileText className="size-4 text-brand" />
           {t("settings.billing.download_invoices")}
         </div>
         <div className="space-y-2">
@@ -151,7 +151,7 @@ export function DashboardBillingSection({ restaurant, billingCheckoutUrl }: Prop
         </div>
         <p className="mt-3 text-xs text-slate-500">
           {t("settings.billing.invoices_hint_prefix")}{" "}
-          <Link to="/dashboard/settings?tab=billing" className="text-[#0066FF] hover:underline dark:text-cyan-400">
+          <Link to="/dashboard/settings?tab=billing" className="text-brand hover:underline dark:text-cyan-400">
             {t("settings.billing.invoices_hint_link")}
           </Link>{" "}
           {t("settings.billing.invoices_hint_suffix")}
@@ -172,7 +172,7 @@ export function DashboardBillingSection({ restaurant, billingCheckoutUrl }: Prop
           <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-600 dark:bg-slate-950 sm:col-span-2">
             <span className="text-slate-500">{t("settings.billing.license_key")}</span>
             <p className="mt-1 flex items-center gap-2 font-mono text-xs tracking-wider text-slate-900 dark:text-white">
-              <KeyRound className="size-3.5 text-[#0066FF]" />
+              <KeyRound className="size-3.5 text-brand" />
               {restaurant.licenseKey}
             </p>
           </div>

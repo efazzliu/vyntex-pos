@@ -118,7 +118,7 @@ function AdminNavBody({
             >
               {businessName}
             </p>
-            <p className="text-[#0066FF] text-xs font-medium">
+            <p className="text-brand text-xs font-medium">
               {staffName} &middot;{" "}
               {staffRole === "manager"
                 ? t("staff.role_manager")
@@ -132,7 +132,7 @@ function AdminNavBody({
             >
               {businessName}
             </SheetTitle>
-            <SheetDescription className="text-[#0066FF] text-xs font-medium">
+            <SheetDescription className="text-brand text-xs font-medium">
               {staffName} &middot;{" "}
               {staffRole === "manager"
                 ? t("staff.role_manager")
@@ -208,7 +208,7 @@ function AdminNavBody({
               className={cn(
                 "flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer",
                 activeView === item.id
-                  ? "bg-[#0066FF]/15 text-[#0066FF]"
+                  ? "bg-brand/15 text-brand"
                   : light
                     ? "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                     : "text-[#8b93a7] hover:bg-[#1e2a45]/60 hover:text-white",

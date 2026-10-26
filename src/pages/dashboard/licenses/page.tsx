@@ -190,11 +190,11 @@ export default function DashboardLicensesPage() {
         <section className="relative overflow-hidden rounded-[1.75rem] border border-[#16325a]/80 bg-[#07182e] text-white shadow-[0_30px_80px_-48px_rgba(7,24,46,0.85)]">
           <div
             aria-hidden
-            className="pointer-events-none absolute -right-16 -top-20 size-56 rounded-full bg-[#00a8c7]/25 blur-3xl"
+            className="pointer-events-none absolute -right-16 -top-20 size-56 rounded-full bg-brand-sky/25 blur-3xl"
           />
           <div
             aria-hidden
-            className="pointer-events-none absolute -bottom-24 left-10 size-64 rounded-full bg-[#0066ff]/20 blur-3xl"
+            className="pointer-events-none absolute -bottom-24 left-10 size-64 rounded-full bg-brand/20 blur-3xl"
           />
           <div
             aria-hidden
@@ -204,7 +204,7 @@ export default function DashboardLicensesPage() {
           <div className="relative flex flex-col gap-6 p-5 sm:p-7">
             <div className="flex items-start justify-between gap-4">
               <div className="flex min-w-0 items-center gap-3.5">
-                <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0066ff] to-[#00a8c7] text-white shadow-[0_12px_30px_-12px_rgba(0,168,199,0.9)]">
+                <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand to-brand-sky text-white shadow-[0_12px_30px_-12px_rgba(0,121,235,0.9)]">
                   <ShieldCheck className="size-6" strokeWidth={2.25} />
                 </span>
                 <div className="min-w-0">
@@ -284,7 +284,7 @@ export default function DashboardLicensesPage() {
                     className={cn(
                       "h-full rounded-full transition-[width] duration-1000 ease-out",
                       currentStatus.active
-                        ? "bg-gradient-to-r from-[#0066ff] to-[#00d4c8]"
+                        ? "bg-gradient-to-r from-brand to-brand-accent"
                         : "bg-rose-400",
                     )}
                     style={{ width: reveal ? `${termPct}%` : "0%" }}
@@ -343,7 +343,7 @@ export default function DashboardLicensesPage() {
             </div>
             <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-[#0066ff] to-[#00a8c7] transition-[width] duration-1000 ease-out"
+                className="h-full rounded-full bg-gradient-to-r from-brand to-brand-sky transition-[width] duration-1000 ease-out"
                 style={{ width: reveal ? `${devicePct}%` : "0%" }}
               />
             </div>
@@ -352,7 +352,7 @@ export default function DashboardLicensesPage() {
           <div className="flex flex-col gap-2.5 border-t border-slate-100 bg-slate-50/70 px-5 py-4 sm:flex-row sm:px-6">
             <Button
               asChild
-              className="h-11 flex-1 rounded-xl bg-gradient-to-r from-[#0066ff] to-[#00a8c7] text-white shadow-sm hover:opacity-95"
+              className="h-11 flex-1 rounded-xl bg-gradient-to-r from-brand to-brand-sky text-white shadow-sm hover:opacity-95"
             >
               <Link to="/dashboard/settings?tab=billing">
                 <CreditCard className="mr-2 size-4" />

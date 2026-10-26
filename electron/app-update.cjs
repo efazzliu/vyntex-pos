@@ -1,7 +1,10 @@
 const { app, ipcMain, BrowserWindow, net, shell } = require("electron");
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
+
+let downloadedInstaller = { version: null, path: null };
 
 const UPDATE_ORIGIN = (
   process.env.VYNTEX_UPDATE_ORIGIN || "https://www.vyntexpos.net"
@@ -48,10 +51,12 @@ async function fetchLatestMeta() {
       const j = await res.json();
       const appVersion = String(j?.appVersion ?? "").trim();
       if (appVersion) {
+        const notes = String(j?.releaseNotes ?? "").trim();
         return {
           appVersion,
           installerUpdatedAt:
             typeof j.installerUpdatedAt === "string" ? j.installerUpdatedAt : null,
+          releaseNotes: notes || null,
         };
       }
     } catch (err) {
@@ -122,6 +127,31 @@ function launchInstallerAndQuit(exePath) {
   }, 500);
 }
 
+async function ensureDownloadedInstaller() {
+  if (!app.isPackaged) {
+    return { ok: false, error: "dev" };
+  }
+  const currentVersion = app.getVersion();
+  const latest = await fetchLatestMeta();
+  if (cmpVersion(latest.appVersion, currentVersion) <= 0) {
+    return { ok: false, error: "none", version: latest.appVersion };
+  }
+  const dest = path.join(
+    app.getPath("temp"),
+    `VyntexPOS-Setup-${latest.appVersion}.exe`,
+  );
+  if (
+    downloadedInstaller.version === latest.appVersion &&
+    downloadedInstaller.path &&
+    fs.existsSync(downloadedInstaller.path)
+  ) {
+    return { ok: true, path: downloadedInstaller.path, version: latest.appVersion };
+  }
+  await downloadInstaller(installerUrlForArch(), dest);
+  downloadedInstaller = { version: latest.appVersion, path: dest };
+  return { ok: true, path: dest, version: latest.appVersion };
+}
+
 function registerAppUpdateIpc() {
   ipcMain.removeHandler("app-update-check");
   ipcMain.handle("app-update-check", async () => {
@@ -133,26 +163,44 @@ function registerAppUpdateIpc() {
       latestVersion: latest.appVersion,
       updateAvailable: cmpVersion(latest.appVersion, currentVersion) > 0,
       packaged: app.isPackaged,
+      releaseNotes: latest.releaseNotes,
+      installerUpdatedAt: latest.installerUpdatedAt,
+      downloaded: Boolean(
+        downloadedInstaller.version === latest.appVersion &&
+          downloadedInstaller.path &&
+          fs.existsSync(downloadedInstaller.path),
+      ),
     };
+  });
+
+  ipcMain.removeHandler("app-update-download");
+  ipcMain.handle("app-update-download", async () => {
+    const result = await ensureDownloadedInstaller();
+    if (!result.ok) return result;
+    return { ok: true, version: result.version };
   });
 
   ipcMain.removeHandler("app-update-install");
   ipcMain.handle("app-update-install", async () => {
-    if (!app.isPackaged) {
-      return { ok: false, error: "dev" };
-    }
-    const currentVersion = app.getVersion();
-    const latest = await fetchLatestMeta();
-    if (cmpVersion(latest.appVersion, currentVersion) <= 0) {
-      return { ok: false, error: "none" };
-    }
-    const dest = path.join(
-      app.getPath("temp"),
-      `VyntexPOS-Setup-${latest.appVersion}.exe`,
-    );
-    await downloadInstaller(installerUrlForArch(), dest);
-    launchInstallerAndQuit(dest);
+    const result = await ensureDownloadedInstaller();
+    if (!result.ok) return result;
+    launchInstallerAndQuit(result.path);
     return { ok: true };
+  });
+
+  ipcMain.removeHandler("app-system-info");
+  ipcMain.handle("app-system-info", async () => {
+    return {
+      ok: true,
+      appVersion: app.getVersion(),
+      packaged: app.isPackaged,
+      platform: process.platform,
+      arch: process.arch,
+      electron: process.versions.electron || null,
+      chrome: process.versions.chrome || null,
+      osRelease: os.release(),
+      osType: os.type(),
+    };
   });
 }
 

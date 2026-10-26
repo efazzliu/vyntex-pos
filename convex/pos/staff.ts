@@ -59,6 +59,7 @@ export const createStaff = mutation({
     role: v.union(
       v.literal("admin"),
       v.literal("manager"),
+      v.literal("cashier"),
       v.literal("waiter"),
       v.literal("inventory"),
       v.literal("accountant"),
@@ -67,6 +68,8 @@ export const createStaff = mutation({
     ),
     pinHash: v.string(),
     permissions: permissionsValidator,
+    actorStaffId: v.optional(v.string()),
+    actorStaffName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const restaurant = await getRestaurantByLicense(ctx, args.licenseKey);
@@ -86,7 +89,7 @@ export const createStaff = mutation({
       });
     }
 
-    return await ctx.db.insert("staff", {
+    const createdId = await ctx.db.insert("staff", {
       restaurantId: restaurant._id,
       name: args.name,
       role: args.role,
@@ -94,6 +97,14 @@ export const createStaff = mutation({
       isActive: true,
       permissions: args.permissions,
     });
+    await ctx.db.insert("auditLogs", {
+      restaurantId: restaurant._id,
+      staffName: args.actorStaffName?.trim() || "System",
+      action: "staff_create",
+      details: `Created staff ${args.name} with role ${args.role}`,
+      createdAt: new Date().toISOString(),
+    });
+    return createdId;
   },
 });
 
@@ -105,6 +116,7 @@ export const updateStaff = mutation({
     role: v.union(
       v.literal("admin"),
       v.literal("manager"),
+      v.literal("cashier"),
       v.literal("waiter"),
       v.literal("inventory"),
       v.literal("accountant"),
@@ -114,6 +126,8 @@ export const updateStaff = mutation({
     pinHash: v.optional(v.string()),
     isActive: v.boolean(),
     permissions: permissionsValidator,
+    actorStaffId: v.optional(v.string()),
+    actorStaffName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const restaurant = await getRestaurantByLicense(ctx, args.licenseKey);
@@ -154,6 +168,21 @@ export const updateStaff = mutation({
       permissions: args.permissions,
       ...(args.pinHash ? { pinHash: args.pinHash } : {}),
     });
+    const roleChanged = staff.role !== args.role;
+    const activeChanged = staff.isActive !== args.isActive;
+    await ctx.db.insert("auditLogs", {
+      restaurantId: restaurant._id,
+      staffName: args.actorStaffName?.trim() || "System",
+      action: "staff_update",
+      details: [
+        `Updated staff ${args.name}`,
+        roleChanged ? `role ${staff.role} → ${args.role}` : `role ${args.role}`,
+        activeChanged ? (args.isActive ? "activated" : "deactivated") : null,
+      ]
+        .filter(Boolean)
+        .join("; "),
+      createdAt: new Date().toISOString(),
+    });
   },
 });
 
@@ -161,6 +190,8 @@ export const deleteStaff = mutation({
   args: {
     licenseKey: v.string(),
     staffId: v.id("staff"),
+    actorStaffId: v.optional(v.string()),
+    actorStaffName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     await getRestaurantByLicense(ctx, args.licenseKey);
@@ -184,6 +215,13 @@ export const deleteStaff = mutation({
     }
 
     await ctx.db.delete(args.staffId);
+    await ctx.db.insert("auditLogs", {
+      restaurantId: staff.restaurantId,
+      staffName: args.actorStaffName?.trim() || "System",
+      action: "staff_update",
+      details: `Removed staff ${staff.name} (${staff.role})`,
+      createdAt: new Date().toISOString(),
+    });
   },
 });
 

@@ -50,6 +50,18 @@ export default defineSchema({
       v.union(v.literal("prefix"), v.literal("suffix"))
     ),
     currencyDecimals: v.optional(v.number()),
+    dailySalesTarget: v.optional(v.number()),
+    dashboardTargetAmount: v.optional(v.number()),
+    dashboardTargetStartAt: v.optional(v.string()),
+    dashboardTargetEndAt: v.optional(v.string()),
+    dashboardTargetPeriod: v.optional(
+      v.union(
+        v.literal("month"),
+        v.literal("six_months"),
+        v.literal("custom"),
+      ),
+    ),
+    dashboardReportSchedules: v.optional(v.array(v.any())),
     plan: v.union(
       v.literal("starter"),
       v.literal("professional"),
@@ -74,6 +86,8 @@ export default defineSchema({
     icon: v.optional(v.string()),
     displayOrder: v.number(),
     isActive: v.boolean(),
+    /** Default kitchen/bar prep options for items in this category. */
+    prepConfig: v.optional(v.any()),
   }).index("by_restaurant", ["restaurantId"]),
 
   menus: defineTable({
@@ -96,10 +110,14 @@ export default defineSchema({
     vatRate: v.optional(v.number()),
     imageStorageId: v.optional(v.id("_storage")),
     isFavorite: v.optional(v.boolean()),
-    /** When false, hidden from waiter self-service staff meal (admin flow still sees all). */
+    /** When true, this item appears in staff meal. Admin must opt each product in. */
     staffMealAllowed: v.optional(v.boolean()),
-    /** Optional per-item price used for waiter self-service staff meal (0 = free). */
+    /** Staff unit price after freeQty (0 = free). */
     staffMealPrice: v.optional(v.number()),
+    /** First N units per staff per local day are free. */
+    staffMealFreeQty: v.optional(v.number()),
+    /** Max units per staff per local day (0/omit = unlimited). */
+    staffMealDailyLimit: v.optional(v.number()),
     totalSold: v.optional(v.number()),
     // Stock / inventory fields
     trackStock: v.optional(v.boolean()),
@@ -131,6 +149,8 @@ export default defineSchema({
     ),
     /** Admin-defined option groups (doneness, sides, removals, etc.). */
     customizationConfig: v.optional(v.any()),
+    /** Kitchen/bar prep screen: temperature buttons, ON/OFF extras, quick notes. */
+    prepConfig: v.optional(v.any()),
   })
     .index("by_restaurant", ["restaurantId"])
     .index("by_category", ["categoryId"])
@@ -162,6 +182,7 @@ export default defineSchema({
     role: v.union(
       v.literal("admin"),
       v.literal("manager"),
+      v.literal("cashier"),
       v.literal("waiter"),
       v.literal("inventory"),
       v.literal("accountant"),
@@ -290,6 +311,8 @@ export default defineSchema({
     ),
     voidedBy: v.optional(v.id("staff")),
     voidedAt: v.optional(v.string()),
+    sentAt: v.optional(v.string()),
+    readyAt: v.optional(v.string()),
     vatRate: v.optional(v.number()),
   }).index("by_order", ["orderId"]),
 

@@ -174,7 +174,7 @@ export default function PhoneTeamPage() {
       >
         <Link
           to="/app/profile"
-          className="flex size-10 shrink-0 items-center justify-center rounded-xl text-slate-700 hover:bg-[#0066FF]/10"
+          className="flex size-10 shrink-0 items-center justify-center rounded-xl text-slate-700 hover:bg-brand/10"
           aria-label={t("phone.profile.backToProfile")}
         >
           <ChevronLeft className="size-6" strokeWidth={2} />
@@ -190,7 +190,7 @@ export default function PhoneTeamPage() {
           to="/app/staff"
           className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:bg-slate-50"
         >
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-subtle text-brand-hover">
             <Users className="size-5" />
           </div>
           <div className="min-w-0 flex-1">
@@ -214,7 +214,7 @@ export default function PhoneTeamPage() {
           <span className="text-slate-300">›</span>
         </Link>
 
-        <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-[#0066FF]/8 to-violet-50 p-4">
+        <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-brand/8 to-violet-50 p-4">
           <h2 className="text-sm font-bold text-slate-900">{t("phone.team.inviteSection")}</h2>
           <p className="mt-1 text-xs leading-relaxed text-slate-600">{t("phone.team.inviteHelp")}</p>
 
@@ -247,7 +247,7 @@ export default function PhoneTeamPage() {
               </div>
               <Button
                 type="button"
-                className="mt-4 h-11 w-full rounded-xl bg-[#0066FF] hover:bg-[#0055DD]"
+                className="mt-4 h-11 w-full rounded-xl bg-brand hover:bg-brand-hover"
                 disabled={creating || !venueId}
                 onClick={() => void generate()}
               >
@@ -305,7 +305,7 @@ export default function PhoneTeamPage() {
         ) : null}
 
         {lastCode ? (
-          <div className="rounded-2xl border-2 border-dashed border-[#0066FF]/40 bg-white p-4 text-center shadow-sm">
+          <div className="rounded-2xl border-2 border-dashed border-brand/40 bg-white p-4 text-center shadow-sm">
             <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
               {t("phone.team.codeLabel")}
             </p>

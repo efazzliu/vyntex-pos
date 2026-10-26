@@ -17,19 +17,23 @@ import { toast } from "sonner";
 import { useOnlineStatus } from "@/hooks/use-online-status.ts";
 import { useOfflineData } from "@/hooks/use-offline-data.ts";
 import { getDataCache, saveDataCache } from "@/lib/local-db.ts";
-import { Plus, Pencil, Trash2, Users, Shield, ChefHat, UserCheck, Crown, PackageSearch, Calculator, ClipboardCheck } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Shield, ChefHat, UserCheck, Crown, PackageSearch, Calculator, ClipboardCheck, User } from "lucide-react";
 import StaffDialog from "./staff-dialog.tsx";
 import { usePosLocale } from "./pos-locale-provider.tsx";
+import { BRAND } from "@/lib/brand-colors.ts";
 
 type StaffManagementProps = {
   licenseKey: string;
   plan: string;
+  actorStaffId?: string;
+  actorStaffName?: string;
 };
 
 const ROLE_CONFIG: Record<string, { color: string; icon: typeof Shield }> = {
-  admin: { color: "#0066FF", icon: Shield },
+  admin: { color: BRAND.primary, icon: Shield },
   manager: { color: "#8B5CF6", icon: Crown },
-  waiter: { color: "#44CC00", icon: UserCheck },
+  cashier: { color: "#16A34A", icon: User },
+  waiter: { color: BRAND.accent, icon: UserCheck },
   inventory: { color: "#F59E0B", icon: PackageSearch },
   accountant: { color: "#06B6D4", icon: Calculator },
   auditor: { color: "#EC4899", icon: ClipboardCheck },
@@ -46,7 +50,12 @@ function roleDisplayLabel(
   return v === key ? role : v;
 }
 
-export default function StaffManagement({ licenseKey, plan }: StaffManagementProps) {
+export default function StaffManagement({
+  licenseKey,
+  plan,
+  actorStaffId,
+  actorStaffName,
+}: StaffManagementProps) {
   const { t } = usePosLocale();
   const isOnline = useOnlineStatus();
   const staffListQuery = useQuery('pos.staff.getStaff', { licenseKey });
@@ -73,7 +82,12 @@ export default function StaffManagement({ licenseKey, plan }: StaffManagementPro
     if (!window.confirm(t("staff_page.confirm_remove", { name: staffName })))
       return;
     try {
-      await deleteStaff({ licenseKey, staffId });
+      await deleteStaff({
+        licenseKey,
+        staffId,
+        actorStaffId,
+        actorStaffName,
+      });
       setStaffList((prev) => prev.filter((s) => s._id !== staffId));
       const cached = (await getDataCache<Doc<"staff">[]>(`staff:${licenseKey}`)) ?? [];
       await saveDataCache(
@@ -139,6 +153,8 @@ export default function StaffManagement({ licenseKey, plan }: StaffManagementPro
           licenseKey={licenseKey}
           plan={plan}
           editing={editingStaff}
+          actorStaffId={actorStaffId}
+          actorStaffName={actorStaffName}
           onSaved={(staff, mode) => {
             if (mode === "create") {
               setStaffList((prev) => [...prev, staff]);
@@ -184,7 +200,7 @@ export default function StaffManagement({ licenseKey, plan }: StaffManagementPro
 
         {/* Staff rows */}
         {staffList.map((member) => {
-          const config = ROLE_CONFIG[member.role];
+          const config = ROLE_CONFIG[member.role] ?? ROLE_CONFIG.waiter;
 
           return (
             <div
@@ -237,7 +253,7 @@ export default function StaffManagement({ licenseKey, plan }: StaffManagementPro
                     setEditingStaff(member);
                     setDialogOpen(true);
                   }}
-                  className="p-2 rounded-lg text-[#5a6580] hover:text-[#0066FF] hover:bg-[#0066FF]/10 transition-colors cursor-pointer"
+                  className="p-2 rounded-lg text-[#5a6580] hover:text-brand hover:bg-brand/10 transition-colors cursor-pointer"
                   title={t("btn.edit")}
                 >
                   <Pencil className="size-4" />
@@ -272,6 +288,8 @@ export default function StaffManagement({ licenseKey, plan }: StaffManagementPro
         licenseKey={licenseKey}
         plan={plan}
         editing={editingStaff}
+        actorStaffId={actorStaffId}
+        actorStaffName={actorStaffName}
         onSaved={(staff, mode) => {
           if (mode === "create") {
             setStaffList((prev) => [...prev, staff]);

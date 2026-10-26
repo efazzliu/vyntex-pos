@@ -47,8 +47,8 @@ const STATUS_STYLES: Record<
     icon: Clock,
   },
   preparing: {
-    card: "border-[#0066FF]/25 bg-[#0066FF]/[0.06]",
-    label: "bg-[#0066FF]/15 text-[#0044aa]",
+    card: "border-brand/25 bg-brand/[0.06]",
+    label: "bg-brand/15 text-brand-active",
     icon: Package,
   },
   ready: {
@@ -136,7 +136,7 @@ export default function PhoneOrdersPage() {
         <section>
           <div className="mb-2 flex items-center gap-2">
             <h2 className="text-base font-semibold text-[#0f172a]">{t("phone.orders.activeSection")}</h2>
-            <span className="flex min-w-7 items-center justify-center rounded-full bg-[#0066FF]/12 px-2 py-0.5 text-xs font-semibold text-[#0066FF] tabular-nums">
+            <span className="flex min-w-7 items-center justify-center rounded-full bg-brand/12 px-2 py-0.5 text-xs font-semibold text-brand tabular-nums">
               {loading ? "—" : (active?.length ?? 0)}
             </span>
           </div>

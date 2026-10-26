@@ -19,11 +19,19 @@ export function PhoneAccessBrandingProvider({ children }: { children: ReactNode 
   useEffect(() => {
     if (!licenseKey) return;
     let cancelled = false;
-    void resolvePhoneAccessBranding(licenseKey).then((next) => {
-      if (!cancelled) setBranding(next);
-    });
+    const load = () => {
+      void resolvePhoneAccessBranding(licenseKey).then((next) => {
+        if (!cancelled) setBranding(next);
+      });
+    };
+    load();
+    const onFocus = () => load();
+    window.addEventListener("focus", onFocus);
+    const timer = window.setInterval(load, 4000);
     return () => {
       cancelled = true;
+      window.removeEventListener("focus", onFocus);
+      window.clearInterval(timer);
     };
   }, [licenseKey]);
 

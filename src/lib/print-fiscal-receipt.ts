@@ -4,15 +4,25 @@
  * - Non-fiscal pre-bill: admin template "Pre-Bill" (`non_fiscal_receipt`) in Settings → Templates.
  */
 
+import { printDesignCss, printDesignDividerInline, printDesignInlineBody, readPrintDesign } from "@/lib/print-design.ts";
 import { resolvePinLoginBranding } from "@/lib/supabase-pos/license-sync.ts";
 import {
   DEFAULT_SILENT_PRINT_IPC_TIMEOUT_MS,
+  PRINT_POWERED_BY,
   hasElectronSilentPrintIpc,
   isSilentPrintQueueableError,
   tryPrintHtmlDocumentAsync,
   type PrintHtmlAsyncOutcome,
 } from "@/lib/print-html.ts";
 import { enqueueHtmlPrintJob, flushPrintQueueNow } from "@/lib/print-queue.ts";
+import {
+  buildPreBillHtml,
+  formatPreBillMoney,
+  preBillPrintExtras,
+  resolvePreBillCopy,
+  visibilityFromTemplate,
+} from "@/lib/print-pre-bill.ts";
+import { loadPaperPrintDeviceName } from "@/lib/pos-print-device.ts";
 import { runPosQuery } from "@/lib/supabase-pos/pos-router.ts";
 
 export type FiscalReceiptStrings = {
@@ -108,6 +118,9 @@ export function buildFiscalReceiptHtml(args: {
   };
   /** Browser print tab title */
   pageTitle?: string;
+  motto?: string;
+  website?: string;
+  design?: unknown;
 }): string {
   const {
     toggles,
@@ -126,12 +139,16 @@ export function buildFiscalReceiptHtml(args: {
     logoDataUrl,
     business,
     pageTitle = "Receipt",
+    motto,
+    website,
+    design,
   } = args;
 
-  const dash =
-    "border-bottom:1px dashed #999;margin:10px 0;padding-bottom:8px;";
-  const body =
-    "font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;color:#111;max-width:280px;margin:0 auto;padding:12px;background:#fff;";
+  const designSource = design ?? styles;
+  const printDesign = readPrintDesign(designSource);
+  const alignCss = `text-align:${printDesign.align};`;
+  const dash = printDesignDividerInline(designSource);
+  const body = printDesignInlineBody(designSource);
   const rowFlex =
     "display:flex;justify-content:space-between;gap:8px;align-items:baseline;";
   const sx = (...parts: string[]) => parts.filter(Boolean).join(";");
@@ -143,10 +160,10 @@ export function buildFiscalReceiptHtml(args: {
   const headerSub = headerLines.slice(1).join(" · ");
 
   let html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>${escapeHtml(pageTitle)}</title>`;
-  html += `<style>@media print{body{padding:4px}}</style></head><body style="${escapeHtml(body)}">`;
+  html += `<style>@media print{body{padding:4px}}${printDesignCss(designSource)}</style></head><body style="${escapeHtml(body)}">`;
 
   if (toggles.logo) {
-    html += `<div style="text-align:center;margin-bottom:8px;">`;
+    html += `<div style="${alignCss}margin-bottom:8px;">`;
     if (logoDataUrl) {
       html += `<img src="${escapeHtml(logoDataUrl)}" alt="" style="max-height:56px;max-width:120px;object-fit:contain;"/>`;
     } else {
@@ -157,9 +174,9 @@ export function buildFiscalReceiptHtml(args: {
 
   if (toggles.headerText) {
     html += `<div style="${dash}">`;
-    html += `<div style="${escapeHtml(styleFromMap(styles, "header"))}text-align:center;font-size:14px;font-weight:700;">${escapeHtml(headerMain)}</div>`;
+    html += `<div style="${escapeHtml(styleFromMap(styles, "header"))}${alignCss}font-size:14px;font-weight:700;">${escapeHtml(headerMain)}</div>`;
     if (headerSub) {
-      html += `<div style="${escapeHtml(styleFromMap(styles, "subheader"))}text-align:center;color:#666;font-size:11px;margin-top:4px;">${escapeHtml(headerSub)}</div>`;
+      html += `<div style="${escapeHtml(styleFromMap(styles, "subheader"))}${alignCss}color:#666;font-size:11px;margin-top:4px;">${escapeHtml(headerSub)}</div>`;
     }
     html += `</div>`;
   }
@@ -170,7 +187,7 @@ export function buildFiscalReceiptHtml(args: {
       .map((value) => value?.trim())
       .filter(Boolean)
       .join(", ");
-    html += `<div style="${dash}text-align:center;font-size:10px;">`;
+    html += `<div style="${dash}${alignCss}font-size:10px;">`;
     if (businessName) {
       html += `<div style="font-weight:700;">${escapeHtml(businessName)}</div>`;
     }
@@ -202,7 +219,7 @@ export function buildFiscalReceiptHtml(args: {
   html += `</div>`;
 
   html += `<div style="${dash}">`;
-  html += `<div style="${escapeHtml(styleFromMap(styles, "sectionTitle"))}text-align:center;color:#666;font-size:10px;letter-spacing:0.12em;margin-bottom:6px;">${escapeHtml(strings.itemsSectionTitle)}</div>`;
+  html += `<div style="${escapeHtml(styleFromMap(styles, "sectionTitle"))}${alignCss}color:#666;font-size:10px;letter-spacing:0.12em;margin-bottom:6px;">${escapeHtml(strings.itemsSectionTitle)}</div>`;
   for (const line of lines) {
     const itemStyle = styleFromMap(styles, "itemRow");
     const pricePart =
@@ -224,13 +241,19 @@ export function buildFiscalReceiptHtml(args: {
   html += `</div>`;
 
   if (toggles.footerText && labels.footerText.trim()) {
-    html += `<div style="${dash}text-align:center;">`;
+    html += `<div style="${dash}${alignCss}">`;
     html += `<div style="${escapeHtml(styleFromMap(styles, "footer"))}">${escapeHtml(labels.footerText.trim())}</div>`;
     html += `</div>`;
   }
 
-  html += `<div style="text-align:center;color:#888;font-size:10px;margin-top:8px;">`;
-  html += `${escapeHtml(printedAt.toLocaleString())}<br/>${escapeHtml(strings.poweredBy)}`;
+  if (website?.trim()) {
+    html += `<div style="${alignCss}color:#666;font-size:10px;margin-top:6px;">${escapeHtml(website.trim())}</div>`;
+  }
+  if (motto?.trim()) {
+    html += `<div style="${alignCss}color:#666;font-size:9px;letter-spacing:0.2em;margin-top:6px;">${escapeHtml(motto.trim())}</div>`;
+  }
+  html += `<div style="${alignCss}color:#888;font-size:10px;margin-top:8px;">`;
+  html += `${escapeHtml(PRINT_POWERED_BY)}`;
   html += `</div>`;
 
   html += `</body></html>`;
@@ -268,7 +291,7 @@ const DEFAULT_NON_FISCAL_TOGGLES: TemplateToggles = {
 
 const DEFAULT_NON_FISCAL_LABELS: TemplateLabels = {
   headerText: "PRE-BILL",
-  footerText: "This is not a fiscal document",
+  footerText: "Thank you for your visit!",
 };
 
 function mergeReceiptTemplate(
@@ -337,6 +360,7 @@ async function printPosSalesReceipt(args: {
     licenseKey,
   })) as Array<{
     templateType: string;
+    printerId?: string | null;
     toggles?: TemplateToggles;
     labels?: TemplateLabels;
     styles?: Record<string, Record<string, unknown>>;
@@ -431,6 +455,7 @@ async function printPosSalesReceipt(args: {
         legalName?: string;
         address?: string;
         city?: string;
+        phone?: string;
         taxNumber?: string;
         vatNumber?: string;
       }
@@ -443,6 +468,7 @@ async function printPosSalesReceipt(args: {
       legalName?: string;
       address?: string;
       city?: string;
+      phone?: string;
       taxNumber?: string;
       vatNumber?: string;
     };
@@ -452,6 +478,7 @@ async function printPosSalesReceipt(args: {
         legalName: company.legalName,
         address: company.address,
         city: company.city,
+        phone: company.phone,
         taxNumber: company.taxNumber,
         vatNumber: company.vatNumber,
       };
@@ -460,29 +487,103 @@ async function printPosSalesReceipt(args: {
     /* optional business profile columns */
   }
 
-  const html = buildFiscalReceiptHtml({
-    toggles,
-    labels,
-    styles,
-    lines,
-    subtotal: Number(raw.subtotal),
-    tax: Number(raw.tax),
-    total: Number(raw.total),
-    orderRef: formatOrderRef(raw.orderNumber, raw._id),
-    tableName: raw.tableName ?? "—",
-    waiterName: raw.staffName ?? "—",
-    printedAt: new Date(),
-    formatPrice,
-    strings,
-    logoDataUrl,
-    business,
-    pageTitle,
+  const designExtra =
+    styles && typeof styles === "object"
+      ? ((styles as Record<string, unknown>)._design as Record<string, unknown> | undefined)
+      : undefined;
+  const website =
+    typeof designExtra?.website === "string"
+      ? designExtra.website.trim()
+      : "www.vyntexpos.net";
+  const customAddress =
+    typeof designExtra?.address === "string" ? designExtra.address.trim() : "";
+  const templateLogo =
+    typeof designExtra?.logoDataUrl === "string" ? designExtra.logoDataUrl : null;
+  const receiptLogo = templateLogo || logoDataUrl;
+  const subtotal = Number(raw.subtotal);
+  const total = Number(raw.total);
+  const discount = Math.max(0, Math.round((subtotal - total) * 100) / 100);
+  const extras = preBillPrintExtras(designExtra);
+
+  const html =
+    templateType === "non_fiscal_receipt"
+      ? buildPreBillHtml({
+          ...resolvePreBillCopy({
+            ...labels,
+            subtitle: extras.content.subtitle,
+            legalText: extras.content.legalText,
+            tagline: extras.content.motto,
+          }),
+          venueLine: extras.venueLine,
+          itemsHeading: extras.itemsHeading,
+          showQtyPrefix: extras.showQtyPrefix,
+          dateFormat: extras.dateFormat,
+          hour12: extras.hour12,
+          fieldLabels: extras.fieldLabels,
+          lines,
+          subtotal,
+          discount,
+          tax: Number(raw.tax),
+          total,
+          orderRef:
+            raw.orderNumber != null && Number.isFinite(raw.orderNumber)
+              ? `#${raw.orderNumber}`
+              : formatOrderRef(raw.orderNumber, raw._id),
+          tableName: raw.tableName ?? "—",
+          waiterName: raw.staffName ?? "—",
+          operatorName: raw.staffName ?? "Admin",
+          printedAt: new Date(),
+          formatPrice: (n) => formatPreBillMoney(n, extras.content, formatPrice),
+          logoDataUrl: toggles.logo ? receiptLogo : null,
+          business: {
+            name: extras.content.storeName || business?.name || "VYNTEX",
+            address: customAddress || business?.address,
+            city: customAddress ? undefined : business?.city,
+            phone: business?.phone,
+            website,
+          },
+          visibility: visibilityFromTemplate(
+            toggles,
+            designExtra && typeof designExtra === "object" ? designExtra : undefined,
+          ),
+          pageTitle,
+          design: designExtra,
+        })
+      : buildFiscalReceiptHtml({
+          toggles,
+          labels,
+          styles,
+          lines,
+          subtotal,
+          tax: Number(raw.tax),
+          total,
+          orderRef: formatOrderRef(raw.orderNumber, raw._id),
+          tableName: raw.tableName ?? "—",
+          waiterName: raw.staffName ?? "—",
+          printedAt: new Date(),
+          formatPrice,
+          strings,
+          logoDataUrl: receiptLogo,
+          business,
+          pageTitle,
+          website,
+          motto:
+            typeof designExtra?.motto === "string"
+              ? designExtra.motto.trim()
+              : extras.content.motto,
+        });
+
+  const resolvedDevice = await loadPaperPrintDeviceName({
+    licenseKey,
+    templateType,
+    templatePrinterId: templateRow?.printerId,
+    fallback: deviceName,
   });
 
   const outcome = await tryPrintHtmlDocumentAsync(html, {
     silent: true,
     allowInteractiveFallback: !hasElectronSilentPrintIpc(),
-    deviceName,
+    deviceName: resolvedDevice,
     silentTimeoutMs: DEFAULT_SILENT_PRINT_IPC_TIMEOUT_MS,
   });
 
@@ -491,7 +592,7 @@ async function printPosSalesReceipt(args: {
   } else if (isSilentPrintQueueableError(outcome.error)) {
     void enqueueHtmlPrintJob({
       html,
-      deviceName,
+      deviceName: resolvedDevice,
       silent: true,
       allowInteractiveFallback: !hasElectronSilentPrintIpc(),
       jobType: "receipt",

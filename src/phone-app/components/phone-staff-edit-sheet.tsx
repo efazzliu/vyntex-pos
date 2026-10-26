@@ -40,6 +40,7 @@ type StaffDoc = {
 const ROLES: StaffRole[] = [
   "admin",
   "manager",
+  "cashier",
   "waiter",
   "inventory",
   "accountant",
@@ -234,7 +235,7 @@ export function PhoneStaffEditSheet({
 
         <SheetFooter className="mt-4 flex-col gap-2 sm:flex-col">
           <Button
-            className="w-full rounded-xl bg-[#6d28d9] hover:bg-[#5b21b6]"
+            className="w-full rounded-xl bg-brand-hover hover:bg-brand-active"
             disabled={saving}
             onClick={() => void handleSave()}
           >

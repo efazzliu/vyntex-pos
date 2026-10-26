@@ -91,7 +91,7 @@ export default function PhoneNotificationsPage() {
       >
         <Link
           to="/app/profile"
-          className="flex size-10 items-center justify-center rounded-xl text-slate-700 hover:bg-[#0066FF]/10"
+          className="flex size-10 items-center justify-center rounded-xl text-slate-700 hover:bg-brand/10"
           aria-label={t("phone.notifications.backProfile")}
         >
           <ChevronLeft className="size-6" strokeWidth={2} />

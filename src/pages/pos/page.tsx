@@ -37,6 +37,7 @@ import { toast } from "sonner";
 import { usePosTheme } from "./_lib/use-pos-theme.ts";
 import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 import { sendPosDeviceHeartbeat } from "@/lib/supabase-pos/device-presence.ts";
+import { runPosMutation } from "@/lib/supabase-pos/pos-router.ts";
 import { switchActivationToDevPlanVenue } from "@/lib/dev-pos-plan-venue.ts";
 
 type LaunchStep =
@@ -332,7 +333,7 @@ export default function PosLauncher({ accountAuthMode = false }: PosLauncherProp
       /* offline — allow PIN session */
     }
     setActiveStaff(staff);
-    if (staff.role === "waiter") {
+    if (staff.role === "waiter" || staff.role === "cashier") {
       setStep("shift-check");
     } else {
       setStep("ready");
@@ -340,6 +341,17 @@ export default function PosLauncher({ accountAuthMode = false }: PosLauncherProp
   }, []);
 
   const handleLogout = () => {
+    if (activation && activeStaff) {
+      const isDeviceAdmin = activeStaff.id === "local-admin";
+      void runPosMutation("pos.dashboard.insertAuditLog", {
+        licenseKey: activation.licenseKey,
+        staffName: activeStaff.name,
+        staffId: isDeviceAdmin ? undefined : activeStaff.id,
+        action: "logout",
+        details: `${activeStaff.name} signed out`,
+        metadata: { source: "pos" },
+      });
+    }
     setActiveStaff(null);
     if (accountAuthMode) {
       navigate("/app", { replace: true });

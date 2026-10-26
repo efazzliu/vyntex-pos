@@ -1,4 +1,12 @@
-export type StaffRole = "admin" | "manager" | "waiter" | "inventory" | "accountant" | "auditor" | "kitchen";
+export type StaffRole =
+  | "admin"
+  | "manager"
+  | "cashier"
+  | "waiter"
+  | "inventory"
+  | "accountant"
+  | "auditor"
+  | "kitchen";
 
 export type ActiveStaff = {
   id: string;

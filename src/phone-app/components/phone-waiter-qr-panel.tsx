@@ -141,7 +141,7 @@ export default function PhoneWaiterQrPanel({ licenseKey }: PhoneWaiterQrPanelPro
             <img src={qrDataUrl} alt={t("phone.staff.qrTitle")} className="size-[196px]" />
           ) : (
             <div className="flex size-[196px] items-center justify-center rounded-xl bg-slate-100">
-              <Loader2 className="size-7 animate-spin text-[#0066FF]" />
+              <Loader2 className="size-7 animate-spin text-brand" />
             </div>
           )}
         </div>

@@ -1,12 +1,21 @@
 import { supabase } from "@/lib/supabase.ts";
 import {
   assertNoPgError,
+  isMissingPgColumnError,
   isMissingSupabaseTableError,
 } from "./db-errors.ts";
 import { getRestaurantByLicense } from "./restaurant.ts";
 import { insertAuditLog } from "./dashboard-ops.ts";
 import { uuidOrNull } from "./uuid.ts";
 import { applySupplyRecipeAfterSale } from "./supply-recipe-ops.ts";
+import {
+  chargeStaffMeal,
+  isStaffMealAllowed,
+  normalizeStaffMealRule,
+  qtyUsedToday,
+  staffMealLimitError,
+  staffMealNotAllowedError,
+} from "@/lib/staff-meal-config.ts";
 
 type ConsumptionLine = {
   menuItemId: string;
@@ -51,6 +60,29 @@ export async function getStaffConsumption(args: {
   return { entries, total };
 }
 
+export async function getAllUnclearedConsumption(args: { licenseKey: string }) {
+  const r = await getRestaurantByLicense(args.licenseKey);
+  const { data, error } = await supabase
+    .from("pos_staff_consumption")
+    .select("id, staff_id, total")
+    .eq("restaurant_id", r.id)
+    .eq("cleared", false);
+  if (error) {
+    const msg = String(error.message ?? "");
+    if (!isMissingSupabaseTableError(msg, "pos_staff_consumption")) {
+      console.warn("[POS] uncleared consumption:", msg);
+    }
+    return { entries: [] as Array<{ _id: string; staffId: string; total: number }>, total: 0 };
+  }
+  const entries = (data ?? []).map((row) => ({
+    _id: String(row.id),
+    staffId: row.staff_id != null ? String(row.staff_id) : "",
+    total: Number(row.total ?? 0),
+  }));
+  const total = entries.reduce((s, e) => s + e.total, 0);
+  return { entries, total: Math.round(total * 100) / 100 };
+}
+
 export async function addConsumption(args: Record<string, unknown>) {
   const licenseKey = args.licenseKey as string;
   const staffId = uuidOrNull(args.staffId as string);
@@ -61,9 +93,106 @@ export async function addConsumption(args: Record<string, unknown>) {
     );
   }
   const r = await getRestaurantByLicense(licenseKey);
-  const items = args.items as ConsumptionLine[];
+  const requested = args.items as ConsumptionLine[];
   const loggedByStaffName = String(args.loggedByStaffName ?? "");
   const staffName = String(args.staffName ?? "");
+
+  const qtyByItem = new Map<
+    string,
+    { name: string; qty: number }
+  >();
+  for (const line of requested ?? []) {
+    const id = uuidOrNull(String(line.menuItemId ?? ""));
+    const qty = Number(line.quantity);
+    if (!id || !Number.isFinite(qty) || qty <= 0) continue;
+    const prev = qtyByItem.get(id);
+    qtyByItem.set(id, {
+      name: String(line.name ?? prev?.name ?? ""),
+      qty: (prev?.qty ?? 0) + qty,
+    });
+  }
+  if (qtyByItem.size === 0) {
+    throw new Error("Staff consumption needs at least one item.");
+  }
+
+  const itemIds = [...qtyByItem.keys()];
+  const staffMealSelect =
+    "id, name, price, staff_meal_allowed, staff_meal_price, staff_meal_free_qty, staff_meal_daily_limit";
+  let { data: menuRows, error: menuErr } = await supabase
+    .from("menu_items")
+    .select(staffMealSelect)
+    .eq("restaurant_id", r.id)
+    .in("id", itemIds);
+  if (
+    menuErr &&
+    (isMissingPgColumnError(menuErr.message, "staff_meal_price") ||
+      isMissingPgColumnError(menuErr.message, "staff_meal_free_qty") ||
+      isMissingPgColumnError(menuErr.message, "staff_meal_daily_limit"))
+  ) {
+    ({ data: menuRows, error: menuErr } = await supabase
+      .from("menu_items")
+      .select("id, name, price, staff_meal_allowed")
+      .eq("restaurant_id", r.id)
+      .in("id", itemIds));
+  }
+  assertNoPgError("Menu items for staff meal", menuErr);
+  const menuById = new Map(
+    (menuRows ?? []).map((row) => [String(row.id), row]),
+  );
+
+  const existing = await getStaffConsumption({ licenseKey, staffId });
+  const items: ConsumptionLine[] = [];
+  for (const [id, req] of qtyByItem) {
+    const row = menuById.get(id);
+    if (!row) {
+      throw new Error(staffMealNotAllowedError(req.name || id));
+    }
+    const mealFields = {
+      staffMealAllowed: row.staff_meal_allowed as boolean | null,
+      staffMealPrice:
+        row.staff_meal_price != null ? Number(row.staff_meal_price) : undefined,
+      staffMealFreeQty:
+        row.staff_meal_free_qty != null
+          ? Number(row.staff_meal_free_qty)
+          : undefined,
+      staffMealDailyLimit:
+        row.staff_meal_daily_limit != null
+          ? Number(row.staff_meal_daily_limit)
+          : undefined,
+    };
+    const rule = normalizeStaffMealRule(mealFields);
+    const itemName = String(row.name ?? req.name);
+    if (!isStaffMealAllowed(mealFields)) {
+      throw new Error(staffMealNotAllowedError(itemName));
+    }
+    const used = qtyUsedToday(existing.entries, id);
+    const charge = chargeStaffMeal(rule, used, req.qty);
+    if (charge.blocked || charge.allowedQty < req.qty) {
+      throw new Error(staffMealLimitError(itemName, rule.dailyLimit));
+    }
+    const listPrice = Number(row.price);
+    if (charge.freeQty > 0) {
+      items.push({
+        menuItemId: id,
+        name: itemName,
+        price: 0,
+        quantity: charge.freeQty,
+        listPrice,
+      });
+    }
+    if (charge.paidQty > 0) {
+      items.push({
+        menuItemId: id,
+        name: itemName,
+        price: charge.staffPrice,
+        quantity: charge.paidQty,
+        listPrice,
+      });
+    }
+  }
+  if (items.length === 0) {
+    throw new Error("Staff consumption needs at least one item.");
+  }
 
   const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
   const listTotal = items.reduce((sum, i) => {

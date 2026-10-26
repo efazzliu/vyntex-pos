@@ -152,9 +152,9 @@ export default function DashboardOverviewModern() {
 
   return (
     <AdminPage>
-      <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-indigo-600">
+      <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-brand-subtle bg-brand-light/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-brand">
         {t("ac.nav.admin_center")}
-        <span className="font-medium normal-case tracking-normal text-indigo-400">
+        <span className="font-medium normal-case tracking-normal text-brand-soft">
           {t("ac.hierarchy.badge")}
         </span>
       </div>
@@ -166,7 +166,7 @@ export default function DashboardOverviewModern() {
           </h1>
           <p className="mt-1 text-sm text-slate-500">{t("ac.overview.subtitle")}</p>
         </div>
-        <Button asChild className="h-10 self-start rounded-xl bg-indigo-600 px-4 text-white hover:bg-indigo-700">
+        <Button asChild className="h-10 self-start rounded-xl bg-brand px-4 text-white hover:bg-brand-hover">
           <Link to="/app">
             <Plus className="size-4" />
             {t("ac.overview.add_venue")}
@@ -179,7 +179,7 @@ export default function DashboardOverviewModern() {
           <Store className="mx-auto size-10 text-slate-300" />
           <h2 className="mt-4 text-lg font-semibold">{t("ac.venues.empty_title")}</h2>
           <p className="mt-1 text-sm text-slate-500">{t("ac.venues.empty_body")}</p>
-          <Button asChild className="mt-5 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700">
+          <Button asChild className="mt-5 rounded-xl bg-brand text-white hover:bg-brand-hover">
             <Link to="/app">{t("ac.overview.add_venue")}</Link>
           </Button>
         </section>
@@ -318,7 +318,7 @@ export default function DashboardOverviewModern() {
                       </div>
                       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
                         <div
-                          className={cn("h-full rounded-full", index === 0 ? "bg-amber-400" : "bg-indigo-500")}
+                          className={cn("h-full rounded-full", index === 0 ? "bg-amber-400" : "bg-brand")}
                           style={{ width: `${Math.max(6, share)}%` }}
                         />
                       </div>
@@ -361,7 +361,7 @@ export default function DashboardOverviewModern() {
                       </p>
                     </div>
                     <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
-                      <div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-blue-400" style={{ width: `${Math.max(4, width)}%` }} />
+                      <div className="h-full rounded-full bg-gradient-to-r from-brand to-brand-soft" style={{ width: `${Math.max(4, width)}%` }} />
                     </div>
                     <div className="flex items-center justify-end gap-3 text-right">
                       <span className="text-sm font-semibold tabular-nums text-slate-900">{formatMetric(value, metric)}</span>
@@ -411,7 +411,7 @@ export default function DashboardOverviewModern() {
                       <td className="px-5 py-3.5 text-right">
                         <Link
                           to={`/admin-center/venues?focus=${row.venueId}`}
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-brand hover:text-brand-hover"
                         >
                           {t("ac.table.view")}
                           <ArrowRight className="size-3.5" />
@@ -428,7 +428,7 @@ export default function DashboardOverviewModern() {
             <section className={cn(acCard, "p-5 xl:col-span-7")}>
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-slate-900">{t("ac.license.title")}</h2>
-                <Link to="/admin-center/licenses" className="text-xs font-medium text-indigo-600">
+                <Link to="/admin-center/licenses" className="text-xs font-medium text-brand">
                   {t("ac.common.manage")}
                 </Link>
               </div>
@@ -496,7 +496,7 @@ export default function DashboardOverviewModern() {
             <section className={cn(acCard, "p-5 xl:col-span-5")}>
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-slate-900">{t("ac.activity.title")}</h2>
-                <Link to="/admin-center/activity" className="text-xs font-medium text-indigo-600">
+                <Link to="/admin-center/activity" className="text-xs font-medium text-brand">
                   {t("ac.activity.view_all")}
                 </Link>
               </div>
@@ -550,7 +550,7 @@ function KpiCard({
           <p className="mt-1 text-xl font-semibold tabular-nums tracking-tight text-slate-900">{value}</p>
           <div className="mt-1">{hint}</div>
         </div>
-        <span className="flex size-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+        <span className="flex size-9 items-center justify-center rounded-xl bg-brand-light text-brand">
           <Icon className="size-4" strokeWidth={1.75} />
         </span>
       </div>

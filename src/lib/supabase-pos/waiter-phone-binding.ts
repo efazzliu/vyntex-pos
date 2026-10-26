@@ -1,5 +1,8 @@
 import { isSupabaseConfigured, supabase } from "@/lib/supabase.ts";
 
+export const PHONE_DEVICE_REVOKED =
+  "This phone is no longer authorized. Pair it again from POS Settings → Phone App. / Ky telefon nuk është më i autorizuar. Çiftojeni përsëri nga Cilësimet POS → App i telefonit.";
+
 export type WaiterPhoneBindingStatus = {
   bound: boolean;
   disconnected: boolean;
@@ -33,4 +36,15 @@ export async function fetchWaiterPhoneBindingStatus(
     disconnected: Boolean(r.disconnected),
     restaurantName: r.restaurant_name != null ? String(r.restaurant_name) : null,
   };
+}
+
+/** Blocks new POS actions from a revoked waiter phone, even if it was paired before. */
+export async function assertWaiterPhoneAuthorized(
+  licenseKey: string,
+  phoneDeviceId: string,
+): Promise<void> {
+  const status = await fetchWaiterPhoneBindingStatus(licenseKey, phoneDeviceId);
+  if (!status || status.disconnected || !status.bound) {
+    throw new Error(PHONE_DEVICE_REVOKED);
+  }
 }

@@ -36,8 +36,8 @@ export default function AdminOverview() {
       label: "Total Users",
       value: stats.totalUsers,
       icon: Users,
-      color: "text-blue-500",
-      bg: "bg-blue-100 dark:bg-blue-900/30",
+      color: "text-brand",
+      bg: "bg-brand-subtle dark:bg-brand-active/30",
       href: "/admin/users",
     },
     {

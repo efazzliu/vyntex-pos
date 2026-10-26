@@ -23,7 +23,7 @@ import {
   setWaiterSession,
 } from "@/phone-app/lib/waiter-session.ts";
 
-const ORDER_ROLES = new Set<StaffRole>(["waiter", "manager", "admin"]);
+const ORDER_ROLES = new Set<StaffRole>(["waiter", "cashier", "manager", "admin"]);
 
 type StaffChoice = {
   id: string;
@@ -221,7 +221,7 @@ export default function PhoneWaiterAccount() {
   if (!authChecked) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-[#070b14] text-white">
-        <Loader2 className="size-8 animate-spin text-[#0066FF]" />
+        <Loader2 className="size-8 animate-spin text-brand" />
       </div>
     );
   }
@@ -240,7 +240,7 @@ export default function PhoneWaiterAccount() {
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            "radial-gradient(100% 60% at 50% -5%, rgba(0,102,255,0.4) 0%, transparent 55%), linear-gradient(180deg, #0a1224 0%, #070b14 100%)",
+            "radial-gradient(100% 60% at 50% -5%, rgba(0,91,214,0.4) 0%, transparent 55%), linear-gradient(180deg, #0a1224 0%, #070b14 100%)",
         }}
       />
 
@@ -280,7 +280,7 @@ export default function PhoneWaiterAccount() {
 
         {busy && !staff ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3">
-            <Loader2 className="size-10 animate-spin text-[#0066FF]" />
+            <Loader2 className="size-10 animate-spin text-brand" />
             <p className="text-sm text-white/60">{t("phone.waiter.accountBinding")}</p>
           </div>
         ) : venue && staff ? (
@@ -301,7 +301,7 @@ export default function PhoneWaiterAccount() {
                       "disabled:opacity-50",
                     )}
                   >
-                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#44CC00]/15 text-[#44CC00]">
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-accent/15 text-brand-accent">
                       <UserRound className="size-5" />
                     </span>
                     <span className="min-w-0 flex-1">
@@ -318,7 +318,7 @@ export default function PhoneWaiterAccount() {
           )
         ) : venues === null ? (
           <div className="flex flex-1 items-center justify-center">
-            <Loader2 className="size-8 animate-spin text-[#0066FF]" />
+            <Loader2 className="size-8 animate-spin text-brand" />
           </div>
         ) : venues.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-white/15 bg-white/[0.04] px-4 py-10 text-center text-sm text-white/45">
@@ -339,7 +339,7 @@ export default function PhoneWaiterAccount() {
                       "disabled:opacity-40",
                     )}
                   >
-                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#0066FF]/15 text-[#7eb6ff]">
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand/15 text-brand-soft">
                       <Store className="size-5" />
                     </span>
                     <span className="min-w-0 flex-1">

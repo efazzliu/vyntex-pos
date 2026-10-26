@@ -4,33 +4,108 @@ import {
   isMissingPgColumnError,
   isMissingSupabaseTableError,
 } from "./db-errors.ts";
-import { getRestaurantByLicense } from "./restaurant.ts";
-import { getTables } from "./tables-ops.ts";
-import { uuidOrNull } from "./uuid.ts";
+import {
+  clearRestaurantCache,
+  getRestaurantByLicense,
+} from "./restaurant.ts";
+import { saleFloorTableId } from "./mappers.ts";
+import { getTables, isOpenSaleStatus } from "./tables-ops.ts";
+import { isLocalDevicePosAdmin, uuidOrNull } from "./uuid.ts";
+import { normalizeReportSchedules } from "@/lib/dashboard-custom-reports.ts";
+import { assertStaffPermission } from "./staff-auth.ts";
+import {
+  effectiveLowStockThreshold,
+  parsePosStockRules,
+  stockRulesFromRestaurantRow,
+} from "@/lib/pos-order-availability.ts";
 
 const SALE_ITEMS_IN_CHUNK = 120;
 
+type DashboardSaleItemRow = {
+  id: string;
+  saleId: string;
+  menuItemId?: string;
+  name: string;
+  price: number | string;
+  quantity: number | string;
+  status: string;
+  station?: "kitchen" | "bar";
+  createdAt: string;
+  sentAt?: string;
+  readyAt?: string;
+};
+
 async function fetchSaleItemsForSaleIds(
   saleIds: string[],
-): Promise<
-  { name: string; price: number | string; quantity: number | string; status: string }[]
-> {
+): Promise<DashboardSaleItemRow[]> {
   if (saleIds.length === 0) return [];
-  const rows: {
-    name: string;
-    price: number | string;
-    quantity: number | string;
-    status: string;
-  }[] = [];
+  const rows: DashboardSaleItemRow[] = [];
   for (let i = 0; i < saleIds.length; i += SALE_ITEMS_IN_CHUNK) {
     const chunk = saleIds.slice(i, i + SALE_ITEMS_IN_CHUNK);
-    const { data, error } = await supabase
+    const full = await supabase
       .from("sale_items")
-      .select("name, price, quantity, status")
+      .select("id, sale_id, menu_item_id, name, price, quantity, status, station, created_at")
       .in("sale_id", chunk);
+    let data = full.data as unknown[] | null;
+    let error = full.error;
+    if (
+      error &&
+      (isMissingPgColumnError(error.message, "station") ||
+        isMissingPgColumnError(error.message, "menu_item_id"))
+    ) {
+      const fallback = await supabase
+        .from("sale_items")
+        .select("id, sale_id, name, price, quantity, status, created_at")
+        .in("sale_id", chunk);
+      data = fallback.data as unknown[] | null;
+      error = fallback.error;
+    }
     assertNoPgError("Dashboard sale lines", error);
-    for (const r of data ?? []) {
-      rows.push(r as (typeof rows)[number]);
+    const timingById = new Map<
+      string,
+      { sentAt?: string; readyAt?: string }
+    >();
+    const timingResult = await supabase
+      .from("sale_items")
+      .select("id, sent_at, ready_at")
+      .in("sale_id", chunk);
+    if (timingResult.error) {
+      const message = String(timingResult.error.message ?? "");
+      if (
+        !isMissingPgColumnError(message, "sent_at") &&
+        !isMissingPgColumnError(message, "ready_at")
+      ) {
+        assertNoPgError("Dashboard sale-line timings", timingResult.error);
+      }
+    } else {
+      for (const timing of timingResult.data ?? []) {
+        const id = String(timing.id ?? "");
+        if (!id) continue;
+        const sentAt = String(timing.sent_at ?? "").trim() || undefined;
+        const readyAt = String(timing.ready_at ?? "").trim() || undefined;
+        timingById.set(id, { sentAt, readyAt });
+      }
+    }
+    for (const raw of data ?? []) {
+      const r = raw as Record<string, unknown>;
+      const id = String(r.id ?? "");
+      const timing = timingById.get(id);
+      rows.push({
+        id,
+        saleId: String(r.sale_id ?? ""),
+        menuItemId: r.menu_item_id ? String(r.menu_item_id) : undefined,
+        name: String(r.name ?? ""),
+        price: Number(r.price ?? 0),
+        quantity: Number(r.quantity ?? 0),
+        status: String(r.status ?? ""),
+        station:
+          r.station === "bar" || r.station === "kitchen"
+            ? r.station
+            : undefined,
+        createdAt: String(r.created_at ?? ""),
+        sentAt: timing?.sentAt,
+        readyAt: timing?.readyAt,
+      });
     }
   }
   return rows;
@@ -39,6 +114,22 @@ async function fetchSaleItemsForSaleIds(
 export type DashboardViewPeriod = "day" | "week" | "month" | "year";
 /** Passed from POS UI language for chart axis labels and weekday names. */
 export type DashboardLocaleOption = "en" | "sq";
+export type DashboardTargetPeriod = "month" | "six_months" | "custom";
+
+function normalizeDashboardTargetPeriod(
+  value: unknown,
+): DashboardTargetPeriod | null {
+  return value === "month" ||
+    value === "six_months" ||
+    value === "custom"
+    ? value
+    : null;
+}
+
+function normalizeIsoInstant(value: unknown): string | null {
+  const timestamp = Date.parse(String(value ?? "").trim());
+  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null;
+}
 
 function chartLocaleTag(locale?: DashboardLocaleOption): string {
   return locale === "sq" ? "sq-AL" : "en-US";
@@ -77,6 +168,38 @@ function summarizePaid(
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+const DASHBOARD_KPI_BUCKETS = 12;
+
+function kpiBucketIndex(at: string, startIso: string, endIso: string): number {
+  const start = Date.parse(startIso);
+  const end = Date.parse(endIso);
+  const value = Date.parse(at);
+  if (
+    !Number.isFinite(start) ||
+    !Number.isFinite(end) ||
+    !Number.isFinite(value) ||
+    end <= start ||
+    value < start ||
+    value >= end
+  ) {
+    return -1;
+  }
+  return Math.min(
+    DASHBOARD_KPI_BUCKETS - 1,
+    Math.floor(((value - start) / (end - start)) * DASHBOARD_KPI_BUCKETS),
+  );
+}
+
+/** When the bill was collected — close/pay time, not when the table first opened. */
+function saleCollectedAtIso(o: {
+  created_at?: unknown;
+  paid_at?: unknown;
+}): string {
+  const paidAt = String(o.paid_at ?? "").trim();
+  if (paidAt) return paidAt;
+  return String(o.created_at ?? "");
 }
 
 type PaidRowChart = { created_at: string; total: number | string };
@@ -394,6 +517,138 @@ function buildLast7DaysPaidRevenueByDaySb(
   return out;
 }
 
+function parseRevenueDayBoundaries(dayBoundariesIso: string[]): string[] {
+  if (dayBoundariesIso.length < 3 || dayBoundariesIso.length % 2 === 0) {
+    throw new Error("Revenue overview requires an odd number of ordered boundaries");
+  }
+  const boundaries = dayBoundariesIso.map((value) => String(value).trim());
+  for (let index = 0; index < boundaries.length; index += 1) {
+    if (!Number.isFinite(Date.parse(boundaries[index]))) {
+      throw new Error("Invalid revenue overview date");
+    }
+    if (index > 0 && boundaries[index] <= boundaries[index - 1]) {
+      throw new Error("Revenue overview dates must be ordered");
+    }
+  }
+  return boundaries;
+}
+
+function buildRevenueOverview(
+  paid: PaidRowChart[],
+  dayBoundariesIso: string[],
+) {
+  const boundaries = parseRevenueDayBoundaries(dayBoundariesIso);
+  const bucketCount = (boundaries.length - 1) / 2;
+  const points: Array<{
+    currentRevenue: number;
+    previousRevenue: number;
+  }> = [];
+  let currentTotal = 0;
+  let previousTotal = 0;
+
+  for (let dayIndex = 0; dayIndex < bucketCount; dayIndex += 1) {
+    const previous = sumBucketPaidSb(
+      paid,
+      boundaries[dayIndex],
+      boundaries[dayIndex + 1],
+    );
+    const current = sumBucketPaidSb(
+      paid,
+      boundaries[dayIndex + bucketCount],
+      boundaries[dayIndex + bucketCount + 1],
+    );
+    points.push({
+      currentRevenue: current.revenue,
+      previousRevenue: previous.revenue,
+    });
+    currentTotal += current.revenue;
+    previousTotal += previous.revenue;
+  }
+
+  return {
+    currentTotal: round2(currentTotal),
+    previousTotal: round2(previousTotal),
+    points,
+  };
+}
+
+export async function getRevenueOverview(
+  licenseKey: string,
+  dayBoundariesIso: string[],
+) {
+  const boundaries = parseRevenueDayBoundaries(dayBoundariesIso);
+  const restaurant = await getRestaurantByLicense(licenseKey);
+  const rangeFromIso = boundaries[0];
+  const rangeToExclusiveIso = boundaries[boundaries.length - 1];
+  const rowsById = new Map<string, Record<string, unknown>>();
+
+  let supportsPaidAt = true;
+  const createdRange = await supabase
+    .from("sales")
+    .select("id, created_at, paid_at, total")
+    .eq("restaurant_id", restaurant.id)
+    .eq("status", "paid")
+    .gte("created_at", rangeFromIso)
+    .lt("created_at", rangeToExclusiveIso);
+
+  let createdRows = createdRange.data as unknown[] | null;
+  let createdError = createdRange.error;
+  if (
+    createdError &&
+    isMissingPgColumnError(String(createdError.message ?? ""), "paid_at")
+  ) {
+    supportsPaidAt = false;
+    const fallback = await supabase
+      .from("sales")
+      .select("id, created_at, total")
+      .eq("restaurant_id", restaurant.id)
+      .eq("status", "paid")
+      .gte("created_at", rangeFromIso)
+      .lt("created_at", rangeToExclusiveIso);
+    createdRows = fallback.data as unknown[] | null;
+    createdError = fallback.error;
+  }
+  assertNoPgError("Revenue overview created-at range", createdError);
+
+  for (const raw of createdRows ?? []) {
+    const row = raw as Record<string, unknown>;
+    const id = String(row.id ?? "");
+    if (id) rowsById.set(id, row);
+  }
+
+  if (supportsPaidAt) {
+    const paidRange = await supabase
+      .from("sales")
+      .select("id, created_at, paid_at, total")
+      .eq("restaurant_id", restaurant.id)
+      .eq("status", "paid")
+      .gte("paid_at", rangeFromIso)
+      .lt("paid_at", rangeToExclusiveIso);
+    if (
+      paidRange.error &&
+      !isMissingPgColumnError(
+        String(paidRange.error.message ?? ""),
+        "paid_at",
+      )
+    ) {
+      assertNoPgError("Revenue overview paid-at range", paidRange.error);
+    }
+    if (!paidRange.error) {
+      for (const raw of paidRange.data ?? []) {
+        const row = raw as Record<string, unknown>;
+        const id = String(row.id ?? "");
+        if (id) rowsById.set(id, row);
+      }
+    }
+  }
+
+  const paid: PaidRowChart[] = [...rowsById.values()].map((row) => ({
+    created_at: saleCollectedAtIso(row),
+    total: Number(row.total ?? 0),
+  }));
+  return buildRevenueOverview(paid, boundaries);
+}
+
 function buildFiscalTrend12m(
   rows: Array<{ created_at: string; total: number | string; payment_type?: string | null; status?: string | null }>,
   now: Date,
@@ -470,7 +725,15 @@ export async function getDashboardStats(
   rangeFromIso?: string,
   rangeToExclusiveIso?: string,
   operationalDayStartIso?: string,
+  staffId?: string,
 ) {
+  if (staffId) {
+    await assertStaffPermission({
+      licenseKey,
+      staffId,
+      permission: "canViewReports",
+    });
+  }
   const r = await getRestaurantByLicense(licenseKey);
   const parsedAnchor = anchorDateIso ? new Date(anchorDateIso) : null;
   const now =
@@ -488,16 +751,94 @@ export async function getDashboardStats(
   const opStart = String(operationalDayStartIso ?? "").trim();
   const useRangeFilter = rf.length > 0 && rtx.length > 0 && rtx > rf;
 
-  const paidInRange = (createdAt: string) =>
-    String(createdAt) >= rf && String(createdAt) < rtx;
+  const kpiStartIso = useRangeFilter ? rf : starts.day;
+  const kpiEndIso = useRangeFilter
+    ? rtx
+    : addLocalDays(new Date(starts.day), 1).toISOString();
+  const kpiDurationMs = Math.max(
+    1,
+    Date.parse(kpiEndIso) - Date.parse(kpiStartIso),
+  );
+  const kpiDayCount = Math.max(
+    1,
+    Math.round(kpiDurationMs / 86_400_000),
+  );
+  const previousKpiStartIso = new Date(
+    Date.parse(kpiStartIso) - kpiDurationMs,
+  ).toISOString();
+  const previousKpiEndIso = kpiStartIso;
 
+  const configuredTargetAmount = Number(r.dashboard_target_amount ?? 0);
+  const configuredTargetStartAt = normalizeIsoInstant(
+    r.dashboard_target_start_at,
+  );
+  const configuredTargetEndAt = normalizeIsoInstant(
+    r.dashboard_target_end_at,
+  );
+  const configuredTargetPeriod = normalizeDashboardTargetPeriod(
+    r.dashboard_target_period,
+  );
+  const hasConfiguredTarget =
+    Number.isFinite(configuredTargetAmount) &&
+    configuredTargetAmount > 0 &&
+    configuredTargetStartAt !== null &&
+    configuredTargetEndAt !== null &&
+    configuredTargetEndAt > configuredTargetStartAt &&
+    configuredTargetPeriod !== null;
+
+  const paidInRange = (collectedAt: string) =>
+    String(collectedAt) >= rf && String(collectedAt) < rtx;
+
+  const orderHistoryFrom = [
+    previousKpiStartIso,
+    starts.year,
+    ...(hasConfiguredTarget ? [configuredTargetStartAt!] : []),
+  ].sort()[0];
+  const paidHistoryFrom = [
+    previousKpiStartIso,
+    ...(hasConfiguredTarget ? [configuredTargetStartAt!] : []),
+  ].sort()[0];
+  const paidHistoryTo = [
+    kpiEndIso,
+    ...(hasConfiguredTarget ? [configuredTargetEndAt!] : []),
+  ].sort().at(-1)!;
   const { data: orders } = await supabase
     .from("sales")
     .select("*")
     .eq("restaurant_id", r.id)
-    .gte("created_at", starts.year);
+    .gte("created_at", orderHistoryFrom);
 
-  const list = orders ?? [];
+  const byId = new Map<string, Record<string, unknown>>();
+  for (const row of orders ?? []) {
+    const rec = row as Record<string, unknown>;
+    const id = String(rec.id ?? "");
+    if (id) byId.set(id, rec);
+  }
+
+  {
+    const paidAtQ = await supabase
+      .from("sales")
+      .select("*")
+      .eq("restaurant_id", r.id)
+      .eq("status", "paid")
+      .gte("paid_at", paidHistoryFrom)
+      .lt("paid_at", paidHistoryTo);
+    if (
+      paidAtQ.error &&
+      !isMissingPgColumnError(String(paidAtQ.error.message ?? ""), "paid_at")
+    ) {
+      assertNoPgError("Dashboard paid-at range", paidAtQ.error);
+    }
+    if (!paidAtQ.error) {
+      for (const row of paidAtQ.data ?? []) {
+        const rec = row as Record<string, unknown>;
+        const id = String(rec.id ?? "");
+        if (id) byId.set(id, rec);
+      }
+    }
+  }
+
+  const list = [...byId.values()];
 
   const chartFrom = new Date(now.getFullYear() - 5, 0, 1).toISOString();
   const { data: paidChartRows, error: chartErr } = await supabase
@@ -528,13 +869,14 @@ export async function getDashboardStats(
   );
   const paidFrom = (startIso: string) =>
     list.filter(
-      (o) => o.status === "paid" && String(o.created_at) >= startIso,
+      (o) =>
+        o.status === "paid" && saleCollectedAtIso(o) >= startIso,
     );
 
   const detailPeriod: DashboardViewPeriod = viewPeriod ?? "day";
   const detailPaid = useRangeFilter
     ? list.filter(
-        (o) => o.status === "paid" && paidInRange(String(o.created_at ?? "")),
+        (o) => o.status === "paid" && paidInRange(saleCollectedAtIso(o)),
       )
     : paidFrom(starts[detailPeriod]);
 
@@ -553,6 +895,55 @@ export async function getDashboardStats(
   const todayRevenue = periodSummaries.day.revenue;
   const todayPaidCount = periodSummaries.day.paidCount;
   const avgOrderValue = periodSummaries.day.avgOrderValue;
+
+  const kpiCurrentPaid = list.filter((o) => {
+    if (o.status !== "paid") return false;
+    const at = saleCollectedAtIso(o);
+    return at >= kpiStartIso && at < kpiEndIso;
+  });
+  const kpiPreviousPaid = list.filter((o) => {
+    if (o.status !== "paid") return false;
+    const at = saleCollectedAtIso(o);
+    return at >= previousKpiStartIso && at < previousKpiEndIso;
+  });
+  const currentKpiSummary = summarizePaid(
+    kpiCurrentPaid as { total: number | string }[],
+  );
+  const previousKpiSummary = summarizePaid(
+    kpiPreviousPaid as { total: number | string }[],
+  );
+  const targetRevenue = hasConfiguredTarget
+    ? list.reduce((sum, order) => {
+        if (String(order.status ?? "").toLowerCase() !== "paid") return sum;
+        const collectedAt = saleCollectedAtIso(order);
+        if (
+          collectedAt < configuredTargetStartAt! ||
+          collectedAt >= configuredTargetEndAt!
+        ) {
+          return sum;
+        }
+        return sum + Math.max(0, Number(order.total ?? 0));
+      }, 0)
+    : 0;
+
+  const saleMoney = (raw: unknown) => {
+    const n = Number(raw ?? 0);
+    return Number.isFinite(n) ? Math.max(0, n) : 0;
+  };
+  const openSales = list.filter((o) => isOpenSaleStatus(o.status));
+  const openUnpaidTotal = openSales.reduce((sum, o) => {
+    const due = saleMoney(o.total) - saleMoney(
+      (o as { paid_amount?: unknown }).paid_amount,
+    );
+    return sum + Math.max(0, due);
+  }, 0);
+  const openCollectedTotal = openSales.reduce((sum, o) => {
+    const total = saleMoney(o.total);
+    const paid = saleMoney((o as { paid_amount?: unknown }).paid_amount);
+    return sum + Math.min(total, paid);
+  }, 0);
+  const paidCirculation = todayRevenue + openCollectedTotal;
+  const totalCirculation = paidCirculation + openUnpaidTotal;
 
   const listToday =
     useRangeFilter && opStart.length > 0
@@ -584,9 +975,15 @@ export async function getDashboardStats(
   );
 
   const tables = await getTables(licenseKey);
-  const activeTables = tables.filter(
+  const occupiedTables = tables.filter(
     (t) => t.status === "occupied" || t.status === "bill-printed",
   ).length;
+  const reservedTables = tables.filter((t) => t.status === "reserved").length;
+  const availableTables = Math.max(
+    0,
+    tables.length - occupiedTables - reservedTables,
+  );
+  const activeTables = occupiedTables;
 
   const activeOrders = listToday.filter(
     (o) => o.status !== "paid" && o.status !== "cancelled",
@@ -617,6 +1014,17 @@ export async function getDashboardStats(
     revenueByMethod[method].total += Number(o.total);
   }
 
+  const paymentMix = { cash: 0, card: 0, debt: 0, other: 0 };
+  for (const o of detailPaid) {
+    const amount = saleMoney(o.total);
+    const paymentType = String(o.payment_type ?? "").toLowerCase();
+    const method = String(o.payment_method ?? "cash").toLowerCase();
+    if (paymentType === "debt") paymentMix.debt += amount;
+    else if (method === "cash") paymentMix.cash += amount;
+    else if (method === "card") paymentMix.card += amount;
+    else paymentMix.other += amount;
+  }
+
   const ordersByStatus: Record<string, number> = {};
   for (const o of listToday) {
     ordersByStatus[o.status] = (ordersByStatus[o.status] ?? 0) + 1;
@@ -643,28 +1051,462 @@ export async function getDashboardStats(
   }
 
   const paidSaleIds = detailPaid.map((o) => String(o.id));
+  const previousSaleIds = kpiPreviousPaid.map((o) => String(o.id));
+  const liveSaleIds = openSales.map((o) => String(o.id));
   const lineRows = await fetchSaleItemsForSaleIds(paidSaleIds);
-  const itemAgg = new Map<string, { quantity: number; revenue: number }>();
+  const previousLineRows = await fetchSaleItemsForSaleIds(previousSaleIds);
+  const liveLineRows = await fetchSaleItemsForSaleIds(liveSaleIds);
+  let totalPreparationMinutes = 0;
+  let preparationSampleCount = 0;
+  for (const line of lineRows) {
+    const status = String(line.status ?? "").toLowerCase();
+    if (status === "voided" || status === "cancelled") continue;
+    const sentMs = Date.parse(String(line.sentAt ?? ""));
+    const readyMs = Date.parse(String(line.readyAt ?? ""));
+    if (
+      !Number.isFinite(sentMs) ||
+      !Number.isFinite(readyMs) ||
+      readyMs < sentMs
+    ) {
+      continue;
+    }
+    const minutes = (readyMs - sentMs) / 60_000;
+    if (minutes > 12 * 60) continue;
+    totalPreparationMinutes += minutes;
+    preparationSampleCount += 1;
+  }
+  const averagePreparationMinutes =
+    preparationSampleCount > 0
+      ? totalPreparationMinutes / preparationSampleCount
+      : 0;
+  let menuResult = await supabase
+    .from("menu_items")
+    .select(
+      "id, name, price, station, category_id, image_url, supply_recipe, track_stock, stock_unit, current_stock, low_stock_threshold",
+    )
+    .eq("restaurant_id", r.id);
+  if (
+    menuResult.error &&
+    isMissingPgColumnError(
+      String(menuResult.error.message ?? ""),
+      "supply_recipe",
+    )
+  ) {
+    menuResult = await supabase
+      .from("menu_items")
+      .select(
+        "id, name, price, station, category_id, image_url, track_stock, stock_unit, current_stock, low_stock_threshold",
+      )
+      .eq("restaurant_id", r.id);
+  }
+  assertNoPgError("Dashboard menu inventory", menuResult.error);
+  const menuRows = menuResult.data ?? [];
+  const { data: categoryRows, error: categoryError } = await supabase
+    .from("menu_categories")
+    .select("id, name, color")
+    .eq("restaurant_id", r.id);
+  assertNoPgError("Dashboard menu categories", categoryError);
+  const menuStationById = new Map<string, "kitchen" | "bar">();
+  const menuStationByName = new Map<string, "kitchen" | "bar">();
+  for (const row of menuRows) {
+    const station = row.station === "bar" ? "bar" : "kitchen";
+    menuStationById.set(String(row.id), station);
+    menuStationByName.set(String(row.name ?? "").trim().toLowerCase(), station);
+  }
+  const resolveStation = (line: DashboardSaleItemRow): "kitchen" | "bar" =>
+    line.station ??
+    (line.menuItemId ? menuStationById.get(line.menuItemId) : undefined) ??
+    menuStationByName.get(line.name.trim().toLowerCase()) ??
+    "kitchen";
+
+  const kpiSeries = {
+    revenue: Array.from({ length: DASHBOARD_KPI_BUCKETS }, () => 0),
+    orders: Array.from({ length: DASHBOARD_KPI_BUCKETS }, () => 0),
+    bar: Array.from({ length: DASHBOARD_KPI_BUCKETS }, () => 0),
+    kitchen: Array.from({ length: DASHBOARD_KPI_BUCKETS }, () => 0),
+  };
+  const currentSaleAt = new Map<string, string>();
+  for (const sale of kpiCurrentPaid) {
+    const at = saleCollectedAtIso(sale);
+    const bucket = kpiBucketIndex(at, kpiStartIso, kpiEndIso);
+    if (bucket < 0) continue;
+    const saleId = String(sale.id ?? "");
+    currentSaleAt.set(saleId, at);
+    kpiSeries.revenue[bucket] += Number(sale.total ?? 0);
+    kpiSeries.orders[bucket] += 1;
+  }
+
+  let barRevenue = 0;
+  let kitchenRevenue = 0;
+  let previousBarRevenue = 0;
+  let previousKitchenRevenue = 0;
+  const itemAgg = new Map<
+    string,
+    {
+      menuItemId?: string;
+      name: string;
+      quantity: number;
+      revenue: number;
+    }
+  >();
   for (const it of lineRows) {
     const st = String(it.status ?? "").toLowerCase();
     if (st === "voided" || st === "cancelled") continue;
     const name = String(it.name ?? "").trim() || "Item";
     const qty = Number(it.quantity ?? 0);
     const rev = Number(it.price ?? 0) * qty;
-    const prev = itemAgg.get(name) ?? { quantity: 0, revenue: 0 };
+    const saleAt = currentSaleAt.get(it.saleId);
+    if (saleAt) {
+      const bucket = kpiBucketIndex(saleAt, kpiStartIso, kpiEndIso);
+      if (resolveStation(it) === "bar") {
+        barRevenue += rev;
+        if (bucket >= 0) kpiSeries.bar[bucket] += rev;
+      } else {
+        kitchenRevenue += rev;
+        if (bucket >= 0) kpiSeries.kitchen[bucket] += rev;
+      }
+    }
+    const aggregateKey =
+      it.menuItemId ?? `name:${name.toLocaleLowerCase()}`;
+    const prev = itemAgg.get(aggregateKey) ?? {
+      menuItemId: it.menuItemId,
+      name,
+      quantity: 0,
+      revenue: 0,
+    };
     prev.quantity += qty;
     prev.revenue += rev;
-    itemAgg.set(name, prev);
+    itemAgg.set(aggregateKey, prev);
   }
-  const topItems = [...itemAgg.entries()]
-    .map(([name, v]) => ({
-      name,
-      quantity: Math.round(v.quantity * 1000) / 1000,
-      revenue: Math.round(v.revenue * 100) / 100,
-    }))
+  for (const it of previousLineRows) {
+    const st = String(it.status ?? "").toLowerCase();
+    if (st === "voided" || st === "cancelled") continue;
+    const rev = Number(it.price ?? 0) * Number(it.quantity ?? 0);
+    if (resolveStation(it) === "bar") previousBarRevenue += rev;
+    else previousKitchenRevenue += rev;
+  }
+
+  const kitchenOrderIds = new Set<string>();
+  const barOrderIds = new Set<string>();
+  for (const it of lineRows) {
+    const st = String(it.status ?? "").toLowerCase();
+    if (st === "voided" || st === "cancelled") continue;
+    const saleId = String(it.saleId ?? "");
+    if (!saleId) continue;
+    if (resolveStation(it) === "bar") barOrderIds.add(saleId);
+    else kitchenOrderIds.add(saleId);
+  }
+
+  const liveQueueStatuses = new Set(["sent", "preparing"]);
+  let kitchenQueueItems = 0;
+  let barQueueItems = 0;
+  let readyItems = 0;
+  let delayedItems = 0;
+  let totalQueueAgeMinutes = 0;
+  let agedQueueItems = 0;
+  const liveNowMs = Date.now();
+  for (const line of liveLineRows) {
+    const status = String(line.status ?? "").toLowerCase();
+    if (status === "ready") readyItems += Number(line.quantity ?? 0);
+    if (!liveQueueStatuses.has(status)) continue;
+    const quantity = Math.max(1, Number(line.quantity ?? 1));
+    if (resolveStation(line) === "bar") barQueueItems += quantity;
+    else kitchenQueueItems += quantity;
+    const createdMs = Date.parse(line.createdAt);
+    if (!Number.isFinite(createdMs)) continue;
+    const ageMinutes = Math.max(0, (liveNowMs - createdMs) / 60_000);
+    totalQueueAgeMinutes += ageMinutes;
+    agedQueueItems += 1;
+    if (ageMinutes >= 15) delayedItems += quantity;
+  }
+  const averageQueueAgeMinutes =
+    agedQueueItems > 0 ? totalQueueAgeMinutes / agedQueueItems : 0;
+
+  const trackedMenuRows = (menuRows ?? []).filter(
+    (row) => row.track_stock === true,
+  );
+  const venueLowStock = parsePosStockRules(stockRulesFromRestaurantRow(r))
+    .defaultLowStockThreshold;
+  const outOfStockRows = trackedMenuRows.filter(
+    (row) => Number(row.current_stock ?? 0) <= 0,
+  );
+  const lowStockRows = trackedMenuRows.filter((row) => {
+    const current = Number(row.current_stock ?? 0);
+    const threshold = effectiveLowStockThreshold(
+      row.low_stock_threshold == null
+        ? undefined
+        : Number(row.low_stock_threshold),
+      venueLowStock,
+    );
+    return current > 0 && current <= threshold;
+  });
+
+  const supplyChartStartIso = startLocalMonth(
+    addLocalMonths(now, -5),
+  ).toISOString();
+  const stockQueryStartIso =
+    supplyChartStartIso < kpiStartIso ? supplyChartStartIso : kpiStartIso;
+  const [stockLogResult, expenseResult] = await Promise.all([
+    supabase
+      .from("pos_stock_logs")
+      .select("menu_item_id, type, change, created_at")
+      .eq("restaurant_id", r.id)
+      .gte("created_at", stockQueryStartIso)
+      .lt("created_at", kpiEndIso),
+    supabase
+      .from("pos_expenses")
+      .select("amount, created_at")
+      .eq("restaurant_id", r.id)
+      .gte("created_at", kpiStartIso)
+      .lt("created_at", kpiEndIso),
+  ]);
+  const priceByMenuId = new Map(
+    (menuRows ?? []).map((row) => [String(row.id), Number(row.price ?? 0)]),
+  );
+  const costMovementTypes = new Set([
+    "sale",
+    "recipe_sale",
+    "staff_consumption",
+    "waste",
+  ]);
+  let estimatedStockCost = 0;
+  if (!stockLogResult.error) {
+    for (const row of stockLogResult.data ?? []) {
+      const createdAt = String(row.created_at ?? "");
+      if (createdAt < kpiStartIso || createdAt >= kpiEndIso) continue;
+      const change = Number(row.change ?? 0);
+      if (change >= 0 || !costMovementTypes.has(String(row.type ?? ""))) {
+        continue;
+      }
+      estimatedStockCost +=
+        Math.abs(change) *
+        (priceByMenuId.get(String(row.menu_item_id ?? "")) ?? 0);
+    }
+  }
+  const operatingExpenses = expenseResult.error
+    ? 0
+    : (expenseResult.data ?? []).reduce(
+        (sum, row) => sum + Math.max(0, Number(row.amount ?? 0)),
+        0,
+      );
+  const estimatedProfit =
+    currentKpiSummary.revenue - estimatedStockCost - operatingExpenses;
+  const marginPercent =
+    currentKpiSummary.revenue > 0
+      ? (estimatedProfit / currentKpiSummary.revenue) * 100
+      : 0;
+  const cancelledOrdersInPeriod = list.filter((order) => {
+    if (String(order.status ?? "").toLowerCase() !== "cancelled") return false;
+    const createdAt = String(order.created_at ?? "");
+    return createdAt >= kpiStartIso && createdAt < kpiEndIso;
+  }).length;
+  const ordersCreatedInPeriod = list.filter((order) => {
+    const createdAt = String(order.created_at ?? "");
+    return createdAt >= kpiStartIso && createdAt < kpiEndIso;
+  }).length;
+  const cancellationRatePercent =
+    ordersCreatedInPeriod > 0
+      ? (cancelledOrdersInPeriod / ordersCreatedInPeriod) * 100
+      : 0;
+  const paidTableOrders = kpiCurrentPaid.filter(
+    (order) => order.table_id != null || String(order.table_ref ?? "").trim(),
+  ).length;
+  const tableTurnsPerDay =
+    tables.length > 0
+      ? paidTableOrders / tables.length / kpiDayCount
+      : 0;
+  const configuredDailyTarget = Number(
+    r.dashboard_daily_sales_target ?? 0,
+  );
+  const dailySalesTarget =
+    Number.isFinite(configuredDailyTarget) && configuredDailyTarget > 0
+      ? configuredDailyTarget
+      : 0;
+  const periodSalesTarget = dailySalesTarget * kpiDayCount;
+  const stockHistoryRows = stockLogResult.error
+    ? []
+    : (stockLogResult.data ?? []);
+  const supplyProfitChart = Array.from({ length: 6 }, (_, index) => {
+    const monthStart = addLocalMonths(startLocalMonth(now), index - 5);
+    const monthEnd = addLocalMonths(monthStart, 1);
+    const startIso = monthStart.toISOString();
+    const endIso = monthEnd.toISOString();
+    let supplyIntake = 0;
+    let stockExpense = 0;
+    for (const row of stockHistoryRows) {
+      const createdAt = String(row.created_at ?? "");
+      if (createdAt < startIso || createdAt >= endIso) continue;
+      const change = Number(row.change ?? 0);
+      const price =
+        priceByMenuId.get(String(row.menu_item_id ?? "")) ?? 0;
+      if (String(row.type ?? "") === "manual_addition" && change > 0) {
+        supplyIntake += change * price;
+      } else if (
+        change < 0 &&
+        costMovementTypes.has(String(row.type ?? ""))
+      ) {
+        stockExpense += Math.abs(change) * price;
+      }
+    }
+    return {
+      label: monthStart.toLocaleDateString(lc, {
+        month: "short",
+        year: "2-digit",
+      }),
+      revenue: 0,
+      supplyIntake: round2(supplyIntake),
+      stockExpense: round2(stockExpense),
+      estimatedProfit: 0,
+    };
+  });
+  let inventoryTotal = 0;
+  let inventoryKitchen = 0;
+  let inventoryBar = 0;
+  let trackedItemCount = 0;
+  for (const row of trackedMenuRows) {
+    const value =
+      Math.max(0, Number(row.current_stock ?? 0)) *
+      Math.max(0, Number(row.price ?? 0));
+    trackedItemCount += 1;
+    inventoryTotal += value;
+    if (row.station === "bar") inventoryBar += value;
+    else inventoryKitchen += value;
+  }
+  const inventorySnapshot = {
+    totalValue: round2(inventoryTotal),
+    kitchenValue: round2(inventoryKitchen),
+    barValue: round2(inventoryBar),
+    trackedItemCount,
+  };
+  const currentLineById = new Map(
+    [...lineRows, ...liveLineRows].map((line) => [line.id, line]),
+  );
+  const voidedItems = [...currentLineById.values()].reduce(
+    (sum, line) =>
+      String(line.status ?? "").toLowerCase() === "voided"
+        ? sum + Number(line.quantity ?? 0)
+        : sum,
+    0,
+  );
+
+  const menuRecords = menuRows as unknown as Record<string, unknown>[];
+  const menuById = new Map(
+    menuRecords.map((row) => [String(row.id ?? ""), row]),
+  );
+  const menuByName = new Map(
+    menuRecords.map((row) => [
+      String(row.name ?? "").trim().toLocaleLowerCase(),
+      row,
+    ]),
+  );
+  const categoryById = new Map(
+    (categoryRows ?? []).map((row) => [
+      String(row.id ?? ""),
+      {
+        name: String(row.name ?? ""),
+        color: String(row.color ?? "") || "#64748b",
+      },
+    ]),
+  );
+  const fallbackCategoryName = locale === "sq" ? "Të tjera" : "Other";
+  const categorySalesById = new Map<
+    string,
+    { name: string; color: string; quantity: number; revenue: number }
+  >();
+  const topItems = [...itemAgg.values()]
+    .map((item) => {
+      const menuRow =
+        (item.menuItemId ? menuById.get(item.menuItemId) : undefined) ??
+        menuByName.get(item.name.trim().toLocaleLowerCase());
+      const categoryId = String(menuRow?.category_id ?? "");
+      const category = categoryById.get(categoryId);
+      const categoryKey = categoryId || "__other__";
+      const categoryAggregate = categorySalesById.get(categoryKey) ?? {
+        name: category?.name || fallbackCategoryName,
+        color: category?.color || "#64748b",
+        quantity: 0,
+        revenue: 0,
+      };
+      categoryAggregate.quantity += item.quantity;
+      categoryAggregate.revenue += item.revenue;
+      categorySalesById.set(categoryKey, categoryAggregate);
+
+      const recipe = Array.isArray(menuRow?.supply_recipe)
+        ? menuRow.supply_recipe
+        : [];
+      let estimatedUnitCost = 0;
+      let hasCostEstimate = false;
+      for (const rawLine of recipe) {
+        if (!rawLine || typeof rawLine !== "object") continue;
+        const line = rawLine as Record<string, unknown>;
+        const supplyId = String(
+          line.supplyMenuItemId ?? line.supply_menu_item_id ?? "",
+        );
+        const quantityPerUnit = Number(
+          line.qtyPerUnit ?? line.qty_per_unit ?? 0,
+        );
+        const supplyPrice = priceByMenuId.get(supplyId);
+        if (
+          !supplyId ||
+          !Number.isFinite(quantityPerUnit) ||
+          quantityPerUnit <= 0 ||
+          supplyPrice === undefined
+        ) {
+          continue;
+        }
+        estimatedUnitCost += supplyPrice * quantityPerUnit;
+        hasCostEstimate = true;
+      }
+      const estimatedProfit = hasCostEstimate
+        ? round2(item.revenue - estimatedUnitCost * item.quantity)
+        : null;
+      const marginPercent =
+        estimatedProfit !== null && item.revenue > 0
+          ? round2((estimatedProfit / item.revenue) * 100)
+          : null;
+
+      return {
+        name: item.name,
+        quantity: Math.round(item.quantity * 1000) / 1000,
+        revenue: round2(item.revenue),
+        estimatedProfit,
+        marginPercent,
+        imageUrl: String(menuRow?.image_url ?? "").trim() || null,
+      };
+    })
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 15);
+  const categorySales = [...categorySalesById.values()]
+    .map((category) => ({
+      ...category,
+      quantity: Math.round(category.quantity * 1000) / 1000,
+      revenue: round2(category.revenue),
+    }))
+    .sort((a, b) => b.revenue - a.revenue);
 
+  const recentOrderCandidates = list
+    .filter((order) => {
+      const status = String(order.status ?? "").toLowerCase();
+      const activityAt =
+        status === "paid"
+          ? saleCollectedAtIso(order)
+          : String(order.created_at ?? "");
+      return activityAt >= kpiStartIso && activityAt < kpiEndIso;
+    })
+    .sort((a, b) => {
+      const aStatus = String(a.status ?? "").toLowerCase();
+      const bStatus = String(b.status ?? "").toLowerCase();
+      const aAt =
+        aStatus === "paid"
+          ? saleCollectedAtIso(a)
+          : String(a.created_at ?? "");
+      const bAt =
+        bStatus === "paid"
+          ? saleCollectedAtIso(b)
+          : String(b.created_at ?? "");
+      return bAt.localeCompare(aAt);
+    })
+    .slice(0, 6);
   const staffPerf = new Map<string, { orders: number; revenue: number }>();
   for (const o of detailPaid) {
     const key = o.staff_id ? String(o.staff_id) : "__unassigned__";
@@ -673,7 +1515,14 @@ export async function getDashboardStats(
     prev.revenue += Number(o.total ?? 0);
     staffPerf.set(key, prev);
   }
-  const staffIds = [...staffPerf.keys()].filter((k) => k !== "__unassigned__");
+  const staffIds = [
+    ...new Set([
+      ...[...staffPerf.keys()].filter((key) => key !== "__unassigned__"),
+      ...recentOrderCandidates
+        .map((order) => String(order.staff_id ?? ""))
+        .filter(Boolean),
+    ]),
+  ];
   const staffNameById = new Map<string, string>();
   if (staffIds.length > 0) {
     const { data: stRows, error: stErr } = await supabase
@@ -695,14 +1544,139 @@ export async function getDashboardStats(
       revenue: Math.round(v.revenue * 100) / 100,
     }))
     .sort((a, b) => b.revenue - a.revenue);
+  const tableNameById = new Map(
+    tables.map((table) => [String(table._id), table.name]),
+  );
+  const recentOrders = recentOrderCandidates.map((order) => {
+    const status = String(order.status ?? "").toLowerCase();
+    const tableId = saleFloorTableId(
+      order as { table_id?: string | null; table_ref?: string | null },
+    );
+    return {
+      id: String(order.id ?? ""),
+      orderNumber: Number(order.order_number ?? 0),
+      tableName: tableId ? (tableNameById.get(tableId) ?? unknownLabel) : "—",
+      staffName: order.staff_id
+        ? (staffNameById.get(String(order.staff_id)) ?? unknownLabel)
+        : "—",
+      customerName: String(order.customer_name ?? ""),
+      status,
+      total: round2(Number(order.total ?? 0)),
+      paymentMethod: String(order.payment_method ?? ""),
+      activityAt:
+        status === "paid"
+          ? saleCollectedAtIso(order)
+          : String(order.created_at ?? ""),
+    };
+  });
+
+  for (const series of Object.values(kpiSeries)) {
+    for (let i = 0; i < series.length; i++) {
+      series[i] = round2(series[i]);
+    }
+  }
 
   return {
     periodSummaries,
     viewPeriod: detailPeriod,
     todayRevenue: Math.round(todayRevenue * 100) / 100,
+    paidCirculation: Math.round(paidCirculation * 100) / 100,
+    openUnpaidTotal: Math.round(openUnpaidTotal * 100) / 100,
+    totalCirculation: Math.round(totalCirculation * 100) / 100,
     todayPaidCount,
     /** Të gjitha shitjet e regjistruara sot (pa të anuluara). */
     todayOrdersCount,
+    dashboardKpis: {
+      totalRevenue: currentKpiSummary.revenue,
+      previousRevenue: previousKpiSummary.revenue,
+      totalOrders: currentKpiSummary.paidCount,
+      previousOrders: previousKpiSummary.paidCount,
+      barRevenue: round2(barRevenue),
+      previousBarRevenue: round2(previousBarRevenue),
+      kitchenRevenue: round2(kitchenRevenue),
+      previousKitchenRevenue: round2(previousKitchenRevenue),
+      series: kpiSeries,
+    },
+    enterpriseOverview: {
+      liveOperations: {
+        activeTables,
+        totalTables: tables.length,
+        availableTables,
+        occupiedTables,
+        reservedTables,
+        kitchenOrders: kitchenOrderIds.size,
+        barOrders: barOrderIds.size,
+        activeOrders: openSales.length,
+        kitchenQueueItems: Math.round(kitchenQueueItems),
+        barQueueItems: Math.round(barQueueItems),
+        readyItems: Math.round(readyItems),
+        delayedItems: Math.round(delayedItems),
+        averageQueueAgeMinutes: round2(averageQueueAgeMinutes),
+      },
+      targetPulse: {
+        amount: hasConfiguredTarget ? round2(configuredTargetAmount) : 0,
+        currentRevenue: round2(targetRevenue),
+        startAt: hasConfiguredTarget ? configuredTargetStartAt : null,
+        endAt: hasConfiguredTarget ? configuredTargetEndAt : null,
+        period: hasConfiguredTarget ? configuredTargetPeriod : null,
+      },
+      profitability: {
+        revenue: currentKpiSummary.revenue,
+        estimatedStockCost: round2(estimatedStockCost),
+        operatingExpenses: round2(operatingExpenses),
+        estimatedProfit: round2(estimatedProfit),
+        marginPercent: round2(marginPercent),
+      },
+      performance: {
+        averageOrderValue: currentKpiSummary.avgOrderValue,
+        previousAverageOrderValue: previousKpiSummary.avgOrderValue,
+        averagePreparationMinutes: round2(averagePreparationMinutes),
+        preparationSampleCount,
+        tableTurnsPerDay: round2(tableTurnsPerDay),
+        cancellationRatePercent: round2(cancellationRatePercent),
+        dailySalesTarget: round2(dailySalesTarget),
+        periodSalesTarget: round2(periodSalesTarget),
+      },
+      paymentMix: {
+        cash: round2(paymentMix.cash),
+        card: round2(paymentMix.card),
+        debt: round2(paymentMix.debt),
+        other: round2(paymentMix.other),
+      },
+      smartAlerts: {
+        outOfStockCount: outOfStockRows.length,
+        outOfStockNames: outOfStockRows
+          .slice(0, 3)
+          .map((row) => String(row.name ?? "")),
+        outOfStockItems: outOfStockRows.slice(0, 3).map((row) => ({
+          id: String(row.id ?? ""),
+          name: String(row.name ?? ""),
+          currentStock: round2(Number(row.current_stock ?? 0)),
+          lowStockThreshold: round2(
+            Number(row.low_stock_threshold ?? 0),
+          ),
+          stockUnit: String(row.stock_unit ?? "pc"),
+          imageUrl: String(row.image_url ?? "").trim() || null,
+        })),
+        lowStockCount: lowStockRows.length,
+        lowStockNames: lowStockRows
+          .slice(0, 3)
+          .map((row) => String(row.name ?? "")),
+        lowStockItems: lowStockRows.slice(0, 3).map((row) => ({
+          id: String(row.id ?? ""),
+          name: String(row.name ?? ""),
+          currentStock: round2(Number(row.current_stock ?? 0)),
+          lowStockThreshold: round2(
+            Number(row.low_stock_threshold ?? 0),
+          ),
+          stockUnit: String(row.stock_unit ?? "pc"),
+          imageUrl: String(row.image_url ?? "").trim() || null,
+        })),
+        delayedItems: Math.round(delayedItems),
+        cancelledOrders: cancelledOrdersInPeriod,
+        voidedItems: Math.round(voidedItems),
+      },
+    },
     activeOrders,
     avgOrderValue: Math.round(avgOrderValue * 100) / 100,
     activeTables,
@@ -717,13 +1691,203 @@ export async function getDashboardStats(
     revenueByMethod,
     ordersByStatus,
     topItems,
+    categorySales,
     staffPerformance,
+    recentOrders,
     salesChart,
     fiscalTrend,
     visitorBuckets,
     visitorHeatmap,
     weekDayRevenue,
+    supplyProfitChart,
+    inventorySnapshot,
   };
+}
+
+export async function updateDailySalesTarget(args: {
+  licenseKey: string;
+  dailyTarget: number;
+}) {
+  const dailyTarget = Number(args.dailyTarget);
+  if (!Number.isFinite(dailyTarget) || dailyTarget < 0) {
+    throw new Error("Daily sales target must be zero or greater.");
+  }
+  const restaurant = await getRestaurantByLicense(args.licenseKey);
+  const { error } = await supabase
+    .from("restaurants")
+    .update({
+      dashboard_daily_sales_target:
+        dailyTarget > 0 ? round2(dailyTarget) : null,
+    })
+    .eq("id", restaurant.id);
+  if (error) {
+    const message = String(error.message ?? "");
+    if (
+      isMissingPgColumnError(message, "dashboard_daily_sales_target")
+    ) {
+      throw new Error(
+        "Mungon kolona dashboard_daily_sales_target. Ekzekuto migrimin 042_enterprise_dashboard_metrics.sql.",
+      );
+    }
+    throw error;
+  }
+  clearRestaurantCache(args.licenseKey);
+  return { ok: true as const };
+}
+
+export async function updateTargetPulse(args: {
+  licenseKey: string;
+  staffId: string;
+  amount: number;
+  startAt: string;
+  endAt: string;
+  period: DashboardTargetPeriod;
+}) {
+  const amount = Number(args.amount);
+  const startAt = normalizeIsoInstant(args.startAt);
+  const endAt = normalizeIsoInstant(args.endAt);
+  const period = normalizeDashboardTargetPeriod(args.period);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error("Target amount must be greater than zero.");
+  }
+  if (!startAt || !endAt || endAt <= startAt || !period) {
+    throw new Error("Target dates or period are invalid.");
+  }
+
+  const restaurant = await getRestaurantByLicense(args.licenseKey);
+  if (!isLocalDevicePosAdmin(args.staffId)) {
+    const staffId = uuidOrNull(args.staffId);
+    if (!staffId) {
+      throw new Error("Only an active admin can update Target Pulse.");
+    }
+    const { data: staff, error: staffError } = await supabase
+      .from("staff")
+      .select("id")
+      .eq("id", staffId)
+      .eq("restaurant_id", restaurant.id)
+      .eq("role", "admin")
+      .eq("is_active", true)
+      .maybeSingle();
+    assertNoPgError("Authorize Target Pulse update", staffError);
+    if (!staff) {
+      throw new Error("Only an active admin can update Target Pulse.");
+    }
+  }
+
+  const { error } = await supabase
+    .from("restaurants")
+    .update({
+      dashboard_target_amount: round2(amount),
+      dashboard_target_start_at: startAt,
+      dashboard_target_end_at: endAt,
+      dashboard_target_period: period,
+    })
+    .eq("id", restaurant.id);
+  if (error) {
+    const message = String(error.message ?? "");
+    const targetColumns = [
+      "dashboard_target_amount",
+      "dashboard_target_start_at",
+      "dashboard_target_end_at",
+      "dashboard_target_period",
+    ];
+    if (
+      targetColumns.some((column) =>
+        isMissingPgColumnError(message, column),
+      )
+    ) {
+      throw new Error(
+        "Mungojnë kolonat e Target Pulse. Ekzekuto supabase/ensure_dashboard_target_pulse.sql në Supabase SQL Editor.",
+      );
+    }
+    throw error;
+  }
+  clearRestaurantCache(args.licenseKey);
+  return { ok: true as const };
+}
+
+export async function getReportSchedules(licenseKey: string) {
+  const restaurant = await getRestaurantByLicense(licenseKey);
+  return {
+    venueName: restaurant.name,
+    schedules: normalizeReportSchedules(restaurant.dashboard_report_schedules),
+  };
+}
+
+export async function saveReportSchedules(args: {
+  licenseKey: string;
+  staffId: string;
+  schedules: unknown;
+}) {
+  const restaurant = await getRestaurantByLicense(args.licenseKey);
+  if (!isLocalDevicePosAdmin(args.staffId)) {
+    const staffId = uuidOrNull(args.staffId);
+    if (!staffId) {
+      throw new Error("Only an active admin can update report schedules.");
+    }
+    const { data: staff, error: staffError } = await supabase
+      .from("staff")
+      .select("id")
+      .eq("id", staffId)
+      .eq("restaurant_id", restaurant.id)
+      .eq("role", "admin")
+      .eq("is_active", true)
+      .maybeSingle();
+    assertNoPgError("Authorize report schedule update", staffError);
+    if (!staff) {
+      throw new Error("Only an active admin can update report schedules.");
+    }
+  }
+
+  const schedules = normalizeReportSchedules(args.schedules);
+  const { error } = await supabase
+    .from("restaurants")
+    .update({ dashboard_report_schedules: schedules })
+    .eq("id", restaurant.id);
+  if (error) {
+    const message = String(error.message ?? "");
+    if (isMissingPgColumnError(message, "dashboard_report_schedules")) {
+      throw new Error(
+        "Mungon kolona e raporteve. Ekzekuto supabase/ensure_dashboard_report_schedules.sql në Supabase SQL Editor.",
+      );
+    }
+    throw error;
+  }
+  clearRestaurantCache(args.licenseKey);
+  return { ok: true as const, schedules };
+}
+
+export async function markReportSchedulesSent(args: {
+  licenseKey: string;
+  sentIds: string[];
+}) {
+  const restaurant = await getRestaurantByLicense(args.licenseKey);
+  const sentIds = new Set(
+    (Array.isArray(args.sentIds) ? args.sentIds : []).map((id) => String(id)),
+  );
+  if (sentIds.size === 0) return { ok: true as const };
+  const today = new Date();
+  const todayYmd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const schedules = normalizeReportSchedules(
+    restaurant.dashboard_report_schedules,
+  ).map((schedule) =>
+    sentIds.has(schedule.id)
+      ? { ...schedule, lastSentYmd: todayYmd }
+      : schedule,
+  );
+  const { error } = await supabase
+    .from("restaurants")
+    .update({ dashboard_report_schedules: schedules })
+    .eq("id", restaurant.id);
+  if (error) {
+    const message = String(error.message ?? "");
+    if (isMissingPgColumnError(message, "dashboard_report_schedules")) {
+      return { ok: false as const };
+    }
+    throw error;
+  }
+  clearRestaurantCache(args.licenseKey);
+  return { ok: true as const, schedules };
 }
 
 export type SoldItemRangeRow = {
@@ -780,7 +1944,15 @@ export async function getSoldItemsByDateTimeRange(args: {
 export async function getZReport(args: {
   licenseKey: string;
   date?: string;
+  staffId?: string;
 }) {
+  if (args.staffId) {
+    await assertStaffPermission({
+      licenseKey: args.licenseKey,
+      staffId: args.staffId,
+      permission: "canViewReports",
+    });
+  }
   const r = await getRestaurantByLicense(args.licenseKey);
   const target = args.date ? new Date(args.date) : new Date();
   const dayStart = new Date(
@@ -958,6 +2130,14 @@ export async function getZReport(args: {
   kitchenRevenue = Math.round(kitchenRevenue * 100) / 100;
   const grossRevenue = Math.round((barRevenue + kitchenRevenue) * 100) / 100;
 
+  const cashTotal = paid
+    .filter(
+      (o) =>
+        o.payment_type !== "debt" &&
+        o.payment_type !== "complimentary" &&
+        o.payment_method !== "card",
+    )
+    .reduce((s, o) => s + Number(o.total), 0);
   const cardTotal = paid
     .filter(
       (o) =>
@@ -1093,6 +2273,7 @@ export async function getZReport(args: {
     barRevenue,
     kitchenRevenue,
     grossRevenue,
+    cashTotal: Math.round(cashTotal * 100) / 100,
     cardTotal: Math.round(cardTotal * 100) / 100,
     debtTotal: Math.round(debtTotal * 100) / 100,
     complimentaryTotal: Math.round(complimentaryTotal * 100) / 100,
@@ -1107,7 +2288,14 @@ export async function getZReport(args: {
   };
 }
 
-export async function getZReportHistory(licenseKey: string) {
+export async function getZReportHistory(licenseKey: string, staffId?: string) {
+  if (staffId) {
+    await assertStaffPermission({
+      licenseKey,
+      staffId,
+      permission: "canViewReports",
+    });
+  }
   const r = await getRestaurantByLicense(licenseKey);
   const { data, error } = await supabase
     .from("pos_z_reports")
@@ -1288,7 +2476,18 @@ export async function closeDay(args: Record<string, unknown>) {
   return { zNumber, totalToHandOver: finalHandOver };
 }
 
-export async function getAuditLogs(args: { licenseKey: string; limit?: number }) {
+export async function getAuditLogs(args: {
+  licenseKey: string;
+  limit?: number;
+  staffId?: string;
+}) {
+  if (args.staffId) {
+    await assertStaffPermission({
+      licenseKey: args.licenseKey,
+      staffId: args.staffId,
+      permission: "canViewAuditLog",
+    });
+  }
   const r = await getRestaurantByLicense(args.licenseKey);
   const { data, error } = await supabase
     .from("pos_audit_logs")

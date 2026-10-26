@@ -39,6 +39,21 @@ export function errorMessageFromUnknown(
   return fallback;
 }
 
+/** Postgres check_violation (23514), e.g. payment_type not in the live CHECK list. */
+export function isPgCheckConstraintError(
+  message: string,
+  constraintHint?: string,
+): boolean {
+  const m = message.toLowerCase();
+  const isCheck =
+    m.includes("check constraint") ||
+    m.includes("violates check") ||
+    m.includes("violates check constraint");
+  if (!isCheck) return false;
+  if (!constraintHint) return true;
+  return m.includes(constraintHint.toLowerCase());
+}
+
 /** PostgREST when a table was never created or the schema cache is stale. */
 export function isMissingSupabaseTableError(
   message: string,

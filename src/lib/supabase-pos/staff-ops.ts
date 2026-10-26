@@ -6,6 +6,12 @@ import { staffFromRow, saleFloorTableId } from "./mappers.ts";
 import { loadOpenSalesForTable } from "./tables-ops.ts";
 import { uuidOrNull } from "./uuid.ts";
 import { payOrder } from "./orders-ops.ts";
+import { insertAuditLog } from "./dashboard-ops.ts";
+import {
+  assertStaffCanManageStaff,
+  loadStaffMember,
+} from "./staff-auth.ts";
+import { permissionsForRole } from "@/lib/staff-permissions.ts";
 
 function normalizeStaffRlsError(error: { message?: string; code?: string } | null): Error | null {
   if (!error) return null;
@@ -41,7 +47,13 @@ export async function createStaff(args: {
   role: string;
   pinHash: string;
   permissions?: Record<string, unknown>;
+  actorStaffId?: string;
+  actorStaffName?: string;
 }) {
+  await assertStaffCanManageStaff({
+    licenseKey: args.licenseKey,
+    actorStaffId: args.actorStaffId,
+  });
   const r = await getRestaurantByLicense(args.licenseKey);
   const { data, error } = await supabase
     .from("staff")
@@ -51,13 +63,21 @@ export async function createStaff(args: {
       role: args.role,
       pin_hash: args.pinHash,
       is_active: true,
-      permissions: args.permissions ?? null,
+      permissions: args.permissions ?? permissionsForRole(args.role),
     })
     .select("id")
     .single();
 
   if (error) throw normalizeStaffRlsError(error) ?? error;
   clearRestaurantCache(args.licenseKey);
+  await insertAuditLog({
+    licenseKey: args.licenseKey,
+    staffId: args.actorStaffId,
+    staffName: args.actorStaffName?.trim() || "System",
+    action: "staff_create",
+    details: `Created staff ${args.name.trim()} with role ${args.role}`,
+    metadata: { role: args.role, staffId: data!.id },
+  });
   return data!.id as string;
 }
 
@@ -69,8 +89,14 @@ export async function updateStaff(args: {
   pinHash?: string;
   isActive: boolean;
   permissions?: Record<string, unknown>;
+  actorStaffId?: string;
+  actorStaffName?: string;
 }) {
-  await getRestaurantByLicense(args.licenseKey);
+  await assertStaffCanManageStaff({
+    licenseKey: args.licenseKey,
+    actorStaffId: args.actorStaffId,
+  });
+  const previous = await loadStaffMember(args.licenseKey, args.staffId);
   const patch: Record<string, unknown> = {
     name: args.name.trim(),
     role: args.role,
@@ -85,15 +111,56 @@ export async function updateStaff(args: {
     .eq("id", args.staffId);
 
   if (error) throw normalizeStaffRlsError(error) ?? error;
+
+  const roleChanged = previous && previous.role !== args.role;
+  const activeChanged = previous && previous.isActive !== args.isActive;
+  const details = [
+    `Updated staff ${args.name.trim()}`,
+    roleChanged ? `role ${previous?.role} → ${args.role}` : `role ${args.role}`,
+    activeChanged
+      ? args.isActive
+        ? "activated"
+        : "deactivated"
+      : null,
+  ]
+    .filter(Boolean)
+    .join("; ");
+  await insertAuditLog({
+    licenseKey: args.licenseKey,
+    staffId: args.actorStaffId,
+    staffName: args.actorStaffName?.trim() || "System",
+    action: "staff_update",
+    details,
+    metadata: {
+      staffId: args.staffId,
+      role: args.role,
+      previousRole: previous?.role,
+      isActive: args.isActive,
+    },
+  });
 }
 
 export async function deleteStaff(args: {
   licenseKey: string;
   staffId: string;
+  actorStaffId?: string;
+  actorStaffName?: string;
 }) {
-  await getRestaurantByLicense(args.licenseKey);
+  await assertStaffCanManageStaff({
+    licenseKey: args.licenseKey,
+    actorStaffId: args.actorStaffId,
+  });
+  const previous = await loadStaffMember(args.licenseKey, args.staffId);
   const { error } = await supabase.from("staff").delete().eq("id", args.staffId);
   if (error) throw normalizeStaffRlsError(error) ?? error;
+  await insertAuditLog({
+    licenseKey: args.licenseKey,
+    staffId: args.actorStaffId,
+    staffName: args.actorStaffName?.trim() || "System",
+    action: "staff_update",
+    details: `Removed staff ${previous?.name ?? args.staffId} (${previous?.role ?? "unknown"})`,
+    metadata: { staffId: args.staffId, removed: true },
+  });
 }
 
 export async function clockIn(args: {

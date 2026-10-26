@@ -139,7 +139,7 @@ export default function ContactPage() {
                   type="submit"
                   size="lg"
                   disabled={isSubmitting}
-                  className="bg-gradient-to-r from-[#0066FF] to-[#00AACC] hover:from-[#0055DD] hover:to-[#0099BB] text-white border-0"
+                  className="bg-gradient-to-r from-brand to-brand-sky hover:from-brand-hover hover:to-brand-hover text-white border-0"
                 >
                   {isSubmitting ? t("contact.sending") : t("contact.send")}
                 </Button>
@@ -157,7 +157,7 @@ export default function ContactPage() {
                 {SUPPORT_BUSINESS_EMAIL_READY ? (
                   <>
                     <div className="mb-3 flex items-center gap-3">
-                      <div className="flex size-10 items-center justify-center rounded-lg bg-gradient-to-br from-[#0066FF]/10 to-[#44CC00]/10">
+                      <div className="flex size-10 items-center justify-center rounded-lg bg-gradient-to-br from-brand/10 to-brand-accent/10">
                         <Mail className="size-5 text-primary" />
                       </div>
                       <h3 className="font-semibold text-foreground">
@@ -199,7 +199,7 @@ export default function ContactPage() {
 
               <div className="rounded-xl border border-border bg-card p-6">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#0066FF]/10 to-[#44CC00]/10 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-brand/10 to-brand-accent/10 flex items-center justify-center">
                     <MessageSquare className="size-5 text-primary" />
                   </div>
                   <h3 className="font-semibold text-foreground">{t("contact.liveChat")}</h3>
@@ -209,7 +209,7 @@ export default function ContactPage() {
 
               <div className="rounded-xl border border-border bg-card p-6">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#0066FF]/10 to-[#44CC00]/10 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-brand/10 to-brand-accent/10 flex items-center justify-center">
                     <Clock className="size-5 text-primary" />
                   </div>
                   <h3 className="font-semibold text-foreground">{t("contact.responseTime")}</h3>

@@ -130,7 +130,7 @@ function BusinessCardsPage() {
             {t("business.empty_body")}
           </p>
           <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
-            <Button asChild className="rounded-xl bg-gradient-to-r from-[#0066FF] to-[#00AACC] text-white">
+            <Button asChild className="rounded-xl bg-gradient-to-r from-brand to-brand-sky text-white">
               <Link to="/dashboard/get-started">
                 <KeyRound className="size-4" />
                 {t("business.activate")}
@@ -417,7 +417,7 @@ function BusinessProfileEditor({ requestedId }: { requestedId: string }) {
               : "Activate or link a POS license to this account first. Then you can edit venue details, address, and receipt information here."}
           </p>
           <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
-            <Button asChild className="rounded-xl bg-gradient-to-r from-[#0066FF] to-[#00AACC] text-white">
+            <Button asChild className="rounded-xl bg-gradient-to-r from-brand to-brand-sky text-white">
               <Link to="/dashboard/business-settings">{t("business.back")}</Link>
             </Button>
             <Button asChild variant="outline" className="rounded-xl">

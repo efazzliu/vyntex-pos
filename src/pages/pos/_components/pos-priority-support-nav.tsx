@@ -67,7 +67,7 @@ export default function PosPrioritySupportNav({
             : "border border-[#1e2a45] bg-[#131A2E]",
         )}
       >
-        <div className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-[#0066FF] to-[#00AACC] text-white">
+        <div className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-brand to-brand-sky text-white">
           <MessageCircle className="size-5 shrink-0" />
           <span className="font-semibold text-sm truncate">
             {t("support.priority_title")}
@@ -82,7 +82,7 @@ export default function PosPrioritySupportNav({
           <p>{t("support.priority_body")}</p>
           <Button
             asChild
-            className="w-full bg-white text-[#0066FF] hover:bg-white/90"
+            className="w-full bg-white text-brand hover:bg-white/90"
           >
             <a href={SUPPORT_MAILTO_HREF}>{t("support.priority_email")}</a>
           </Button>

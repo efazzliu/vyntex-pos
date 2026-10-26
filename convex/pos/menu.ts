@@ -81,6 +81,7 @@ export const createCategory = mutation({
     name: v.string(),
     color: v.string(),
     icon: v.optional(v.string()),
+    prepConfig: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
     const restaurant = await getRestaurantByLicense(ctx, args.licenseKey);
@@ -104,6 +105,7 @@ export const createCategory = mutation({
       icon: args.icon,
       displayOrder: maxOrder + 1,
       isActive: true,
+      prepConfig: args.prepConfig,
     });
   },
 });
@@ -164,6 +166,7 @@ export const updateCategory = mutation({
     color: v.string(),
     icon: v.optional(v.string()),
     isActive: v.boolean(),
+    prepConfig: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
     await getRestaurantByLicense(ctx, args.licenseKey);
@@ -180,6 +183,7 @@ export const updateCategory = mutation({
       color: args.color,
       icon: args.icon,
       isActive: args.isActive,
+      prepConfig: args.prepConfig,
     });
   },
 });
@@ -295,6 +299,8 @@ export const createItem = mutation({
     isFavorite: v.optional(v.boolean()),
     staffMealAllowed: v.optional(v.boolean()),
     staffMealPrice: v.optional(v.number()),
+    staffMealFreeQty: v.optional(v.number()),
+    staffMealDailyLimit: v.optional(v.number()),
     trackStock: v.optional(v.boolean()),
     stockUnit: v.optional(v.union(v.literal("pc"), v.literal("lt"), v.literal("kg"), v.literal("g"), v.literal("ml"), v.literal("bottle"), v.literal("box"))),
     initialStock: v.optional(v.number()),
@@ -352,6 +358,8 @@ export const createItem = mutation({
       isFavorite: args.isFavorite,
       staffMealAllowed: args.staffMealAllowed,
       staffMealPrice: args.staffMealPrice,
+      staffMealFreeQty: args.staffMealFreeQty,
+      staffMealDailyLimit: args.staffMealDailyLimit,
       trackStock: args.trackStock,
       stockUnit: args.stockUnit,
       initialStock: args.initialStock,
@@ -382,6 +390,8 @@ export const updateItem = mutation({
     isFavorite: v.optional(v.boolean()),
     staffMealAllowed: v.optional(v.boolean()),
     staffMealPrice: v.optional(v.number()),
+    staffMealFreeQty: v.optional(v.number()),
+    staffMealDailyLimit: v.optional(v.number()),
     trackStock: v.optional(v.boolean()),
     stockUnit: v.optional(v.union(v.literal("pc"), v.literal("lt"), v.literal("kg"), v.literal("g"), v.literal("ml"), v.literal("bottle"), v.literal("box"))),
     initialStock: v.optional(v.number()),
@@ -435,6 +445,8 @@ export const updateItem = mutation({
       isFavorite: args.isFavorite,
       staffMealAllowed: args.staffMealAllowed,
       staffMealPrice: args.staffMealPrice,
+      staffMealFreeQty: args.staffMealFreeQty,
+      staffMealDailyLimit: args.staffMealDailyLimit,
       trackStock: args.trackStock,
       stockUnit: args.stockUnit,
       initialStock: args.initialStock,

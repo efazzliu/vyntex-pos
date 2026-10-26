@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { usePosLocale } from "./pos-locale-provider.tsx";
+import { BRAND } from "@/lib/brand-colors.ts";
 
 type OrderHistoryProps = {
   licenseKey: string;
@@ -222,7 +223,7 @@ export default function OrderHistory({
 
       {/* Stats bar */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatPill label={t("orders_hist.stat_total")} value={totalOrders} color="#0066FF" />
+        <StatPill label={t("orders_hist.stat_total")} value={totalOrders} color={BRAND.primary} />
         <StatPill label={t("orders_hist.stat_fiscal")} value={fiscalizedCount} color="#22C55E" />
         <StatPill label={t("orders_hist.stat_non_fiscal")} value={nonFiscalCount} color="#EF4444" />
         <StatPill label={t("orders_hist.stat_revenue")} value={formatPrice(totalRevenue)} color="#F59E0B" />

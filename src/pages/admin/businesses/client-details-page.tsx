@@ -670,7 +670,7 @@ export default function AdminClientDetailsPage() {
                       <Button
                         size="sm"
                         variant="secondary"
-                        className="h-9 rounded-lg border border-blue-200 bg-blue-50 px-3 text-blue-700 hover:bg-blue-100 dark:border-blue-500/30 dark:bg-blue-500/15 dark:text-blue-200"
+                        className="h-9 rounded-lg border border-brand-subtle bg-brand-light px-3 text-brand-hover hover:bg-brand-subtle dark:border-brand/30 dark:bg-brand/15 dark:text-brand-soft"
                         onClick={() => {
                           const subject = encodeURIComponent("Billing reminder");
                           const body = encodeURIComponent(

@@ -60,12 +60,12 @@ export function AdminSidebar({
           "group flex items-center gap-3 rounded-xl border border-transparent px-3 py-2 text-[13px] font-medium transition-all",
           collapsed && "justify-center px-0",
           active
-            ? "border-indigo-100 bg-indigo-50 text-indigo-700 shadow-[inset_0_0_0_1px_rgba(99,102,241,0.08)]"
+            ? "border-brand-subtle bg-brand-light text-brand-hover shadow-[inset_0_0_0_1px_rgba(0,91,214,0.08)]"
             : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
         )}
       >
         <link.icon
-          className={cn("size-4 shrink-0", active ? "text-indigo-600" : "text-slate-400 group-hover:text-slate-600")}
+          className={cn("size-4 shrink-0", active ? "text-brand" : "text-slate-400 group-hover:text-slate-600")}
           strokeWidth={1.75}
         />
         {!collapsed ? t(link.key) : null}
@@ -85,7 +85,7 @@ export function AdminSidebar({
         {!collapsed ? (
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold tracking-tight text-slate-900">Vyntex POS</p>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-indigo-500">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-brand">
               {t("ac.nav.admin_center")}
             </p>
           </div>
@@ -130,12 +130,12 @@ export function AdminSidebar({
         {!collapsed ? (
           <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-2.5">
             <div className="flex items-center gap-2.5">
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-blue-600 text-xs font-bold text-white">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand to-brand text-xs font-bold text-white">
                 {initial}
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-slate-900">{displayName}</p>
-                <p className="text-[11px] font-medium text-indigo-600">{t("ac.nav.owner")}</p>
+                <p className="text-[11px] font-medium text-brand">{t("ac.nav.owner")}</p>
               </div>
               <button
                 type="button"

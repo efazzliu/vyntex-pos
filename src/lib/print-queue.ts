@@ -92,6 +92,38 @@ export async function flushPrintQueueNow(): Promise<{ sent: number; failed: numb
   return { sent, failed };
 }
 
+export async function flushQueuedPrintJob(
+  id: number,
+): Promise<"sent" | "failed" | "skipped"> {
+  if (isProcessing) return "skipped";
+  const jobs = await getQueuedPrintJobs();
+  const job = jobs.find((item) => item.id === id);
+  if (!job) return "skipped";
+  if (!(await canAttemptSilentPrint())) return "failed";
+
+  isProcessing = true;
+  try {
+    if (job.retries >= MAX_PRINT_RETRIES) {
+      await removeQueuedPrintJob(job.id);
+      return "skipped";
+    }
+    const outcome = await tryPrintHtmlDocumentAsync(job.html, {
+      silent: job.silent,
+      allowInteractiveFallback: job.allowInteractiveFallback,
+      deviceName: job.deviceName,
+      silentTimeoutMs: DEFAULT_SILENT_PRINT_IPC_TIMEOUT_MS,
+    });
+    if (outcome.ok) {
+      await removeQueuedPrintJob(job.id);
+      return "sent";
+    }
+    await incrementPrintJobRetry(job.id, outcome.error);
+    return "failed";
+  } finally {
+    isProcessing = false;
+  }
+}
+
 /**
  * Call once from `PosApp` on startup. Does not poll the OS printer in the background.
  */

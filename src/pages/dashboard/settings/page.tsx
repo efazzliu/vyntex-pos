@@ -82,7 +82,7 @@ function PremiumCard({
   return (
     <section className="rounded-2xl border border-[#2c4673] bg-[#121f38] p-6 shadow-[0_24px_56px_-34px_rgba(2,6,23,0.95)]">
       <div className="mb-5 flex items-start gap-3 border-b border-[#2a436f] pb-4">
-        <div className="rounded-xl border border-[#315084] bg-gradient-to-br from-[#0f5fdd]/35 to-[#18a6b0]/25 p-2.5">
+        <div className="rounded-xl border border-[#315084] bg-gradient-to-br from-brand/35 to-[#18a6b0]/25 p-2.5">
           {icon}
         </div>
         <div>
@@ -200,7 +200,7 @@ export default function DashboardSettings() {
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 p-6 lg:p-8">
       <header className="relative overflow-hidden rounded-2xl border border-[#315084] bg-gradient-to-br from-[#162746] via-[#10213f] to-[#0e1a31] p-6 lg:p-7">
-        <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-[#0d58da]/20 blur-3xl" />
+        <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-brand/20 blur-3xl" />
         <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white/80">
           <Sparkles className="h-3.5 w-3.5" />
           Settings Hub
@@ -244,14 +244,14 @@ export default function DashboardSettings() {
                 />
                 <p className="text-xs text-[#97abcc]">
                   To change email contact{" "}
-                  <a href={SUPPORT_MAILTO_HREF} className="text-[#66b3ff] hover:underline">
+                  <a href={SUPPORT_MAILTO_HREF} className="text-brand-soft hover:underline">
                     {SUPPORT_EMAIL}
                   </a>
                   .
                 </p>
               </div>
               <div className="pt-2">
-                <Button type="submit" disabled={personalLoading || !authLoaded} className="h-11 rounded-xl bg-gradient-to-r from-[#0066FF] to-[#00AACC] text-white">
+                <Button type="submit" disabled={personalLoading || !authLoaded} className="h-11 rounded-xl bg-gradient-to-r from-brand to-brand-sky text-white">
                   {personalLoading ? "Saving..." : "Save profile"}
                 </Button>
               </div>
@@ -296,7 +296,7 @@ export default function DashboardSettings() {
                 </Select>
               </div>
               <div className="pt-2">
-                <Button type="submit" disabled={businessLoading} className="h-11 rounded-xl bg-gradient-to-r from-[#0066FF] to-[#00AACC] text-white">
+                <Button type="submit" disabled={businessLoading} className="h-11 rounded-xl bg-gradient-to-r from-brand to-brand-sky text-white">
                   {businessLoading ? "Saving..." : "Save business"}
                 </Button>
               </div>
@@ -321,7 +321,7 @@ export default function DashboardSettings() {
                 type="button"
                 onClick={openBilling}
                 disabled={!billingHref}
-                className="h-11 rounded-xl bg-gradient-to-r from-[#0066FF] to-[#00AACC] text-white disabled:cursor-not-allowed disabled:opacity-100 disabled:from-[#324e82] disabled:to-[#2f6780] disabled:text-white/75"
+                className="h-11 rounded-xl bg-gradient-to-r from-brand to-brand-sky text-white disabled:cursor-not-allowed disabled:opacity-100 disabled:from-[#324e82] disabled:to-[#2f6780] disabled:text-white/75"
               >
                 <ExternalLink className="mr-2 size-4" />
                 {billingHref ? "Continue payment" : "Checkout unavailable"}
@@ -336,7 +336,7 @@ export default function DashboardSettings() {
             {!billingHref ? (
               <p className="text-xs text-[#97abcc]">
                 Checkout link is not configured. Use Change plan or contact{" "}
-                <a href={SUPPORT_MAILTO_HREF} className="text-[#66b3ff] hover:underline">
+                <a href={SUPPORT_MAILTO_HREF} className="text-brand-soft hover:underline">
                   {SUPPORT_EMAIL}
                 </a>
                 .
@@ -357,14 +357,14 @@ export default function DashboardSettings() {
             </div>
             <div className="flex items-center justify-between rounded-lg border border-[#2a436f] bg-[#0b162b] px-3 py-2">
               <span className="text-[#97abcc]">Plan</span>
-              <span className="rounded-full bg-[#0066FF]/20 px-2.5 py-0.5 text-xs font-semibold text-[#66b3ff]">
+              <span className="rounded-full bg-brand/20 px-2.5 py-0.5 text-xs font-semibold text-brand-soft">
                 {planLabels[restaurant.plan as keyof typeof planLabels] ?? restaurant.plan}
               </span>
             </div>
             <div className="rounded-lg border border-[#2a436f] bg-[#0b162b] px-3 py-2">
               <span className="text-[#97abcc]">License Key</span>
               <div className="mt-1 flex items-center gap-2 text-white">
-                <KeyRound className="size-3.5 text-[#66b3ff]" />
+                <KeyRound className="size-3.5 text-brand-soft" />
                 <code className="font-mono text-xs tracking-wider">{restaurant.licenseKey}</code>
               </div>
             </div>
@@ -577,7 +577,7 @@ export default function DashboardSettings() {
         className="rounded-xl border border-border bg-card p-6 space-y-5"
       >
         <div className="flex items-center gap-3 pb-4 border-b border-border">
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#0066FF]/10 to-[#44CC00]/10 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-brand/10 to-brand-accent/10 flex items-center justify-center">
             <User className="size-5 text-primary" />
           </div>
           <div>
@@ -637,7 +637,7 @@ export default function DashboardSettings() {
         className="rounded-xl border border-border bg-card p-6 space-y-5"
       >
         <div className="flex items-center gap-3 pb-4 border-b border-border">
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#0066FF]/10 to-[#44CC00]/10 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-brand/10 to-brand-accent/10 flex items-center justify-center">
             <Building2 className="size-5 text-primary" />
           </div>
           <div>
@@ -718,7 +718,7 @@ export default function DashboardSettings() {
       {/* Billing */}
       <div className="rounded-xl border border-border bg-card p-6 space-y-5">
         <div className="flex items-center gap-3 pb-4 border-b border-border">
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#0066FF]/10 to-[#44CC00]/10 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-brand/10 to-brand-accent/10 flex items-center justify-center">
             <CreditCard className="size-5 text-primary" />
           </div>
           <div>
@@ -782,7 +782,7 @@ export default function DashboardSettings() {
       {/* License details (read-only) */}
       <div className="rounded-xl border border-border bg-card p-6 space-y-4">
         <div className="flex items-center gap-3 pb-4 border-b border-border">
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#0066FF]/10 to-[#44CC00]/10 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-brand/10 to-brand-accent/10 flex items-center justify-center">
             <Shield className="size-5 text-primary" />
           </div>
           <div>

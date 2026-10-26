@@ -259,7 +259,7 @@ export default function DashboardTeamAccessPage() {
     <AdminPage>
       <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-indigo-500">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand">
             {t("ac.nav.admin_center")}
           </p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">{t("ac.nav.team")}</h1>
@@ -268,7 +268,7 @@ export default function DashboardTeamAccessPage() {
         <Button
           onClick={() => void createInvite()}
           disabled={creatingInvite || !restaurant}
-          className="rounded-xl bg-indigo-600 text-white hover:bg-indigo-700"
+          className="rounded-xl bg-brand text-white hover:bg-brand-hover"
         >
           {creatingInvite ? <Loader2 className="size-4 animate-spin" /> : <MailPlus className="size-4" />}
           {t("ac.team.invite")}
@@ -290,7 +290,7 @@ export default function DashboardTeamAccessPage() {
         <div className="divide-y divide-slate-100">
           {members.map((member) => (
             <div key={member.id} className="flex items-center gap-4 px-5 py-4">
-              <span className="flex size-10 items-center justify-center rounded-xl bg-indigo-50 text-sm font-bold text-indigo-700">
+              <span className="flex size-10 items-center justify-center rounded-xl bg-brand-light text-sm font-bold text-brand-hover">
                 {member.name.charAt(0).toUpperCase()}
               </span>
               <div className="min-w-0 flex-1">
@@ -350,10 +350,10 @@ export default function DashboardTeamAccessPage() {
             <button
               type="button"
               onClick={() => void copyInvite()}
-              className="flex w-full items-center justify-between rounded-2xl border border-indigo-100 bg-indigo-50 px-5 py-4"
+              className="flex w-full items-center justify-between rounded-2xl border border-brand-subtle bg-brand-light px-5 py-4"
             >
-              <code className="text-xl font-bold tracking-[0.2em] text-indigo-800">{invite.code}</code>
-              {copied ? <Check className="size-5 text-emerald-600" /> : <Copy className="size-5 text-indigo-600" />}
+              <code className="text-xl font-bold tracking-[0.2em] text-brand-active">{invite.code}</code>
+              {copied ? <Check className="size-5 text-emerald-600" /> : <Copy className="size-5 text-brand" />}
             </button>
           ) : null}
           <DialogFooter>
@@ -379,7 +379,7 @@ export default function DashboardTeamAccessPage() {
                     key={role}
                     className={cn(
                       "flex items-center gap-2 rounded-xl border px-3 py-2 text-sm capitalize",
-                      editRole === role ? "border-indigo-300 bg-indigo-50" : "border-slate-200",
+                      editRole === role ? "border-brand-soft bg-brand-light" : "border-slate-200",
                     )}
                   >
                     <RadioGroupItem value={role} />
@@ -414,7 +414,7 @@ export default function DashboardTeamAccessPage() {
             <Button variant="ghost" onClick={() => setEditing(null)}>
               {t("ac.common.cancel")}
             </Button>
-            <Button className="rounded-xl bg-indigo-600 text-white hover:bg-indigo-700" onClick={saveEdit}>
+            <Button className="rounded-xl bg-brand text-white hover:bg-brand-hover" onClick={saveEdit}>
               {t("ac.team.save")}
             </Button>
           </DialogFooter>

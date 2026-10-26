@@ -188,7 +188,7 @@ export default function ActivationScreen({ onActivated }: ActivationScreenProps)
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.5, delay: 0.2 }}
           />
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-[#0066FF] to-[#44CC00] bg-clip-text text-transparent">
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-brand to-brand-accent bg-clip-text text-transparent">
             Vyntex POS
           </h1>
           <p className="text-[#8b93a7] text-sm mt-1">Enterprise POS Platform</p>
@@ -215,8 +215,8 @@ export default function ActivationScreen({ onActivated }: ActivationScreenProps)
             </div>
           )}
           <div className="text-center space-y-2">
-            <div className="inline-flex items-center justify-center size-12 rounded-xl bg-[#0066FF]/10 mb-2">
-              <KeyRound className="size-6 text-[#0066FF]" />
+            <div className="inline-flex items-center justify-center size-12 rounded-xl bg-brand/10 mb-2">
+              <KeyRound className="size-6 text-brand" />
             </div>
             <h2 className="text-lg font-semibold text-white">License Activation</h2>
             <p className="text-sm text-[#8b93a7]">
@@ -241,7 +241,7 @@ export default function ActivationScreen({ onActivated }: ActivationScreenProps)
                     onKeyDown={(e) => handleKeyDown(i, e)}
                     maxLength={4}
                     placeholder="XXXX"
-                    className="text-center font-mono text-base tracking-widest bg-[#0A0F1E] border-[#1e2a45] text-white placeholder:text-[#3a4560] h-12 focus:border-[#0066FF] focus:ring-[#0066FF]/20"
+                    className="text-center font-mono text-base tracking-widest bg-[#0A0F1E] border-[#1e2a45] text-white placeholder:text-[#3a4560] h-12 focus:border-brand focus:ring-brand/20"
                   />
                   {i < 3 && (
                     <span className="text-[#3a4560] font-mono text-lg shrink-0">-</span>
@@ -282,7 +282,7 @@ export default function ActivationScreen({ onActivated }: ActivationScreenProps)
             disabled={
               !isKeyComplete || loading || !deviceId || !isSupabaseConfigured
             }
-            className="w-full h-12 bg-gradient-to-r from-[#0066FF] to-[#0052cc] hover:from-[#0052cc] hover:to-[#003d99] text-white font-semibold text-base"
+            className="w-full h-12 bg-gradient-to-r from-brand to-brand-hover hover:from-brand-hover hover:to-brand-active text-white font-semibold text-base"
           >
             {loading ? (
               <span className="flex items-center gap-2">
@@ -298,11 +298,11 @@ export default function ActivationScreen({ onActivated }: ActivationScreenProps)
         {/* Footer hint */}
         <p className="text-center text-xs text-[#5a6580] mt-6">
           Find your license key in the{" "}
-          <span className="text-[#0066FF]">Vyntex POS Web Dashboard</span>
+          <span className="text-brand">Vyntex POS Web Dashboard</span>
         </p>
         {showPhoneBackLink ? (
           <p className="mt-3 text-center text-sm">
-            <Link to="/login" className="text-[#0066FF] hover:underline">
+            <Link to="/login" className="text-brand hover:underline">
               Kthehu te kyçja / Back to sign in
             </Link>
           </p>

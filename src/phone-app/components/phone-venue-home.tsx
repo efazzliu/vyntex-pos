@@ -159,7 +159,7 @@ export default function PhoneVenueHome() {
       <div
         className={cn(
           "relative shrink-0 px-4 pb-6 pt-[max(0.75rem,env(safe-area-inset-top))]",
-          "bg-gradient-to-br from-[#0066FF] via-[#5b4ddb] to-[#6d28d9]",
+          "bg-gradient-to-br from-brand via-brand-sky to-[#6d28d9]",
         )}
       >
         <div className="flex items-start gap-3 pt-2 sm:gap-4">
@@ -179,20 +179,46 @@ export default function PhoneVenueHome() {
           </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-2 gap-3">
-          <div className="rounded-2xl bg-white/15 px-3 py-3 backdrop-blur-sm">
-            <DollarSign className="mb-2 size-5 text-white/90" strokeWidth={2} />
-            <p className="text-lg font-bold tabular-nums text-white">
-              {loading && !stats ? "—" : formatMoney(stats?.todayRevenue ?? 0, restaurant.currency)}
+        <div className="mt-5 grid grid-cols-3 gap-2">
+          <div className="rounded-2xl bg-white/15 px-2.5 py-3 backdrop-blur-sm">
+            <TrendingUp className="mb-2 size-4 text-white/90" strokeWidth={2} />
+            <p className="text-[15px] font-bold tabular-nums text-white">
+              {loading && !stats
+                ? "—"
+                : formatMoney(
+                    stats?.totalCirculation ??
+                      (stats?.todayRevenue ?? 0) + (stats?.openUnpaidTotal ?? 0),
+                    restaurant.currency,
+                  )}
             </p>
-            <p className="text-xs text-white/75">{t("phone.venueHome.salesToday")}</p>
+            <p className="text-[10px] leading-tight text-white/75">
+              {t("phone.venueHome.circulationTotal")}
+            </p>
           </div>
-          <div className="rounded-2xl bg-white/15 px-3 py-3 backdrop-blur-sm">
-            <ShoppingBag className="mb-2 size-5 text-white/90" strokeWidth={2} />
-            <p className="text-lg font-bold tabular-nums text-white">
-              {loading && !stats ? "—" : stats?.todayOrdersCount ?? 0}
+          <div className="rounded-2xl bg-white/15 px-2.5 py-3 backdrop-blur-sm">
+            <DollarSign className="mb-2 size-4 text-white/90" strokeWidth={2} />
+            <p className="text-[15px] font-bold tabular-nums text-white">
+              {loading && !stats
+                ? "—"
+                : formatMoney(
+                    stats?.paidCirculation ?? stats?.todayRevenue ?? 0,
+                    restaurant.currency,
+                  )}
             </p>
-            <p className="text-xs text-white/75">{t("phone.venueHome.ordersToday")}</p>
+            <p className="text-[10px] leading-tight text-white/75">
+              {t("phone.venueHome.circulationPaid")}
+            </p>
+          </div>
+          <div className="rounded-2xl bg-white/15 px-2.5 py-3 backdrop-blur-sm">
+            <ShoppingBag className="mb-2 size-4 text-white/90" strokeWidth={2} />
+            <p className="text-[15px] font-bold tabular-nums text-white">
+              {loading && !stats
+                ? "—"
+                : formatMoney(stats?.openUnpaidTotal ?? 0, restaurant.currency)}
+            </p>
+            <p className="text-[10px] leading-tight text-white/75">
+              {t("phone.venueHome.circulationUnpaid")}
+            </p>
           </div>
         </div>
       </div>
@@ -245,7 +271,7 @@ export default function PhoneVenueHome() {
 
         <Button
           type="button"
-          className="h-12 w-full rounded-xl bg-[#0066FF] text-base font-semibold text-white shadow-sm hover:bg-[#0055DD]"
+          className="h-12 w-full rounded-xl bg-brand text-base font-semibold text-white shadow-sm hover:bg-brand-hover"
           onClick={() => setQrOpen(true)}
         >
           <QrCode className="mr-2 size-5" />

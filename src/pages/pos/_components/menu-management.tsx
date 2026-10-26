@@ -54,8 +54,9 @@ import { useOfflineData } from "@/hooks/use-offline-data.ts";
 import { getDataCache, saveDataCache } from "@/lib/local-db.ts";
 import { usePosLocale } from "./pos-locale-provider.tsx";
 import { emojiForCategoryName } from "@/lib/pos-category-icons.ts";
+import { BRAND } from "@/lib/brand-colors.ts";
 
-const ACCENT_BLUE = "#0066FF";
+const ACCENT_BLUE = BRAND.primary;
 const ACCENT_GREEN = "#22c55e";
 
 /** Same names as supply auto-category (`ensureSupplyCategory`); hidden from product category strip. */
@@ -95,6 +96,7 @@ type CategoryData = {
   color: string;
   icon?: string;
   isActive: boolean;
+  prepConfig?: unknown;
 };
 
 type MenuManagementProps = {
@@ -696,6 +698,7 @@ export default function MenuManagement({
                     color: cat.color,
                     icon: cat.icon,
                     isActive: cat.isActive,
+                    prepConfig: cat.prepConfig,
                   });
                   setCategoryDialogOpen(true);
                 }}
@@ -714,7 +717,7 @@ export default function MenuManagement({
                 setEditingCategory(null);
                 setCategoryDialogOpen(true);
               }}
-              className="flex flex-col items-center justify-center gap-1 min-w-[88px] px-3 py-2.5 rounded-xl border-2 border-dashed border-slate-300 hover:border-[#0066FF] text-slate-500 hover:text-[#0066FF] transition-all cursor-pointer shrink-0 bg-white"
+              className="flex flex-col items-center justify-center gap-1 min-w-[88px] px-3 py-2.5 rounded-xl border-2 border-dashed border-slate-300 hover:border-brand text-slate-500 hover:text-brand transition-all cursor-pointer shrink-0 bg-white"
             >
               <Plus className="size-4" />
               <span className="text-[10px] font-semibold whitespace-nowrap">
@@ -803,7 +806,7 @@ export default function MenuManagement({
             ) : null}
             <Button
               size="sm"
-              className="bg-[#0066FF] hover:bg-[#0055dd] text-white font-semibold"
+              className="bg-brand hover:bg-brand-hover text-white font-semibold"
               onClick={() => {
                 if (
                   (!categories || categories.length === 0) &&
@@ -870,7 +873,7 @@ export default function MenuManagement({
                 setNewMenuName("");
                 setMenuDialogOpen(true);
               }}
-              className="px-3 py-1.5 rounded-full text-xs font-medium text-slate-500 hover:text-[#0066FF] transition-all cursor-pointer border border-dashed border-slate-300 hover:border-[#0066FF] shrink-0 whitespace-nowrap bg-white"
+              className="px-3 py-1.5 rounded-full text-xs font-medium text-slate-500 hover:text-brand transition-all cursor-pointer border border-dashed border-slate-300 hover:border-brand shrink-0 whitespace-nowrap bg-white"
             >
               <Plus className="size-3 inline-block mr-0.5 -mt-0.5" />
               {t("menu_page.add_menu")}
@@ -1006,7 +1009,7 @@ export default function MenuManagement({
                 className={cn(
                   "grid grid-cols-[44px_1fr_140px_120px_90px_110px_118px] items-center gap-3 px-4 py-3 border-t border-slate-200 transition-colors",
                   isChecked
-                    ? "bg-[#0066FF]/5"
+                    ? "bg-brand/5"
                     : "bg-white hover:bg-slate-50"
                 )}
               >
@@ -1127,7 +1130,7 @@ export default function MenuManagement({
                       title={t("stock_page.change_title")}
                       aria-label={t("stock_page.change_title")}
                       onClick={() => openMallStockAdjust(item)}
-                      className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer hover:bg-slate-100 transition-colors text-slate-500 hover:text-[#0066FF]"
+                      className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer hover:bg-slate-100 transition-colors text-slate-500 hover:text-brand"
                     >
                       <Boxes className="size-3.5" strokeWidth={2} />
                     </button>
@@ -1178,6 +1181,7 @@ export default function MenuManagement({
               color: category.color,
               icon: category.icon,
               isActive: category.isActive,
+              prepConfig: category.prepConfig,
             };
             setCategories((prev) => [...prev, created]);
           } else {
@@ -1258,9 +1262,11 @@ export default function MenuManagement({
                 imageUrl: item.imageUrl,
                 isFavorite: item.isFavorite ?? false,
                 staffMealAllowed:
-                  (item as { staffMealAllowed?: boolean }).staffMealAllowed !==
-                  false,
+                  (item as { staffMealAllowed?: boolean }).staffMealAllowed ===
+                  true,
                 staffMealPrice: (item as { staffMealPrice?: number }).staffMealPrice,
+                staffMealFreeQty: (item as { staffMealFreeQty?: number }).staffMealFreeQty,
+                staffMealDailyLimit: (item as { staffMealDailyLimit?: number }).staffMealDailyLimit,
                 trackStock: item.trackStock ?? false,
                 stockUnit: item.stockUnit,
                 initialStock: item.initialStock,
@@ -1374,7 +1380,7 @@ export default function MenuManagement({
                 className={cn(
                   "shrink-0 cursor-pointer rounded-full border px-4 py-1.5 text-xs font-semibold whitespace-nowrap transition-all",
                   mallStockMode === "add"
-                    ? "border-transparent bg-gradient-to-r from-[#0066FF] to-[#22c55e] text-white shadow-md shadow-[#0066FF]/15"
+                    ? "border-transparent bg-gradient-to-r from-brand to-[#22c55e] text-white shadow-md shadow-brand/15"
                     : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900",
                 )}
               >
@@ -1386,7 +1392,7 @@ export default function MenuManagement({
                 className={cn(
                   "shrink-0 cursor-pointer rounded-full border px-4 py-1.5 text-xs font-semibold whitespace-nowrap transition-all",
                   mallStockMode === "remove"
-                    ? "border-transparent bg-gradient-to-r from-[#0066FF] to-[#22c55e] text-white shadow-md shadow-[#0066FF]/15"
+                    ? "border-transparent bg-gradient-to-r from-brand to-[#22c55e] text-white shadow-md shadow-brand/15"
                     : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900",
                 )}
               >
@@ -1507,7 +1513,7 @@ function CategoryCard({
       className={cn(
         "relative group flex flex-col items-center gap-1 min-w-[88px] px-3 py-2.5 rounded-xl cursor-pointer transition-all shrink-0",
         isSelected
-          ? "bg-[#0066FF]/10 ring-2 ring-[#0066FF] shadow-lg shadow-[#0066FF]/10"
+          ? "bg-brand/10 ring-2 ring-brand shadow-lg shadow-brand/10"
           : "bg-white hover:bg-slate-50 border border-slate-200",
         isHidden && "opacity-40"
       )}
@@ -1540,7 +1546,7 @@ function CategoryCard({
         </div>
       )}
 
-      <div className="w-8 h-8 rounded-lg bg-[#0066FF]/10 flex items-center justify-center">
+      <div className="w-8 h-8 rounded-lg bg-brand/10 flex items-center justify-center">
         {icon}
       </div>
       <span className="text-[11px] font-semibold text-slate-900 truncate max-w-[80px]">
@@ -1568,7 +1574,7 @@ function MenuPill({
       className={cn(
         "px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0",
         selected
-          ? "bg-gradient-to-r from-[#0066FF] to-[#22c55e] text-white"
+          ? "bg-gradient-to-r from-brand to-[#22c55e] text-white"
           : "text-slate-500 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 bg-white"
       )}
     >
@@ -1594,7 +1600,7 @@ function MallPill({
       className={cn(
         "flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0 border",
         selected
-          ? "bg-gradient-to-r from-[#0066FF] to-[#22c55e] text-white border-transparent shadow-lg shadow-[#0066FF]/10"
+          ? "bg-gradient-to-r from-brand to-[#22c55e] text-white border-transparent shadow-lg shadow-brand/10"
           : "text-slate-500 hover:text-slate-900 hover:bg-slate-100 border-slate-200 bg-white",
       )}
     >

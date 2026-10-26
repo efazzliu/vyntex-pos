@@ -3,6 +3,20 @@
  * Avoids popup blockers and Windows/Electron trying to resolve about:blank as an OS protocol.
  */
 
+export const PRINT_POWERED_BY = "Powered by: www.vyntexpos.net";
+
+export function ensurePrintPoweredByFooter(html: string): string {
+  if (/www\.vyntexpos\.net/i.test(html) && /powered by/i.test(html)) {
+    return html;
+  }
+  const footer =
+    `<div class="vyntex-powered-by" style="text-align:center;color:#888;font-size:10px;margin-top:12px;letter-spacing:0.02em;">${PRINT_POWERED_BY}</div>`;
+  if (/<\/body>/i.test(html)) {
+    return html.replace(/<\/body>/i, `${footer}</body>`);
+  }
+  return `${html}${footer}`;
+}
+
 export type PrintHtmlSilentResult = { ok: boolean; error?: string };
 
 export type PrintHtmlSilentPayload =
@@ -46,6 +60,7 @@ export async function canAttemptSilentPrint(): Promise<boolean> {
 
 /** Interactive print (browser/Electron print dialog). */
 export function printHtmlDocument(htmlFullDocument: string): boolean {
+  htmlFullDocument = ensurePrintPoweredByFooter(htmlFullDocument);
   const iframe = document.createElement("iframe");
   iframe.setAttribute("aria-hidden", "true");
   iframe.style.cssText =
@@ -118,6 +133,7 @@ export async function tryPrintHtmlDocumentAsync(
     silentTimeoutMs?: number;
   },
 ): Promise<PrintHtmlAsyncOutcome> {
+  htmlFullDocument = ensurePrintPoweredByFooter(htmlFullDocument);
   const allowDialog = options?.allowInteractiveFallback !== false;
   const wantSilent = options?.silent === true;
   const silentApi = wantSilent ? getDesktopPrintSilent() : undefined;
@@ -191,6 +207,7 @@ export type DesktopSystemPrinterInfo = {
   deviceName: string;
   displayName: string;
   isDefault: boolean;
+  isOffline?: boolean;
 };
 
 export type GetSystemPrintersResult =

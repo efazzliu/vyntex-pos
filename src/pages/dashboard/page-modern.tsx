@@ -258,7 +258,7 @@ export default function DashboardOverviewModern() {
                 {t("overview.empty_subtitle")}
               </p>
             </div>
-            <Button asChild className="h-10 self-start rounded-xl bg-[#087cf0] px-4 text-white">
+            <Button asChild className="h-10 self-start rounded-xl bg-brand-sky px-4 text-white">
               <Link to="/dashboard/get-started">
                 <Plus className="mr-1.5 size-4" />
                 {t("overview.activate_license")}
@@ -386,7 +386,7 @@ export default function DashboardOverviewModern() {
             </section>
           </div>
 
-          <section className="mt-4 rounded-2xl border border-sky-100 bg-gradient-to-r from-sky-50 to-blue-50 px-5 py-4">
+          <section className="mt-4 rounded-2xl border border-sky-100 bg-gradient-to-r from-sky-50 to-brand-light px-5 py-4">
             <p className="text-sm font-semibold text-slate-900">{t("overview.free_month_title")}</p>
             <p className="mt-1 text-xs text-slate-500">{t("overview.free_month_hint")}</p>
           </section>
@@ -449,7 +449,7 @@ export default function DashboardOverviewModern() {
             >
               <Bell className="size-4" />
             </button>
-            <Button asChild className="h-10 rounded-xl bg-[#087cf0] px-4 text-white hover:bg-[#066bd0]">
+            <Button asChild className="h-10 rounded-xl bg-brand-sky px-4 text-white hover:bg-brand">
               <Link to="/dashboard/business-settings">
                 <Plus className="mr-1.5 size-4" />
                 {t("overview.quick_action")}
@@ -835,9 +835,9 @@ export default function DashboardOverviewModern() {
           </section>
         </div>
 
-        <section className="mt-4 flex flex-col gap-4 rounded-2xl border border-sky-100 bg-gradient-to-r from-sky-50 to-blue-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <section className="mt-4 flex flex-col gap-4 rounded-2xl border border-sky-100 bg-gradient-to-r from-sky-50 to-brand-light px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brand-subtle text-brand">
               <TrendingUp className="size-5" />
             </span>
             <div>

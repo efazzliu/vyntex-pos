@@ -90,7 +90,7 @@ export default function AuthTopNav() {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link to="/" className="flex items-center gap-2.5">
           <img src={VYNTEX_APP_LOGO_SRC} alt="Vyntex POS" className="h-8 w-8" />
-          <span className="text-xl font-bold bg-gradient-to-r from-[#0066FF] to-[#44CC00] bg-clip-text text-transparent">
+          <span className="text-xl font-bold bg-gradient-to-r from-brand to-brand-accent bg-clip-text text-transparent">
             Vyntex POS
           </span>
         </Link>
@@ -114,7 +114,7 @@ export default function AuthTopNav() {
           <Button
             size="sm"
             onClick={() => navigate(ctaPath)}
-            className="hidden rounded-full bg-gradient-to-r from-[#0066FF] to-[#00AACC] px-4 text-white shadow-lg shadow-blue-600/25 transition-all hover:scale-[1.02] hover:from-[#0055DD] hover:to-[#0099BB] md:inline-flex"
+            className="hidden rounded-full bg-gradient-to-r from-brand to-brand-sky px-4 text-white shadow-lg shadow-brand/25 transition-all hover:scale-[1.02] hover:from-brand-hover hover:to-brand-hover md:inline-flex"
           >
             {ctaLabel}
           </Button>

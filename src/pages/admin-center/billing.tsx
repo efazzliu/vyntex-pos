@@ -25,7 +25,7 @@ export default function DashboardBillingPage() {
   return (
     <AdminPage className="space-y-5">
       <header>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-indigo-500">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand">
           {t("ac.nav.admin_center")}
         </p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">{t("ac.nav.billing")}</h1>
@@ -54,7 +54,7 @@ export default function DashboardBillingPage() {
           </dl>
           {primary ? (
             <Button
-              className="mt-5 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700"
+              className="mt-5 rounded-xl bg-brand text-white hover:bg-brand-hover"
               onClick={() =>
                 openRenew({
                   venueId: primary.id,
@@ -143,7 +143,7 @@ export default function DashboardBillingPage() {
                   <td className="px-5 py-3.5 text-right">
                     <button
                       type="button"
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600"
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-brand"
                       onClick={() => toast.success(t("ac.billing.download_started"))}
                     >
                       <Download className="size-3.5" />

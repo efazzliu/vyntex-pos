@@ -7,6 +7,7 @@ import { useFingerScroll } from "@/phone-app/hooks/use-finger-scroll.ts";
 import { emojiForCategoryName } from "@/lib/pos-category-icons.ts";
 import { resolveMenuItemImageUrl } from "@/lib/menu-item-photo-urls.ts";
 import { cn } from "@/lib/utils.ts";
+import { BRAND } from "@/lib/brand-colors.ts";
 
 type GuestCategory = {
   _id: string;
@@ -105,7 +106,7 @@ export default function PhoneGuestMenu() {
             className={cn(
               "flex h-[3.85rem] w-[4.35rem] shrink-0 flex-col items-center justify-center gap-1 rounded-xl border px-1.5 py-1.5 text-center transition",
               activeCategory === "all"
-                ? "border-transparent bg-[#0066FF] text-white"
+                ? "border-transparent bg-brand text-white"
                 : "border-white/10 bg-white/[0.05] text-white/60",
             )}
           >
@@ -127,7 +128,7 @@ export default function PhoneGuestMenu() {
                     ? "border-transparent text-white"
                     : "border-white/10 bg-white/[0.05] text-white/60",
                 )}
-                style={sel ? { backgroundColor: cat.color || "#0066FF" } : undefined}
+                style={sel ? { backgroundColor: cat.color || BRAND.primary } : undefined}
               >
                 <span className="flex size-5 items-center justify-center text-[15px] leading-none">
                   {(cat.icon && cat.icon.trim()) || emojiForCategoryName(cat.name) || (
@@ -176,7 +177,7 @@ export default function PhoneGuestMenu() {
                 <span className="line-clamp-2 w-full text-[13px] font-medium leading-tight">
                   {item.name}
                 </span>
-                <span className="text-[13px] font-semibold tabular-nums text-[#7eb6ff]">
+                <span className="text-[13px] font-semibold tabular-nums text-brand-soft">
                   {formatPrice(item.price)}
                 </span>
               </div>

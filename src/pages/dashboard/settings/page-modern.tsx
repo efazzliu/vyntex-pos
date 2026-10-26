@@ -113,13 +113,13 @@ export default function DashboardSettingsModern() {
                 <Icon
                   className={cn(
                     "size-4",
-                    active ? "text-[#0066FF] dark:text-cyan-400" : "opacity-70",
+                    active ? "text-brand dark:text-cyan-400" : "opacity-70",
                   )}
                 />
                 {t(labelKey)}
                 {active ? (
                   <span
-                    className="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-gradient-to-r from-[#0066FF] to-[#00AACC]"
+                    className="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-gradient-to-r from-brand to-brand-sky"
                     aria-hidden
                   />
                 ) : null}

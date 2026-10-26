@@ -101,7 +101,7 @@ export default function AdminLegacyLicensesPage() {
 
       <AdminCard className="p-3 sm:p-4">
         <div className="mb-3 flex items-center gap-2 sm:mb-4">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#0066FF]/10 text-[#0066FF] dark:bg-blue-500/15 dark:text-blue-300">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand dark:bg-brand/15 dark:text-brand-soft">
             <Plus className="size-4" />
           </span>
           <div>
@@ -140,7 +140,7 @@ export default function AdminLegacyLicensesPage() {
             />
           </div>
           <Button
-            className="h-9 w-full rounded-lg bg-[#0066FF] text-white hover:bg-[#0058e0] sm:w-auto"
+            className="h-9 w-full rounded-lg bg-brand text-white hover:bg-brand sm:w-auto"
             disabled={creating}
             onClick={() => void createLicense()}
           >
@@ -236,16 +236,16 @@ function LicenseKeyChip({ licenseKey, className }: { licenseKey: string; classNa
       type="button"
       onClick={() => void copyLicenseKey(licenseKey)}
       className={cn(
-        "group inline-flex min-w-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-left transition-colors hover:border-[#0066FF]/40 hover:bg-[#0066FF]/5 dark:border-slate-700 dark:bg-slate-900/60",
+        "group inline-flex min-w-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-left transition-colors hover:border-brand/40 hover:bg-brand/5 dark:border-slate-700 dark:bg-slate-900/60",
         className,
       )}
       title="Copy license key"
     >
-      <KeyRound className="size-3.5 shrink-0 text-slate-400 group-hover:text-[#0066FF]" />
+      <KeyRound className="size-3.5 shrink-0 text-slate-400 group-hover:text-brand" />
       <span className="truncate font-mono text-[12px] font-medium text-slate-700 dark:text-slate-200">
         {licenseKey}
       </span>
-      <Copy className="ml-auto size-3 shrink-0 text-slate-300 group-hover:text-[#0066FF]" />
+      <Copy className="ml-auto size-3 shrink-0 text-slate-300 group-hover:text-brand" />
     </button>
   );
 }

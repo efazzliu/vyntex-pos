@@ -107,8 +107,8 @@ function PlanTierFeatureCarousel() {
               aria-label={t("activate.carousel.show_plan", { plan: t(s.labelKey) })}
               onClick={() => setIndex(i)}
               className={cn(
-                "h-1.5 rounded-full transition-all duration-300 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-[#44CC00]/70",
-                i === index ? "w-7 bg-[#44CC00]" : "w-1.5 bg-white/25 hover:bg-white/40",
+                "h-1.5 rounded-full transition-all duration-300 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/70",
+                i === index ? "w-7 bg-brand-accent" : "w-1.5 bg-white/25 hover:bg-white/40",
               )}
             />
           ))}
@@ -128,7 +128,7 @@ function PlanTierFeatureCarousel() {
           <ul className="space-y-3.5">
             {slide.bulletKeys.map((key) => (
               <li key={key} className="flex gap-3 text-sm leading-snug text-white/88">
-                <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[#44CC00]" aria-hidden />
+                <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-brand-accent" aria-hidden />
                 <span>{t(key)}</span>
               </li>
             ))}
@@ -254,11 +254,11 @@ export default function SetupForm() {
           aria-hidden
         />
         <div
-          className="pointer-events-none absolute -right-20 top-1/4 h-72 w-72 rounded-full bg-[#0066FF]/20 blur-[100px]"
+          className="pointer-events-none absolute -right-20 top-1/4 h-72 w-72 rounded-full bg-brand/20 blur-[100px]"
           aria-hidden
         />
         <div
-          className="pointer-events-none absolute -left-16 bottom-1/4 h-64 w-64 rounded-full bg-[#44CC00]/12 blur-[90px]"
+          className="pointer-events-none absolute -left-16 bottom-1/4 h-64 w-64 rounded-full bg-brand-accent/12 blur-[90px]"
           aria-hidden
         />
 
@@ -267,11 +267,11 @@ export default function SetupForm() {
             <img
               src={VYNTEX_APP_LOGO_SRC}
               alt={t("activate.logo_alt")}
-              className="h-20 w-20 object-contain drop-shadow-[0_12px_40px_rgba(0,102,255,0.45)] sm:h-24 sm:w-24 lg:h-28 lg:w-28 xl:h-32 xl:w-32"
+              className="h-20 w-20 object-contain drop-shadow-[0_12px_40px_rgba(0,91,214,0.45)] sm:h-24 sm:w-24 lg:h-28 lg:w-28 xl:h-32 xl:w-32"
             />
             <div>
               <h1 className="text-3xl font-bold leading-tight tracking-tight text-white sm:text-4xl xl:text-[2.5rem]">
-                <span className="bg-gradient-to-r from-[#66B3FF] via-white to-[#7FE0C3] bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-brand-soft via-white to-[#7FE0C3] bg-clip-text text-transparent">
                   Vyntex POS
                 </span>
               </h1>
@@ -340,11 +340,11 @@ export default function SetupForm() {
                 <Label className="text-sm font-medium text-slate-700 dark:text-white/80">
                   {t("activate.selected_plan")}
                 </Label>
-                <div className="rounded-xl border border-[#0066FF]/25 bg-[#0066FF]/[0.06] p-4 sm:p-5 dark:border-[#0066FF]/35 dark:bg-[#0066FF]/10">
+                <div className="rounded-xl border border-brand/25 bg-brand/[0.06] p-4 sm:p-5 dark:border-brand/35 dark:bg-brand/10">
                   <p className="text-lg font-semibold text-slate-900 dark:text-white">
                     {t("activate.professional_plan")}
                   </p>
-                  <p className="mt-1 text-sm font-bold text-[#0066FF] dark:text-[#66B3FF] sm:text-base">
+                  <p className="mt-1 text-sm font-bold text-brand dark:text-brand-soft sm:text-base">
                     {t("activate.trial_label")}
                   </p>
                   <p className="mt-2 text-sm leading-snug text-slate-600 dark:text-white/50">
@@ -433,7 +433,7 @@ export default function SetupForm() {
               </p>
               <Button
                 type="submit"
-                className="order-1 h-12 w-full shrink-0 rounded-xl bg-gradient-to-r from-[#0066FF] to-[#00AACC] px-10 text-base font-semibold text-white shadow-lg shadow-blue-500/25 transition hover:from-[#0055DD] hover:to-[#0099BB] sm:order-2 sm:h-14 sm:w-auto sm:min-w-[220px] lg:min-w-[260px] lg:text-lg"
+                className="order-1 h-12 w-full shrink-0 rounded-xl bg-gradient-to-r from-brand to-brand-sky px-10 text-base font-semibold text-white shadow-lg shadow-brand/25 transition hover:from-brand-hover hover:to-brand-hover sm:order-2 sm:h-14 sm:w-auto sm:min-w-[220px] lg:min-w-[260px] lg:text-lg"
                 disabled={loading}
               >
                 {loading ? t("activate.submitting") : t("activate.submit")}

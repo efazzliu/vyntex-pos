@@ -47,7 +47,7 @@ export default function ProductDemoPage() {
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pb-20 pt-14 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-2xl text-center">
-        <span className="inline-flex items-center gap-2 rounded-full border border-[#0066FF]/25 bg-[#0066FF]/10 px-3.5 py-1.5 text-xs font-semibold text-[#0066FF]">
+        <span className="inline-flex items-center gap-2 rounded-full border border-brand/25 bg-brand/10 px-3.5 py-1.5 text-xs font-semibold text-brand">
           <Sparkles className="size-3.5" />
           {t("productDemo.badge")}
         </span>
@@ -59,7 +59,7 @@ export default function ProductDemoPage() {
         </p>
       </div>
 
-      <div className="mt-10 overflow-hidden rounded-3xl border border-[#1e2a45] bg-[#0A0F1E] shadow-[0_40px_100px_-50px_rgba(0,102,255,0.35)]">
+      <div className="mt-10 overflow-hidden rounded-3xl border border-[#1e2a45] bg-[#0A0F1E] shadow-[0_40px_100px_-50px_rgba(0,91,214,0.35)]">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1e2a45] bg-[#0D1326] px-4 py-3 sm:px-6">
           <div className="flex flex-wrap gap-1.5">
             {TABS.map((item) => (
@@ -73,7 +73,7 @@ export default function ProductDemoPage() {
                 className={cn(
                   "flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors sm:text-sm",
                   tab === item.id
-                    ? "bg-[#0066FF] text-white shadow-lg shadow-[#0066FF]/25"
+                    ? "bg-brand text-white shadow-lg shadow-brand/25"
                     : "text-[#8b93a7] hover:bg-[#131A2E] hover:text-white",
                 )}
               >
@@ -107,7 +107,7 @@ export default function ProductDemoPage() {
 
       <div className="mt-8 flex flex-col items-center justify-center gap-3 text-center sm:flex-row">
         <p className="text-sm text-muted-foreground">{t("productDemo.ctaHint")}</p>
-        <Button asChild className="h-10 rounded-xl bg-gradient-to-r from-[#0066FF] to-[#00AACC] text-white">
+        <Button asChild className="h-10 rounded-xl bg-gradient-to-r from-brand to-brand-sky text-white">
           <Link to={primaryCtaHref} className="inline-flex items-center">
             {t("home.hero.ctaPrimary")}
             <ArrowRight className="ml-1 size-4" />

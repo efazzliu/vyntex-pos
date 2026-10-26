@@ -59,7 +59,7 @@ function PosViewErrorFallback({
         <Button
           type="button"
           onClick={onRetry}
-          className="bg-[#0066FF] text-white hover:bg-[#0052cc]"
+          className="bg-brand text-white hover:bg-brand-hover"
         >
           {t("btn.retry")}
         </Button>

@@ -124,7 +124,7 @@ function AnimatedCounter({
       className="text-4xl sm:text-5xl font-bold text-white tabular-nums"
     >
       {display}
-      <span className="bg-gradient-to-r from-[#0066FF] to-[#44CC00] bg-clip-text text-transparent">
+      <span className="bg-gradient-to-r from-brand to-brand-accent bg-clip-text text-transparent">
         {suffix}
       </span>
     </div>
@@ -142,7 +142,7 @@ export default function StatsSection() {
         className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(ellipse at center, rgba(0,102,255,0.08), transparent 70%)",
+            "radial-gradient(ellipse at center, rgba(0,91,214,0.08), transparent 70%)",
         }}
       />
 

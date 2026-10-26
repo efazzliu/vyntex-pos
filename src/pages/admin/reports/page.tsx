@@ -115,7 +115,7 @@ export default function AdminReportsPage() {
         <div className="relative z-10 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h2 className="text-2xl font-semibold tracking-tight">Reports & Analytics</h2>
-            <p className="mt-1 text-sm text-blue-100/80">
+            <p className="mt-1 text-sm text-brand-soft/80">
               Modern analytics cockpit with live-style visual feedback.
             </p>
           </div>
@@ -280,7 +280,7 @@ export default function AdminReportsPage() {
                 </BarChart>
               </ResponsiveContainer>
             </div>
-            <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
+            <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-brand-light px-3 py-1 text-xs font-medium text-brand-hover dark:bg-brand/15 dark:text-brand-soft">
               <Package className="size-3.5" />
               Trend updates with selected range
             </div>
@@ -312,14 +312,14 @@ function Metric3DCard({
       whileHover={{ y: -6, rotateX: 4, rotateY: -2 }}
       className="group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 [transform-style:preserve-3d] shadow-[0_24px_55px_-42px_rgba(15,23,42,0.65)] transition dark:border-slate-700/70 dark:bg-slate-900/85"
     >
-      <div className="pointer-events-none absolute inset-x-3 top-0 h-12 rounded-b-[100%] bg-gradient-to-b from-blue-400/20 to-transparent blur-md" />
+      <div className="pointer-events-none absolute inset-x-3 top-0 h-12 rounded-b-[100%] bg-gradient-to-b from-brand-soft/20 to-transparent blur-md" />
       <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600 dark:border-slate-700/70 dark:bg-slate-800/80 dark:text-slate-300">
         {icon}
         {title}
       </div>
       <p className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">{value}</p>
       <p className="mt-1 text-xs text-slate-500 dark:text-slate-300/70">{note}</p>
-      <div className="pointer-events-none absolute -bottom-14 right-0 size-32 rounded-full bg-blue-500/10 blur-2xl transition group-hover:bg-blue-500/20" />
+      <div className="pointer-events-none absolute -bottom-14 right-0 size-32 rounded-full bg-brand/10 blur-2xl transition group-hover:bg-brand/20" />
     </motion.article>
   );
 }

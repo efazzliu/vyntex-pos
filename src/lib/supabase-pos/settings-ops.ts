@@ -11,6 +11,33 @@ import {
   parsePosPaymentSettings,
 } from "@/lib/pos-payment-handling.ts";
 import {
+  appendTaxHistory,
+  defaultVatFraction,
+  getCountryTaxCatalog,
+  parsePosTaxSettings,
+  serializePosTaxSettings,
+  taxSettingsSummary,
+} from "@/lib/pos-tax-config.ts";
+import {
+  parsePosStockRules,
+  serializePosStockRules,
+  stockRulesFromRestaurantRow,
+} from "@/lib/pos-order-availability.ts";
+import {
+  parsePosSecuritySettings,
+  serializePosSecuritySettings,
+  type PosSecuritySettings,
+} from "@/lib/pos-security-config.ts";
+import {
+  parsePosCustomerDisplay,
+  serializePosCustomerDisplay,
+  type PosCustomerDisplaySettings,
+} from "@/lib/pos-customer-display.ts";
+import { isLocalDevicePosAdmin, uuidOrNull } from "./uuid.ts";
+import { assertStaffCanManageStaff } from "./staff-auth.ts";
+import { STAFF_PERMISSION_DENIED } from "@/lib/staff-permissions.ts";
+import { insertAuditLog } from "./dashboard-ops.ts";
+import {
   normalizePhoneAccessBranding,
   normalizePinLoginBranding,
   type PhoneAccessBranding,
@@ -164,6 +191,21 @@ async function ensureFactoryLocaleIfUnset(
   };
 }
 
+function countRegisteredPosDevices(
+  raw: unknown,
+  primaryDeviceId?: string | null,
+): number {
+  const ids = new Set<string>();
+  const list = Array.isArray(raw) ? raw : [];
+  for (const item of list) {
+    const id = String(item ?? "").trim();
+    if (id) ids.add(id);
+  }
+  const primary = String(primaryDeviceId ?? "").trim();
+  if (primary) ids.add(primary);
+  return ids.size;
+}
+
 export async function getCompanyDetails(licenseKey: string) {
   let r = await getRestaurantByLicense(licenseKey, { fresh: true });
   r = await ensureFactoryLocaleIfUnset(r, licenseKey);
@@ -174,6 +216,10 @@ export async function getCompanyDetails(licenseKey: string) {
     phone: r.phone ?? "",
     legalName: r.legal_name ?? "",
     city: r.city ?? "",
+    postalCode: r.postal_code ?? "",
+    country: r.country ?? "",
+    email: r.business_email ?? "",
+    website: r.website ?? "",
     taxNumber: r.tax_number ?? "",
     vatNumber: r.vat_number ?? "",
     defaultVatRate: r.default_vat_rate ?? 0.2,
@@ -188,8 +234,24 @@ export async function getCompanyDetails(licenseKey: string) {
     licenseKey: r.license_key,
     licenseExpiry: r.license_expiry,
     licenseStatus: r.license_status,
+    licenseStartedAt: r.created_at ?? null,
+    maxTerminals: r.max_terminals ?? null,
+    registeredDeviceCount: countRegisteredPosDevices(
+      r.registered_devices,
+      r.device_id,
+    ),
     paymentSettings: parsePosPaymentSettings(r.pos_payment_settings),
+    generalPrefs: r.pos_general_prefs,
+    taxSettings: r.pos_tax_settings,
+    stockRules: (() => {
+      const stored = stockRulesFromRestaurantRow(r);
+      return stored === undefined ? null : parsePosStockRules(stored);
+    })(),
     enforceOrderAvailability: r.pos_enforce_availability === true,
+    mobileAccessEnabled: r.mobile_access_enabled !== false,
+    lastPosSyncAt: r.last_pos_sync_at ?? null,
+    securitySettings: parsePosSecuritySettings(r.pos_security_settings),
+    customerDisplay: parsePosCustomerDisplay(r.pos_customer_display),
   };
 }
 
@@ -221,11 +283,23 @@ export async function updateLocaleSettings(args: {
   clearRestaurantCache(args.licenseKey);
 }
 
+function optionalText(value: string | undefined) {
+  if (value === undefined) return undefined;
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
 export async function updateCompanyProfile(args: {
   licenseKey: string;
   name?: string;
+  type?: string;
   address?: string;
   phone?: string;
+  email?: string;
+  website?: string;
+  city?: string;
+  postalCode?: string;
+  country?: string;
 }) {
   const r = await getRestaurantByLicense(args.licenseKey);
   const patch: Record<string, unknown> = {};
@@ -234,8 +308,14 @@ export async function updateCompanyProfile(args: {
     if (!n) throw new Error("Business name is required");
     patch.name = n;
   }
-  if (args.address !== undefined) patch.address = args.address.trim() || null;
-  if (args.phone !== undefined) patch.phone = args.phone.trim() || null;
+  // Business type is chosen when the license is purchased. The POS cannot change it.
+  if (args.address !== undefined) patch.address = optionalText(args.address);
+  if (args.phone !== undefined) patch.phone = optionalText(args.phone);
+  if (args.email !== undefined) patch.business_email = optionalText(args.email);
+  if (args.website !== undefined) patch.website = optionalText(args.website);
+  if (args.city !== undefined) patch.city = optionalText(args.city);
+  if (args.postalCode !== undefined) patch.postal_code = optionalText(args.postalCode);
+  if (args.country !== undefined) patch.country = optionalText(args.country);
 
   if (Object.keys(patch).length === 0) return;
 
@@ -243,8 +323,43 @@ export async function updateCompanyProfile(args: {
     .from("restaurants")
     .update(patch)
     .eq("id", r.id);
-  if (error) throw error;
+  if (!error) {
+    clearRestaurantCache(args.licenseKey);
+    return;
+  }
+
+  const missing =
+    /column|schema cache/i.test(String(error.message ?? "")) &&
+    /business_email|website|postal_code|country|city|type/i.test(String(error.message ?? ""));
+  if (!missing) throw error;
+
+  const basic: Record<string, unknown> = {};
+  if (patch.name !== undefined) basic.name = patch.name;
+  if (patch.address !== undefined) basic.address = patch.address;
+  if (patch.phone !== undefined) basic.phone = patch.phone;
+  if (patch.type !== undefined) basic.type = patch.type;
+  if (Object.keys(basic).length === 0) throw error;
+  const retry = await supabase.from("restaurants").update(basic).eq("id", r.id);
+  if (retry.error) throw retry.error;
   clearRestaurantCache(args.licenseKey);
+}
+
+export async function updateGeneralPrefs(args: {
+  licenseKey: string;
+  prefs: Record<string, unknown>;
+}) {
+  const r = await getRestaurantByLicense(args.licenseKey);
+  const { error } = await supabase
+    .from("restaurants")
+    .update({ pos_general_prefs: args.prefs })
+    .eq("id", r.id);
+  if (!error) {
+    clearRestaurantCache(args.licenseKey);
+    return;
+  }
+  const msg = String(error.message ?? "");
+  if (/pos_general_prefs|schema cache|column/i.test(msg)) return;
+  throw error;
 }
 
 export async function updatePaymentSettings(args: {
@@ -253,6 +368,8 @@ export async function updatePaymentSettings(args: {
   manager: boolean;
   waiter: boolean;
   methods?: { cash?: boolean; card?: boolean; qr?: boolean };
+  channels?: unknown;
+  roleMethods?: unknown;
   allowSplitBill?: boolean;
   allowRefund?: boolean;
 }) {
@@ -265,9 +382,15 @@ export async function updatePaymentSettings(args: {
       waiter: args.waiter === true,
     },
     methods: args.methods,
+    channels: args.channels,
+    roleMethods: args.roleMethods,
     allowSplitBill: args.allowSplitBill,
     allowRefund: args.allowRefund,
+  }) as Record<string, unknown>;
+  const keptRules = stockRulesFromRestaurantRow({
+    pos_payment_settings: r.pos_payment_settings,
   });
+  if (keptRules !== undefined) payload.stockRules = keptRules;
   const { error } = await supabase
     .from("restaurants")
     .update({ pos_payment_settings: payload })
@@ -286,22 +409,64 @@ export async function updatePaymentSettings(args: {
 
 export async function updateOrderAvailabilitySettings(args: {
   licenseKey: string;
-  enforce: boolean;
+  enforce?: boolean;
+  blockOutOfStock?: boolean;
+  defaultLowStockThreshold?: number;
 }) {
   const r = await getRestaurantByLicense(args.licenseKey);
-  const { error } = await supabase
+  const nextRules = parsePosStockRules(stockRulesFromRestaurantRow(r));
+  if (typeof args.blockOutOfStock === "boolean") {
+    nextRules.blockOutOfStock = args.blockOutOfStock;
+  }
+  if (
+    typeof args.defaultLowStockThreshold === "number" &&
+    Number.isFinite(args.defaultLowStockThreshold)
+  ) {
+    nextRules.defaultLowStockThreshold = parsePosStockRules({
+      defaultLowStockThreshold: args.defaultLowStockThreshold,
+    }).defaultLowStockThreshold;
+  }
+  const serialized = serializePosStockRules(nextRules);
+  const enforcePatch: Record<string, unknown> = {};
+  if (typeof args.enforce === "boolean") {
+    enforcePatch.pos_enforce_availability = args.enforce === true;
+  }
+  const columnWrite = await supabase
     .from("restaurants")
-    .update({ pos_enforce_availability: args.enforce === true })
-    .eq("id", r.id);
-  if (error) {
-    const msg = String(error.message ?? "").toLowerCase();
-    if (msg.includes("pos_enforce_availability") || msg.includes("schema cache")) {
+    .update({ ...enforcePatch, pos_stock_rules: serialized })
+    .eq("id", r.id)
+    .select("id")
+    .maybeSingle();
+  const columnMsg = String(columnWrite.error?.message ?? "").toLowerCase();
+  const missingRulesColumn =
+    columnWrite.error != null &&
+    (columnMsg.includes("pos_stock_rules") || columnMsg.includes("schema cache"));
+  if (columnWrite.error && !missingRulesColumn) {
+    if (columnMsg.includes("pos_enforce_availability")) {
       throw new Error(
         "Mungon kolona pos_enforce_availability. Ekzekuto supabase/ensure_pos_order_availability.sql në Supabase SQL Editor.",
       );
     }
-    throw error;
+    throw columnWrite.error;
   }
+  if (!columnWrite.error) {
+    if (!columnWrite.data) throw new Error("Stock rules were not saved.");
+    clearRestaurantCache(args.licenseKey);
+    return;
+  }
+  const currentPay =
+    r.pos_payment_settings && typeof r.pos_payment_settings === "object"
+      ? { ...(r.pos_payment_settings as Record<string, unknown>) }
+      : {};
+  currentPay.stockRules = serialized;
+  const fallback = await supabase
+    .from("restaurants")
+    .update({ ...enforcePatch, pos_payment_settings: currentPay })
+    .eq("id", r.id)
+    .select("id")
+    .maybeSingle();
+  if (fallback.error) throw fallback.error;
+  if (!fallback.data) throw new Error("Stock rules were not saved.");
   clearRestaurantCache(args.licenseKey);
 }
 
@@ -309,13 +474,74 @@ export async function updateTaxSettings(args: {
   licenseKey: string;
   vatNumber?: string;
   defaultVatRate?: number;
+  pricingMode?: "inclusive" | "exclusive";
+  defaultRateId?: string;
+  enabledRateIds?: string[];
+  customPercent?: number;
+  customName?: string;
+  actorStaffId?: string;
+  actorStaffName?: string;
 }) {
   const r = await getRestaurantByLicense(args.licenseKey);
+  const ctx = {
+    country: r.country ?? "",
+    businessType: r.type ?? "restaurant",
+    fallbackVatFraction: Number(r.default_vat_rate ?? 0.2),
+  };
+  const catalog = getCountryTaxCatalog(ctx.country);
+  const previous = parsePosTaxSettings(r.pos_tax_settings, ctx);
+
+  const vatNumber =
+    args.vatNumber !== undefined ? args.vatNumber.trim() : (r.vat_number ?? "");
+
   const patch: Record<string, unknown> = {};
-  if (args.vatNumber !== undefined)
-    patch.vat_number = args.vatNumber.trim() || null;
-  if (args.defaultVatRate !== undefined)
+  if (args.vatNumber !== undefined) patch.vat_number = vatNumber || null;
+
+  if (
+    args.pricingMode !== undefined ||
+    args.defaultRateId !== undefined ||
+    args.enabledRateIds !== undefined ||
+    args.customPercent !== undefined ||
+    args.customName !== undefined
+  ) {
+    if (!catalog) {
+      throw new Error(
+        "Set the business country in General before configuring tax rates.",
+      );
+    }
+    const next = parsePosTaxSettings(
+      {
+        pricingMode: args.pricingMode ?? previous.pricingMode,
+        defaultRateId: args.defaultRateId ?? previous.defaultRateId,
+        enabledRateIds: args.enabledRateIds ?? previous.enabledRateIds,
+        customPercent: args.customPercent ?? previous.customPercent,
+        customName: args.customName ?? previous.customName,
+        history: previous.history,
+      },
+      ctx,
+    );
+    const legal = new Set(catalog.rates.map((rate) => rate.id));
+    if (next.enabledRateIds.some((id) => !legal.has(id))) {
+      throw new Error("A selected tax rate is not valid for this country.");
+    }
+    if (!next.enabledRateIds.includes(next.defaultRateId)) {
+      throw new Error("The default tax rate must be one of the enabled country rates.");
+    }
+    const serialized = serializePosTaxSettings({
+      ...next,
+      history: appendTaxHistory(previous, {
+        summary: taxSettingsSummary(next, ctx),
+        vatNumber,
+        pricingMode: next.pricingMode,
+        defaultRateId: next.defaultRateId,
+        enabledRateIds: next.enabledRateIds,
+      }),
+    });
+    patch.pos_tax_settings = serialized;
+    patch.default_vat_rate = defaultVatFraction(serialized, ctx);
+  } else if (args.defaultVatRate !== undefined) {
     patch.default_vat_rate = args.defaultVatRate;
+  }
 
   if (Object.keys(patch).length === 0) return;
 
@@ -323,8 +549,27 @@ export async function updateTaxSettings(args: {
     .from("restaurants")
     .update(patch)
     .eq("id", r.id);
-  if (error) throw error;
+  if (error) {
+    const msg = String(error.message ?? "").toLowerCase();
+    if (msg.includes("pos_tax_settings") || msg.includes("schema cache")) {
+      throw new Error(
+        "Mungon kolona pos_tax_settings. Ekzekuto supabase/migrations/046_restaurants_tax_settings.sql në Supabase SQL Editor.",
+      );
+    }
+    throw error;
+  }
   clearRestaurantCache(args.licenseKey);
+  await insertAuditLog({
+    licenseKey: args.licenseKey,
+    staffId: args.actorStaffId,
+    staffName: args.actorStaffName?.trim() || "System",
+    action: "tax_update",
+    details: `Tax settings updated${vatNumber ? ` (${vatNumber})` : ""}`,
+    metadata: {
+      defaultRateId: args.defaultRateId ?? previous.defaultRateId,
+      pricingMode: args.pricingMode ?? previous.pricingMode,
+    },
+  });
 }
 
 /** Persist device quick-login PIN hash so close day can authorize when staff.pin_hash differs. */
@@ -429,4 +674,315 @@ export async function deletePrinter(args: {
     .delete()
     .eq("id", args.printerId);
   if (error) throw error;
+}
+
+export type PosSecurityDevice = {
+  id: string;
+  deviceId: string;
+  displayName: string;
+  locationName: string | null;
+  os: string | null;
+  appVersion: string | null;
+  ipAddress: string | null;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  lastSyncAt: string | null;
+  disconnectedAt: string | null;
+  deviceKind: string;
+};
+
+function requireCloudSecurityStaffId(staffId: string | null | undefined): string {
+  if (isLocalDevicePosAdmin(staffId)) {
+    throw new Error("CLOUD_ADMIN_REQUIRED");
+  }
+  const sid = uuidOrNull(staffId);
+  if (!sid) throw new Error("CLOUD_ADMIN_REQUIRED");
+  return sid;
+}
+
+export async function updateSecuritySettings(args: {
+  licenseKey: string;
+  actorStaffId?: string | null;
+  sessionTimeoutMinutes: number;
+}) {
+  if (!String(args.actorStaffId ?? "").trim()) {
+    throw new Error(STAFF_PERMISSION_DENIED);
+  }
+  await assertStaffCanManageStaff({
+    licenseKey: args.licenseKey,
+    actorStaffId: args.actorStaffId,
+  });
+  const r = await getRestaurantByLicense(args.licenseKey);
+  const next: PosSecuritySettings = serializePosSecuritySettings({
+    sessionTimeoutMinutes: args.sessionTimeoutMinutes as PosSecuritySettings["sessionTimeoutMinutes"],
+  });
+  const { error } = await supabase
+    .from("restaurants")
+    .update({ pos_security_settings: next })
+    .eq("id", r.id);
+  if (error) {
+    const msg = String(error.message ?? "").toLowerCase();
+    if (msg.includes("pos_security_settings") || msg.includes("schema cache")) {
+      throw new Error(
+        "Mungon kolona pos_security_settings. Ekzekuto supabase/migrations/048_pos_security.sql në Supabase SQL Editor.",
+      );
+    }
+    throw error;
+  }
+  clearRestaurantCache(args.licenseKey);
+}
+
+export async function updateCustomerDisplay(args: {
+  licenseKey: string;
+  actorStaffId?: string | null;
+  settings: PosCustomerDisplaySettings;
+}) {
+  if (!String(args.actorStaffId ?? "").trim()) {
+    throw new Error(STAFF_PERMISSION_DENIED);
+  }
+  await assertStaffCanManageStaff({
+    licenseKey: args.licenseKey,
+    actorStaffId: args.actorStaffId,
+  });
+  const r = await getRestaurantByLicense(args.licenseKey);
+  const next = serializePosCustomerDisplay(args.settings);
+  const { error } = await supabase
+    .from("restaurants")
+    .update({ pos_customer_display: next })
+    .eq("id", r.id);
+  if (error) {
+    const msg = String(error.message ?? "").toLowerCase();
+    if (msg.includes("pos_customer_display") || msg.includes("schema cache")) {
+      throw new Error(
+        "Mungon kolona pos_customer_display. Ekzekuto supabase/migrations/049_pos_customer_display.sql në Supabase SQL Editor.",
+      );
+    }
+    throw error;
+  }
+  clearRestaurantCache(args.licenseKey);
+}
+
+export async function listSecurityDevices(args: {
+  licenseKey: string;
+  staffId?: string | null;
+}): Promise<PosSecurityDevice[]> {
+  await assertStaffCanManageStaff({
+    licenseKey: args.licenseKey,
+    actorStaffId: args.staffId,
+  });
+  const staffId = requireCloudSecurityStaffId(args.staffId);
+  const { data, error } = await supabase.rpc("vyntex_pos_list_security_devices", {
+    p_license_key: args.licenseKey,
+    p_staff_id: staffId,
+  });
+  if (error) {
+    const msg = String(error.message ?? "").toLowerCase();
+    if (msg.includes("vyntex_pos_list_security_devices") || msg.includes("schema cache")) {
+      throw new Error(
+        "Mungon funksioni i sigurisë. Ekzekuto supabase/migrations/048_pos_security.sql në Supabase SQL Editor.",
+      );
+    }
+    if (msg.includes("not authorized")) {
+      throw new Error("CLOUD_ADMIN_REQUIRED");
+    }
+    throw error;
+  }
+  return (data ?? []).map((row: Record<string, unknown>) => ({
+    id: String(row.id ?? ""),
+    deviceId: String(row.device_id ?? ""),
+    displayName: String(row.display_name ?? "POS"),
+    locationName: row.location_name ? String(row.location_name) : null,
+    os: row.os ? String(row.os) : null,
+    appVersion: row.app_version ? String(row.app_version) : null,
+    ipAddress: row.ip_address ? String(row.ip_address) : null,
+    firstSeenAt: String(row.first_seen_at ?? ""),
+    lastSeenAt: String(row.last_seen_at ?? ""),
+    lastSyncAt: row.last_sync_at ? String(row.last_sync_at) : null,
+    disconnectedAt: row.disconnected_at ? String(row.disconnected_at) : null,
+    deviceKind: String(row.device_kind ?? "pos"),
+  }));
+}
+
+export async function revokeSecurityDevice(args: {
+  licenseKey: string;
+  staffId?: string | null;
+  staffName?: string;
+  targetDeviceId: string;
+  currentDeviceId?: string;
+}): Promise<void> {
+  await assertStaffCanManageStaff({
+    licenseKey: args.licenseKey,
+    actorStaffId: args.staffId,
+  });
+  const staffId = requireCloudSecurityStaffId(args.staffId);
+  const target = String(args.targetDeviceId ?? "").trim();
+  if (!target) throw new Error("CLOUD_ADMIN_REQUIRED");
+  if (args.currentDeviceId && target === args.currentDeviceId) {
+    throw new Error("CANNOT_REVOKE_SELF");
+  }
+  const { data, error } = await supabase.rpc("vyntex_pos_revoke_device", {
+    p_license_key: args.licenseKey,
+    p_staff_id: staffId,
+    p_target_device_id: target,
+  });
+  if (error) {
+    const msg = String(error.message ?? "").toLowerCase();
+    if (msg.includes("vyntex_pos_revoke_device") || msg.includes("schema cache")) {
+      throw new Error(
+        "Mungon funksioni i sigurisë. Ekzekuto supabase/migrations/048_pos_security.sql në Supabase SQL Editor.",
+      );
+    }
+    if (msg.includes("not authorized") || msg.includes("waiter phones")) {
+      throw new Error(msg.includes("waiter") ? "PHONE_APP_DEVICE" : "CLOUD_ADMIN_REQUIRED");
+    }
+    throw error;
+  }
+  if (data !== true) throw new Error("REVOKE_FAILED");
+  clearRestaurantCache(args.licenseKey);
+  await insertAuditLog({
+    licenseKey: args.licenseKey,
+    staffId,
+    staffName: args.staffName || "Admin",
+    action: "device_revoke",
+    details: `Signed out terminal ${target}`,
+    metadata: { deviceId: target, source: "security_settings" },
+  });
+}
+
+export type PosWaiterPhoneDevice = {
+  id: string;
+  deviceId: string;
+  displayName: string;
+  os: string | null;
+  appVersion: string | null;
+  ipAddress: string | null;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  lastSyncAt: string | null;
+  disconnectedAt: string | null;
+};
+
+function mapWaiterPhoneRow(row: Record<string, unknown>): PosWaiterPhoneDevice {
+  return {
+    id: String(row.id ?? ""),
+    deviceId: String(row.device_id ?? ""),
+    displayName: String(row.display_name ?? "Phone"),
+    os: row.os ? String(row.os) : null,
+    appVersion: row.app_version ? String(row.app_version) : null,
+    ipAddress: row.ip_address ? String(row.ip_address) : null,
+    firstSeenAt: String(row.first_seen_at ?? ""),
+    lastSeenAt: String(row.last_seen_at ?? ""),
+    lastSyncAt: row.last_sync_at ? String(row.last_sync_at) : null,
+    disconnectedAt: row.disconnected_at ? String(row.disconnected_at) : null,
+  };
+}
+
+export async function listWaiterPhones(args: {
+  licenseKey: string;
+  staffId?: string | null;
+}): Promise<PosWaiterPhoneDevice[]> {
+  await assertStaffCanManageStaff({
+    licenseKey: args.licenseKey,
+    actorStaffId: args.staffId,
+  });
+  const staffId = requireCloudSecurityStaffId(args.staffId);
+  const { data, error } = await supabase.rpc("vyntex_pos_list_waiter_phones", {
+    p_license_key: args.licenseKey,
+    p_staff_id: staffId,
+  });
+  if (error) {
+    const msg = String(error.message ?? "").toLowerCase();
+    if (msg.includes("vyntex_pos_list_waiter_phones") || msg.includes("schema cache")) {
+      throw new Error(
+        "Mungon funksioni i telefonave. Ekzekuto supabase/migrations/050_pos_phone_app_devices.sql në Supabase SQL Editor.",
+      );
+    }
+    if (msg.includes("not authorized")) {
+      throw new Error("CLOUD_ADMIN_REQUIRED");
+    }
+    throw error;
+  }
+  return (data ?? []).map((row: Record<string, unknown>) => mapWaiterPhoneRow(row));
+}
+
+export async function revokeWaiterPhone(args: {
+  licenseKey: string;
+  staffId?: string | null;
+  staffName?: string;
+  targetDeviceId: string;
+}): Promise<void> {
+  await assertStaffCanManageStaff({
+    licenseKey: args.licenseKey,
+    actorStaffId: args.staffId,
+  });
+  const staffId = requireCloudSecurityStaffId(args.staffId);
+  const target = String(args.targetDeviceId ?? "").trim();
+  if (!target) throw new Error("CLOUD_ADMIN_REQUIRED");
+  const { data, error } = await supabase.rpc("vyntex_pos_revoke_waiter_phone", {
+    p_license_key: args.licenseKey,
+    p_staff_id: staffId,
+    p_target_device_id: target,
+  });
+  if (error) {
+    const msg = String(error.message ?? "").toLowerCase();
+    if (msg.includes("vyntex_pos_revoke_waiter_phone") || msg.includes("schema cache")) {
+      throw new Error(
+        "Mungon funksioni i telefonave. Ekzekuto supabase/migrations/050_pos_phone_app_devices.sql në Supabase SQL Editor.",
+      );
+    }
+    if (msg.includes("phone_not_found")) {
+      throw new Error("PHONE_NOT_FOUND");
+    }
+    if (msg.includes("not authorized")) {
+      throw new Error("CLOUD_ADMIN_REQUIRED");
+    }
+    throw error;
+  }
+  if (data !== true) throw new Error("REVOKE_FAILED");
+  await insertAuditLog({
+    licenseKey: args.licenseKey,
+    staffId,
+    staffName: args.staffName || "Admin",
+    action: "device_revoke",
+    details: `Revoked waiter phone ${target}`,
+    metadata: { deviceId: target, source: "phone_app_settings" },
+  });
+}
+
+export async function renameWaiterPhone(args: {
+  licenseKey: string;
+  staffId?: string | null;
+  targetDeviceId: string;
+  displayName: string;
+}): Promise<void> {
+  await assertStaffCanManageStaff({
+    licenseKey: args.licenseKey,
+    actorStaffId: args.staffId,
+  });
+  const staffId = requireCloudSecurityStaffId(args.staffId);
+  const target = String(args.targetDeviceId ?? "").trim();
+  const displayName = String(args.displayName ?? "").trim();
+  if (!target || !displayName) throw new Error("CLOUD_ADMIN_REQUIRED");
+  const { data, error } = await supabase.rpc("vyntex_pos_rename_waiter_phone", {
+    p_license_key: args.licenseKey,
+    p_staff_id: staffId,
+    p_target_device_id: target,
+    p_display_name: displayName,
+  });
+  if (error) {
+    const msg = String(error.message ?? "").toLowerCase();
+    if (msg.includes("vyntex_pos_rename_waiter_phone") || msg.includes("schema cache")) {
+      throw new Error(
+        "Mungon funksioni i telefonave. Ekzekuto supabase/migrations/050_pos_phone_app_devices.sql në Supabase SQL Editor.",
+      );
+    }
+    if (msg.includes("phone_not_found")) {
+      throw new Error("PHONE_NOT_FOUND");
+    }
+    if (msg.includes("not authorized")) {
+      throw new Error("CLOUD_ADMIN_REQUIRED");
+    }
+    throw error;
+  }
+  if (data !== true) throw new Error("RENAME_FAILED");
 }

@@ -1,12 +1,11 @@
 import { useState } from "react";
 import { motion } from "motion/react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Monitor, Play, Smartphone } from "lucide-react";
+import { ArrowRight, Play } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
 import { useMarketingPrimaryCtaHref } from "@/hooks/use-marketing-primary-cta-href.ts";
-import { POS_SOFTWARE_PATH, VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
-import { PHONE_APP_PATH } from "@/lib/guest-menu-url.ts";
+import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 import DemoVideoDialog from "./demo-video-dialog.tsx";
 
 const MOCK_KEYS = [
@@ -42,7 +41,7 @@ export default function HeroSection() {
             scale: [1, 1.2, 0.9, 1],
           }}
           transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute -top-32 -left-32 w-[500px] h-[500px] rounded-full bg-[#0066FF]/15 blur-[120px]"
+          className="absolute -top-32 -left-32 w-[500px] h-[500px] rounded-full bg-brand/15 blur-[120px]"
         />
         <motion.div
           animate={{
@@ -51,12 +50,12 @@ export default function HeroSection() {
             scale: [1, 0.9, 1.15, 1],
           }}
           transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute -bottom-32 -right-32 w-[500px] h-[500px] rounded-full bg-[#44CC00]/12 blur-[120px]"
+          className="absolute -bottom-32 -right-32 w-[500px] h-[500px] rounded-full bg-brand-accent/12 blur-[120px]"
         />
         <motion.div
           animate={{ x: [0, 60, -80, 0], y: [0, -50, 90, 0] }}
           transition={{ duration: 30, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[400px] h-[400px] rounded-full bg-[#0099CC]/8 blur-[100px]"
+          className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[400px] h-[400px] rounded-full bg-brand-sky/8 blur-[100px]"
         />
       </div>
 
@@ -70,7 +69,7 @@ export default function HeroSection() {
           <img
             src={VYNTEX_APP_LOGO_SRC}
             alt="Vyntex POS"
-            className="mx-auto h-14 w-14 drop-shadow-[0_0_36px_rgba(0,102,255,0.45)] sm:h-16 sm:w-16"
+            className="mx-auto h-14 w-14 drop-shadow-[0_0_36px_rgba(0,91,214,0.45)] sm:h-16 sm:w-16"
           />
         </motion.div>
 
@@ -80,7 +79,7 @@ export default function HeroSection() {
           transition={{ delay: 0.2, duration: 0.6 }}
           className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.07] px-4 py-1.5 backdrop-blur-sm"
         >
-          <span className="w-2 h-2 rounded-full bg-[#44CC00] animate-pulse" />
+          <span className="w-2 h-2 rounded-full bg-brand-accent animate-pulse" />
           <span className="text-sm text-white/70 font-medium">{t("home.hero.badge")}</span>
         </motion.div>
 
@@ -92,7 +91,7 @@ export default function HeroSection() {
         >
           <span className="text-white">{t("home.hero.line1")}</span>
           <br />
-          <span className="bg-gradient-to-r from-[#0066FF] via-[#00AACC] to-[#44CC00] bg-clip-text text-transparent">
+          <span className="bg-gradient-to-r from-brand via-brand-sky to-brand-accent bg-clip-text text-transparent">
             {t("home.hero.line2")}
           </span>
         </motion.h1>
@@ -115,32 +114,12 @@ export default function HeroSection() {
           <Button
             size="lg"
             asChild
-            className="bg-gradient-to-r from-[#0066FF] to-[#00AACC] hover:from-[#0055DD] hover:to-[#0099BB] text-white border-0 px-8 h-12 text-base shadow-lg shadow-blue-500/25"
+            className="bg-gradient-to-r from-brand to-brand-sky hover:from-brand-hover hover:to-brand-hover text-white border-0 px-8 h-12 text-base shadow-lg shadow-brand/25"
           >
             <Link to={primaryCtaHref} className="inline-flex items-center">
               {t("home.hero.ctaPrimary")}
               <ArrowRight className="ml-1 size-4" />
             </Link>
-          </Button>
-          <Button
-            size="lg"
-            asChild
-            className="h-12 border border-white/30 bg-white/10 px-8 text-base text-white shadow-lg shadow-black/20 hover:bg-white/20"
-          >
-            <Link to={POS_SOFTWARE_PATH} className="inline-flex items-center">
-              <Monitor className="mr-1 size-4" />
-              {t("home.hero.ctaSoftware")}
-            </Link>
-          </Button>
-          <Button
-            size="lg"
-            asChild
-            className="h-12 border-0 bg-white px-8 text-base text-[#0A1628] shadow-lg shadow-black/20 hover:bg-white/90"
-          >
-            <a href={PHONE_APP_PATH} className="inline-flex items-center">
-              <Smartphone className="mr-1 size-4" />
-              {t("home.hero.ctaPhone")}
-            </a>
           </Button>
           <Button
             size="lg"
@@ -161,7 +140,7 @@ export default function HeroSection() {
           transition={{ delay: 1, duration: 0.8 }}
           className="relative mt-8"
         >
-          <div className="relative mx-auto max-w-4xl rounded-2xl border border-white/15 bg-white/[0.04] p-1.5 shadow-2xl shadow-blue-500/10 backdrop-blur-sm">
+          <div className="relative mx-auto max-w-4xl rounded-2xl border border-white/15 bg-white/[0.04] p-1.5 shadow-2xl shadow-brand/10 backdrop-blur-sm">
             <div className="rounded-xl bg-gradient-to-br from-[#0A1628] to-[#0F1D32] p-5 sm:p-6">
               <div className="grid grid-cols-3 gap-3 sm:gap-4">
                 {MOCK_KEYS.map((key, i) => (
@@ -190,14 +169,14 @@ export default function HeroSection() {
                       duration: 0.6,
                       ease: "easeOut",
                     }}
-                    className="flex-1 rounded-t bg-gradient-to-t from-[#0066FF]/30 to-[#44CC00]/30"
+                    className="flex-1 rounded-t bg-gradient-to-t from-brand/30 to-brand-accent/30"
                   />
                 ))}
               </div>
             </div>
           </div>
 
-          <div className="absolute -inset-8 bg-gradient-to-r from-[#0066FF]/8 via-transparent to-[#44CC00]/8 blur-3xl -z-10 rounded-3xl" />
+          <div className="absolute -inset-8 bg-gradient-to-r from-brand/8 via-transparent to-brand-accent/8 blur-3xl -z-10 rounded-3xl" />
         </motion.div>
       </div>
     </section>

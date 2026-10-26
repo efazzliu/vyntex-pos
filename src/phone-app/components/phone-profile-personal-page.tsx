@@ -97,7 +97,7 @@ export default function PhoneProfilePersonalPage() {
       >
         <Link
           to="/app/profile"
-          className="flex size-10 shrink-0 items-center justify-center rounded-xl text-slate-700 hover:bg-[#0066FF]/10"
+          className="flex size-10 shrink-0 items-center justify-center rounded-xl text-slate-700 hover:bg-brand/10"
           aria-label={t("phone.profile.backToProfile")}
         >
           <ChevronLeft className="size-6" strokeWidth={2} />
@@ -141,7 +141,7 @@ export default function PhoneProfilePersonalPage() {
           ) : (
             <p className="text-xs leading-relaxed text-slate-500">
               {t("phone.profile.emailReadonlyHint")}{" "}
-              <a href={SUPPORT_MAILTO_HREF} className="font-medium text-[#0066FF] underline">
+              <a href={SUPPORT_MAILTO_HREF} className="font-medium text-brand underline">
                 {SUPPORT_EMAIL}
               </a>
               .
@@ -180,7 +180,7 @@ export default function PhoneProfilePersonalPage() {
         ) : null}
         <Button
           type="submit"
-          className="mt-2 h-11 w-full rounded-xl bg-[#0066FF] hover:bg-[#0055DD]"
+          className="mt-2 h-11 w-full rounded-xl bg-brand hover:bg-brand-hover"
           disabled={
             loading ||
             saving ||

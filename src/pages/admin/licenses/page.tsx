@@ -388,7 +388,7 @@ export default function AdminLicenses() {
                               setActionsOpenId(null);
                             }}
                           >
-                            <CalendarPlus className="size-4 text-blue-500" />
+                            <CalendarPlus className="size-4 text-brand" />
                             Extend
                           </button>
                           <div className="border-t border-border my-1" />

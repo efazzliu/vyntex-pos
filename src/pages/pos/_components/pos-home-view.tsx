@@ -20,6 +20,7 @@ import type { PosView, StaffRole } from "../_lib/types.ts";
 import { canAccessView } from "../_lib/plan-features.ts";
 import { posTablesIndexedDbKey } from "@/lib/supabase-pos/cache-keys.ts";
 import { usePosLocale } from "./pos-locale-provider.tsx";
+import { BRAND } from "@/lib/brand-colors.ts";
 
 type PosHomeViewProps = {
   activation: ActivationData;
@@ -87,13 +88,13 @@ export default function PosHomeView({
               icon={FolderOpen}
               label={t("home.categories")}
               value={categories.length}
-              color="#0066FF"
+              color={BRAND.primary}
             />
             <StatCard
               icon={Package}
               label={t("home.menu_items")}
               value={availableItems}
-              color="#44CC00"
+              color={BRAND.accent}
             />
             <StatCard
               icon={LayoutGrid}
@@ -133,7 +134,7 @@ export default function PosHomeView({
                   icon={UtensilsCrossed}
                   title={t("home.action_menu")}
                   description={t("home.action_menu_desc")}
-                  color="#0066FF"
+                  color={BRAND.primary}
                   onClick={() => onNavigate("menu")}
                 />
               )}
@@ -142,7 +143,7 @@ export default function PosHomeView({
                   icon={LayoutGrid}
                   title={t("home.action_tables")}
                   description={t("home.action_tables_desc")}
-                  color="#44CC00"
+                  color={BRAND.accent}
                   onClick={() => onNavigate("tables")}
                 />
               )}
@@ -157,7 +158,7 @@ export default function PosHomeView({
               )}
             </>
           )}
-          {staffRole === "waiter" && canAccessView(plan, "floor") && (
+          {(staffRole === "waiter" || staffRole === "cashier") && canAccessView(plan, "floor") && (
             <ActionCard
               icon={MapPinned}
               title={t("home.action_floor_waiter")}
@@ -195,7 +196,7 @@ export default function PosHomeView({
                     : table.status === "occupied"
                       ? "border-red-800/40 bg-red-950/20"
                       : table.status === "bill-printed"
-                        ? "border-blue-800/40 bg-blue-950/20"
+                        ? "border-brand-active/40 bg-brand-active/20"
                         : "border-amber-800/40 bg-amber-950/20"
                 )}
               >
@@ -211,7 +212,7 @@ export default function PosHomeView({
                       : table.status === "occupied"
                         ? "bg-red-500/20 text-red-400"
                         : table.status === "bill-printed"
-                          ? "bg-blue-500/20 text-blue-400"
+                          ? "bg-brand/20 text-brand-soft"
                           : "bg-amber-500/20 text-amber-400"
                   )}
                 >

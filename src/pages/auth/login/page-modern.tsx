@@ -146,7 +146,7 @@ export default function LoginPageModern({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="h-11 rounded-xl border-slate-200 bg-white pl-10 text-slate-900 caret-slate-900 shadow-sm placeholder:text-slate-400 focus-visible:ring-[#0066FF]/40"
+              className="h-11 rounded-xl border-slate-200 bg-white pl-10 text-slate-900 caret-slate-900 shadow-sm placeholder:text-slate-400 focus-visible:ring-brand/40"
             />
           </div>
           <div className="flex flex-wrap gap-3 text-xs">
@@ -154,7 +154,7 @@ export default function LoginPageModern({
               type="button"
               onClick={() => void handlePasswordReset()}
               disabled={sendingReset}
-              className="text-[#0066FF]"
+              className="text-brand"
             >
               {sendingReset ? t("auth.login.sendingReset") : t("auth.login.forgotPassword")}
             </button>
@@ -162,7 +162,7 @@ export default function LoginPageModern({
               type="button"
               onClick={() => void handleResendVerification()}
               disabled={sendingVerification}
-              className="text-[#0066FF]"
+              className="text-brand"
             >
               {sendingVerification
                 ? t("auth.login.sendingVerification")
@@ -182,7 +182,7 @@ export default function LoginPageModern({
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="h-11 rounded-xl border-slate-200 bg-white pl-10 pr-11 text-slate-900 caret-slate-900 shadow-sm placeholder:text-slate-400 focus-visible:ring-[#0066FF]/40"
+              className="h-11 rounded-xl border-slate-200 bg-white pl-10 pr-11 text-slate-900 caret-slate-900 shadow-sm placeholder:text-slate-400 focus-visible:ring-brand/40"
             />
             <button
               type="button"
@@ -193,28 +193,28 @@ export default function LoginPageModern({
             </button>
           </div>
         </div>
-        <Button type="submit" disabled={loading} className="h-11 w-full rounded-xl bg-gradient-to-r from-[#0066FF] to-[#00AACC] text-white shadow-lg shadow-blue-500/30 transition hover:scale-[1.01] hover:from-[#0055DD] hover:to-[#0099BB]">
+        <Button type="submit" disabled={loading} className="h-11 w-full rounded-xl bg-gradient-to-r from-brand to-brand-sky text-white shadow-lg shadow-brand/30 transition hover:scale-[1.01] hover:from-brand-hover hover:to-brand-hover">
           {loading ? t("auth.login.submitLoading") : t("auth.login.submit")}
         </Button>
       </form>
       {showCreateAccountLink ? (
         <p className="mt-5 text-center text-sm text-slate-600">
           {t("auth.login.noAccount")}{" "}
-          <Link to={registerUrlWithFreeTrial()} className="font-semibold text-[#0066FF] hover:underline">
+          <Link to={registerUrlWithFreeTrial()} className="font-semibold text-brand hover:underline">
             {t("auth.login.createAccount")}
           </Link>
         </p>
       ) : null}
       {showManagerCodeLink ? (
         <p className="mt-4 text-center text-sm">
-          <Link to="/redeem-code" className="text-[#0066FF]">
+          <Link to="/redeem-code" className="text-brand">
             {t("auth.login.managerCodeLink")}
           </Link>
         </p>
       ) : null}
       {showWaiterLink ? (
         <p className="mt-4 text-center text-sm">
-          <Link to="/waiter" className="text-[#0066FF]">
+          <Link to="/waiter" className="text-brand">
             {t("phone.waiter.loginLink")}
           </Link>
         </p>
@@ -248,8 +248,8 @@ export default function LoginPageModern({
             backgroundSize: "60px 60px",
           }}
         />
-        <div className="absolute -top-32 -left-32 h-[500px] w-[500px] rounded-full bg-[#0066FF]/15 blur-[120px]" />
-        <div className="absolute -bottom-32 -right-32 h-[500px] w-[500px] rounded-full bg-[#44CC00]/12 blur-[120px]" />
+        <div className="absolute -top-32 -left-32 h-[500px] w-[500px] rounded-full bg-brand/15 blur-[120px]" />
+        <div className="absolute -bottom-32 -right-32 h-[500px] w-[500px] rounded-full bg-brand-accent/12 blur-[120px]" />
       </div>
       <div className="relative z-10 flex min-h-screen w-full items-center justify-center px-4 py-8 pt-24">
         <div className="w-full max-w-6xl overflow-hidden rounded-3xl border border-white/15 bg-white/[0.06] shadow-[0_40px_100px_-28px_rgba(2,6,23,0.85)] backdrop-blur-xl">
@@ -264,11 +264,11 @@ export default function LoginPageModern({
                 <h2 className="mt-5 text-4xl font-bold leading-tight text-white">{t("auth.login.heroTitle")}</h2>
                 <ul className="mt-8 space-y-3 text-sm text-white/80">
                   <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-[#66B3FF]" />
+                    <CheckCircle2 className="h-4 w-4 text-brand-soft" />
                     {t("auth.login.heroBullet1")}
                   </li>
                   <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-[#66B3FF]" />
+                    <CheckCircle2 className="h-4 w-4 text-brand-soft" />
                     {t("auth.login.heroBullet2")}
                   </li>
                 </ul>

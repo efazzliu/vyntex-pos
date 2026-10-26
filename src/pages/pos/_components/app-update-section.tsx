@@ -116,7 +116,7 @@ export default function AppUpdateSection() {
   return (
     <section className="rounded-xl border border-[#1e2a45] bg-[#0D1326] p-5 space-y-4">
       <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-        <ArrowUpCircle className="size-5 text-[#0066FF]" />
+        <ArrowUpCircle className="size-5 text-brand" />
         {t("settings.update")}
       </h2>
 
@@ -131,7 +131,7 @@ export default function AppUpdateSection() {
           {state === "downloading" ? (
             <div className="mt-2 h-1.5 w-48 max-w-full overflow-hidden rounded-full bg-[#1e2a45]">
               <div
-                className="h-full rounded-full bg-[#0066FF] transition-[width]"
+                className="h-full rounded-full bg-brand transition-[width]"
                 style={{ width: `${Math.max(4, progress)}%` }}
               />
             </div>
@@ -154,7 +154,7 @@ export default function AppUpdateSection() {
             <Button
               type="button"
               size="sm"
-              className="bg-[#0066FF] hover:bg-[#0052CC]"
+              className="bg-brand hover:bg-brand-hover"
               onClick={() => void runInstall()}
               disabled={state === "downloading" || state === "installing"}
             >

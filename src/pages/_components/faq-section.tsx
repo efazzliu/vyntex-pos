@@ -65,7 +65,7 @@ export default function FaqSection() {
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
           >
-            <span className="text-sm font-semibold tracking-widest uppercase bg-gradient-to-r from-[#0066FF] to-[#44CC00] bg-clip-text text-transparent">
+            <span className="text-sm font-semibold tracking-widest uppercase bg-gradient-to-r from-brand to-brand-accent bg-clip-text text-transparent">
               {t("home.faq.label")}
             </span>
             <h2 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-foreground">

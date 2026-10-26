@@ -17,6 +17,8 @@ import { Wallet, Receipt } from "lucide-react";
 import { usePosLocale } from "./pos-locale-provider.tsx";
 import { usePosTheme } from "../_lib/use-pos-theme.ts";
 import { errorMessageFromUnknown } from "@/lib/supabase-pos/db-errors.ts";
+import { printExpenseVoucherNow } from "@/lib/print-live-papers.ts";
+import { isSilentPrintQueueableError } from "@/lib/print-html.ts";
 
 type ExpenseDialogProps = {
   open: boolean;
@@ -58,16 +60,41 @@ export default function ExpenseDialog({
 
     setSaving(true);
     try {
+      const savedNote = note.trim();
       await addExpense({
         licenseKey,
         staffId,
         staffName,
         amount: numAmount,
-        note: note.trim(),
+        note: savedNote,
       });
       toast.success(t("expense_saved") || "Expense saved");
       setAmount("");
       setNote("");
+      try {
+        const printed = await printExpenseVoucherNow({
+          licenseKey,
+          formatPrice,
+          staffName,
+          approvedBy: staffName,
+          note: savedNote,
+          amount: numAmount,
+        });
+        if (!printed.ok) {
+          const electronApp = Boolean(
+            typeof window !== "undefined" &&
+              (window as Window & { desktop?: { isElectron?: boolean } }).desktop
+                ?.isElectron,
+          );
+          const queued = electronApp && isSilentPrintQueueableError(printed.error);
+          if (!queued) {
+            toast.error(t("order.print_ticket_silent_failed"));
+          }
+        }
+      } catch (printErr) {
+        console.error("[POS] expense print", printErr);
+        toast.error(t("order.print_ticket_silent_failed"));
+      }
     } catch (err) {
       const fallback = t("expense_error") || "Failed to save expense";
       toast.error(errorMessageFromUnknown(err, fallback));

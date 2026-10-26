@@ -69,8 +69,8 @@ export default function RegisterPage() {
             backgroundSize: "60px 60px",
           }}
         />
-        <div className="absolute -top-32 -left-32 h-[500px] w-[500px] rounded-full bg-[#0066FF]/15 blur-[120px]" />
-        <div className="absolute -bottom-32 -right-32 h-[500px] w-[500px] rounded-full bg-[#44CC00]/12 blur-[120px]" />
+        <div className="absolute -top-32 -left-32 h-[500px] w-[500px] rounded-full bg-brand/15 blur-[120px]" />
+        <div className="absolute -bottom-32 -right-32 h-[500px] w-[500px] rounded-full bg-brand-accent/12 blur-[120px]" />
       </div>
 
       <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-8 pt-24">
@@ -170,14 +170,14 @@ export default function RegisterPage() {
 
               <p className="mt-4 text-center text-sm text-slate-500">
                 Already have an account?{" "}
-                <Link to="/login" className="font-medium text-[#0066FF] hover:underline">
+                <Link to="/login" className="font-medium text-brand hover:underline">
                   Login
                 </Link>
               </p>
             </section>
 
             <section className="relative hidden p-10 md:block">
-              <div className="absolute inset-0 bg-gradient-to-br from-[#0066FF]/20 via-[#00AACC]/10 to-[#44CC00]/15" />
+              <div className="absolute inset-0 bg-gradient-to-br from-brand/20 via-brand-sky/10 to-brand-accent/15" />
               <div className="relative">
                 <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold tracking-wide text-white/85">
                   <Sparkles className="h-3.5 w-3.5" />
@@ -191,15 +191,15 @@ export default function RegisterPage() {
                 </p>
                 <ul className="mt-8 space-y-3 text-sm text-white/80">
                   <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-[#66B3FF]" />
+                    <CheckCircle2 className="h-4 w-4 text-brand-soft" />
                     Guided setup for venues and staff
                   </li>
                   <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-[#66B3FF]" />
+                    <CheckCircle2 className="h-4 w-4 text-brand-soft" />
                     Secure login with email verification
                   </li>
                   <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-[#66B3FF]" />
+                    <CheckCircle2 className="h-4 w-4 text-brand-soft" />
                     Access from desktop and phone
                   </li>
                 </ul>
@@ -279,8 +279,8 @@ export default function RegisterPage() {
             backgroundSize: "60px 60px",
           }}
         />
-        <div className="absolute -top-32 -left-32 h-[500px] w-[500px] rounded-full bg-[#0066FF]/15 blur-[120px]" />
-        <div className="absolute -bottom-32 -right-32 h-[500px] w-[500px] rounded-full bg-[#44CC00]/12 blur-[120px]" />
+        <div className="absolute -top-32 -left-32 h-[500px] w-[500px] rounded-full bg-brand/15 blur-[120px]" />
+        <div className="absolute -bottom-32 -right-32 h-[500px] w-[500px] rounded-full bg-brand-accent/12 blur-[120px]" />
       </div>
 
       <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-8 pt-24">
@@ -342,7 +342,7 @@ export default function RegisterPage() {
 
           <p className="mt-4 text-center text-sm text-slate-500">
             Already have an account?{" "}
-            <Link to="/login" className="text-[#0066FF] hover:underline">
+            <Link to="/login" className="text-brand hover:underline">
               Login
             </Link>
           </p>

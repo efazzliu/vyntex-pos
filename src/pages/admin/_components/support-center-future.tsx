@@ -34,7 +34,7 @@ const TICKETS = [
 const PRIORITY_STYLES: Record<string, string> = {
   Critical: "bg-red-500/15 text-red-300 border-red-500/35",
   High: "bg-amber-500/15 text-amber-300 border-amber-500/35",
-  Medium: "bg-blue-500/15 text-blue-300 border-blue-500/35",
+  Medium: "bg-brand/15 text-brand-soft border-brand/35",
   Low: "bg-emerald-500/15 text-emerald-300 border-emerald-500/35",
 };
 
@@ -42,7 +42,7 @@ export function SupportCenterFuture() {
   const [activeFilter, setActiveFilter] = useState<FilterKey>("all");
   const metrics = useMemo(
     () => [
-      { title: "Active Queue", value: "24", note: "+6 in last hour", icon: <Headset className="size-4" />, glow: "from-cyan-400/40 to-blue-500/10" },
+      { title: "Active Queue", value: "24", note: "+6 in last hour", icon: <Headset className="size-4" />, glow: "from-cyan-400/40 to-brand/10" },
       { title: "Critical", value: "3", note: "Need immediate action", icon: <ShieldAlert className="size-4" />, glow: "from-red-400/40 to-red-600/10" },
       { title: "SLA Health", value: "94%", note: "Stable this shift", icon: <Activity className="size-4" />, glow: "from-violet-400/40 to-fuchsia-500/10" },
       { title: "Resolved Today", value: "67", note: "Avg 14 min", icon: <CheckCircle2 className="size-4" />, glow: "from-emerald-400/40 to-emerald-600/10" },
@@ -102,7 +102,7 @@ export function SupportCenterFuture() {
               <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">{metric.value}</p>
               <p className="mt-1 text-xs text-slate-500 dark:text-slate-300/70">{metric.note}</p>
             </div>
-            <div className="pointer-events-none absolute -bottom-14 right-0 h-32 w-32 rounded-full bg-blue-500/10 blur-2xl transition group-hover:bg-blue-500/20" />
+            <div className="pointer-events-none absolute -bottom-14 right-0 h-32 w-32 rounded-full bg-brand/10 blur-2xl transition group-hover:bg-brand/20" />
           </motion.article>
         ))}
       </div>
@@ -136,7 +136,7 @@ export function SupportCenterFuture() {
                   className={cn(
                     "rounded-full border px-3 py-1.5 text-xs font-medium transition",
                     active
-                      ? "border-blue-400/60 bg-blue-500/15 text-blue-700 dark:text-blue-300"
+                      ? "border-brand-soft/60 bg-brand/15 text-brand-hover dark:text-brand-soft"
                       : "border-slate-200/70 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700/70 dark:bg-slate-800/85 dark:text-slate-300 dark:hover:text-white",
                   )}
                 >
@@ -194,7 +194,7 @@ export function SupportCenterFuture() {
                     className={cn(
                       "inline-flex h-8 w-8 items-center justify-center rounded-full border",
                       step.state === "done" && "border-emerald-400/40 bg-emerald-500/15 text-emerald-300",
-                      step.state === "active" && "border-blue-400/50 bg-blue-500/15 text-blue-300 animate-pulse",
+                      step.state === "active" && "border-brand-soft/50 bg-brand/15 text-brand-soft animate-pulse",
                       step.state === "pending" && "border-slate-300/60 bg-slate-100 text-slate-500 dark:border-slate-700/70 dark:bg-slate-800 dark:text-slate-300/70",
                     )}
                   >

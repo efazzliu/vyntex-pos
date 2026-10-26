@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
 import { useQuery } from "convex/react";
 import type { ActivationData } from "@/lib/local-db.ts";
 import type { ActiveStaff, PosView } from "../_lib/types.ts";
@@ -39,11 +39,52 @@ import {
   canAccessView,
   defaultAdminManagerLandingView,
   hasAdvancedAnalytics,
+  hasEnterpriseExtras,
   hasEnterpriseSupplyMall,
   hasEnterpriseSupplyRecipe,
   kitchenDisplayNavState,
 } from "../_lib/plan-features.ts";
 import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
+import {
+  isFloorStaffRole,
+  permissionsForRole,
+  staffHasPermission,
+} from "@/lib/staff-permissions.ts";
+import type { SettingsCategoryId } from "./pos-settings-categories.ts";
+import { parsePosSecuritySettings } from "@/lib/pos-security-config.ts";
+import {
+  parsePosCustomerDisplay,
+  writeLocalCustomerDisplay,
+} from "@/lib/pos-customer-display.ts";
+
+function usePosIdleLock(
+  minutes: number,
+  onLogout: () => void,
+  message: string,
+) {
+  const onLogoutRef = useRef(onLogout);
+  onLogoutRef.current = onLogout;
+  useEffect(() => {
+    if (!minutes || minutes <= 0) return;
+    let timer = 0;
+    const arm = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        toast.info(message);
+        onLogoutRef.current();
+      }, minutes * 60_000);
+    };
+    arm();
+    const events = ["pointerdown", "keydown"] as const;
+    for (const event of events) {
+      window.addEventListener(event, arm, { passive: true });
+    }
+    return () => {
+      window.clearTimeout(timer);
+      for (const event of events) window.removeEventListener(event, arm);
+    };
+  }, [minutes, message]);
+}
 
 type PosAppProps = {
   activation: ActivationData;
@@ -87,6 +128,24 @@ function PosAppInner({
 }: PosAppProps) {
   const { t } = usePosLocale();
   const { theme, setTheme } = usePosTheme();
+  const companyDetails = useQuery("pos.settings.getCompanyDetails", {
+    licenseKey: activation.licenseKey,
+  });
+  const idleMinutes = parsePosSecuritySettings(
+    (companyDetails as { securitySettings?: unknown } | undefined)?.securitySettings,
+  ).sessionTimeoutMinutes;
+  usePosIdleLock(idleMinutes, onLogout, t("settings.sec_idle_locked"));
+  useEffect(() => {
+    const cd = parsePosCustomerDisplay(
+      (companyDetails as { customerDisplay?: unknown } | undefined)?.customerDisplay,
+    );
+    writeLocalCustomerDisplay(activation.licenseKey, cd);
+    try {
+      localStorage.setItem("vyntex.pos.lastLicenseKey", activation.licenseKey);
+    } catch {
+      /* ignore */
+    }
+  }, [activation.licenseKey, companyDetails]);
 
   const handleThemeChange = useCallback(
     (next: "dark" | "light") => {
@@ -140,8 +199,21 @@ function PosAppInner({
     activeStaff.role === "auditor" ||
     currentStaffDoc?.permissions?.canViewAuditLog === true;
 
+  const canViewReports = staffHasPermission(
+    currentStaffDoc ?? { role: activeStaff.role, isActive: true },
+    "canViewReports",
+  );
+
+  const permissionHolder = currentStaffDoc ?? {
+    role: activeStaff.role,
+    isActive: true,
+    permissions: permissionsForRole(activeStaff.role),
+  };
+  const canManageStock = staffHasPermission(permissionHolder, "canManageStock");
+  const canManageMenu = staffHasPermission(permissionHolder, "canManageMenu");
+
   const defaultView: PosView = useMemo(() => {
-    if (activeStaff.role === "waiter") return "floor";
+    if (isFloorStaffRole(activeStaff.role)) return "floor";
     if (activeStaff.role === "admin" || activeStaff.role === "manager") {
       return defaultAdminManagerLandingView(activation.plan);
     }
@@ -306,6 +378,19 @@ function PosAppInner({
     [activation.plan, canViewAuditLog, t],
   );
 
+  const [settingsJump, setSettingsJump] = useState<{
+    category: SettingsCategoryId;
+    nonce: number;
+  } | null>(null);
+  useEffect(() => {
+    if (activeView !== "settings") setSettingsJump(null);
+  }, [activeView]);
+  const canOpenSettings = canAccessView(activation.plan, "settings");
+  const openStockRules = useCallback(() => {
+    setSettingsJump({ category: "inventory", nonce: Date.now() });
+    setActiveView("settings");
+  }, []);
+
   const handleTableSelect = (tableId: Id<"tables">) => {
     setSelectedTableId(tableId);
     setActiveView("order");
@@ -316,8 +401,8 @@ function PosAppInner({
     setActiveView("floor");
   };
 
-  // ── Waiter: full-screen floor plan ──────────────────────
-  if (activeStaff.role === "waiter") {
+  // ── Waiter / cashier: full-screen floor plan ──────────────────────
+  if (isFloorStaffRole(activeStaff.role)) {
     if (activeView === "order" && selectedTableId) {
       return (
         <OfflineSyncManager>
@@ -359,7 +444,7 @@ function PosAppInner({
               licenseKey: activation.licenseKey,
               onLogout,
               canLogStaffConsumption,
-              role: "waiter",
+              role: activeStaff.role === "cashier" ? "cashier" : "waiter",
             }}
           />
         </div>
@@ -381,6 +466,7 @@ function PosAppInner({
       activeView === view &&
       canAccessView(activation.plan, view) &&
       (view !== "audit-log" || canViewAuditLog) &&
+      ((view !== "dashboard" && view !== "z-report") || canViewReports) &&
       (view !== "kitchen-display" || kitchenDisplayNavState(activation.plan) === "live")
         ? node
         : null;
@@ -421,7 +507,7 @@ function PosAppInner({
                 />
               ) : null}
 
-              <div className={cn("flex-1 min-h-0", isFloorOrOrder || activeView === "tables" ? "overflow-hidden" : "overflow-auto")}>
+              <div className={cn("flex-1 min-h-0", isFloorOrOrder || activeView === "tables" ? "overflow-hidden" : "overflow-auto no-scrollbar")}>
             <PosViewErrorBoundary key={activeView}>
             {/* Floor — same as waiter, logo opens drawer */}
             {activeView === "floor" && (
@@ -464,16 +550,27 @@ function PosAppInner({
 
             {/* Dashboard */}
             {gated("dashboard", (
-              <div className="h-full overflow-auto">
+              <div className="h-full overflow-auto no-scrollbar">
                 <PosDashboard
                   licenseKey={activation.licenseKey}
                   staffId={activeStaff.id}
                   staffName={activeStaff.name}
                   staffRole={activeStaff.role}
                   showAdvancedAnalytics={hasAdvancedAnalytics(activation.plan)}
+                  showEnterpriseOverview={hasEnterpriseExtras(activation.plan)}
                   onOpenSalesDetail={
                     canAccessView(activation.plan, "order-history")
                       ? () => setActiveViewFromPlan("order-history")
+                      : undefined
+                  }
+                  onOpenStock={
+                    canAccessView(activation.plan, "stock")
+                      ? () => setActiveViewFromPlan("stock")
+                      : undefined
+                  }
+                  onOpenSettings={
+                    canAccessView(activation.plan, "settings")
+                      ? () => setActiveViewFromPlan("settings")
                       : undefined
                   }
                 />
@@ -513,7 +610,12 @@ function PosAppInner({
             {/* Staff */}
             {gated("staff", (
               <div className="h-full overflow-auto">
-                <StaffManagement licenseKey={activation.licenseKey} plan={activation.plan} />
+                <StaffManagement
+                  licenseKey={activation.licenseKey}
+                  plan={activation.plan}
+                  actorStaffId={activeStaff.id}
+                  actorStaffName={activeStaff.name}
+                />
               </div>
             ))}
 
@@ -524,6 +626,9 @@ function PosAppInner({
                   licenseKey={activation.licenseKey}
                   staffName={activeStaff.name}
                   enterpriseSupplyMall={hasEnterpriseSupplyMall(activation.plan)}
+                  canManageStock={canManageStock}
+                  canManageMenu={canManageMenu}
+                  onOpenStockRules={canOpenSettings ? openStockRules : undefined}
                 />
               </div>
             ))}
@@ -565,13 +670,16 @@ function PosAppInner({
             {/* Audit Log */}
             {gated("audit-log", (
               <div className="h-full overflow-auto">
-                <AuditLogView licenseKey={activation.licenseKey} />
+                <AuditLogView
+                  licenseKey={activation.licenseKey}
+                  staffId={activeStaff.id}
+                />
               </div>
             ))}
 
             {/* Settings */}
             {gated("settings", (
-              <div className="h-full overflow-auto">
+              <div className="h-full min-h-0 overflow-hidden">
                 <PosSettings
                   licenseKey={activation.licenseKey}
                   plan={activation.plan}
@@ -579,6 +687,10 @@ function PosAppInner({
                   onThemeChange={handleThemeChange}
                   onNavigate={setActiveViewFromPlan}
                   staffRole={activeStaff.role}
+                  staffId={activeStaff.id}
+                  staffName={activeStaff.name}
+                  deviceId={activation.deviceId}
+                  jumpToCategory={settingsJump}
                 />
               </div>
             ))}
@@ -607,7 +719,7 @@ function PosAppInner({
           onLogout={onLogout}
           canViewAuditLog={canViewAuditLog}
         />
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-auto no-scrollbar">
           <PosViewErrorBoundary key={activeView}>
           {activeView === "stock" && canAccessView(activation.plan, "stock") && (
             <div className="h-full overflow-auto">
@@ -615,6 +727,8 @@ function PosAppInner({
                 licenseKey={activation.licenseKey}
                 staffName={activeStaff.name}
                 enterpriseSupplyMall={hasEnterpriseSupplyMall(activation.plan)}
+                canManageStock={canManageStock}
+                canManageMenu={canManageMenu}
               />
             </div>
           )}
@@ -631,23 +745,36 @@ function PosAppInner({
               <KitchenDisplayView licenseKey={activation.licenseKey} />
             )}
           {activeView === "dashboard" &&
+            canViewReports &&
             canAccessView(activation.plan, "dashboard") && (
-              <div className="h-full overflow-auto">
+              <div className="h-full overflow-auto no-scrollbar">
                 <PosDashboard
                   licenseKey={activation.licenseKey}
                   staffId={activeStaff.id}
                   staffName={activeStaff.name}
                   staffRole={activeStaff.role}
                   showAdvancedAnalytics={hasAdvancedAnalytics(activation.plan)}
+                  showEnterpriseOverview={hasEnterpriseExtras(activation.plan)}
                   onOpenSalesDetail={
                     canAccessView(activation.plan, "order-history")
                       ? () => setActiveViewForRole("order-history")
+                      : undefined
+                  }
+                  onOpenStock={
+                    canAccessView(activation.plan, "stock")
+                      ? () => setActiveViewForRole("stock")
+                      : undefined
+                  }
+                  onOpenSettings={
+                    canAccessView(activation.plan, "settings")
+                      ? () => setActiveViewForRole("settings")
                       : undefined
                   }
                 />
               </div>
             )}
           {activeView === "z-report" &&
+            canViewReports &&
             canAccessView(activation.plan, "z-report") && (
               <div className="h-full overflow-auto">
                 <ZReport
@@ -661,7 +788,10 @@ function PosAppInner({
             canViewAuditLog &&
             canAccessView(activation.plan, "audit-log") && (
               <div className="h-full overflow-auto">
-                <AuditLogView licenseKey={activation.licenseKey} />
+                <AuditLogView
+                  licenseKey={activation.licenseKey}
+                  staffId={activeStaff.id}
+                />
               </div>
             )}
           </PosViewErrorBoundary>
@@ -708,7 +838,7 @@ function AdminTopBar({
         <p className="truncate text-[13px] font-semibold tracking-tight text-white">
           {businessName}
         </p>
-        <span className="shrink-0 rounded-md bg-[#0066FF]/12 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#0066FF]">
+        <span className="shrink-0 rounded-md bg-brand/12 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand">
           {roleText}
         </span>
       </div>

@@ -147,18 +147,18 @@ function DashboardSidebar({
     <aside
       className={cn(
         "relative flex h-full flex-col border-r border-slate-200 bg-white text-slate-800 transition-all duration-300",
-        "dark:border-sky-500/20 dark:bg-gradient-to-b dark:from-[#050c16] dark:to-[#02040a] dark:text-zinc-100 dark:shadow-[inset_-1px_0_0_0_rgba(56,189,248,0.08)]",
+        "dark:border-sky-500/20 dark:bg-gradient-to-b dark:from-[#050c16] dark:to-[#02040a] dark:text-zinc-100 dark:shadow-[inset_-1px_0_0_0_rgba(0,198,255,0.08)]",
         mobile ? "w-full" : collapsed ? "w-[72px]" : "w-[230px]",
       )}
     >
-      <div className="pointer-events-none absolute inset-x-0 top-0 hidden h-40 bg-gradient-to-b from-sky-500/12 via-blue-600/5 to-transparent dark:block" />
-      <div className="pointer-events-none absolute inset-0 hidden bg-[radial-gradient(ellipse_80%_60%_at_0%_0%,rgba(56,189,248,0.08),transparent_55%)] opacity-80 dark:block" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 hidden h-40 bg-gradient-to-b from-sky-500/12 via-brand/5 to-transparent dark:block" />
+      <div className="pointer-events-none absolute inset-0 hidden bg-[radial-gradient(ellipse_80%_60%_at_0%_0%,rgba(0,198,255,0.08),transparent_55%)] opacity-80 dark:block" />
       {/* Header */}
       <div className="relative z-10 flex items-center justify-between border-b border-slate-200 bg-slate-50/90 p-4 backdrop-blur-sm dark:border-sky-500/15 dark:bg-black/20">
         <Link to="/" className="flex items-center gap-2.5 min-w-0">
           <img src={VYNTEX_APP_LOGO_SRC} alt={t("layout.brand")} className="h-7 w-7 shrink-0" />
           {!collapsed && (
-            <span className="text-lg font-bold bg-gradient-to-r from-[#0066FF] to-[#44CC00] bg-clip-text text-transparent truncate">
+            <span className="text-lg font-bold bg-gradient-to-r from-brand to-brand-accent bg-clip-text text-transparent truncate">
               {t("layout.brand")}
             </span>
           )}
@@ -266,8 +266,8 @@ function DashboardSidebar({
       {/* User section */}
       {!collapsed && (
         <div className="relative z-10 border-t border-slate-200 bg-slate-50/90 p-4 backdrop-blur-sm dark:border-sky-500/15 dark:bg-black/20">
-          <div className="mb-3 flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm dark:border-sky-500/20 dark:bg-black/35 dark:shadow-[0_0_24px_-12px_rgba(56,189,248,0.15)]">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#0066FF] to-[#44CC00] text-xs font-bold text-white">
+          <div className="mb-3 flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm dark:border-sky-500/20 dark:bg-black/35 dark:shadow-[0_0_24px_-12px_rgba(0,198,255,0.15)]">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand to-brand-accent text-xs font-bold text-white">
               {initial}
             </div>
             <div className="min-w-0">
@@ -671,7 +671,7 @@ function DashboardContent() {
       return (
         <div className="flex h-dvh items-center justify-center bg-background px-4">
           <div className="w-full max-w-xl rounded-2xl border border-border bg-card p-8 text-center">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-[#0066FF]/10 to-[#44CC00]/10">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-brand/10 to-brand-accent/10">
               <Sparkles className="size-6 text-primary" />
             </div>
             <h1 className="text-2xl font-bold text-foreground">

@@ -187,19 +187,20 @@ export default function PinLoginScreen({
   const insertAuditLogMut = useMutation("pos.dashboard.insertAuditLog");
   const recordAdminPinForPhoneMut = useMutation("pos.dashboard.recordAdminPinLoginForPhone");
 
-  const logAdminPinLogin = useCallback(
+  const logPinLogin = useCallback(
     (staff: ActiveStaff) => {
-      if (staff.role !== "admin" && staff.id !== "local-admin") return;
       if (!licenseKey.trim()) return;
       const isDeviceAdmin = staff.id === "local-admin";
-      /** Phone notifications: own mutation so they work even when `pos_audit_logs` insert fails. */
-      void recordAdminPinForPhoneMut({
-        licenseKey,
-        staffName: staff.name,
-        staffId: isDeviceAdmin ? undefined : staff.id,
-        staffRole: staff.role,
-        isDeviceAdmin,
-      });
+      if (staff.role === "admin" || isDeviceAdmin) {
+        /** Phone notifications: own mutation so they work even when `pos_audit_logs` insert fails. */
+        void recordAdminPinForPhoneMut({
+          licenseKey,
+          staffName: staff.name,
+          staffId: isDeviceAdmin ? undefined : staff.id,
+          staffRole: staff.role,
+          isDeviceAdmin,
+        });
+      }
       void insertAuditLogMut({
         licenseKey,
         staffName: staff.name,
@@ -207,7 +208,7 @@ export default function PinLoginScreen({
         action: "login",
         details: isDeviceAdmin
           ? `Device admin ${staff.name} signed in with PIN`
-          : `Administrator ${staff.name} signed in with PIN`,
+          : `${staff.name} signed in with PIN`,
         metadata: {
           source: "pin",
           role: staff.role,
@@ -217,6 +218,17 @@ export default function PinLoginScreen({
     },
     [licenseKey, insertAuditLogMut, recordAdminPinForPhoneMut],
   );
+
+  const logFailedPin = useCallback(() => {
+    if (!licenseKey.trim()) return;
+    void insertAuditLogMut({
+      licenseKey,
+      staffName: "Unknown",
+      action: "login_failed",
+      details: "Failed PIN sign-in on this terminal",
+      metadata: { source: "pin" },
+    });
+  }, [licenseKey, insertAuditLogMut]);
 
   const verifyEnteredPin = useCallback(
     async (enteredPin: string) => {
@@ -239,7 +251,7 @@ export default function PinLoginScreen({
               name: match.name,
               role: match.role,
             };
-            logAdminPinLogin(staff);
+            logPinLogin(staff);
             setSuccess(staff);
             setTimeout(() => void Promise.resolve(onLogin(staff)), 800);
             return;
@@ -252,7 +264,7 @@ export default function PinLoginScreen({
               name: localMatch.name,
               role: localMatch.role,
             };
-            logAdminPinLogin(staff);
+            logPinLogin(staff);
             setSuccess(staff);
             setTimeout(() => void Promise.resolve(onLogin(staff)), 800);
             return;
@@ -266,12 +278,13 @@ export default function PinLoginScreen({
             name: localAdmin.name,
             role: "admin",
           };
-          logAdminPinLogin(adminStaff);
+          logPinLogin(adminStaff);
           setSuccess(adminStaff);
           setTimeout(() => void Promise.resolve(onLogin(adminStaff)), 800);
           return;
         }
 
+        logFailedPin();
         setError(true);
         setTimeout(() => {
           setPin("");
@@ -281,7 +294,7 @@ export default function PinLoginScreen({
         setVerifying(false);
       }
     },
-    [staffRows, licenseKey, onLogin, logAdminPinLogin],
+    [staffRows, licenseKey, onLogin, logPinLogin, logFailedPin],
   );
 
   const trySubmitPin = useCallback(() => {
@@ -591,7 +604,7 @@ export default function PinLoginScreen({
               isLightPos
                 ? "border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:border-slate-300"
                 : "border-[#1e2a45] bg-[#131A2E] text-white placeholder:text-[#3a4560] focus-visible:border-[#1e2a45]",
-              success && "border-[#44CC00] focus-visible:border-[#44CC00]",
+              success && "border-brand-accent focus-visible:border-brand-accent",
               error && !success && "border-red-500 focus-visible:border-red-500",
             )}
           />
@@ -649,7 +662,7 @@ export default function PinLoginScreen({
               disabled={
                 verifying || !isValidStaffPinLength(pin.length)
               }
-              className="mt-2 w-full max-w-[17rem] h-12 rounded-2xl font-semibold bg-[#44CC00] hover:bg-[#3db80a] disabled:opacity-40 disabled:pointer-events-none transition-all active:scale-[0.98]"
+              className="mt-2 w-full max-w-[17rem] h-12 rounded-2xl font-semibold bg-brand-accent hover:bg-[#3db80a] disabled:opacity-40 disabled:pointer-events-none transition-all active:scale-[0.98]"
             >
               <span className={isLightPos ? "text-[#f8fafc]" : "text-white"}>
                 {tPin("pin.sign_in")}

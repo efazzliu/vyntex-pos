@@ -9,6 +9,10 @@ export type RestaurantRow = {
   phone: string | null;
   legal_name?: string | null;
   city?: string | null;
+  postal_code?: string | null;
+  country?: string | null;
+  business_email?: string | null;
+  website?: string | null;
   tax_number?: string | null;
   vat_number?: string | null;
   default_vat_rate?: number | null;
@@ -29,9 +33,23 @@ export type RestaurantRow = {
   phone_access_branding?: unknown;
   pos_theme?: string | null;
   pos_payment_settings?: unknown;
+  pos_general_prefs?: unknown;
+  pos_tax_settings?: unknown;
+  pos_stock_rules?: unknown;
+  pos_security_settings?: unknown;
+  pos_customer_display?: unknown;
   pos_enforce_availability?: boolean | null;
+  mobile_access_enabled?: boolean | null;
+  last_pos_sync_at?: string | null;
+  dashboard_daily_sales_target?: number | string | null;
+  dashboard_target_amount?: number | string | null;
+  dashboard_target_start_at?: string | null;
+  dashboard_target_end_at?: string | null;
+  dashboard_target_period?: string | null;
+  dashboard_report_schedules?: unknown;
   max_terminals?: number;
   registered_devices?: unknown;
+  created_at?: string;
 };
 
 const cache = new Map<string, RestaurantRow>();

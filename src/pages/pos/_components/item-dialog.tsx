@@ -72,6 +72,25 @@ import {
   normalizeCustomizationConfig,
   type MenuCustomizationGroup,
 } from "@/lib/menu-customizations.ts";
+import { MenuItemPrepEditor } from "@/components/menu-item-prep-editor.tsx";
+import {
+  emptyPrepConfig,
+  normalizePrepConfig,
+  type PrepConfig,
+} from "@/lib/menu-prep-config.ts";
+import {
+  defaultVatFraction,
+  enabledCatalogRates,
+  formatTaxPercent,
+  fractionToPercent,
+  getCountryTaxCatalog,
+  parsePosTaxSettings,
+  ratePercent,
+} from "@/lib/pos-tax-config.ts";
+import {
+  DEFAULT_LOW_STOCK_THRESHOLD,
+  parsePosStockRules,
+} from "@/lib/pos-order-availability.ts";
 
 type StationValue = "kitchen" | "bar" | undefined;
 type StockUnit = "pc" | "lt" | "kg" | "g" | "ml" | "bottle" | "box";
@@ -157,10 +176,14 @@ export type EditingItem = {
   imageStorageId?: Id<"_storage">;
   imageUrl?: string | null;
   isFavorite?: boolean;
-  /** Default true when omitted — false hides item from waiter Staff meal self-service. */
+  /** When true, this item appears in staff meal. */
   staffMealAllowed?: boolean;
-  /** Optional price used for waiter staff meal (0 = free). */
+  /** Staff unit price after freeQty (0 = free). */
   staffMealPrice?: number;
+  /** First N units per staff per day are free. */
+  staffMealFreeQty?: number;
+  /** Max units per staff per day (0/omit = unlimited). */
+  staffMealDailyLimit?: number;
   trackStock?: boolean;
   stockUnit?: StockUnit;
   initialStock?: number;
@@ -174,6 +197,7 @@ export type EditingItem = {
   supplyRecipe?: { supplyMenuItemId: Id<"menuItems">; qtyPerUnit: number }[];
   vatRate?: number;
   customizationConfig?: MenuCustomizationGroup[];
+  prepConfig?: PrepConfig;
 };
 
 /** DB / mappers sometimes emit "" for null category_id; `??` does not treat "" as missing. */
@@ -270,6 +294,8 @@ export default function ItemDialog({
   const [staffMealAllowed, setStaffMealAllowed] = useState(false);
   const [staffMealPricingMode, setStaffMealPricingMode] = useState<"free" | "custom">("free");
   const [staffMealCustomPrice, setStaffMealCustomPrice] = useState("");
+  const [staffMealDailyLimit, setStaffMealDailyLimit] = useState("1");
+  const [staffMealFreeQty, setStaffMealFreeQty] = useState("");
   const [stockUnit, setStockUnit] = useState<StockUnit>("pc");
   const [initialStock, setInitialStock] = useState("");
   const [lowStockThreshold, setLowStockThreshold] = useState("");
@@ -293,6 +319,48 @@ export default function ItemDialog({
   );
 
   const menus = useQuery("pos.menu.getMenus", { licenseKey });
+  const companyQuery = useQuery(
+    "pos.settings.getCompanyDetails",
+    open ? { licenseKey } : "skip",
+  );
+  const vatChoices = useMemo(() => {
+    const company =
+      companyQuery && typeof companyQuery === "object" && !Array.isArray(companyQuery)
+        ? (companyQuery as Record<string, unknown>)
+        : null;
+    const country = String(company?.country ?? "");
+    const businessType = String(company?.type ?? "restaurant");
+    const fallback = Number(company?.defaultVatRate ?? 0.2);
+    const settings = parsePosTaxSettings(company?.taxSettings, {
+      country,
+      businessType,
+      fallbackVatFraction: fallback,
+    });
+    const catalog = getCountryTaxCatalog(country);
+    const rates = enabledCatalogRates(catalog, settings);
+    const options = rates.map((rate) => {
+      const percent = ratePercent(rate, settings);
+      return {
+        id: rate.id,
+        percent,
+        label: `${percent}%`,
+        nameKey: rate.nameKey,
+      };
+    });
+    return {
+      options,
+      defaultPercent: formatTaxPercent(
+        fractionToPercent(defaultVatFraction(settings, { country, businessType, fallbackVatFraction: fallback })),
+      ),
+    };
+  }, [companyQuery]);
+  const venueLowStock = useMemo(() => {
+    const company =
+      companyQuery && typeof companyQuery === "object" && !Array.isArray(companyQuery)
+        ? (companyQuery as Record<string, unknown>)
+        : null;
+    return parsePosStockRules(company?.stockRules).defaultLowStockThreshold;
+  }, [companyQuery]);
   const allMenuForRecipe = useQuery(
     "pos.menu.getAllItems",
     open && enterpriseSupplyRecipe && !supplyMallContext
@@ -323,6 +391,7 @@ export default function ItemDialog({
   >(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [customizationGroups, setCustomizationGroups] = useState<MenuCustomizationGroup[]>([]);
+  const [prepConfig, setPrepConfig] = useState<PrepConfig>(emptyPrepConfig());
 
   useEffect(() => {
     if (open) {
@@ -349,6 +418,18 @@ export default function ItemDialog({
           setStaffMealPricingMode("free");
           setStaffMealCustomPrice("");
         }
+        setStaffMealDailyLimit(
+          typeof editing.staffMealDailyLimit === "number" &&
+            editing.staffMealDailyLimit > 0
+            ? String(editing.staffMealDailyLimit)
+            : "",
+        );
+        setStaffMealFreeQty(
+          typeof editing.staffMealFreeQty === "number" &&
+            editing.staffMealFreeQty > 0
+            ? String(editing.staffMealFreeQty)
+            : "",
+        );
         setTrackStock(editing.trackStock ?? false);
         setStockUnit(editing.stockUnit ?? "pc");
         const mallCtx =
@@ -369,6 +450,7 @@ export default function ItemDialog({
         setCustomizationGroups(
           normalizeCustomizationConfig(editing.customizationConfig),
         );
+        setPrepConfig(normalizePrepConfig(editing.prepConfig));
         setSelectedCategoryId(nonEmptyCategoryId(editing.categoryId));
         setSupplyVendor(editing.supplyVendor ?? "");
         setSupplyLot(editing.supplyLot ?? "");
@@ -406,7 +488,7 @@ export default function ItemDialog({
         setName(initialName ?? "");
         setDescription("");
         setPrice("");
-        setVatPct("20");
+        setVatPct(vatChoices.defaultPercent);
         setAvailable(initialAvailable ?? true);
         setStation(initialStation);
         setMenuId(undefined);
@@ -414,15 +496,18 @@ export default function ItemDialog({
         setStaffMealAllowed(false);
         setStaffMealPricingMode("free");
         setStaffMealCustomPrice("");
+        setStaffMealDailyLimit("1");
+        setStaffMealFreeQty("");
         setTrackStock(initialTrackStock ?? false);
         setStockUnit(initialStockUnit ?? "pc");
         setInitialStock("");
-        setLowStockThreshold("");
+        setLowStockThreshold(String(venueLowStock || DEFAULT_LOW_STOCK_THRESHOLD));
         setImagePreview(null);
         setCurrentImageStorageId(undefined);
         setImageFile(null);
         setImageRemoved(false);
         setCustomizationGroups([]);
+        setPrepConfig(emptyPrepConfig());
         setSelectedCategoryId(
           nonEmptyCategoryId(categoryId) ??
             nonEmptyCategoryId(categories[0]?._id),
@@ -447,6 +532,7 @@ export default function ItemDialog({
     initialName,
     dialogNewTitleOverride,
     enterpriseSupplyRecipe,
+    venueLowStock,
   ]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -507,9 +593,19 @@ export default function ItemDialog({
       return;
     }
     let parsedStaffMealPrice: number | undefined = undefined;
+    let parsedStaffMealFreeQty: number | undefined = undefined;
+    let parsedStaffMealDailyLimit: number | undefined = undefined;
     if (staffMealAllowed) {
+      const parsedLimit = parseInt(staffMealDailyLimit, 10);
+      if (staffMealDailyLimit.trim() && (!Number.isFinite(parsedLimit) || parsedLimit < 1)) {
+        toast.error(t("menu.err_staff_meal_daily_limit"));
+        return;
+      }
+      parsedStaffMealDailyLimit =
+        Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 0;
       if (staffMealPricingMode === "free") {
         parsedStaffMealPrice = 0;
+        parsedStaffMealFreeQty = parsedStaffMealDailyLimit;
       } else {
         const p = parseFloat(staffMealCustomPrice);
         if (isNaN(p) || p < 0) {
@@ -517,6 +613,20 @@ export default function ItemDialog({
           return;
         }
         parsedStaffMealPrice = p;
+        const parsedFree = parseInt(staffMealFreeQty, 10);
+        if (staffMealFreeQty.trim() && (!Number.isFinite(parsedFree) || parsedFree < 0)) {
+          toast.error(t("menu.err_staff_meal_free_qty"));
+          return;
+        }
+        parsedStaffMealFreeQty =
+          Number.isFinite(parsedFree) && parsedFree > 0 ? parsedFree : 0;
+        if (
+          parsedStaffMealDailyLimit > 0 &&
+          parsedStaffMealFreeQty > parsedStaffMealDailyLimit
+        ) {
+          toast.error(t("menu.err_staff_meal_free_qty"));
+          return;
+        }
       }
     }
 
@@ -556,7 +666,10 @@ export default function ItemDialog({
               initialStock: isSupplyMallEdit
                 ? (editing?.initialStock ?? qtyFromStockField)
                 : parseFloat(initialStock) || 0,
-              lowStockThreshold: parseFloat(lowStockThreshold) || 5,
+              lowStockThreshold: (() => {
+                const n = parseFloat(lowStockThreshold);
+                return Number.isFinite(n) && n >= 0 ? n : venueLowStock;
+              })(),
             }
           : {
               trackStock: false as const,
@@ -593,6 +706,9 @@ export default function ItemDialog({
             }))
             .filter((group) => group.name && group.options.length > 0)
         : [];
+      const prepSavePayload = !supplyMallContext
+        ? normalizePrepConfig(prepConfig)
+        : emptyPrepConfig();
 
       if (editing) {
         await updateItem({
@@ -610,6 +726,8 @@ export default function ItemDialog({
           isFavorite,
           staffMealAllowed,
           staffMealPrice: parsedStaffMealPrice,
+          staffMealFreeQty: parsedStaffMealFreeQty,
+          staffMealDailyLimit: parsedStaffMealDailyLimit,
           ...stockArgs,
           currentStock: trackStock
             ? isSupplyMallEdit
@@ -622,6 +740,7 @@ export default function ItemDialog({
             ? { supplyRecipe: recipeSavePayload }
             : {}),
           customizationConfig: customizationSavePayload,
+          prepConfig: prepSavePayload,
         });
         const nextCurrentStock = trackStock
           ? isSupplyMallEdit
@@ -646,6 +765,8 @@ export default function ItemDialog({
           isFavorite,
           staffMealAllowed,
           staffMealPrice: parsedStaffMealPrice,
+          staffMealFreeQty: parsedStaffMealFreeQty,
+          staffMealDailyLimit: parsedStaffMealDailyLimit,
           trackStock: stockArgs.trackStock,
           stockUnit: stockArgs.stockUnit,
           initialStock: stockArgs.initialStock,
@@ -656,6 +777,7 @@ export default function ItemDialog({
             ? { supplyRecipe: recipeSavePayload }
             : {}),
           customizationConfig: customizationSavePayload,
+          prepConfig: prepSavePayload,
         };
         const cached = (await getDataCache<EditingItem[]>(`menuItems:${licenseKey}`)) ?? [];
         await saveDataCache(
@@ -685,6 +807,8 @@ export default function ItemDialog({
           isFavorite,
           staffMealAllowed,
           staffMealPrice: parsedStaffMealPrice,
+          staffMealFreeQty: parsedStaffMealFreeQty,
+          staffMealDailyLimit: parsedStaffMealDailyLimit,
           ...stockArgs,
           ...(supplyCreate ? supplyMutationPayload : {}),
           ...(vatRatePayload !== undefined ? { vatRate: vatRatePayload } : {}),
@@ -692,6 +816,7 @@ export default function ItemDialog({
             ? { supplyRecipe: recipeSavePayload }
             : {}),
           customizationConfig: customizationSavePayload,
+          prepConfig: prepSavePayload,
         });
         const cached = (await getDataCache<EditingItem[]>(`menuItems:${licenseKey}`)) ?? [];
         const newItem: EditingItem = {
@@ -709,6 +834,8 @@ export default function ItemDialog({
           isFavorite,
           staffMealAllowed,
           staffMealPrice: parsedStaffMealPrice,
+          staffMealFreeQty: parsedStaffMealFreeQty,
+          staffMealDailyLimit: parsedStaffMealDailyLimit,
           trackStock: stockArgs.trackStock,
           stockUnit: stockArgs.stockUnit,
           initialStock: stockArgs.initialStock,
@@ -719,6 +846,7 @@ export default function ItemDialog({
             ? { supplyRecipe: recipeSavePayload }
             : {}),
           customizationConfig: customizationSavePayload,
+          prepConfig: prepSavePayload,
         };
         await saveDataCache(`menuItems:${licenseKey}`, [...cached, newItem]);
         onSaved?.(newItem, "create");
@@ -916,6 +1044,7 @@ export default function ItemDialog({
           )}
 
           {!supplyMallContext ? (
+            <>
             <MenuItemCustomizationEditor
               groups={customizationGroups}
               onChange={setCustomizationGroups}
@@ -931,6 +1060,34 @@ export default function ItemDialog({
                 defaultOption: t("menu.customization_default"),
               }}
             />
+            <MenuItemPrepEditor
+              config={prepConfig}
+              onChange={setPrepConfig}
+              labels={{
+                title: t("menu.prep_title"),
+                hint: t("menu.prep_hint"),
+                choiceTitle: t("menu.prep_choice_title"),
+                choiceHint: t("menu.prep_choice_hint"),
+                addChoiceGroup: t("menu.prep_add_choice_group"),
+                groupName: t("menu.prep_group_name"),
+                addOption: t("menu.prep_add_option"),
+                optionName: t("menu.prep_option_name"),
+                togglesTitle: t("menu.prep_toggles_title"),
+                togglesHint: t("menu.prep_toggles_hint"),
+                toggleGroupName: t("menu.prep_toggle_group_name"),
+                addToggle: t("menu.prep_add_toggle"),
+                paidExtrasTitle: t("menu.prep_paid_extras_title"),
+                paidExtrasHint: t("menu.prep_paid_extras_hint"),
+                addPaidExtra: t("menu.prep_add_paid_extra"),
+                priceDelta: t("menu.customization_price_delta"),
+                allowCustomInstructions: t("menu.prep_allow_custom_instructions"),
+                allowCustomInstructionsHint: t("menu.prep_allow_custom_instructions_hint"),
+                quickTitle: t("menu.prep_quick_title"),
+                quickHint: t("menu.prep_quick_hint"),
+                addQuick: t("menu.prep_add_quick"),
+              }}
+            />
+            </>
           ) : null}
 
           {/* Image upload */}
@@ -950,7 +1107,7 @@ export default function ItemDialog({
                 )}
               </div>
               <div className="flex flex-col gap-2">
-                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-[#0066FF] px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[#0055dd]">
+                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-brand-hover">
                   <Upload className="size-3" />
                   {imagePreview ? t("menu.image_change") : t("menu.image_upload")}
                   <input
@@ -1044,22 +1201,43 @@ export default function ItemDialog({
             <div className="space-y-2">
               <Label className="text-slate-600">{t("menu.label_vat")}</Label>
               <div className="flex flex-wrap gap-1.5">
-                {["0", "8", "10", "18", "20"].map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => setVatPct(n)}
-                    className={cn(
-                      "px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer border",
-                      vatPct === n
-                        ? "bg-[#0066FF]/20 border-[#0066FF]/50 text-[#0066FF]"
-                        : "bg-white border-slate-200 text-slate-600 hover:border-slate-300",
-                    )}
-                  >
-                    {n}%
-                  </button>
-                ))}
+                {(
+                  vatChoices.options.some((o) => formatTaxPercent(o.percent) === vatPct)
+                    ? vatChoices.options
+                    : vatChoices.options.length > 0
+                      ? [
+                          {
+                            id: "current",
+                            percent: Number(vatPct) || 0,
+                            label: `${vatPct}%`,
+                            nameKey: "",
+                          },
+                          ...vatChoices.options,
+                        ]
+                      : [{ id: "fallback", percent: Number(vatPct) || 0, label: `${vatPct}%`, nameKey: "" }]
+                ).map((opt) => {
+                  const n = formatTaxPercent(opt.percent);
+                  const selected = vatPct === n || Number(vatPct) === opt.percent;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setVatPct(n)}
+                      className={cn(
+                        "px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer border",
+                        selected
+                          ? "bg-brand/20 border-brand/50 text-brand"
+                          : "bg-white border-slate-200 text-slate-600 hover:border-slate-300",
+                      )}
+                    >
+                      {opt.nameKey ? `${t(opt.nameKey)} ${n}%` : `${n}%`}
+                    </button>
+                  );
+                })}
               </div>
+              {vatChoices.options.length === 0 ? (
+                <p className="text-[11px] text-slate-500">{t("settings.tax_need_country")}</p>
+              ) : null}
             </div>
           ) : null}
 
@@ -1076,7 +1254,7 @@ export default function ItemDialog({
                   className={cn(
                     "px-3 py-1.5 rounded-lg text-sm font-medium transition-all cursor-pointer",
                     menuId === undefined
-                      ? "bg-[#0066FF] text-white"
+                      ? "bg-brand text-white"
                       : "bg-white text-slate-600 border border-slate-200 hover:border-slate-300"
                   )}
                 >
@@ -1090,7 +1268,7 @@ export default function ItemDialog({
                     className={cn(
                       "px-3 py-1.5 rounded-lg text-sm font-medium transition-all cursor-pointer",
                       menuId === m._id
-                        ? "bg-[#0066FF] text-white"
+                        ? "bg-brand text-white"
                         : "bg-white text-slate-600 border border-slate-200 hover:border-slate-300"
                     )}
                   >
@@ -1157,12 +1335,17 @@ export default function ItemDialog({
                 </div>
                 <Switch
                   checked={staffMealAllowed}
-                  onCheckedChange={setStaffMealAllowed}
+                  onCheckedChange={(next) => {
+                    setStaffMealAllowed(next);
+                    if (next && !staffMealDailyLimit.trim()) {
+                      setStaffMealDailyLimit("1");
+                    }
+                  }}
                 />
               </div>
 
               {staffMealAllowed && (
-                <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
                   <Label className="text-slate-600">{t("menu.label_staff_meal_pricing")}</Label>
                   <div className="flex items-center gap-2">
                     <button
@@ -1183,7 +1366,7 @@ export default function ItemDialog({
                       className={cn(
                         "px-3 py-1.5 rounded-lg text-xs font-medium border transition-all cursor-pointer",
                         staffMealPricingMode === "custom"
-                          ? "bg-[#0066FF]/15 border-[#0066FF]/40 text-[#0066FF]"
+                          ? "bg-brand/15 border-brand/40 text-brand"
                           : "bg-white border-slate-200 text-slate-600 hover:border-slate-300",
                       )}
                     >
@@ -1204,6 +1387,39 @@ export default function ItemDialog({
                       />
                     </div>
                   )}
+                  {staffMealPricingMode === "custom" && (
+                    <div className="space-y-1">
+                      <Label className="text-xs text-slate-500">
+                        {t("menu.label_staff_meal_free_qty")}
+                      </Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={staffMealFreeQty}
+                        onChange={(e) => setStaffMealFreeQty(e.target.value)}
+                        placeholder="0"
+                        className="border-slate-200 bg-white text-slate-900"
+                      />
+                      <p className="text-[11px] text-slate-500">
+                        {t("menu.hint_staff_meal_first_free")}
+                      </p>
+                    </div>
+                  )}
+                  <div className="space-y-1">
+                    <Label className="text-xs text-slate-500">
+                      {t("menu.label_staff_meal_daily_limit")}
+                    </Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={staffMealDailyLimit}
+                      onChange={(e) => setStaffMealDailyLimit(e.target.value)}
+                      placeholder={t("menu.hint_staff_meal_daily_unlimited")}
+                      className="border-slate-200 bg-white text-slate-900"
+                    />
+                  </div>
                 </div>
               )}
             </>
@@ -1240,7 +1456,7 @@ export default function ItemDialog({
                             ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-800"
                             : supplyAccentBar
                               ? "border-violet-500/60 bg-violet-500/15 text-violet-900"
-                              : "bg-[#0066FF]/20 border-[#0066FF]/50 text-[#0066FF]"
+                              : "bg-brand/20 border-brand/50 text-brand"
                           : "bg-white border-slate-200 text-slate-600 hover:border-slate-300",
                       )}
                     >
@@ -1482,7 +1698,7 @@ export default function ItemDialog({
                           className={cn(
                             "px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer border",
                             stockUnit === u.value
-                              ? "bg-[#0066FF]/20 border-[#0066FF]/50 text-[#0066FF]"
+                              ? "bg-brand/20 border-brand/50 text-brand"
                               : "bg-white border-slate-200 text-slate-600 hover:border-slate-300",
                           )}
                         >
@@ -1678,7 +1894,7 @@ export default function ItemDialog({
               supplyAccentKitchen && "bg-emerald-600 hover:bg-emerald-700",
               supplyAccentBar && "bg-violet-600 hover:bg-violet-700",
               !supplyMallContext &&
-                "bg-gradient-to-r from-[#0066FF] to-[#22c55e] hover:opacity-95",
+                "bg-gradient-to-r from-brand to-[#22c55e] hover:opacity-95",
             )}
           >
             {editing

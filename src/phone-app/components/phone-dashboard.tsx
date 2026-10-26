@@ -166,7 +166,7 @@ export default function PhoneDashboard() {
                           className={cn(
                             "flex size-12 shrink-0 items-center justify-center rounded-xl",
                             active
-                              ? "bg-[#0066FF]/12 text-[#0066FF]"
+                              ? "bg-brand/12 text-brand"
                               : "bg-slate-100 text-slate-400",
                           )}
                         >

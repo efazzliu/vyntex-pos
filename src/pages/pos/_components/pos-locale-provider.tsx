@@ -4,10 +4,11 @@ import {
   useEffect,
   useMemo,
   useCallback,
+  useState,
   type ReactNode,
 } from "react";
-import { I18nextProvider, useTranslation } from "react-i18next";
-import posI18n from "../_lib/pos-i18n.ts";
+import { I18nextProvider } from "react-i18next";
+import posI18n, { translatePos } from "../_lib/pos-i18n.ts";
 import {
   POS_DEFAULT_CURRENCY_DECIMALS,
   POS_DEFAULT_CURRENCY_POSITION,
@@ -67,14 +68,34 @@ function PosLocaleInner({
   currencyDecimals = POS_DEFAULT_CURRENCY_DECIMALS,
   children,
 }: PosLocaleProviderProps) {
-  const { i18n, t } = useTranslation("pos");
+  const [i18nLanguage, setI18nLanguage] = useState(posI18n.language);
+  const [resourceRevision, setResourceRevision] = useState(0);
 
   // Sync i18next language with the database setting
   useEffect(() => {
-    if (i18n.language !== language) {
-      void i18n.changeLanguage(language);
+    if (posI18n.language !== language) {
+      void posI18n.changeLanguage(language);
     }
-  }, [language, i18n]);
+  }, [language]);
+
+  useEffect(() => {
+    const syncLanguage = (next: string) => setI18nLanguage(next);
+    const syncResources = () => setResourceRevision((revision) => revision + 1);
+    posI18n.on("languageChanged", syncLanguage);
+    posI18n.store.on("added", syncResources);
+    posI18n.store.on("removed", syncResources);
+    return () => {
+      posI18n.off("languageChanged", syncLanguage);
+      posI18n.store.off("added", syncResources);
+      posI18n.store.off("removed", syncResources);
+    };
+  }, []);
+
+  const t = useCallback(
+    (key: string, options?: Record<string, unknown>) =>
+      translatePos(key, options, language),
+    [language, i18nLanguage, resourceRevision],
+  );
 
   const currency: CurrencyConfig = useMemo(
     () => ({

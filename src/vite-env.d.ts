@@ -13,7 +13,12 @@ type PrintHtmlSilentPayload =
 type GetSystemPrintersIpcResult =
   | {
       ok: true;
-      printers: { deviceName: string; displayName: string; isDefault: boolean }[];
+      printers: {
+        deviceName: string;
+        displayName: string;
+        isDefault: boolean;
+        isOffline?: boolean;
+      }[];
     }
   | { ok: false; error: string };
 
@@ -30,9 +35,31 @@ interface VyntexDesktopApi {
     latestVersion: string;
     updateAvailable: boolean;
     packaged: boolean;
+    releaseNotes?: string | null;
+    installerUpdatedAt?: string | null;
+    downloaded?: boolean;
   }>;
+  downloadAppUpdate?: () => Promise<{ ok: boolean; error?: string; version?: string }>;
   installAppUpdate?: () => Promise<{ ok: boolean; error?: string }>;
+  appSystemInfo?: () => Promise<{
+    ok: boolean;
+    appVersion: string;
+    packaged: boolean;
+    platform: string;
+    arch: string;
+    electron: string | null;
+    chrome: string | null;
+    osRelease: string;
+    osType: string;
+  }>;
   onAppUpdateProgress?: (callback: (percent: number) => void) => () => void;
+  customerDisplayStatus?: () => Promise<{
+    open: boolean;
+    extraDisplayCount: number;
+    displayLabel?: string | null;
+  }>;
+  customerDisplayOpen?: () => Promise<{ ok: boolean; error?: string }>;
+  customerDisplayClose?: () => Promise<{ ok: boolean }>;
 }
 
 declare global {

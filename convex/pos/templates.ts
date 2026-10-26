@@ -155,14 +155,14 @@ const DEFAULT_LABELS: Record<
   },
   non_fiscal_receipt: {
     headerText: "PRE-BILL",
-    footerText: "This is not a fiscal document",
+    footerText: "Thank you for your visit!",
   },
   kitchen_ticket: {
-    headerText: "KITCHEN ORDER",
+    headerText: "KITCHEN",
     footerText: "",
   },
   bar_ticket: {
-    headerText: "BAR ORDER",
+    headerText: "BAR",
     footerText: "",
   },
   waiter_shift_report: {
@@ -174,19 +174,19 @@ const DEFAULT_LABELS: Record<
     footerText: "",
   },
   z_report: {
-    headerText: "Z-REPORT (END OF DAY)",
+    headerText: "Z-REPORT",
     footerText: "Fiscal closure complete",
   },
   complimentary_slip: {
-    headerText: "COMPLIMENTARY",
-    footerText: "On the house - Thank you!",
+    headerText: "WITH COMPLIMENTS",
+    footerText: "Enjoy your treat",
   },
   expense_voucher: {
-    headerText: "EXPENSE VOUCHER",
+    headerText: "EXPENSE",
     footerText: "",
   },
   debt_voucher: {
-    headerText: "DEBT VOUCHER",
+    headerText: "ON ACCOUNT",
     footerText: "Please pay at your earliest convenience",
   },
 };

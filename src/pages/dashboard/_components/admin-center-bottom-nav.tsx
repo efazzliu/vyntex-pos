@@ -13,7 +13,7 @@ export function AdminCenterBottomNav() {
   return (
     <nav
       className={cn(
-        "fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200/90 bg-white/90 px-1 pt-1 shadow-[0_-8px_32px_rgba(0,102,255,0.06)] backdrop-blur-xl md:hidden",
+        "fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200/90 bg-white/90 px-1 pt-1 shadow-[0_-8px_32px_rgba(0,91,214,0.06)] backdrop-blur-xl md:hidden",
         "pb-[max(0.35rem,env(safe-area-inset-bottom))]",
       )}
       aria-label={t("ac.nav.admin_center")}
@@ -31,20 +31,20 @@ export function AdminCenterBottomNav() {
               to={link.href}
               className={cn(
                 "flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl py-2 transition-colors",
-                active ? "bg-[#0066FF]/10" : "hover:bg-slate-50/90",
+                active ? "bg-brand/10" : "hover:bg-slate-50/90",
               )}
             >
               <Icon
                 className={cn(
                   "size-5 shrink-0",
-                  active ? "text-[#0066FF]" : "text-slate-400",
+                  active ? "text-brand" : "text-slate-400",
                 )}
                 strokeWidth={active ? 2.25 : 1.75}
               />
               <span
                 className={cn(
                   "mt-0.5 max-w-[4.25rem] truncate text-[10px] font-semibold",
-                  active ? "text-[#0066FF]" : "text-slate-500",
+                  active ? "text-brand" : "text-slate-500",
                 )}
               >
                 {t(link.key)}

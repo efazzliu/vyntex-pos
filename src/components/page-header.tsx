@@ -16,7 +16,7 @@ export default function PageHeader({ badge, title, subtitle }: PageHeaderProps) 
           transition={{ duration: 0.5 }}
         >
           {badge && (
-            <span className="text-sm font-semibold tracking-widest uppercase bg-gradient-to-r from-[#0066FF] to-[#44CC00] bg-clip-text text-transparent">
+            <span className="text-sm font-semibold tracking-widest uppercase bg-gradient-to-r from-brand to-brand-accent bg-clip-text text-transparent">
               {badge}
             </span>
           )}

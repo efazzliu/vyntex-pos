@@ -9,7 +9,6 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet.tsx";
 import { Button } from "@/components/ui/button.tsx";
-import { Input } from "@/components/ui/input.tsx";
 import { cn } from "@/lib/utils.ts";
 import { toast } from "sonner";
 import {
@@ -22,7 +21,6 @@ import {
   ArrowLeft,
   ChefHat,
   Wine,
-  Star,
   User,
   KeyRound,
   Delete,
@@ -38,8 +36,16 @@ import {
 import { printStaffMealTickets } from "@/lib/pos-print-sent-order.ts";
 import { isSilentPrintQueueableError } from "@/lib/print-html.ts";
 import { errorMessageFromUnknown } from "@/lib/supabase-pos/db-errors.ts";
-
-type StaffPriceMode = "full" | "free" | "discount";
+import { printerDeviceNameForRole } from "@/lib/pos-printer-routing.ts";
+import {
+  chargeStaffMeal,
+  isStaffMealAllowed,
+  normalizeStaffMealRule,
+  qtyUsedToday,
+  remainingStaffMealQty,
+  type StaffMealCharge,
+  type StaffMealRule,
+} from "@/lib/staff-meal-config.ts";
 
 function translatedStaffRole(
   t: (key: string, opts?: Record<string, unknown>) => string,
@@ -53,21 +59,17 @@ function translatedStaffRole(
 type ConsumptionItem = {
   menuItemId: Id<"menuItems">;
   name: string;
-  /** Menu list price per unit */
+  /** Guest menu list price per unit */
   listPrice: number;
   quantity: number;
 };
 
-function chargedUnitPrice(
-  listPrice: number,
-  mode: StaffPriceMode,
-  discountPercent: number
-): number {
-  if (mode === "free") return 0;
-  if (mode === "full") return listPrice;
-  const pct = Math.min(100, Math.max(0, discountPercent));
-  return Math.round(listPrice * (1 - pct / 100) * 100) / 100;
-}
+type StaffMenuItem = Doc<"menuItems"> & {
+  staffMealAllowed?: boolean;
+  staffMealPrice?: number;
+  staffMealFreeQty?: number;
+  staffMealDailyLimit?: number;
+};
 
 type StaffConsumptionDialogProps = {
   open: boolean;
@@ -104,8 +106,6 @@ export default function StaffConsumptionDialog({
     targetStaffName ?? ""
   );
   const [cart, setCart] = useState<ConsumptionItem[]>([]);
-  const [priceMode, setPriceMode] = useState<StaffPriceMode>("full");
-  const [discountPercent, setDiscountPercent] = useState(50);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -131,20 +131,14 @@ export default function StaffConsumptionDialog({
   const { theme: posTheme } = usePosTheme();
 
   const printersList = Array.isArray(printersQuery) ? printersQuery : [];
-  const kitchenTicketDeviceName = useMemo(() => {
-    const p = printersList.find((x) => x.isActive && x.role === "kitchen");
-    if (!p) return undefined;
-    const a = (p.address ?? "").trim();
-    const n = (p.name ?? "").trim();
-    return (a || n) || undefined;
-  }, [printersList]);
-  const barTicketDeviceName = useMemo(() => {
-    const p = printersList.find((x) => x.isActive && x.role === "bar");
-    if (!p) return undefined;
-    const a = (p.address ?? "").trim();
-    const n = (p.name ?? "").trim();
-    return (a || n) || undefined;
-  }, [printersList]);
+  const kitchenTicketDeviceName = useMemo(
+    () => printerDeviceNameForRole(printersList, "kitchen", licenseKey),
+    [printersList, licenseKey],
+  );
+  const barTicketDeviceName = useMemo(
+    () => printerDeviceNameForRole(printersList, "bar", licenseKey),
+    [printersList, licenseKey],
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -154,8 +148,6 @@ export default function StaffConsumptionDialog({
       setSelectedStaffName(targetStaffName ?? "");
       setCart([]);
       setSearchQuery("");
-      setPriceMode("full");
-      setDiscountPercent(50);
       setActiveCategory("all");
       setPinStaffId(null);
       setPinStaffName("");
@@ -167,8 +159,6 @@ export default function StaffConsumptionDialog({
       setSelectedStaffName("");
       setCart([]);
       setSearchQuery("");
-      setPriceMode("full");
-      setDiscountPercent(50);
       setActiveCategory("all");
       setPinStaffId(null);
       setPinStaffName("");
@@ -179,21 +169,21 @@ export default function StaffConsumptionDialog({
 
   const [activeCategory, setActiveCategory] = useState<Id<"menuCategories"> | "all">("all");
 
-  useEffect(() => {
-    if (selfServiceStaffMeal && priceMode === "discount") {
-      setPriceMode("full");
-    }
-  }, [selfServiceStaffMeal, priceMode]);
+  const staffMenuItems = useMemo(
+    () =>
+      (menuItems ?? []).filter(
+        (i) => i.available && isStaffMealAllowed(i as StaffMenuItem),
+      ) as StaffMenuItem[],
+    [menuItems],
+  );
+
+  const staffCategories = useMemo(() => {
+    const ids = new Set(staffMenuItems.map((i) => i.categoryId));
+    return (categories ?? []).filter((c) => ids.has(c._id));
+  }, [categories, staffMenuItems]);
 
   const availableItems = useMemo(() => {
-    if (!menuItems) return [];
-    let items = menuItems.filter((i) => i.available);
-    if (selfServiceStaffMeal) {
-      items = items.filter((i) => {
-        const row = i as { staffMealAllowed?: boolean };
-        return row.staffMealAllowed !== false;
-      });
-    }
+    let items = staffMenuItems;
 
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
@@ -203,22 +193,54 @@ export default function StaffConsumptionDialog({
     }
 
     return items.sort((a, b) => a.displayOrder - b.displayOrder);
-  }, [menuItems, searchQuery, activeCategory, selfServiceStaffMeal]);
+  }, [staffMenuItems, searchQuery, activeCategory]);
 
-  const cartTotal = cart.reduce(
-    (sum, i) =>
-      sum + chargedUnitPrice(i.listPrice, priceMode, discountPercent) * i.quantity,
-    0
+  const usedByItemId = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const item of staffMenuItems) {
+      map.set(
+        String(item._id),
+        qtyUsedToday(staffConsumption?.entries, String(item._id)),
+      );
+    }
+    return map;
+  }, [staffMenuItems, staffConsumption]);
+
+  const itemRule = (item: StaffMenuItem): StaffMealRule =>
+    normalizeStaffMealRule(item);
+
+  const chargeForCartLine = (
+    item: StaffMenuItem | undefined,
+    quantity: number,
+  ): StaffMealCharge => {
+    const rule = item
+      ? itemRule(item)
+      : { allowed: false, staffPrice: 0, freeQty: 0, dailyLimit: 0 };
+    const used = item ? (usedByItemId.get(String(item._id)) ?? 0) : 0;
+    return chargeStaffMeal(rule, used, quantity);
+  };
+
+  const cartPricing = cart.map((line) => {
+    const item = staffMenuItems.find((m) => m._id === line.menuItemId);
+    const charge = chargeForCartLine(item, line.quantity);
+    return {
+      ...line,
+      listPrice: item?.price ?? line.listPrice,
+      charge,
+    };
+  });
+
+  const cartTotal = cartPricing.reduce((sum, i) => sum + i.charge.total, 0);
+  const cartListTotal = cartPricing.reduce(
+    (sum, i) => sum + i.listPrice * i.quantity,
+    0,
   );
-  const cartListTotal = cart.reduce((sum, i) => sum + i.listPrice * i.quantity, 0);
 
   const reset = () => {
     setStep(targetStaffId ? "pick-items" : "select-staff");
     setSelectedStaffId(targetStaffId ?? null);
     setSelectedStaffName(targetStaffName ?? "");
     setCart([]);
-    setPriceMode("full");
-    setDiscountPercent(50);
     setSearchQuery("");
     setActiveCategory("all");
     setPinStaffId(null);
@@ -315,17 +337,31 @@ export default function StaffConsumptionDialog({
   };
 
   // ── Cart management ──
-  const addToCart = (item: Doc<"menuItems">) => {
-    const selfServiceUnitPrice =
-      selfServiceStaffMeal &&
-      typeof (item as Doc<"menuItems"> & { staffMealPrice?: number }).staffMealPrice === "number"
-        ? Number((item as Doc<"menuItems"> & { staffMealPrice?: number }).staffMealPrice)
-        : item.price;
+  const tryAddQuantity = (item: StaffMenuItem, nextQty: number): boolean => {
+    const rule = itemRule(item);
+    const used = usedByItemId.get(String(item._id)) ?? 0;
+    const charge = chargeStaffMeal(rule, used, nextQty);
+    if (charge.blocked || charge.allowedQty < nextQty) {
+      toast.error(
+        t("staff_meal.limit_exceeded", {
+          name: item.name,
+          limit: rule.dailyLimit,
+        }),
+      );
+      return false;
+    }
+    return true;
+  };
+
+  const addToCart = (item: StaffMenuItem) => {
+    const existing = cart.find((c) => c.menuItemId === item._id);
+    const nextQty = (existing?.quantity ?? 0) + 1;
+    if (!tryAddQuantity(item, nextQty)) return;
     setCart((prev) => {
-      const existing = prev.find((c) => c.menuItemId === item._id);
-      if (existing) {
+      const current = prev.find((c) => c.menuItemId === item._id);
+      if (current) {
         return prev.map((c) =>
-          c.menuItemId === item._id ? { ...c, quantity: c.quantity + 1 } : c
+          c.menuItemId === item._id ? { ...c, quantity: c.quantity + 1 } : c,
         );
       }
       return [
@@ -333,7 +369,7 @@ export default function StaffConsumptionDialog({
         {
           menuItemId: item._id,
           name: item.name,
-          listPrice: selfServiceUnitPrice,
+          listPrice: item.price,
           quantity: 1,
         },
       ];
@@ -341,12 +377,19 @@ export default function StaffConsumptionDialog({
   };
 
   const updateQty = (menuItemId: Id<"menuItems">, delta: number) => {
+    const item = staffMenuItems.find((m) => m._id === menuItemId);
+    const current = cart.find((c) => c.menuItemId === menuItemId);
+    if (!current) return;
+    const nextQty = current.quantity + delta;
+    if (nextQty > current.quantity && item && !tryAddQuantity(item, nextQty)) {
+      return;
+    }
     setCart((prev) =>
       prev
         .map((c) =>
-          c.menuItemId === menuItemId ? { ...c, quantity: c.quantity + delta } : c
+          c.menuItemId === menuItemId ? { ...c, quantity: c.quantity + delta } : c,
         )
-        .filter((c) => c.quantity > 0)
+        .filter((c) => c.quantity > 0),
     );
   };
 
@@ -361,30 +404,64 @@ export default function StaffConsumptionDialog({
         staffName: selectedStaffName,
         loggedByStaffId,
         loggedByStaffName,
-        items: cart.map((i) => {
-          const unit = chargedUnitPrice(i.listPrice, priceMode, discountPercent);
-          return {
-            menuItemId: i.menuItemId,
-            name: i.name,
-            price: unit,
-            quantity: i.quantity,
-            listPrice: i.listPrice,
-          };
+        items: cartPricing.flatMap((i) => {
+          const lines: {
+            menuItemId: Id<"menuItems">;
+            name: string;
+            price: number;
+            quantity: number;
+            listPrice: number;
+          }[] = [];
+          if (i.charge.freeQty > 0) {
+            lines.push({
+              menuItemId: i.menuItemId,
+              name: i.name,
+              price: 0,
+              quantity: i.charge.freeQty,
+              listPrice: i.listPrice,
+            });
+          }
+          if (i.charge.paidQty > 0) {
+            lines.push({
+              menuItemId: i.menuItemId,
+              name: i.name,
+              price: i.charge.staffPrice,
+              quantity: i.charge.paidQty,
+              listPrice: i.listPrice,
+            });
+          }
+          return lines;
         }),
       });
       toast.success(
         t("staff_consumption.toast_logged", { name: selectedStaffName }),
       );
 
-      const linesForPrint = cart.map((c) => {
-        const meta = menuItems?.find((m) => m._id === c.menuItemId);
-        const unit = chargedUnitPrice(c.listPrice, priceMode, discountPercent);
-        return {
-          name: c.name,
-          quantity: c.quantity,
-          station: meta?.station,
-          price: unit,
-        };
+      const linesForPrint = cartPricing.flatMap((c) => {
+        const meta = staffMenuItems.find((m) => m._id === c.menuItemId);
+        const rows: {
+          name: string;
+          quantity: number;
+          station: StaffMenuItem["station"];
+          price: number;
+        }[] = [];
+        if (c.charge.freeQty > 0) {
+          rows.push({
+            name: c.name,
+            quantity: c.charge.freeQty,
+            station: meta?.station,
+            price: 0,
+          });
+        }
+        if (c.charge.paidQty > 0) {
+          rows.push({
+            name: c.name,
+            quantity: c.charge.paidQty,
+            station: meta?.station,
+            price: c.charge.staffPrice,
+          });
+        }
+        return rows;
       });
       void (async () => {
         try {
@@ -403,6 +480,7 @@ export default function StaffConsumptionDialog({
             formatPrice,
             kitchenDevice: kitchenTicketDeviceName,
             barDevice: barTicketDeviceName,
+            licenseKey,
           });
           if (!pr.ok) {
             const electronApp = Boolean(
@@ -465,11 +543,11 @@ export default function StaffConsumptionDialog({
               </p>
             </div>
 
-            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto no-scrollbar px-6 py-4">
               {/* Method 1: Waiter selects staff directly */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2 mb-2">
-                  <User className="size-4 text-[#0066FF]" />
+                  <User className="size-4 text-brand" />
                   <span className="text-sm text-slate-800 font-medium">
                     {t("staff_consumption.pick_from_list")}
                   </span>
@@ -481,9 +559,9 @@ export default function StaffConsumptionDialog({
                       <button
                         key={staff._id}
                         onClick={() => handleSelectStaff(staff)}
-                        className="flex items-center gap-3 px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-[#0066FF]/50 hover:bg-[#0066FF]/5 transition-all cursor-pointer text-left"
+                        className="flex items-center gap-3 px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-brand/50 hover:bg-brand/5 transition-all cursor-pointer text-left"
                       >
-                        <div className="w-8 h-8 rounded-full bg-[#0066FF]/10 flex items-center justify-center text-[#0066FF] text-sm font-bold">
+                        <div className="w-8 h-8 rounded-full bg-brand/10 flex items-center justify-center text-brand text-sm font-bold">
                           {staff.name[0]}
                         </div>
                         <div className="min-w-0">
@@ -533,7 +611,7 @@ export default function StaffConsumptionDialog({
 
         {/* ── Step: PIN Entry ── */}
         {step === "pin-entry" && (
-          <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 py-8">
+          <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto no-scrollbar px-6 py-8">
             <button
               onClick={() => { setStep("select-staff"); setPin(""); setPinError(""); }}
               className="self-start mb-4 flex items-center gap-1.5 text-slate-500 hover:text-slate-900 transition-colors cursor-pointer text-sm"
@@ -638,69 +716,10 @@ export default function StaffConsumptionDialog({
               </div>
             </div>
 
-            <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2">
-              <span className="text-[10px] text-slate-500 uppercase font-semibold shrink-0">
-                {t("staff_consumption.staff_charge")}
-              </span>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setPriceMode("full")}
-                  className={cn(
-                    "px-2.5 py-1 rounded-md text-[10px] font-medium border transition-all cursor-pointer",
-                    priceMode === "full"
-                      ? "bg-[#0066FF] border-[#0066FF] text-white"
-                      : "border-slate-200 text-slate-600 hover:text-slate-900 bg-white"
-                  )}
-                >
-                  {t("staff_consumption.full_price")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPriceMode("free")}
-                  className={cn(
-                    "px-2.5 py-1 rounded-md text-[10px] font-medium border transition-all cursor-pointer",
-                    priceMode === "free"
-                      ? "bg-emerald-600 border-emerald-600 text-white"
-                      : "border-slate-200 text-slate-600 hover:text-slate-900 bg-white"
-                  )}
-                >
-                  {t("staff_consumption.free")}
-                </button>
-                {!selfServiceStaffMeal && (
-                  <button
-                    type="button"
-                    onClick={() => setPriceMode("discount")}
-                    className={cn(
-                      "px-2.5 py-1 rounded-md text-[10px] font-medium border transition-all cursor-pointer",
-                      priceMode === "discount"
-                        ? "bg-amber-600 border-amber-600 text-white"
-                        : "border-slate-200 text-slate-600 hover:text-slate-900 bg-white"
-                    )}
-                  >
-                    {t("staff_consumption.discount")}
-                  </button>
-                )}
-              </div>
-              {!selfServiceStaffMeal && priceMode === "discount" && (
-                <div className="flex items-center gap-1">
-                  <Input
-                    type="number"
-                    min={0}
-                    max={100}
-                    className="h-7 w-14 text-[11px] bg-white border-slate-200 text-slate-900 px-2"
-                    value={discountPercent}
-                    onChange={(e) => {
-                      const n = parseInt(e.target.value, 10);
-                      if (Number.isNaN(n)) setDiscountPercent(0);
-                      else setDiscountPercent(Math.min(100, Math.max(0, n)));
-                    }}
-                  />
-                  <span className="text-[10px] text-slate-500 whitespace-nowrap">
-                    {t("staff_consumption.percent_off")}
-                  </span>
-                </div>
-              )}
+            <div className="flex shrink-0 items-center border-b border-slate-200 bg-slate-50 px-4 py-2">
+              <p className="text-[11px] text-slate-500">
+                {t("staff_consumption.admin_rules_hint")}
+              </p>
             </div>
 
             <div className="flex min-h-0 flex-1 overflow-hidden">
@@ -715,7 +734,7 @@ export default function StaffConsumptionDialog({
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder={t("staff_consumption.search_placeholder")}
-                      className="w-full pl-8 pr-7 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-900 text-xs placeholder:text-slate-400 focus:outline-none focus:border-[#0066FF] transition-colors"
+                      className="w-full pl-8 pr-7 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-900 text-xs placeholder:text-slate-400 focus:outline-none focus:border-brand transition-colors"
                     />
                     {searchQuery && (
                       <button
@@ -736,13 +755,13 @@ export default function StaffConsumptionDialog({
                     className={cn(
                       "px-3 py-1 rounded-md text-[10px] font-medium whitespace-nowrap transition-all cursor-pointer shrink-0",
                       activeCategory === "all"
-                        ? "bg-[#0066FF] text-white"
+                        ? "bg-brand text-white"
                         : "bg-white text-slate-600 hover:text-slate-900 border border-slate-200"
                     )}
                   >
                     {t("staff_consumption.all_categories")}
                   </button>
-                  {categories?.map((cat) => (
+                  {staffCategories.map((cat) => (
                     <button
                       type="button"
                       key={cat._id}
@@ -765,11 +784,11 @@ export default function StaffConsumptionDialog({
                 </div>
 
                 {/* Items grid */}
-                <div className="flex-1 overflow-auto px-3 pb-3">
+                <div className="flex-1 overflow-auto no-scrollbar px-3 pb-3">
                   {availableItems.length === 0 ? (
                     <div className="flex flex-col items-center justify-center gap-2 h-28 text-[#5a6580] text-xs text-center px-4">
                       <p>
-                        {selfServiceStaffMeal
+                        {staffMenuItems.length === 0
                           ? t("staff_meal.no_allowed_items")
                           : t("staff_consumption.no_items_found")}
                       </p>
@@ -778,15 +797,43 @@ export default function StaffConsumptionDialog({
                     <div className="grid grid-cols-2 gap-2">
                       {availableItems.map((item) => {
                         const inCart = cart.find((c) => c.menuItemId === item._id);
+                        const rule = itemRule(item);
+                        const used = usedByItemId.get(String(item._id)) ?? 0;
+                        const remaining = remainingStaffMealQty(rule, used);
+                        const atLimit = remaining === 0;
+                        const nextCharge = chargeStaffMeal(
+                          rule,
+                          used,
+                          (inCart?.quantity ?? 0) + 1,
+                        );
+                        const showFreeThenPaid =
+                          rule.staffPrice > 0 &&
+                          rule.freeQty > used &&
+                          (remaining == null || remaining > 0);
+                        const priceLabel = atLimit
+                          ? t("staff_consumption.limit_reached")
+                          : showFreeThenPaid
+                            ? t("staff_consumption.free_then_paid", {
+                                free: Math.max(0, rule.freeQty - used),
+                                price: formatPrice(rule.staffPrice),
+                              })
+                            : nextCharge.staffPrice <= 0 ||
+                                (rule.freeQty > used && rule.staffPrice <= 0)
+                              ? t("staff_consumption.free")
+                              : formatPrice(rule.staffPrice);
                         return (
                           <button
                             key={item._id}
+                            type="button"
                             onClick={() => addToCart(item)}
+                            disabled={atLimit}
                             className={cn(
-                              "relative text-left rounded-lg border p-2.5 transition-all cursor-pointer",
-                              inCart
-                                ? "border-amber-500/50 bg-amber-500/10"
-                                : "border-slate-200 bg-white hover:border-slate-300"
+                              "relative text-left rounded-lg border p-2.5 transition-all",
+                              atLimit
+                                ? "cursor-not-allowed border-slate-200 bg-slate-50 opacity-60"
+                                : inCart
+                                  ? "cursor-pointer border-amber-500/50 bg-amber-500/10"
+                                  : "cursor-pointer border-slate-200 bg-white hover:border-slate-300"
                             )}
                           >
                             {item.station && (
@@ -801,7 +848,14 @@ export default function StaffConsumptionDialog({
                               {item.name}
                             </p>
                             <p className="text-[10px] text-amber-400 font-semibold mt-0.5">
-                              {formatPrice(item.price)}
+                              {priceLabel}
+                            </p>
+                            <p className="text-[9px] text-slate-400 mt-0.5">
+                              {remaining == null
+                                ? t("staff_consumption.unlimited_today")
+                                : t("staff_consumption.remaining_today", {
+                                    count: remaining,
+                                  })}
                             </p>
                             {inCart && (
                               <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center text-white text-[9px] font-bold">
@@ -824,19 +878,30 @@ export default function StaffConsumptionDialog({
                   </p>
                 </div>
 
-                <div className="flex-1 overflow-auto p-2 space-y-1">
+                <div className="flex-1 overflow-auto no-scrollbar p-2 space-y-1">
                   {cart.length === 0 ? (
                     <div className="flex items-center justify-center h-20 text-slate-400 text-[10px]">
                       {t("staff_consumption.tap_to_add")}
                     </div>
                   ) : (
-                    cart.map((item) => {
-                      const unit = chargedUnitPrice(
-                        item.listPrice,
-                        priceMode,
-                        discountPercent
-                      );
+                    cartPricing.map((item) => {
+                      const unit =
+                        item.quantity > 0
+                          ? item.charge.total / item.quantity
+                          : 0;
                       const showList = unit < item.listPrice - 0.001;
+                      const mixed =
+                        item.charge.freeQty > 0 && item.charge.paidQty > 0;
+                      const menuItem = staffMenuItems.find(
+                        (m) => m._id === item.menuItemId,
+                      );
+                      const canAddMore = menuItem
+                        ? !chargeStaffMeal(
+                            itemRule(menuItem),
+                            usedByItemId.get(String(item.menuItemId)) ?? 0,
+                            item.quantity + 1,
+                          ).blocked
+                        : false;
                       return (
                       <div
                         key={item.menuItemId}
@@ -852,9 +917,14 @@ export default function StaffConsumptionDialog({
                                   : "text-slate-500"
                               }
                             >
-                              {formatPrice(unit)}
+                              {mixed
+                                ? t("staff_consumption.free_then_paid", {
+                                    free: item.charge.freeQty,
+                                    price: formatPrice(item.charge.staffPrice),
+                                  })
+                                : formatPrice(unit)}
                             </span>
-                            {showList && (
+                            {showList && !mixed && (
                               <span className="text-slate-400 line-through ml-1">
                                 {formatPrice(item.listPrice)}
                               </span>
@@ -872,8 +942,10 @@ export default function StaffConsumptionDialog({
                             {item.quantity}
                           </span>
                           <button
+                            type="button"
                             onClick={() => updateQty(item.menuItemId, 1)}
-                            className="p-0.5 rounded hover:bg-slate-100 text-slate-500 cursor-pointer"
+                            disabled={!canAddMore}
+                            className="p-0.5 rounded hover:bg-slate-100 text-slate-500 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             <Plus className="size-3" />
                           </button>
@@ -900,7 +972,7 @@ export default function StaffConsumptionDialog({
                   </div>
                   <Button
                     size="sm"
-                    className="w-full bg-gradient-to-r from-[#0066FF] to-[#22c55e] text-white hover:opacity-95"
+                    className="w-full bg-gradient-to-r from-brand to-[#22c55e] text-white hover:opacity-95"
                     onClick={handleSubmit}
                     disabled={cart.length === 0 || isSubmitting}
                   >

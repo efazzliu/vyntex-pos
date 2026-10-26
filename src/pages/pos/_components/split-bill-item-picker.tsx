@@ -1,9 +1,7 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { useQuery } from "convex/react";
-import { Button } from "@/components/ui/button.tsx";
 import { cn } from "@/lib/utils.ts";
-import { toast } from "sonner";
-import { ChefHat, Wine } from "lucide-react";
+import { Check, CheckCheck, Minus, Plus, X } from "lucide-react";
 import { usePosLocale } from "./pos-locale-provider.tsx";
 
 type OrderItemRow = {
@@ -17,6 +15,16 @@ type OrderItemRow = {
   menuItemId?: string;
 };
 
+export type SplitBillUnit = { id: string; quantity: number };
+
+export type SplitSelectedLine = {
+  key: string;
+  name: string;
+  qty: number;
+  price: number;
+  lineTotal: number;
+};
+
 export type SplitBillGroupedLine = {
   key: string;
   name: string;
@@ -24,9 +32,27 @@ export type SplitBillGroupedLine = {
   totalQuantity: number;
   station?: "kitchen" | "bar";
   notes?: string;
+  units: SplitBillUnit[];
   /** Underlying `sale_items.id` values (Supabase) for this merged row. */
   itemIds: string[];
 };
+
+export function allocateSplitUnits(
+  units: SplitBillUnit[],
+  take: number,
+): SplitBillUnit[] {
+  const out: SplitBillUnit[] = [];
+  let left = take;
+  for (const unit of units) {
+    if (left <= 0) break;
+    const qty = Math.min(unit.quantity, left);
+    if (qty > 0) {
+      out.push({ id: unit.id, quantity: qty });
+      left -= qty;
+    }
+  }
+  return out;
+}
 
 export function buildGroupedLinesForSplitBill(
   items: OrderItemRow[],
@@ -45,8 +71,13 @@ export function buildGroupedLinesForSplitBill(
   for (const item of activeItems) {
     const key = mergeKey(item);
     const existing = grouped.find((g) => g.key === key);
+    const unit: SplitBillUnit = {
+      id: String(item._id),
+      quantity: item.quantity,
+    };
     if (existing) {
       existing.totalQuantity += item.quantity;
+      existing.units.push(unit);
       existing.itemIds.push(String(item._id));
     } else {
       grouped.push({
@@ -56,6 +87,7 @@ export function buildGroupedLinesForSplitBill(
         totalQuantity: item.quantity,
         station: item.station,
         notes: item.notes,
+        units: [unit],
         itemIds: [String(item._id)],
       });
     }
@@ -63,27 +95,32 @@ export function buildGroupedLinesForSplitBill(
   return grouped;
 }
 
+function formatQty(n: number): string {
+  if (Number.isInteger(n)) return String(n);
+  return String(Math.round(n * 1000) / 1000);
+}
+
 type SplitBillItemPickerProps = {
   licenseKey: string;
   orderId: string;
   orderBalanceDue: number;
-  showManualAmountLink: boolean;
-  onManualAmount: () => void;
   onBack: () => void;
-  onContinue: (amount: number, settledSaleItemIds: string[]) => void;
+  onSelectionChange?: (
+    amount: number,
+    settled: SplitBillUnit[],
+    lines: SplitSelectedLine[],
+  ) => void;
 };
 
 export default function SplitBillItemPicker({
   licenseKey,
   orderId,
   orderBalanceDue,
-  showManualAmountLink,
-  onManualAmount,
   onBack,
-  onContinue,
+  onSelectionChange,
 }: SplitBillItemPickerProps) {
   const { t, formatPrice } = usePosLocale();
-  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(() => new Set());
+  const [selectedQty, setSelectedQty] = useState<Record<string, number>>({});
 
   const orderData = useQuery("pos.orders.getOrderWithItems", {
     licenseKey,
@@ -97,53 +134,103 @@ export default function SplitBillItemPicker({
     );
   }, [orderData]);
 
-  const selectedTotal = useMemo(() => {
-    let s = 0;
-    for (const g of grouped) {
-      if (selectedKeys.has(g.key)) {
-        s += g.price * g.totalQuantity;
-      }
-    }
-    return Math.round(s * 100) / 100;
-  }, [grouped, selectedKeys]);
+  const selectedLines = useMemo(
+    () =>
+      grouped.flatMap((g) => {
+        const qty = selectedQty[g.key] ?? 0;
+        if (qty <= 0) return [];
+        return [
+          {
+            key: g.key,
+            name: g.name,
+            qty,
+            price: g.price,
+            lineTotal: Math.round(g.price * qty * 100) / 100,
+          } satisfies SplitSelectedLine,
+        ];
+      }),
+    [grouped, selectedQty],
+  );
 
-  const toggleKey = useCallback((key: string) => {
-    setSelectedKeys((prev) => {
-      const n = new Set(prev);
-      if (n.has(key)) n.delete(key);
-      else n.add(key);
-      return n;
+  const selectedCount = useMemo(
+    () => selectedLines.reduce((sum, row) => sum + row.qty, 0),
+    [selectedLines],
+  );
+
+  const selectedTotal = useMemo(() => {
+    return Math.round(selectedLines.reduce((s, row) => s + row.lineTotal, 0) * 100) / 100;
+  }, [selectedLines]);
+
+  const setLineQty = useCallback((key: string, next: number, max: number) => {
+    setSelectedQty((prev) => {
+      const qty = Math.max(0, Math.min(max, next));
+      if (qty <= 0) {
+        if (!(key in prev)) return prev;
+        const n = { ...prev };
+        delete n[key];
+        return n;
+      }
+      if (prev[key] === qty) return prev;
+      return { ...prev, [key]: qty };
+    });
+  }, []);
+
+  const toggleKey = useCallback((key: string, max: number) => {
+    setSelectedQty((prev) => {
+      const cur = prev[key] ?? 0;
+      if (cur > 0) {
+        const n = { ...prev };
+        delete n[key];
+        return n;
+      }
+      return { ...prev, [key]: max > 1 ? 1 : max };
     });
   }, []);
 
   const selectAll = useCallback(() => {
-    setSelectedKeys(new Set(grouped.map((g) => g.key)));
+    setSelectedQty(
+      Object.fromEntries(grouped.map((g) => [g.key, g.totalQuantity])),
+    );
   }, [grouped]);
 
   const clearAll = useCallback(() => {
-    setSelectedKeys(new Set());
+    setSelectedQty({});
   }, []);
 
-  const eps = 0.009;
+  const settledNow = useMemo(
+    () =>
+      grouped.flatMap((g) =>
+        allocateSplitUnits(g.units, selectedQty[g.key] ?? 0),
+      ),
+    [grouped, selectedQty],
+  );
 
-  const handleContinue = () => {
-    if (selectedTotal <= 0) {
-      toast.error(t("order.split_pick_empty"));
-      return;
-    }
-    if (selectedTotal > orderBalanceDue + eps) {
-      toast.error(t("order.split_pick_over"));
-      return;
-    }
-    const settledIds = grouped
-      .filter((g) => selectedKeys.has(g.key))
-      .flatMap((g) => g.itemIds);
-    onContinue(selectedTotal, settledIds);
-  };
+  useEffect(() => {
+    setSelectedQty((prev) => {
+      let changed = false;
+      const next: Record<string, number> = {};
+      for (const [key, qty] of Object.entries(prev)) {
+        const line = grouped.find((row) => row.key === key);
+        if (!line || line.totalQuantity <= 0) {
+          changed = true;
+          continue;
+        }
+        const clamped = Math.min(qty, line.totalQuantity);
+        if (clamped !== qty) changed = true;
+        if (clamped > 0) next[key] = clamped;
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [grouped]);
+
+  useEffect(() => {
+    onSelectionChange?.(selectedTotal, settledNow, selectedLines);
+  }, [onSelectionChange, selectedTotal, settledNow, selectedLines]);
 
   if (!orderData) {
     return (
-      <div className="flex flex-1 items-center justify-center px-3 py-8 text-sm text-[#8b93a7]">
+      <div className="flex flex-1 items-center justify-center px-4 py-8 text-sm text-slate-400">
         {t("common.loading")}
       </div>
     );
@@ -151,128 +238,156 @@ export default function SplitBillItemPicker({
 
   if (grouped.length === 0) {
     return (
-      <div className="flex flex-1 flex-col gap-3 px-3 py-4">
-        <p className="text-sm text-[#8b93a7]">{t("order.split_pick_no_lines")}</p>
-        <Button type="button" variant="ghost" className="text-[#8b93a7]" onClick={onBack}>
+      <div className="flex flex-1 flex-col gap-4 px-4 py-6">
+        <p className="text-sm text-slate-500">{t("order.split_pick_no_lines")}</p>
+        <button
+          type="button"
+          onClick={onBack}
+          className="h-11 rounded-2xl text-sm font-semibold text-slate-500 hover:text-slate-950"
+        >
           {t("btn.back")}
-        </Button>
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col px-3 py-2 gap-3 overflow-hidden">
-      <div className="shrink-0 space-y-1 text-xs text-[#8b93a7]">
-        <p>
-          {t("order.balance_due")}:{" "}
-          <span className="font-bold text-white">{formatPrice(orderBalanceDue)}</span>
-        </p>
-        <p className="text-[11px] text-[#5a6580]">{t("order.split_pick_hint")}</p>
-      </div>
-
-      <div className="flex shrink-0 gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="flex-1 border-[#2a3a5a] text-xs text-[#8b93a7] hover:text-white"
-          onClick={selectAll}
-        >
-          {t("order.split_pick_all")}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="flex-1 border-[#2a3a5a] text-xs text-[#8b93a7] hover:text-white"
-          onClick={clearAll}
-        >
-          {t("order.split_pick_clear")}
-        </Button>
-      </div>
-
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-        {grouped.map((g) => {
-          const on = selectedKeys.has(g.key);
-          const lineTotal = Math.round(g.price * g.totalQuantity * 100) / 100;
-          return (
-            <button
-              key={g.key}
-              type="button"
-              onClick={() => toggleKey(g.key)}
-              className={cn(
-                "flex w-full items-center gap-2 rounded-xl border px-3 py-2.5 text-left transition-colors",
-                on
-                  ? "border-[#0066FF] bg-[#0066FF]/15"
-                  : "border-[#1e2a45] bg-[#0A0F1E] hover:border-[#2a3a5a]",
-              )}
-            >
-              <span
-                className={cn(
-                  "flex size-5 shrink-0 items-center justify-center rounded border text-[10px] font-bold leading-none",
-                  on
-                    ? "border-[#0066FF] bg-[#0066FF] text-white"
-                    : "border-[#3a4560] bg-[#131A2E]",
-                )}
-              >
-                {on ? "✓" : null}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5">
-                  <p className="truncate text-sm text-white">{g.name}</p>
-                  {g.station === "kitchen" ? (
-                    <ChefHat className="size-3 shrink-0 text-orange-400" />
-                  ) : g.station === "bar" ? (
-                    <Wine className="size-3 shrink-0 text-purple-400" />
-                  ) : null}
-                </div>
-                {g.notes ? (
-                  <p className="mt-0.5 truncate text-[10px] italic text-amber-400/90">
-                    {g.notes}
-                  </p>
-                ) : null}
-                <p className="mt-0.5 text-[11px] text-[#5a6580]">
-                  {formatPrice(g.price)} × {g.totalQuantity}
-                </p>
-              </div>
-              <span className="shrink-0 text-sm font-semibold text-white">
-                {formatPrice(lineTotal)}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="shrink-0 space-y-2 border-t border-[#1e2a45] pt-2">
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-[#8b93a7]">{t("order.split_pick_selected_total")}</span>
-          <span className="font-mono font-semibold text-white">
-            {formatPrice(selectedTotal)}
-          </span>
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 pb-4 pt-2">
+      <div className="flex items-stretch gap-2">
+        <div className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-xl border border-slate-200/90 bg-white px-3.5 py-2.5 shadow-[0_10px_24px_-20px_rgba(15,23,42,0.45)]">
+          <p className="text-[12px] font-medium text-slate-500">
+            {t("order.balance_due")}
+          </p>
+          <p className="text-[14px] font-semibold tabular-nums text-slate-950">
+            {formatPrice(orderBalanceDue)}
+          </p>
         </div>
-        <p className="text-[10px] text-[#5a6580]">{t("order.split_restrict_hint")}</p>
-        {showManualAmountLink ? (
+        <div className="flex shrink-0 items-stretch gap-1.5">
           <button
             type="button"
-            onClick={onManualAmount}
-            className="w-full text-center text-xs text-[#0066FF] underline-offset-2 hover:underline"
+            onClick={selectAll}
+            title={t("order.split_pick_all")}
+            aria-label={t("order.split_pick_all")}
+            className="grid aspect-square h-auto place-items-center rounded-full border border-slate-200/80 bg-white text-slate-500 shadow-[0_10px_24px_-20px_rgba(15,23,42,0.45)] transition hover:bg-[#f4f8ff] hover:text-brand"
           >
-            {t("order.split_by_amount")}
+            <CheckCheck className="size-3.5" strokeWidth={2.2} />
           </button>
-        ) : null}
-        <div className="flex gap-2">
-          <Button
+          <button
             type="button"
-            variant="ghost"
-            className="flex-1 text-[#8b93a7]"
-            onClick={onBack}
+            onClick={clearAll}
+            title={t("order.split_pick_clear")}
+            aria-label={t("order.split_pick_clear")}
+            className="grid aspect-square h-auto place-items-center rounded-full border border-slate-200/80 bg-white text-slate-500 shadow-[0_10px_24px_-20px_rgba(15,23,42,0.45)] transition hover:bg-slate-50 hover:text-slate-950"
           >
-            {t("btn.back")}
-          </Button>
-          <Button type="button" className="flex-1" onClick={handleContinue}>
-            {t("order.split_continue")}
-          </Button>
+            <X className="size-3.5" strokeWidth={2.2} />
+          </button>
         </div>
+      </div>
+
+      <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
+        <div className="space-y-1.5">
+          {grouped.map((g) => {
+            const qty = selectedQty[g.key] ?? 0;
+            const on = qty > 0;
+            const payQty = on ? qty : g.totalQuantity;
+            const lineTotal = Math.round(g.price * payQty * 100) / 100;
+            const showStepper = on && g.totalQuantity > 1;
+            return (
+              <button
+                key={g.key}
+                type="button"
+                onClick={() => toggleKey(g.key, g.totalQuantity)}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-xl border-2 px-2.5 py-1.5 text-left transition",
+                  on
+                    ? "border-brand bg-[#f4f8ff] shadow-[0_10px_24px_-18px_rgba(37,99,235,0.55)]"
+                    : "border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50/80",
+                )}
+              >
+                <span
+                  className={cn(
+                    "grid size-6 shrink-0 place-items-center rounded-lg ring-1",
+                    on
+                      ? "bg-brand text-[#f8fafc] ring-brand"
+                      : "bg-white text-slate-400 ring-slate-200",
+                  )}
+                >
+                  <Check className="size-3" strokeWidth={2.6} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span
+                    className={cn(
+                      "block truncate text-[12px] font-semibold tracking-tight",
+                      on ? "text-slate-950" : "text-slate-700",
+                    )}
+                  >
+                    {g.name}
+                  </span>
+                  <span className="mt-px flex items-center gap-1.5 text-[10px] text-slate-400">
+                    <span>
+                      {showStepper
+                        ? `${formatPrice(g.price)} × ${formatQty(qty)} / ${formatQty(g.totalQuantity)}`
+                        : `${formatPrice(g.price)} × ${formatQty(g.totalQuantity)}`}
+                    </span>
+                    {g.notes ? (
+                      <span className="truncate italic text-amber-600">{g.notes}</span>
+                    ) : null}
+                  </span>
+                </span>
+                {showStepper ? (
+                  <span
+                    className="flex shrink-0 items-center gap-0.5 rounded-full bg-white px-0.5 py-0 ring-1 ring-brand/20"
+                    onClick={(e) => e.stopPropagation()}
+                    onPointerDown={(e) => e.stopPropagation()}
+                  >
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      className="grid size-6 place-items-center rounded-full text-brand hover:bg-[#eff6ff]"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setLineQty(g.key, qty - 1, g.totalQuantity);
+                      }}
+                    >
+                      <Minus className="size-3" strokeWidth={2.4} />
+                    </span>
+                    <span className="w-4 text-center text-[11px] font-semibold tabular-nums text-brand">
+                      {formatQty(qty)}
+                    </span>
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      className="grid size-6 place-items-center rounded-full text-brand hover:bg-[#eff6ff]"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setLineQty(g.key, qty + 1, g.totalQuantity);
+                      }}
+                    >
+                      <Plus className="size-3" strokeWidth={2.4} />
+                    </span>
+                  </span>
+                ) : null}
+                <span
+                  className={cn(
+                    "shrink-0 text-[12px] font-semibold tabular-nums",
+                    on ? "text-brand" : "text-slate-950",
+                  )}
+                >
+                  {formatPrice(lineTotal)}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="mt-3 flex shrink-0 items-center justify-between gap-2 rounded-xl border border-slate-200/90 bg-white px-3.5 py-2.5 shadow-[0_10px_24px_-20px_rgba(15,23,42,0.45)]">
+        <p className="text-[12px] font-medium text-slate-500">
+          {t("order.split_pick_selected_items")}
+        </p>
+        <span className="text-[14px] font-semibold tabular-nums text-slate-950">
+          {selectedCount}
+        </span>
       </div>
     </div>
   );

@@ -6,7 +6,6 @@ import type { Doc } from "@/convex/_generated/dataModel.d.ts";
 import { ClipboardList } from "lucide-react";
 import { getWaiterSession } from "@/phone-app/lib/waiter-session.ts";
 import { staffIdsEqual, uuidOrNull } from "@/lib/supabase-pos/uuid.ts";
-import { useWaiterCanPay } from "@/phone-app/hooks/use-waiter-can-pay.ts";
 import { usePhoneAccessBranding } from "@/phone-app/hooks/use-phone-access-branding.tsx";
 import { phoneAccessHasBottomNav } from "@/lib/local-db.ts";
 
@@ -22,7 +21,6 @@ export default function PhoneWaiterOrders() {
   const session = getWaiterSession();
   const licenseKey = session?.licenseKey ?? "";
   const staffId = session?.staff.id;
-  const waiterCanPay = useWaiterCanPay(licenseKey);
   const access = usePhoneAccessBranding();
 
   const tables = useQuery(
@@ -80,17 +78,17 @@ export default function PhoneWaiterOrders() {
                 key={table._id}
                 type="button"
                 onClick={() => navigate(`/waiter/table/${table._id}`)}
-                className="flex w-full items-center justify-between gap-3 rounded-2xl border border-blue-400/40 bg-blue-500/10 px-3.5 py-3.5 text-left active:scale-[0.99]"
+                className="flex w-full items-center justify-between gap-3 rounded-2xl border border-brand-soft/40 bg-brand/10 px-3.5 py-3.5 text-left active:scale-[0.99]"
               >
                 <div className="min-w-0">
                   <p className="text-[15px] font-semibold">{table.name}</p>
                   <p className="text-[12px] text-white/45">{table.zone}</p>
                 </div>
-                {waiterCanPay ? (
-                  <span className="shrink-0 text-[15px] font-semibold tabular-nums text-[#7eb6ff]">
-                    {summary.total.toFixed(0)}
-                  </span>
-                ) : null}
+                <span className="max-w-[9rem] shrink-0 truncate text-right text-[13px] font-semibold text-brand-soft">
+                  {summary.staffName ||
+                    session?.staff.name ||
+                    t("phone.waiter.tableOpen")}
+                </span>
               </button>
             ))}
           </div>

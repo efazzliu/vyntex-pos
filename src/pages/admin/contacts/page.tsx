@@ -46,7 +46,7 @@ function formatDate(timestamp: number) {
 
 function StatusDot({ status }: { status: string }) {
   const config: Record<string, { label: string; color: string }> = {
-    new: { label: "New", color: "text-blue-500" },
+    new: { label: "New", color: "text-brand" },
     read: { label: "Read", color: "text-amber-500" },
     replied: { label: "Replied", color: "text-emerald-500" },
   };
@@ -158,7 +158,7 @@ export default function AdminContacts() {
         <p className="text-sm text-muted-foreground">
           {contacts.length} total submission{contacts.length !== 1 ? "s" : ""}.
           {contacts.filter((c) => c.status === "new").length > 0 && (
-            <span className="text-blue-500 font-medium ml-1">
+            <span className="text-brand font-medium ml-1">
               {contacts.filter((c) => c.status === "new").length} new
             </span>
           )}
@@ -208,7 +208,7 @@ export default function AdminContacts() {
               className={cn(
                 "w-full text-left rounded-xl border bg-card p-4 hover:shadow-sm transition-all cursor-pointer",
                 contact.status === "new"
-                  ? "border-blue-200 dark:border-blue-800/40 bg-blue-50/50 dark:bg-blue-900/5"
+                  ? "border-brand-subtle dark:border-brand-active/40 bg-brand-light/50 dark:bg-brand-active/5"
                   : "border-border"
               )}
             >
@@ -219,13 +219,13 @@ export default function AdminContacts() {
                     "w-9 h-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5",
                     contact.type === "chat"
                       ? "bg-purple-100 dark:bg-purple-900/30"
-                      : "bg-blue-100 dark:bg-blue-900/30"
+                      : "bg-brand-subtle dark:bg-brand-active/30"
                   )}
                 >
                   {contact.type === "chat" ? (
                     <MessageCircle className="size-4 text-purple-500" />
                   ) : (
-                    <Mail className="size-4 text-blue-500" />
+                    <Mail className="size-4 text-brand" />
                   )}
                 </div>
 

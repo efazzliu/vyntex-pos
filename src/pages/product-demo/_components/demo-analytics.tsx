@@ -1,6 +1,7 @@
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { CreditCard, ShoppingBag, TrendingUp, Users } from "lucide-react";
 import { DEMO_WEEKLY_SALES } from "../_data.ts";
+import { BRAND } from "@/lib/brand-colors.ts";
 
 const KPIS = [
   { label: "Today's Sales", value: "$1,684", icon: TrendingUp },
@@ -15,7 +16,7 @@ export default function DemoAnalytics() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {KPIS.map((kpi) => (
           <div key={kpi.label} className="rounded-xl border border-[#1e2a45] bg-[#131A2E] p-4">
-            <kpi.icon className="mb-2 size-4 text-[#0066FF]" />
+            <kpi.icon className="mb-2 size-4 text-brand" />
             <p className="text-lg font-bold text-white">{kpi.value}</p>
             <p className="text-[11px] text-[#8b93a7]">{kpi.label}</p>
           </div>
@@ -37,7 +38,7 @@ export default function DemoAnalytics() {
                 axisLine={false}
               />
               <Tooltip
-                cursor={{ fill: "rgba(0,102,255,0.08)" }}
+                cursor={{ fill: "rgba(0,91,214,0.08)" }}
                 contentStyle={{
                   background: "#0D1326",
                   border: "1px solid #1e2a45",
@@ -46,7 +47,7 @@ export default function DemoAnalytics() {
                   color: "#fff",
                 }}
               />
-              <Bar dataKey="sales" fill="#0066FF" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="sales" fill={BRAND.primary} radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

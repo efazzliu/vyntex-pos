@@ -1,3 +1,4 @@
+import { BRAND } from "@/lib/brand-colors.ts";
 export type AdminAccentColor = "blue" | "cyan" | "emerald" | "violet" | "rose" | "amber";
 
 export type AdminNotificationPrefs = {
@@ -53,7 +54,7 @@ export const ADMIN_LANGUAGES = [
 ] as const;
 
 export const ADMIN_ACCENT_OPTIONS: Array<{ id: AdminAccentColor; label: string; hex: string }> = [
-  { id: "blue", label: "Blue", hex: "#0066FF" },
+  { id: "blue", label: "Blue", hex: BRAND.primary },
   { id: "cyan", label: "Cyan", hex: "#06b6d4" },
   { id: "emerald", label: "Emerald", hex: "#10b981" },
   { id: "violet", label: "Violet", hex: "#8b5cf6" },

@@ -24,6 +24,7 @@ import {
 import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 import { usePosLocale } from "./pos-locale-provider.tsx";
 import PosPrioritySupportNav from "./pos-priority-support-nav.tsx";
+import { BRAND } from "@/lib/brand-colors.ts";
 
 type PosSidebarProps = {
   activeView: PosView;
@@ -82,7 +83,7 @@ function getNavItems(
       { id: "staff", icon: Users },
       { id: "z-report", icon: FileText },
     ];
-  } else if (role === "waiter") {
+  } else if (role === "waiter" || role === "cashier") {
     items = [
       { id: "home", icon: Home },
       { id: "floor", icon: MapPinned },
@@ -141,6 +142,7 @@ function getComingSoonItems(role: ActiveStaff["role"], plan: string): ComingSoon
 
   if (
     role === "waiter" ||
+    role === "cashier" ||
     role === "inventory" ||
     role === "accountant" ||
     role === "auditor" ||
@@ -153,9 +155,10 @@ function getComingSoonItems(role: ActiveStaff["role"], plan: string): ComingSoon
 }
 
 const ROLE_COLORS: Record<string, string> = {
-  admin: "#0066FF",
+  admin: BRAND.primary,
   manager: "#8B5CF6",
-  waiter: "#44CC00",
+  cashier: "#16A34A",
+  waiter: BRAND.accent,
   inventory: "#F59E0B",
   accountant: "#06B6D4",
   auditor: "#EC4899",
@@ -230,7 +233,7 @@ export default function PosSidebar({
             className={cn(
               "flex flex-col items-center gap-1 w-16 py-2.5 rounded-xl transition-all cursor-pointer",
               activeView === item.id
-                ? "bg-[#0066FF]/15 text-[#0066FF]"
+                ? "bg-brand/15 text-brand"
                 : "text-[#5a6580] hover:text-[#8b93a7] hover:bg-[#1e2a45]/50",
             )}
           >

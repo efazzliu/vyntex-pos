@@ -42,7 +42,7 @@ export function AdminPageHeader() {
                   value={searchValue}
                   onChange={(e) => setSearchValue(e.target.value)}
                   placeholder="Search..."
-                  className="h-10 rounded-full border-slate-200/80 bg-slate-50/80 pl-9 pr-9 shadow-[0_6px_18px_-14px_rgba(2,6,23,0.55)] backdrop-blur-sm focus-visible:ring-2 focus-visible:ring-[#0066FF]/25 dark:border-slate-700/80 dark:bg-slate-900/70"
+                  className="h-10 rounded-full border-slate-200/80 bg-slate-50/80 pl-9 pr-9 shadow-[0_6px_18px_-14px_rgba(2,6,23,0.55)] backdrop-blur-sm focus-visible:ring-2 focus-visible:ring-brand/25 dark:border-slate-700/80 dark:bg-slate-900/70"
                 />
                 <button
                   type="button"
@@ -83,7 +83,7 @@ export function AdminPageHeader() {
                 className="inline-flex h-10 max-w-full items-center gap-2 rounded-full border border-slate-200/80 bg-slate-50/85 px-2 pr-2.5 shadow-[0_8px_20px_-16px_rgba(2,6,23,0.6)] backdrop-blur-sm transition hover:border-slate-300 hover:bg-white dark:border-slate-700/80 dark:bg-slate-900/70 dark:hover:border-slate-600 dark:hover:bg-slate-900"
                 aria-label="Open account menu"
               >
-                <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#0066FF] to-[#44CC00] text-xs font-bold text-white">
+                <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand to-brand-accent text-xs font-bold text-white">
                   {profileInitial}
                 </div>
                 <span className="hidden max-w-[140px] truncate text-sm font-medium text-foreground sm:inline">
@@ -116,7 +116,7 @@ export function AdminPageHeader() {
                   Light
                 </DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="dark" className="cursor-pointer rounded-lg">
-                  <Moon className="size-4 text-indigo-400" />
+                  <Moon className="size-4 text-brand-soft" />
                   Dark
                 </DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="system" className="cursor-pointer rounded-lg">

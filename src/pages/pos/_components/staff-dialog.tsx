@@ -31,6 +31,9 @@ import {
   isValidStaffPinLength,
   sanitizeStaffPinInput,
 } from "../_lib/staff-pin.ts";
+import { permissionsForRole } from "@/lib/staff-permissions.ts";
+import type { StaffRole } from "../_lib/types.ts";
+import { BRAND } from "@/lib/brand-colors.ts";
 
 type StaffDialogProps = {
   open: boolean;
@@ -38,6 +41,8 @@ type StaffDialogProps = {
   licenseKey: string;
   plan: string;
   editing: Doc<"staff"> | null;
+  actorStaffId?: string;
+  actorStaffName?: string;
   onSaved?: (staff: Doc<"staff">, mode: "create" | "update") => void;
 };
 
@@ -71,27 +76,14 @@ const DEFAULT_PERMISSIONS: Permissions = {
   canViewAuditLog: false,
 };
 
-const ADMIN_PERMISSIONS: Permissions = {
-  canVoidItems: true,
-  canGiveDiscount: true,
-  canTransferTables: true,
-  canMergeTables: true,
-  canSplitBills: true,
-  canViewReports: true,
-  canManageMenu: true,
-  canManageStock: true,
-  canLogStaffConsumption: true,
-  canChargeDebt: true,
-  canMarkComplimentary: true,
-  canViewAuditLog: true,
-};
-
 export default function StaffDialog({
   open,
   onOpenChange,
   licenseKey,
   plan,
   editing,
+  actorStaffId,
+  actorStaffName,
   onSaved,
 }: StaffDialogProps) {
   const { t } = usePosLocale();
@@ -106,7 +98,7 @@ export default function StaffDialog({
           value: "admin" as const,
           label: t("staff.role_admin"),
           desc: t("staff.role_desc_admin"),
-          color: "#0066FF",
+          color: BRAND.primary,
         },
         {
           value: "manager" as const,
@@ -115,10 +107,16 @@ export default function StaffDialog({
           color: "#8B5CF6",
         },
         {
+          value: "cashier" as const,
+          label: t("staff.role_cashier"),
+          desc: t("staff.role_desc_cashier"),
+          color: "#16A34A",
+        },
+        {
           value: "waiter" as const,
           label: t("staff.role_waiter"),
           desc: t("staff.role_desc_waiter"),
-          color: "#44CC00",
+          color: BRAND.accent,
         },
         {
           value: "inventory" as const,
@@ -271,9 +269,7 @@ export default function StaffDialog({
   );
 
   const [name, setName] = useState("");
-  const [role, setRole] = useState<
-    "admin" | "manager" | "waiter" | "inventory" | "accountant" | "auditor" | "kitchen"
-  >("waiter");
+  const [role, setRole] = useState<StaffRole>("waiter");
   const [pin, setPin] = useState("");
   const [isActive, setIsActive] = useState(true);
   const [permissions, setPermissions] = useState<Permissions>(DEFAULT_PERMISSIONS);
@@ -305,18 +301,11 @@ export default function StaffDialog({
         setRole("waiter");
         setPin("");
         setIsActive(true);
-        setPermissions(DEFAULT_PERMISSIONS);
+        setPermissions(permissionsForRole("waiter"));
       }
       setError(null);
     }
   }, [open, editing]);
-
-  // When role changes to admin or manager, auto-enable all permissions
-  useEffect(() => {
-    if (role === "admin" || role === "manager") {
-      setPermissions(ADMIN_PERMISSIONS);
-    }
-  }, [role]);
 
   const handlePinChange = (value: string) => {
     setPin(sanitizeStaffPinInput(value));
@@ -373,6 +362,8 @@ export default function StaffDialog({
           pinHash,
           isActive,
           permissions,
+          actorStaffId,
+          actorStaffName,
         });
         const updatedStaff = {
           ...editing,
@@ -397,6 +388,8 @@ export default function StaffDialog({
           role,
           pinHash,
           permissions,
+          actorStaffId,
+          actorStaffName,
         });
         const createdStaff = {
           _id: createdId,
@@ -471,7 +464,10 @@ export default function StaffDialog({
                 <button
                   key={opt.value}
                   type="button"
-                  onClick={() => setRole(opt.value)}
+                  onClick={() => {
+                    setRole(opt.value);
+                    setPermissions(permissionsForRole(opt.value));
+                  }}
                   className={cn(
                     "p-3 rounded-xl border text-center transition-all cursor-pointer",
                     role === opt.value
@@ -547,7 +543,7 @@ export default function StaffDialog({
               {t("staff.access_permissions")}
             </Label>
             {(role === "admin" || role === "manager") && (
-              <p className="text-[10px] text-[#0066FF]">
+              <p className="text-[10px] text-brand">
                 {t("staff.admin_all_permissions_hint")}
               </p>
             )}

@@ -1,6 +1,14 @@
 import { useEffect, type ReactNode } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
-import { getWaiterSession } from "@/phone-app/lib/waiter-session.ts";
+import { fetchWaiterPhoneBindingStatus } from "@/lib/supabase-pos/waiter-phone-binding.ts";
+import {
+  clearWaiterPhonePair,
+  clearWaiterSession,
+  getWaiterPhonePair,
+  getWaiterSession,
+  isOwnerLocalWaiterPair,
+  isWaiterDesignPreviewLicense,
+} from "@/phone-app/lib/waiter-session.ts";
 import { PhoneAccessBrandingProvider, usePhoneAccessBranding } from "@/phone-app/hooks/use-phone-access-branding.tsx";
 import { cn } from "@/lib/utils.ts";
 import { phoneAccessThemeTokens, waiterThemeStyle } from "@/lib/phone-access-theme.ts";
@@ -30,6 +38,33 @@ export default function PhoneWaiterShell() {
   useEffect(() => {
     if (!session) navigate("/waiter", { replace: true });
   }, [session, navigate]);
+
+  useEffect(() => {
+    const pair = getWaiterPhonePair();
+    if (!pair?.licenseKey || !pair.deviceId) return;
+    if (isWaiterDesignPreviewLicense(pair.licenseKey)) return;
+    if (isOwnerLocalWaiterPair(pair)) return;
+
+    let cancelled = false;
+    const check = async () => {
+      const status = await fetchWaiterPhoneBindingStatus(
+        pair.licenseKey,
+        pair.deviceId,
+      );
+      if (cancelled || !status) return;
+      if (status.disconnected || !status.bound) {
+        clearWaiterSession();
+        clearWaiterPhonePair();
+        navigate("/waiter", { replace: true });
+      }
+    };
+    void check();
+    const id = window.setInterval(() => void check(), 8000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [navigate]);
 
   if (!session) return null;
 

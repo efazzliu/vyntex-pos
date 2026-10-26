@@ -150,8 +150,8 @@ export default function AdminSetupScreen({
         {/* Setup Card */}
         <div className="bg-[#131A2E] border border-[#1e2a45] rounded-2xl p-6 space-y-6">
           <div className="text-center space-y-2">
-            <div className="inline-flex items-center justify-center size-12 rounded-xl bg-[#44CC00]/10 mb-2">
-              <UserPlus className="size-6 text-[#44CC00]" />
+            <div className="inline-flex items-center justify-center size-12 rounded-xl bg-brand-accent/10 mb-2">
+              <UserPlus className="size-6 text-brand-accent" />
             </div>
             <h2 className="text-lg font-semibold text-white">Create Business Admin</h2>
             <p className="text-sm text-[#8b93a7]">
@@ -172,7 +172,7 @@ export default function AdminSetupScreen({
                 setError(null);
               }}
               placeholder="Restaurant Manager"
-              className="bg-[#0A0F1E] border-[#1e2a45] text-white placeholder:text-[#3a4560] h-11 focus:border-[#44CC00] focus:ring-[#44CC00]/20"
+              className="bg-[#0A0F1E] border-[#1e2a45] text-white placeholder:text-[#3a4560] h-11 focus:border-brand-accent focus:ring-brand-accent/20"
             />
           </div>
 
@@ -194,7 +194,7 @@ export default function AdminSetupScreen({
                   setError(null);
                 }}
                 placeholder="Min 6 characters"
-                className="bg-[#0A0F1E] border-[#1e2a45] text-white placeholder:text-[#3a4560] h-11 pr-10 focus:border-[#44CC00] focus:ring-[#44CC00]/20"
+                className="bg-[#0A0F1E] border-[#1e2a45] text-white placeholder:text-[#3a4560] h-11 pr-10 focus:border-brand-accent focus:ring-brand-accent/20"
               />
               <button
                 type="button"
@@ -219,7 +219,7 @@ export default function AdminSetupScreen({
                 setError(null);
               }}
               placeholder="Re-enter password"
-              className="bg-[#0A0F1E] border-[#1e2a45] text-white placeholder:text-[#3a4560] h-11 focus:border-[#44CC00] focus:ring-[#44CC00]/20"
+              className="bg-[#0A0F1E] border-[#1e2a45] text-white placeholder:text-[#3a4560] h-11 focus:border-brand-accent focus:ring-brand-accent/20"
             />
           </div>
 
@@ -242,7 +242,7 @@ export default function AdminSetupScreen({
               onChange={(e) => handlePinChange(e.target.value)}
               maxLength={STAFF_PIN_MAX_LEN}
               placeholder="Enter PIN"
-              className="bg-[#0A0F1E] border-[#1e2a45] text-white placeholder:text-[#3a4560] h-11 font-mono text-center focus:border-[#44CC00] focus:ring-[#44CC00]/20"
+              className="bg-[#0A0F1E] border-[#1e2a45] text-white placeholder:text-[#3a4560] h-11 font-mono text-center focus:border-brand-accent focus:ring-brand-accent/20"
             />
           </div>
 
@@ -262,7 +262,7 @@ export default function AdminSetupScreen({
           <Button
             onClick={handleSubmit}
             disabled={loading}
-            className="w-full h-12 bg-gradient-to-r from-[#44CC00] to-[#38a600] hover:from-[#38a600] hover:to-[#2d8500] text-white font-semibold text-base"
+            className="w-full h-12 bg-gradient-to-r from-brand-accent to-[#38a600] hover:from-[#38a600] hover:to-[#2d8500] text-white font-semibold text-base"
           >
             {loading ? (
               <span className="flex items-center gap-2">
@@ -277,7 +277,7 @@ export default function AdminSetupScreen({
 
         {/* Security note */}
         <div className="flex items-center justify-center gap-2 mt-6">
-          <ShieldCheck className="size-3.5 text-[#44CC00]" />
+          <ShieldCheck className="size-3.5 text-brand-accent" />
           <p className="text-xs text-[#5a6580]">
             Credentials are encrypted and stored locally on this device
           </p>

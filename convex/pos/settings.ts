@@ -51,6 +51,7 @@ export const updatePrinter = mutation({
     licenseKey: v.string(),
     printerId: v.id("printers"),
     name: v.optional(v.string()),
+    address: v.optional(v.string()),
     role: v.optional(
       v.union(
         v.literal("receipt"),
@@ -69,6 +70,7 @@ export const updatePrinter = mutation({
     }
     const updates: Record<string, string | boolean> = {};
     if (args.name !== undefined) updates.name = args.name;
+    if (args.address !== undefined) updates.address = args.address;
     if (args.role !== undefined) updates.role = args.role;
     if (args.isActive !== undefined) updates.isActive = args.isActive;
     await ctx.db.patch(args.printerId, updates);
@@ -112,6 +114,9 @@ export const getCompanyDetails = query({
       licenseKey: restaurant.licenseKey,
       licenseExpiry: restaurant.licenseExpiry,
       licenseStatus: restaurant.licenseStatus,
+      licenseStartedAt: new Date(restaurant._creationTime).toISOString(),
+      maxTerminals: null,
+      registeredDeviceCount: restaurant.deviceId ? 1 : 0,
     };
   },
 });
@@ -149,8 +154,14 @@ export const updateCompanyProfile = mutation({
   args: {
     licenseKey: v.string(),
     name: v.optional(v.string()),
+    type: v.optional(v.string()),
     address: v.optional(v.string()),
     phone: v.optional(v.string()),
+    email: v.optional(v.string()),
+    website: v.optional(v.string()),
+    city: v.optional(v.string()),
+    postalCode: v.optional(v.string()),
+    country: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const restaurant = await getRestaurantByLicense(ctx, args.licenseKey);

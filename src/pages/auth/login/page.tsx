@@ -98,16 +98,16 @@ export default function LoginPage({
             backgroundSize: "60px 60px",
           }}
         />
-        <div className="absolute -top-32 -left-32 h-[500px] w-[500px] rounded-full bg-[#0066FF]/15 blur-[120px]" />
-        <div className="absolute -bottom-32 -right-32 h-[500px] w-[500px] rounded-full bg-[#44CC00]/12 blur-[120px]" />
-        <div className="absolute left-1/2 top-1/3 h-[400px] w-[400px] -translate-x-1/2 rounded-full bg-[#0099CC]/8 blur-[100px]" />
+        <div className="absolute -top-32 -left-32 h-[500px] w-[500px] rounded-full bg-brand/15 blur-[120px]" />
+        <div className="absolute -bottom-32 -right-32 h-[500px] w-[500px] rounded-full bg-brand-accent/12 blur-[120px]" />
+        <div className="absolute left-1/2 top-1/3 h-[400px] w-[400px] -translate-x-1/2 rounded-full bg-brand-sky/8 blur-[100px]" />
       </div>
 
       <div className="relative z-10 flex min-h-screen w-full items-center justify-center px-4 py-8 pt-24">
         <div className="w-full max-w-5xl overflow-hidden rounded-3xl border border-white/15 bg-white/5 shadow-[0_35px_90px_-20px_rgba(2,6,23,0.75)] backdrop-blur-xl">
           <div className="grid md:grid-cols-[1.05fr_1fr]">
             <section className="relative hidden p-10 md:block">
-              <div className="absolute inset-0 bg-gradient-to-br from-[#0066FF]/20 via-[#00AACC]/10 to-[#44CC00]/15" />
+              <div className="absolute inset-0 bg-gradient-to-br from-brand/20 via-brand-sky/10 to-brand-accent/15" />
               <div className="relative">
                 <img src={LOGO_URL} alt="Vyntex POS" className="h-14 w-14 object-contain" />
                 <p className="mt-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold tracking-wide text-white/85">
@@ -116,7 +116,7 @@ export default function LoginPage({
                 </p>
                 <h2 className="mt-5 text-3xl font-bold leading-tight text-white">
                   Welcome back to
-                  <span className="bg-gradient-to-r from-[#66B3FF] to-[#8AF35A] bg-clip-text text-transparent">
+                  <span className="bg-gradient-to-r from-brand-soft to-[#8AF35A] bg-clip-text text-transparent">
                     {" "}
                     Vyntex POS
                   </span>
@@ -126,15 +126,15 @@ export default function LoginPage({
                 </p>
                 <ul className="mt-8 space-y-3 text-sm text-white/80">
                   <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-[#66B3FF]" />
+                    <CheckCircle2 className="h-4 w-4 text-brand-soft" />
                     Real-time dashboard and reports
                   </li>
                   <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-[#66B3FF]" />
+                    <CheckCircle2 className="h-4 w-4 text-brand-soft" />
                     Secure cloud authentication
                   </li>
                   <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-[#66B3FF]" />
+                    <CheckCircle2 className="h-4 w-4 text-brand-soft" />
                     Multi-venue management tools
                   </li>
                 </ul>
@@ -185,7 +185,7 @@ export default function LoginPage({
                       type="button"
                       onClick={() => void handlePasswordReset()}
                       disabled={sendingReset}
-                      className="text-xs font-medium text-[#0066FF] hover:underline disabled:opacity-60"
+                      className="text-xs font-medium text-brand hover:underline disabled:opacity-60"
                     >
                       {sendingReset ? "Sending reset..." : "Forgot password?"}
                     </button>
@@ -232,7 +232,7 @@ export default function LoginPage({
 
               {showManagerCodeLink ? (
                 <p className="mt-5 text-center text-sm">
-                  <Link to="/redeem-code" className="font-medium text-[#0066FF] hover:underline">
+                  <Link to="/redeem-code" className="font-medium text-brand hover:underline">
                     {t("auth.login.managerCodeLink")}
                   </Link>
                 </p>
@@ -356,9 +356,9 @@ export default function LoginPage({
             backgroundSize: "60px 60px",
           }}
         />
-        <div className="absolute -top-32 -left-32 h-[500px] w-[500px] rounded-full bg-[#0066FF]/15 blur-[120px]" />
-        <div className="absolute -bottom-32 -right-32 h-[500px] w-[500px] rounded-full bg-[#44CC00]/12 blur-[120px]" />
-        <div className="absolute left-1/2 top-1/3 h-[400px] w-[400px] -translate-x-1/2 rounded-full bg-[#0099CC]/8 blur-[100px]" />
+        <div className="absolute -top-32 -left-32 h-[500px] w-[500px] rounded-full bg-brand/15 blur-[120px]" />
+        <div className="absolute -bottom-32 -right-32 h-[500px] w-[500px] rounded-full bg-brand-accent/12 blur-[120px]" />
+        <div className="absolute left-1/2 top-1/3 h-[400px] w-[400px] -translate-x-1/2 rounded-full bg-brand-sky/8 blur-[100px]" />
       </div>
 
       <div className="relative z-10 flex min-h-screen w-full items-center justify-center px-4 py-8 pt-24">
@@ -405,7 +405,7 @@ export default function LoginPage({
                 type="button"
                 onClick={() => void handlePasswordReset()}
                 disabled={sendingReset}
-                className="text-xs font-medium text-[#0066FF] hover:underline disabled:opacity-60"
+                className="text-xs font-medium text-brand hover:underline disabled:opacity-60"
               >
                 {sendingReset ? "Sending reset..." : "Forgot password?"}
               </button>
@@ -454,7 +454,7 @@ export default function LoginPage({
           <p className="mt-5 text-center text-sm">
             <Link
               to="/pos"
-              className="font-medium text-[#0066FF] hover:underline"
+              className="font-medium text-brand hover:underline"
             >
               {t("auth.login.waiterPinLink")}
             </Link>
@@ -465,7 +465,7 @@ export default function LoginPage({
           <p className="mt-3 text-center text-sm">
             <Link
               to="/redeem-code"
-              className="font-medium text-[#0066FF] hover:underline"
+              className="font-medium text-brand hover:underline"
             >
               {t("auth.login.managerCodeLink")}
             </Link>

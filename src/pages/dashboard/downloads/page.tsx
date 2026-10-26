@@ -71,7 +71,7 @@ export default function DashboardDownloadsPage() {
           <div className="relative grid gap-8 lg:grid-cols-[1.35fr_0.8fr] lg:items-center">
             <div>
               <div className="flex items-start gap-4">
-                <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-500 text-white shadow-lg shadow-blue-200">
+                <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand to-cyan-500 text-white shadow-lg shadow-brand-subtle">
                   <HardDriveDownload className="size-7" />
                 </span>
                 <div>
@@ -109,7 +109,7 @@ export default function DashboardDownloadsPage() {
               <Button
                 size="lg"
                 onClick={() => openInstallerDownload(installerUrlX64, "x64")}
-                className="mt-6 h-12 w-full rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-base font-semibold text-white shadow-lg shadow-blue-200/70 hover:from-blue-700 hover:to-cyan-600 sm:w-auto sm:min-w-72"
+                className="mt-6 h-12 w-full rounded-xl bg-gradient-to-r from-brand to-cyan-500 text-base font-semibold text-white shadow-lg shadow-brand-subtle/70 hover:from-brand-hover hover:to-cyan-600 sm:w-auto sm:min-w-72"
               >
                 <Download className="mr-2 size-5" />
                 {t("downloads.download_windows")}

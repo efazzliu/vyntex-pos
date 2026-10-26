@@ -99,11 +99,7 @@ export async function persistPhoneAccessBranding(
   const normalized = normalizePhoneAccessBranding(branding);
   await savePhoneAccessBranding(licenseKey, normalized);
   if (isSupabaseConfigured) {
-    try {
-      await savePhoneAccessBrandingToCloud(licenseKey, normalized);
-    } catch (err) {
-      console.warn("[license-sync] phone access branding cloud save failed", err);
-    }
+    await savePhoneAccessBrandingToCloud(licenseKey, normalized);
   }
 }
 

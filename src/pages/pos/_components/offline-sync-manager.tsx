@@ -5,6 +5,7 @@ import {
   removeQueuedMutation,
   incrementMutationRetry,
   getOfflineQueueCount,
+  resetOfflineQueueRetries,
   type QueuedMutation,
 } from "@/lib/local-db.ts";
 import { toast } from "sonner";
@@ -16,12 +17,14 @@ type SyncState = {
   queueCount: number;
   isSyncing: boolean;
   lastSyncError: string | null;
+  retrySync: () => Promise<void>;
 };
 
 const SyncContext = createContext<SyncState>({
   queueCount: 0,
   isSyncing: false,
   lastSyncError: null,
+  retrySync: async () => undefined,
 });
 
 export function useSyncState() {
@@ -53,13 +56,16 @@ export default function OfflineSyncManager({ children }: OfflineSyncManagerProps
     return () => clearInterval(interval);
   }, []);
 
-  const replayQueue = useCallback(async () => {
+  const replayQueue = useCallback(async (resetRetries = false) => {
     if (syncInProgressRef.current) return;
     syncInProgressRef.current = true;
     setIsSyncing(true);
     setLastSyncError(null);
 
     try {
+      if (resetRetries) {
+        await resetOfflineQueueRetries();
+      }
       const queue = await getQueuedMutations();
       if (queue.length === 0) {
         setIsSyncing(false);
@@ -72,8 +78,6 @@ export default function OfflineSyncManager({ children }: OfflineSyncManagerProps
 
       for (const item of queue) {
         if (item.retries >= MAX_RETRIES) {
-          // Too many retries, discard
-          await removeQueuedMutation(item.id);
           failCount++;
           continue;
         }
@@ -122,13 +126,22 @@ export default function OfflineSyncManager({ children }: OfflineSyncManagerProps
   useEffect(() => {
     if (isOnline && !wasOnlineRef.current) {
       // Just came back online
-      replayQueue();
+      void replayQueue();
     }
     wasOnlineRef.current = isOnline;
   }, [isOnline, replayQueue]);
 
+  const retrySync = useCallback(() => replayQueue(true), [replayQueue]);
+
   return (
-    <SyncContext.Provider value={{ queueCount, isSyncing, lastSyncError }}>
+    <SyncContext.Provider
+      value={{
+        queueCount,
+        isSyncing,
+        lastSyncError,
+        retrySync,
+      }}
+    >
       {children}
     </SyncContext.Provider>
   );

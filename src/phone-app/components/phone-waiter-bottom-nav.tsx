@@ -5,7 +5,7 @@ import { Bell, ClipboardList, LayoutGrid, UtensilsCrossed } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 import { usePhoneAccessBranding } from "@/phone-app/hooks/use-phone-access-branding.tsx";
 import { phoneAccessHasBottomNav } from "@/lib/local-db.ts";
-import { phoneAccessThemeTokens } from "@/lib/phone-access-theme.ts";
+import { phoneAccessThemeTokens, vyntexSelectedSoft, VYNTEX_LOGO_BLUE } from "@/lib/phone-access-theme.ts";
 import { getWaiterSession } from "@/phone-app/lib/waiter-session.ts";
 
 const ITEMS = [
@@ -20,7 +20,6 @@ export function PhoneWaiterBottomNav() {
   const location = useLocation();
   const access = usePhoneAccessBranding();
   const tokens = phoneAccessThemeTokens(access.theme);
-  const accent = access.accentColor;
   const items = ITEMS.filter((item) => access[item.flag]);
   const session = getWaiterSession();
   const licenseKey = session?.licenseKey ?? "";
@@ -67,14 +66,12 @@ export function PhoneWaiterBottomNav() {
                 "relative flex flex-1 flex-col items-center justify-center gap-0.5 rounded-xl py-2 transition-colors",
                 active ? undefined : tokens.isLight ? "active:bg-slate-100" : "active:bg-white/5",
               )}
-              style={
-                active ? { backgroundColor: `${accent}26` } : undefined
-              }
+              style={active ? vyntexSelectedSoft() : undefined}
             >
               <span className="relative">
                 <Icon
                   className="size-5"
-                  style={{ color: active ? accent : "var(--waiter-muted)" }}
+                  style={{ color: active ? VYNTEX_LOGO_BLUE : "var(--waiter-muted)" }}
                   strokeWidth={active ? 2.25 : 1.75}
                 />
                 {showReadyBadge ? (
@@ -85,7 +82,7 @@ export function PhoneWaiterBottomNav() {
               </span>
               <span
                 className="max-w-[4.5rem] truncate text-[10px] font-semibold"
-                style={{ color: active ? accent : "var(--waiter-muted)" }}
+                style={{ color: active ? VYNTEX_LOGO_BLUE : "var(--waiter-muted)" }}
               >
                 {t(`phone.waiter.${item.key}`)}
               </span>

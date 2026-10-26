@@ -2,11 +2,9 @@ import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   APP_VERSION_LABEL,
-  POS_SOFTWARE_PATH,
   VYNTEX_APP_LOGO_SRC,
   VYNTEX_INSTAGRAM_URL,
 } from "@/lib/site-constants.ts";
-import { PHONE_APP_PATH } from "@/lib/guest-menu-url.ts";
 
 export default function Footer() {
   const { t } = useTranslation("site");
@@ -19,8 +17,6 @@ export default function Footer() {
           { labelKey: "footer.features", href: "/" },
           { labelKey: "nav.vynTypes", href: "/vyn-types" },
           { labelKey: "nav.pricing", href: "/pricing" },
-          { labelKey: "nav.software", href: POS_SOFTWARE_PATH },
-          { labelKey: "nav.phoneApp", href: PHONE_APP_PATH },
         ],
       },
       {
@@ -47,7 +43,7 @@ export default function Footer() {
           <div className="md:col-span-1">
             <Link to="/" className="flex items-center gap-2 mb-4">
               <img src={VYNTEX_APP_LOGO_SRC} alt="Vyntex POS" className="w-8 h-8" />
-              <span className="text-lg font-bold bg-gradient-to-r from-[#0066FF] to-[#44CC00] bg-clip-text text-transparent">
+              <span className="text-lg font-bold bg-gradient-to-r from-brand to-brand-accent bg-clip-text text-transparent">
                 Vyntex POS
               </span>
             </Link>
@@ -93,7 +89,7 @@ export default function Footer() {
             {t("footer.rights")}
           </p>
           <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#44CC00]" />
+            <span className="w-1.5 h-1.5 rounded-full bg-brand-accent" />
             <span className="text-xs text-white/30">{t("footer.operational")}</span>
           </div>
         </div>

@@ -114,7 +114,7 @@ export default function DemoOrderPanel({
               className={cn(
                 "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
                 category === cat
-                  ? "border-[#0066FF] bg-[#0066FF] text-white"
+                  ? "border-brand bg-brand text-white"
                   : "border-[#1e2a45] bg-[#131A2E] text-[#8b93a7] hover:text-white",
               )}
             >
@@ -131,7 +131,7 @@ export default function DemoOrderPanel({
               disabled={!item.available}
               onClick={() => addItem(item.id)}
               className={cn(
-                "flex flex-col items-start gap-1 rounded-xl border border-[#1e2a45] bg-[#131A2E] p-3 text-left transition-colors hover:border-[#0066FF]/50 hover:bg-[#0066FF]/5",
+                "flex flex-col items-start gap-1 rounded-xl border border-[#1e2a45] bg-[#131A2E] p-3 text-left transition-colors hover:border-brand/50 hover:bg-brand/5",
                 !item.available && "cursor-not-allowed opacity-40 hover:border-[#1e2a45] hover:bg-[#131A2E]",
               )}
             >
@@ -144,7 +144,7 @@ export default function DemoOrderPanel({
                 />
               </div>
               <span className="text-xs font-medium text-white">{item.name}</span>
-              <span className="text-[11px] font-semibold text-[#0066FF]">${item.price.toFixed(2)}</span>
+              <span className="text-[11px] font-semibold text-brand">${item.price.toFixed(2)}</span>
             </button>
           ))}
         </div>
@@ -216,7 +216,7 @@ export default function DemoOrderPanel({
         <Button
           disabled={cartRows.length === 0 || charging}
           onClick={charge}
-          className="mt-4 h-11 w-full rounded-xl bg-gradient-to-r from-[#0066FF] to-[#00AACC] text-sm font-semibold text-white hover:opacity-90"
+          className="mt-4 h-11 w-full rounded-xl bg-gradient-to-r from-brand to-brand-sky text-sm font-semibold text-white hover:opacity-90"
         >
           {charging ? "Charging…" : `Charge $${total.toFixed(2)}`}
         </Button>

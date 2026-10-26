@@ -3,6 +3,17 @@ import { query, mutation } from "../_generated/server";
 import { getRestaurantByLicense } from "./helpers.ts";
 import { applySupplyRecipeDeductions } from "./supplyRecipe";
 
+function sameLocalDay(iso: string | undefined, now = new Date()): boolean {
+  if (!iso) return false;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return false;
+  return (
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  );
+}
+
 /** Log a staff consumption entry (items selected from menu) */
 export const addConsumption = mutation({
   args: {
@@ -24,11 +35,90 @@ export const addConsumption = mutation({
   handler: async (ctx, args) => {
     const restaurant = await getRestaurantByLicense(ctx, args.licenseKey);
 
-    const total = args.items.reduce(
+    const qtyByItem = new Map<string, number>();
+    for (const line of args.items) {
+      if (line.quantity <= 0) continue;
+      const key = String(line.menuItemId);
+      qtyByItem.set(key, (qtyByItem.get(key) ?? 0) + line.quantity);
+    }
+
+    const existing = (
+      await ctx.db
+        .query("staffConsumption")
+        .withIndex("by_restaurant", (q) => q.eq("restaurantId", restaurant._id))
+        .collect()
+    ).filter(
+      (e) =>
+        !e.cleared &&
+        e.staffId === args.staffId &&
+        sameLocalDay(e.createdAt),
+    );
+
+    const priced: typeof args.items = [];
+    for (const [itemId, qty] of qtyByItem) {
+      const menuItem = await ctx.db.get(itemId as typeof args.items[0]["menuItemId"]);
+      if (!menuItem || menuItem.restaurantId !== restaurant._id) {
+        throw new Error(`Item not found for staff meal: ${itemId}`);
+      }
+      const allowed = menuItem.staffMealAllowed === true;
+      if (!allowed) {
+        throw new Error(
+          `"${menuItem.name}" is not enabled for staff meals. / "${menuItem.name}" nuk është i lejuar për vakt stafi.`,
+        );
+      }
+      const staffPrice =
+        typeof menuItem.staffMealPrice === "number" && menuItem.staffMealPrice > 0
+          ? menuItem.staffMealPrice
+          : 0;
+      const freeQty =
+        typeof menuItem.staffMealFreeQty === "number" &&
+        menuItem.staffMealFreeQty > 0
+          ? Math.floor(menuItem.staffMealFreeQty)
+          : 0;
+      const dailyLimit =
+        typeof menuItem.staffMealDailyLimit === "number" &&
+        menuItem.staffMealDailyLimit > 0
+          ? Math.floor(menuItem.staffMealDailyLimit)
+          : 0;
+      let used = 0;
+      for (const entry of existing) {
+        for (const row of entry.items) {
+          if (String(row.menuItemId) === itemId) used += row.quantity;
+        }
+      }
+      if (dailyLimit > 0 && used + qty > dailyLimit) {
+        throw new Error(
+          `"${menuItem.name}" is limited to ${dailyLimit} per day for staff. / "${menuItem.name}" lejohet vetëm ${dailyLimit} copë në ditë.`,
+        );
+      }
+      const freeLeft = Math.max(0, freeQty - used);
+      const nextFree = Math.min(qty, freeLeft);
+      const nextPaid = qty - nextFree;
+      if (nextFree > 0) {
+        priced.push({
+          menuItemId: menuItem._id,
+          name: menuItem.name,
+          price: 0,
+          quantity: nextFree,
+          listPrice: menuItem.price,
+        });
+      }
+      if (nextPaid > 0) {
+        priced.push({
+          menuItemId: menuItem._id,
+          name: menuItem.name,
+          price: staffPrice,
+          quantity: nextPaid,
+          listPrice: menuItem.price,
+        });
+      }
+    }
+
+    const total = priced.reduce(
       (sum, i) => sum + i.price * i.quantity,
       0
     );
-    const listTotal = args.items.reduce((sum, i) => {
+    const listTotal = priced.reduce((sum, i) => {
       const unit = i.listPrice ?? i.price;
       return sum + unit * i.quantity;
     }, 0);
@@ -40,13 +130,13 @@ export const addConsumption = mutation({
       staffName: args.staffName,
       loggedByStaffId: args.loggedByStaffId,
       loggedByStaffName: args.loggedByStaffName,
-      items: args.items,
+      items: priced,
       total,
       cleared: false,
       createdAt: now,
     });
 
-    for (const line of args.items) {
+    for (const line of priced) {
       const menuItem = await ctx.db.get(line.menuItemId);
       if (
         menuItem &&
@@ -79,7 +169,7 @@ export const addConsumption = mutation({
       }
     }
 
-    const itemSummary = args.items
+    const itemSummary = priced
       .map((i) => `${i.quantity}x ${i.name}`)
       .join(", ");
     const loggedBy =

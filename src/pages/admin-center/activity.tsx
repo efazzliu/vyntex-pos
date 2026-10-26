@@ -28,7 +28,7 @@ export default function DashboardActivityPage() {
   return (
     <AdminPage>
       <header className="mb-6">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-indigo-500">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand">
           {t("ac.nav.admin_center")}
         </p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">{t("ac.activity.title")}</h1>

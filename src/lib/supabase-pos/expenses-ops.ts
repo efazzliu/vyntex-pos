@@ -90,6 +90,7 @@ export async function getAllUnclearedExpenses(args: { licenseKey: string }) {
     _id: row.id,
     amount: Number(row.amount),
     note: row.note,
+    staffId: row.staff_id != null ? String(row.staff_id) : "",
     staffName: row.staff_name,
     createdAt: row.created_at,
   }));

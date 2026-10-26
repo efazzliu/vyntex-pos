@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import "../index.css";
 import PhoneApp from "./PhoneApp.tsx";
+import { attachUiTextSelectionGuard } from "../lib/disable-ui-text-selection.ts";
 
 /** Block iOS Safari pinch-zoom gestures inside the phone shell. */
 function disablePhoneZoomGestures() {
@@ -13,5 +14,6 @@ function disablePhoneZoomGestures() {
 }
 
 disablePhoneZoomGestures();
+attachUiTextSelectionGuard();
 
 createRoot(document.getElementById("root")!).render(<PhoneApp />);

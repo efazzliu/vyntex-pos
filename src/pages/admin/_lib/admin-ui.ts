@@ -9,7 +9,7 @@ export const adminCardClass = cn(
 
 export const adminHeroClass = cn(
   adminCardClass,
-  "relative bg-gradient-to-br from-white via-slate-50/90 to-blue-50/40 p-5",
+  "relative bg-gradient-to-br from-white via-slate-50/90 to-brand-light/40 p-5",
   "dark:from-slate-950 dark:via-slate-950 dark:to-slate-900/80",
 );
 

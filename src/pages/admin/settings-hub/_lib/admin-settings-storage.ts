@@ -8,6 +8,7 @@ import {
   DEFAULT_NOTIFICATION_PREFS,
   DEFAULT_UI_PREFS,
 } from "./admin-settings-types.ts";
+import { BRAND } from "@/lib/brand-colors.ts";
 
 const LOCAL_UI_KEY = "vyntex-admin-ui";
 
@@ -71,7 +72,7 @@ export function applyAccentCss(accentHex: string) {
 
 export function accentHexForId(id: AdminUiPrefs["accentColor"]): string {
   const map: Record<AdminUiPrefs["accentColor"], string> = {
-    blue: "#0066FF",
+    blue: BRAND.primary,
     cyan: "#06b6d4",
     emerald: "#10b981",
     violet: "#8b5cf6",

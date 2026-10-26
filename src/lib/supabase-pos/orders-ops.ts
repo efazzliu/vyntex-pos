@@ -1,5 +1,9 @@
 import { supabase } from "@/lib/supabase.ts";
-import { assertNoPgError, isMissingPgColumnError } from "./db-errors.ts";
+import {
+  assertNoPgError,
+  isMissingPgColumnError,
+  isPgCheckConstraintError,
+} from "./db-errors.ts";
 import { getRestaurantByLicense } from "./restaurant.ts";
 import { isLocalDevicePosAdmin, staffIdsEqual, uuidOrNull } from "./uuid.ts";
 import {
@@ -14,6 +18,7 @@ import {
   updateFloorTableStatusSafe,
 } from "./floor-sync.ts";
 import { isOpenSaleStatus, loadOpenSalesForTable } from "./tables-ops.ts";
+import { assertStaffPermission } from "./staff-auth.ts";
 import { applySupplyRecipeAfterSale } from "./supply-recipe-ops.ts";
 import {
   customizationPriceDelta,
@@ -21,6 +26,70 @@ import {
   normalizeSelectedCustomizations,
   type SelectedCustomization,
 } from "@/lib/menu-customizations.ts";
+import {
+  parsePosStockRules,
+  stockRulesFromRestaurantRow,
+  type OrderAvailabilityRules,
+} from "@/lib/pos-order-availability.ts";
+import type { RestaurantRow } from "./restaurant.ts";
+
+/** Hidden on replaced lines so the order list does not treat a swap as a delete. */
+const REPLACED_LINE_MARK = "⟦pos:replaced⟧";
+const RETURNED_LINE_MARK = "⟦pos:returned⟧";
+/** Set when current_stock was deducted at send so pay/waste do not deduct twice. */
+const STOCK_COMMITTED_MARK = "⟦pos:stock⟧";
+
+function saleLineWasReplaced(notes: string | null | undefined): boolean {
+  const n = String(notes ?? "");
+  return n.includes(REPLACED_LINE_MARK) || n.includes(RETURNED_LINE_MARK);
+}
+
+function notesWithMark(
+  notes: string | null | undefined,
+  mark: string,
+): string {
+  const cur = String(notes ?? "");
+  if (cur.includes(mark)) return cur;
+  const trimmed = cur.trim();
+  return trimmed ? `${trimmed}\n${mark}` : mark;
+}
+
+function notesWithReplacedMark(notes: string | null | undefined): string {
+  return notesWithMark(notes, REPLACED_LINE_MARK);
+}
+
+function notesWithReturnedMark(notes: string | null | undefined): string {
+  return notesWithMark(notes, RETURNED_LINE_MARK);
+}
+
+function notesWithoutReplacedMark(
+  notes: string | null | undefined,
+): string | undefined {
+  const s = String(notes ?? "")
+    .split("\n")
+    .filter(
+      (line) =>
+        line.trim() !== REPLACED_LINE_MARK &&
+        line.trim() !== RETURNED_LINE_MARK &&
+        line.trim() !== STOCK_COMMITTED_MARK,
+    )
+    .join("\n")
+    .replaceAll(REPLACED_LINE_MARK, "")
+    .replaceAll(RETURNED_LINE_MARK, "")
+    .replaceAll(STOCK_COMMITTED_MARK, "")
+    .trim();
+  return s || undefined;
+}
+
+function saleLineStockCommitted(notes: string | null | undefined): boolean {
+  return String(notes ?? "").includes(STOCK_COMMITTED_MARK);
+}
+
+function notesWithStockCommittedMark(
+  notes: string | null | undefined,
+): string {
+  return notesWithMark(notes, STOCK_COMMITTED_MARK);
+}
 
 function itemRowToDoc(r: {
   id: string;
@@ -46,11 +115,12 @@ function itemRowToDoc(r: {
     name: r.name,
     price: Number(r.price),
     quantity: Number(r.quantity),
-    notes: r.notes ?? undefined,
+    notes: notesWithoutReplacedMark(r.notes),
     station: (r.station as "kitchen" | "bar" | undefined) ?? undefined,
     status: r.status,
     vatRate: r.vat_rate != null ? Number(r.vat_rate) : 0.2,
     createdAt: r.created_at ?? undefined,
+    replaced: saleLineWasReplaced(r.notes),
     ...(selectedCustomizations.length > 0 ? { selectedCustomizations } : {}),
   };
 }
@@ -82,6 +152,109 @@ function parseSettledSaleItemIds(args: Record<string, unknown>): string[] {
   return raw.map((x) => String(x)).filter(Boolean);
 }
 
+type SettledSaleQty = { id: string; quantity: number | null };
+
+function parseSettledSaleQuantities(
+  args: Record<string, unknown>,
+): SettledSaleQty[] {
+  const rawItems = args.settledSaleItems;
+  if (Array.isArray(rawItems) && rawItems.length > 0) {
+    const merged = new Map<string, number>();
+    for (const x of rawItems) {
+      if (!x || typeof x !== "object") continue;
+      const rec = x as Record<string, unknown>;
+      const id = String(rec.id ?? "").trim();
+      const qty = Number(rec.quantity);
+      if (!id || !Number.isFinite(qty) || qty <= 0) continue;
+      merged.set(id, (merged.get(id) ?? 0) + qty);
+    }
+    return [...merged.entries()].map(([id, quantity]) => ({ id, quantity }));
+  }
+  return parseSettledSaleItemIds(args).map((id) => ({ id, quantity: null }));
+}
+
+function buildSettledLinePlan(
+  lineById: Map<string, Record<string, unknown>>,
+  orderId: string,
+  allocations: SettledSaleQty[],
+): {
+  settledSum: number;
+  stockRows: Record<string, unknown>[];
+  deleteIds: string[];
+  reduce: { id: string; nextQty: number }[];
+  settledIds: string[];
+} {
+  let settledSum = 0;
+  const stockRows: Record<string, unknown>[] = [];
+  const deleteIds: string[] = [];
+  const reduce: { id: string; nextQty: number }[] = [];
+  const settledIds: string[] = [];
+  const qtyEps = 0.0005;
+
+  for (const alloc of allocations) {
+    const row = lineById.get(alloc.id);
+    if (!row) throw new Error("Invalid sale line for split payment");
+    if (String(row.sale_id) !== String(orderId)) {
+      throw new Error("Sale line does not belong to this order");
+    }
+    const st = String(row.status ?? "");
+    if (st === "cancelled" || st === "voided") {
+      throw new Error("Cannot pay a cancelled or voided line");
+    }
+    const lineQty = Number(row.quantity);
+    if (!Number.isFinite(lineQty) || lineQty <= 0) {
+      throw new Error("Invalid sale line quantity");
+    }
+    const take =
+      alloc.quantity == null ? lineQty : Math.min(lineQty, alloc.quantity);
+    if (!Number.isFinite(take) || take <= 0) {
+      throw new Error("Invalid settle quantity");
+    }
+    if (alloc.quantity != null && alloc.quantity - take > qtyEps) {
+      throw new Error("Settle quantity exceeds the line");
+    }
+    settledSum += Number(row.price) * take;
+    stockRows.push({ ...row, quantity: take });
+    settledIds.push(alloc.id);
+    if (take >= lineQty - qtyEps) deleteIds.push(alloc.id);
+    else {
+      reduce.push({
+        id: alloc.id,
+        nextQty: Math.round((lineQty - take) * 1000) / 1000,
+      });
+    }
+  }
+
+  return {
+    settledSum: Math.round(settledSum * 100) / 100,
+    stockRows,
+    deleteIds,
+    reduce,
+    settledIds,
+  };
+}
+
+async function applySettledLinePlan(
+  plan: ReturnType<typeof buildSettledLinePlan>,
+  orderId: string,
+) {
+  if (plan.deleteIds.length > 0) {
+    const { error: delErr } = await supabase
+      .from("sale_items")
+      .delete()
+      .in("id", plan.deleteIds);
+    assertNoPgError("Remove paid sale lines", delErr);
+  }
+  for (const row of plan.reduce) {
+    const { error: upErr } = await supabase
+      .from("sale_items")
+      .update({ quantity: row.nextQty })
+      .eq("id", row.id);
+    assertNoPgError("Reduce paid sale line quantity", upErr);
+  }
+  await recalcSaleTotals(orderId);
+}
+
 /** Stock + total_sold for lines being paid (before rows are deleted on split). */
 async function applyStockSoldForSaleItemRows(
   restaurantId: string,
@@ -92,6 +265,7 @@ async function applyStockSoldForSaleItemRows(
   licenseKey: string,
 ) {
   const qtyByMenuId = new Map<string, number>();
+  const qtyDeductByMenuId = new Map<string, number>();
   for (const it of lines) {
     const st = String(it.status ?? "");
     if (st === "cancelled" || st === "voided") continue;
@@ -104,7 +278,11 @@ async function applyStockSoldForSaleItemRows(
           ) ?? null;
     if (!fk) continue;
     const qty = Number(it.quantity);
+    if (!Number.isFinite(qty) || qty <= 0) continue;
     qtyByMenuId.set(fk, (qtyByMenuId.get(fk) ?? 0) + qty);
+    if (!saleLineStockCommitted(it.notes as string | null | undefined)) {
+      qtyDeductByMenuId.set(fk, (qtyDeductByMenuId.get(fk) ?? 0) + qty);
+    }
   }
   if (qtyByMenuId.size === 0) return;
 
@@ -126,10 +304,11 @@ async function applyStockSoldForSaleItemRows(
       const prevStock = Number(mi.current_stock ?? 0);
       const track = Boolean(mi.track_stock);
 
+      const deductQty = qtyDeductByMenuId.get(fk) ?? 0;
       const updates: Record<string, unknown> = { total_sold: prevSold + qty };
       let balanceAfter = prevStock;
-      if (track) {
-        balanceAfter = prevStock - qty;
+      if (track && deductQty > 0) {
+        balanceAfter = Math.max(0, prevStock - deductQty);
         updates.current_stock = balanceAfter;
       }
 
@@ -139,13 +318,13 @@ async function applyStockSoldForSaleItemRows(
         .eq("id", fk);
       assertNoPgError("Update menu item after partial line pay", upErr);
 
-      if (track) {
+      if (track && deductQty > 0) {
         return {
           restaurant_id: restaurantId,
           menu_item_id: fk,
           staff_name: staffName,
           type: "sale" as const,
-          change: -qty,
+          change: -deductQty,
           balance_after: balanceAfter,
           note: `Order ${orderLabel}`,
         };
@@ -163,11 +342,223 @@ async function applyStockSoldForSaleItemRows(
 
   await applySupplyRecipeAfterSale({
     restaurantId,
-    qtyByMenuItemId: qtyByMenuId,
+    qtyByMenuItemId: qtyDeductByMenuId,
     staffName,
     contextNote: `Order ${orderLabel}`,
     licenseKey,
   });
+}
+
+/** Deduct tracked stock for wasted/sent lines. Never goes below 0. */
+async function deductTrackedStockClamped(args: {
+  licenseKey: string;
+  staffName: string;
+  note: string;
+  logType: string;
+  lines: Array<{
+    menu_item_id?: string | null;
+    quantity?: number | string;
+    status?: string | null;
+    notes?: string | null;
+  }>;
+}): Promise<void> {
+  const r = await getRestaurantByLicense(args.licenseKey);
+  const qtyByMenuId = new Map<string, number>();
+  for (const it of args.lines) {
+    if (saleLineIsUnsent(it.status)) continue;
+    if (saleLineStockCommitted(it.notes)) continue;
+    const fk = String(it.menu_item_id ?? "").trim();
+    if (!fk) continue;
+    const qty = Number(it.quantity);
+    if (!Number.isFinite(qty) || qty <= 0) continue;
+    qtyByMenuId.set(fk, (qtyByMenuId.get(fk) ?? 0) + qty);
+  }
+  if (qtyByMenuId.size === 0) return;
+
+  const fks = [...qtyByMenuId.keys()];
+  const { data: menuRows, error: menuLoadErr } = await supabase
+    .from("menu_items")
+    .select("id, track_stock, current_stock")
+    .in("id", fks);
+  assertNoPgError("Load menu items for waste stock", menuLoadErr);
+  const miById = new Map((menuRows ?? []).map((m) => [String(m.id), m]));
+
+  const stockLogRows: Record<string, unknown>[] = [];
+  for (const fk of fks) {
+    const qty = qtyByMenuId.get(fk) ?? 0;
+    const mi = miById.get(fk);
+    if (!mi || !mi.track_stock) continue;
+    const prevStock = Number(mi.current_stock ?? 0);
+    const balanceAfter = Math.max(0, prevStock - qty);
+    const { error: upErr } = await supabase
+      .from("menu_items")
+      .update({ current_stock: balanceAfter })
+      .eq("id", fk);
+    assertNoPgError("Deduct waste stock", upErr);
+    stockLogRows.push({
+      restaurant_id: r.id,
+      menu_item_id: fk,
+      staff_name: args.staffName,
+      type: args.logType,
+      change: -(prevStock - balanceAfter),
+      balance_after: balanceAfter,
+      note: args.note,
+    });
+  }
+  if (stockLogRows.length > 0) {
+    const { error: logErr } = await supabase
+      .from("pos_stock_logs")
+      .insert(stockLogRows);
+    assertNoPgError("Log waste stock", logErr);
+  }
+}
+
+function orderAvailabilityRulesFromRestaurant(
+  r: RestaurantRow,
+): OrderAvailabilityRules {
+  return {
+    honorKitchenStop: r.pos_enforce_availability === true,
+    blockOutOfStock: parsePosStockRules(stockRulesFromRestaurantRow(r)).blockOutOfStock,
+  };
+}
+
+/**
+ * Deduct current_stock when items are sent to kitchen/bar.
+ * Throws UNAVAILABLE_STOCK if blocking is on and there is not enough left.
+ */
+async function commitTrackedStockOnSend(args: {
+  licenseKey: string;
+  staffName: string;
+  note: string;
+  lines: Array<{
+    menu_item_id?: string | null;
+    quantity?: number | string;
+    name?: string | null;
+  }>;
+}): Promise<Map<string, number>> {
+  const r = await getRestaurantByLicense(args.licenseKey);
+  const blockOutOfStock =
+    orderAvailabilityRulesFromRestaurant(r).blockOutOfStock;
+  const qtyByMenuId = new Map<string, number>();
+  for (const it of args.lines) {
+    const fk = String(it.menu_item_id ?? "").trim();
+    if (!fk) continue;
+    const qty = Number(it.quantity);
+    if (!Number.isFinite(qty) || qty <= 0) continue;
+    qtyByMenuId.set(fk, (qtyByMenuId.get(fk) ?? 0) + qty);
+  }
+  if (qtyByMenuId.size === 0) return qtyByMenuId;
+
+  const fks = [...qtyByMenuId.keys()];
+  const { data: menuRows, error: menuLoadErr } = await supabase
+    .from("menu_items")
+    .select("id, name, track_stock, current_stock")
+    .in("id", fks);
+  assertNoPgError("Load menu items for send stock", menuLoadErr);
+  const miById = new Map((menuRows ?? []).map((m) => [String(m.id), m]));
+
+  for (const fk of fks) {
+    const qty = qtyByMenuId.get(fk) ?? 0;
+    const mi = miById.get(fk);
+    if (!mi || !mi.track_stock) continue;
+    const prevStock = Number(mi.current_stock ?? 0);
+    const name = String(mi.name ?? fk);
+    if (
+      blockOutOfStock &&
+      (!Number.isFinite(prevStock) || prevStock < qty)
+    ) {
+      throw new Error(`UNAVAILABLE_STOCK:${name}`);
+    }
+  }
+
+  const stockLogRows: Record<string, unknown>[] = [];
+  for (const fk of fks) {
+    const qty = qtyByMenuId.get(fk) ?? 0;
+    const mi = miById.get(fk);
+    if (!mi || !mi.track_stock) continue;
+    const prevStock = Number.isFinite(Number(mi.current_stock ?? 0))
+      ? Number(mi.current_stock ?? 0)
+      : 0;
+    const balanceAfter = prevStock - qty;
+    const { error: upErr } = await supabase
+      .from("menu_items")
+      .update({ current_stock: balanceAfter })
+      .eq("id", fk);
+    assertNoPgError("Deduct stock on send", upErr);
+    stockLogRows.push({
+      restaurant_id: r.id,
+      menu_item_id: fk,
+      staff_name: args.staffName,
+      type: "sale",
+      change: -qty,
+      balance_after: balanceAfter,
+      note: args.note,
+    });
+  }
+  if (stockLogRows.length > 0) {
+    const { error: logErr } = await supabase
+      .from("pos_stock_logs")
+      .insert(stockLogRows);
+    assertNoPgError("Log stock on send", logErr);
+  }
+
+  await applySupplyRecipeAfterSale({
+    restaurantId: r.id,
+    qtyByMenuItemId: qtyByMenuId,
+    staffName: args.staffName,
+    contextNote: args.note,
+    licenseKey: args.licenseKey,
+  });
+  return qtyByMenuId;
+}
+
+/** Put tracked stock back (return / replace of a sent line). */
+async function restoreTrackedStock(args: {
+  licenseKey: string;
+  staffName: string;
+  note: string;
+  logType: string;
+  qtyByMenuId: Map<string, number>;
+}): Promise<void> {
+  if (args.qtyByMenuId.size === 0) return;
+  const r = await getRestaurantByLicense(args.licenseKey);
+  const fks = [...args.qtyByMenuId.keys()];
+  const { data: menuRows, error: menuLoadErr } = await supabase
+    .from("menu_items")
+    .select("id, track_stock, current_stock")
+    .in("id", fks);
+  assertNoPgError("Load menu items for stock restore", menuLoadErr);
+  const miById = new Map((menuRows ?? []).map((m) => [String(m.id), m]));
+
+  const stockLogRows: Record<string, unknown>[] = [];
+  for (const fk of fks) {
+    const qty = args.qtyByMenuId.get(fk) ?? 0;
+    if (qty <= 0) continue;
+    const mi = miById.get(fk);
+    if (!mi || !mi.track_stock) continue;
+    const prevStock = Number(mi.current_stock ?? 0);
+    const balanceAfter = prevStock + qty;
+    const { error: upErr } = await supabase
+      .from("menu_items")
+      .update({ current_stock: balanceAfter })
+      .eq("id", fk);
+    assertNoPgError("Restore tracked stock", upErr);
+    stockLogRows.push({
+      restaurant_id: r.id,
+      menu_item_id: fk,
+      staff_name: args.staffName,
+      type: args.logType,
+      change: qty,
+      balance_after: balanceAfter,
+      note: args.note,
+    });
+  }
+  if (stockLogRows.length > 0) {
+    const { error: logErr } = await supabase
+      .from("pos_stock_logs")
+      .insert(stockLogRows);
+    assertNoPgError("Log stock restore", logErr);
+  }
 }
 
 type SaleItemInsertRow = {
@@ -180,6 +571,7 @@ type SaleItemInsertRow = {
   station: string | null;
   vat_rate: number;
   selected_customizations?: SelectedCustomization[];
+  status?: string;
 };
 
 function saleItemToInsertShapes(args: SaleItemInsertRow) {
@@ -189,7 +581,7 @@ function saleItemToInsertShapes(args: SaleItemInsertRow) {
     price: args.price,
     quantity: args.quantity,
     notes: args.notes,
-    status: "pending",
+    status: args.status ?? "pending",
   };
   const withVatStation: Record<string, unknown> = {
     ...minimal,
@@ -1024,12 +1416,7 @@ async function assertMenuLinesOrderable(
   lines: OrderLineInput[],
 ) {
   const r = await getRestaurantByLicense(licenseKey);
-  const { data: enforceRow } = await supabase
-    .from("restaurants")
-    .select("pos_enforce_availability")
-    .eq("id", r.id)
-    .maybeSingle();
-  if (enforceRow?.pos_enforce_availability !== true) return;
+  const rules = orderAvailabilityRulesFromRestaurant(r);
 
   const qtyById = new Map<string, number>();
   for (const line of lines) {
@@ -1052,10 +1439,14 @@ async function assertMenuLinesOrderable(
   for (const [id, qty] of qtyById) {
     const row = byId.get(id);
     const name = String(row?.name ?? id);
-    if (!row || row.available === false) {
+    if (rules.honorKitchenStop && (!row || row.available === false)) {
       throw new Error(`UNAVAILABLE_STOPPED:${name}`);
     }
-    if (row.track_stock && Number(row.current_stock ?? 0) < qty) {
+    if (
+      rules.blockOutOfStock &&
+      row?.track_stock &&
+      Number(row.current_stock ?? 0) < qty
+    ) {
       throw new Error(`UNAVAILABLE_STOCK:${name}`);
     }
   }
@@ -1099,7 +1490,60 @@ type MarkSentArgs = {
   staffName?: string;
   /** Optional; client-side cache invalidation only. */
   tableId?: string;
+  /** Cart lines with menu ids — used when sale_items.menu_item_id is missing from schema cache. */
+  stockLines?: OrderLineInput[];
 };
+
+type PendingSendRow = {
+  id: string;
+  station?: string | null;
+  name?: string | null;
+  quantity?: number | string | null;
+  price?: number | string | null;
+  notes?: string | null;
+  menu_item_id?: string | null;
+};
+
+async function loadPendingItemsToSend(orderId: string): Promise<PendingSendRow[]> {
+  const attempts = [
+    "id, station, name, quantity, price, notes, menu_item_id",
+    "id, name, quantity, price, notes, menu_item_id",
+    "id, station, name, quantity, price, notes",
+    "id, name, quantity, price, notes",
+    "id, name, quantity, price",
+  ];
+  let lastErr: { message: string } | null = null;
+  for (const sel of attempts) {
+    const res = await supabase
+      .from("sale_items")
+      .select(sel)
+      .eq("sale_id", orderId)
+      .eq("status", "pending");
+    if (!res.error) {
+      return (res.data ?? []).map((r) => ({
+        id: String(r.id),
+        station: (r as { station?: string | null }).station ?? null,
+        name: (r as { name?: string | null }).name ?? null,
+        quantity: (r as { quantity?: number | string | null }).quantity ?? 0,
+        price: (r as { price?: number | string | null }).price ?? 0,
+        notes: (r as { notes?: string | null }).notes ?? null,
+        menu_item_id: (r as { menu_item_id?: string | null }).menu_item_id ?? null,
+      }));
+    }
+    lastErr = res.error;
+    const msg = res.error.message;
+    const retryable =
+      isPostgrestExposeOrCacheError(msg) ||
+      isMissingPgColumnError(msg, "station") ||
+      isMissingPgColumnError(msg, "menu_item_id") ||
+      isMissingPgColumnError(msg, "notes");
+    if (!retryable) {
+      assertNoPgError("Load items to send", res.error);
+    }
+  }
+  assertNoPgError("Load items to send", lastErr);
+  return [];
+}
 
 /**
  * Mark pending lines sent + kitchen status (no license / staff checks — caller must validate).
@@ -1136,43 +1580,7 @@ async function executeMarkOrderSentToKitchen(args: MarkSentArgs): Promise<{
       if (!row) throw new Error("Order not found");
       return row;
     })(),
-    (async (): Promise<
-      {
-        id: string;
-        station?: string | null;
-        name?: string | null;
-        quantity?: number | string | null;
-        price?: number | string | null;
-        notes?: string | null;
-      }[]
-    > => {
-      const pendingRes = await supabase
-        .from("sale_items")
-        .select("id, station, name, quantity, price, notes")
-        .eq("sale_id", args.orderId)
-        .eq("status", "pending");
-
-      if (
-        pendingRes.error &&
-        isMissingPgColumnError(pendingRes.error.message, "station")
-      ) {
-        console.warn(
-          "[POS] sale_items.station column missing; bar/kitchen split counts as kitchen only.",
-        );
-        const fallback = await supabase
-          .from("sale_items")
-          .select("id, name, quantity, price, notes")
-          .eq("sale_id", args.orderId)
-          .eq("status", "pending");
-        assertNoPgError("Load items to send", fallback.error);
-        return (fallback.data ?? []).map((r) => ({
-          ...r,
-          station: null,
-        }));
-      }
-      assertNoPgError("Load items to send", pendingRes.error);
-      return pendingRes.data ?? [];
-    })(),
+    loadPendingItemsToSend(args.orderId),
   ]);
 
   if (!pending.length) {
@@ -1186,7 +1594,6 @@ async function executeMarkOrderSentToKitchen(args: MarkSentArgs): Promise<{
     else kitchenItems += 1;
   }
 
-  const ids = pending.map((row) => row.id);
   const lineRows: {
     id: string;
     name: string;
@@ -1203,17 +1610,90 @@ async function executeMarkOrderSentToKitchen(args: MarkSentArgs): Promise<{
     notes: row.notes ?? null,
   }));
 
-  const markSent = supabase
-    .from("sale_items")
-    .update({ status: "sent" })
-    .in("id", ids);
-  const markSaleSent = supabase
-    .from("sales")
-    .update({ status: "sent-to-kitchen" })
-    .eq("id", args.orderId);
-  const [sentRes, saleStatusRes] = await Promise.all([markSent, markSaleSent]);
-  assertNoPgError("Mark items sent", sentRes.error);
-  assertNoPgError("Update order to sent", saleStatusRes.error);
+  let staffName = (args.staffName ?? "").trim();
+  if (!staffName) {
+    const sid =
+      uuidOrNull(args.staffId) ?? uuidOrNull(saleRow.staff_id ?? undefined);
+    if (sid) {
+      const { data: st } = await supabase
+        .from("staff")
+        .select("name")
+        .eq("id", sid)
+        .maybeSingle();
+      staffName = (st?.name as string) ?? "Unknown";
+    } else {
+      staffName = "Unknown";
+    }
+  }
+
+  const orderNumber = displayOrderNumber(
+    saleRow.id,
+    (saleRow as { order_number?: number | null }).order_number,
+  );
+  const committedQtys = await commitTrackedStockOnSend({
+    licenseKey: args.licenseKey,
+    staffName,
+    note: `Sent — Order #${orderNumber}`,
+    lines:
+      args.stockLines && args.stockLines.length > 0
+        ? args.stockLines.map((line) => ({
+            menu_item_id: line.menuItemId,
+            quantity: line.quantity,
+            name: line.name,
+          }))
+        : pending.map((row) => ({
+            menu_item_id: row.menu_item_id,
+            quantity: row.quantity ?? 0,
+            name: row.name,
+          })),
+  });
+
+  const ids = pending.map((row) => row.id);
+  try {
+    const sentAt = new Date().toISOString();
+    let sentRes = await supabase
+      .from("sale_items")
+      .update({ status: "sent", sent_at: sentAt })
+      .in("id", ids);
+    if (
+      sentRes.error &&
+      isMissingPgColumnError(sentRes.error.message, "sent_at")
+    ) {
+      sentRes = await supabase
+        .from("sale_items")
+        .update({ status: "sent" })
+        .in("id", ids);
+    }
+    assertNoPgError("Mark items sent", sentRes.error);
+
+    const saleStatusRes = await supabase
+      .from("sales")
+      .update({ status: "sent-to-kitchen" })
+      .eq("id", args.orderId);
+    assertNoPgError("Update order to sent", saleStatusRes.error);
+  } catch (err) {
+    await restoreTrackedStock({
+      licenseKey: args.licenseKey,
+      staffName,
+      note: `Send failed — restore Order #${orderNumber}`,
+      logType: "adjustment",
+      qtyByMenuId: committedQtys,
+    }).catch((restoreErr) =>
+      console.warn("[POS] restore stock after failed send:", restoreErr),
+    );
+    throw err;
+  }
+
+  void Promise.all(
+    pending.map((row) =>
+      supabase
+        .from("sale_items")
+        .update({ notes: notesWithStockCommittedMark(row.notes) })
+        .eq("id", row.id),
+    ),
+  ).catch((noteErr) =>
+    console.warn("[POS] stock-committed note on send:", noteErr),
+  );
 
   const floorId = saleFloorTableId(saleRow);
   const [, tableNameForAudit] = await Promise.all([
@@ -1373,6 +1853,7 @@ export async function submitCartOrder(args: {
     staffId: args.staffId,
     staffName: args.staffName,
     tableId: args.tableId,
+    stockLines: args.lines,
   });
   const orderSnapshot = await getOrderWithItems({
     licenseKey: args.licenseKey,
@@ -1425,22 +1906,40 @@ export async function payOrder(args: Record<string, unknown>) {
   void args.tableId;
   const licenseKey = args.licenseKey as string;
   const orderId = args.orderId as string;
-  const paymentMethod = args.paymentMethod as string;
-  const paymentType = args.paymentType as string;
+  let paymentMethod = String(args.paymentMethod ?? "cash");
+  if (paymentMethod === "qr") paymentMethod = "other";
+  let paymentType = String(args.paymentType ?? "no_receipt");
   const r = await getRestaurantByLicense(licenseKey);
 
-  const { data: order } = await supabase
+  const { data: order, error: loadErr } = await supabase
     .from("sales")
     .select("*")
     .eq("id", orderId)
-    .single();
-  if (!order || order.restaurant_id !== r.id) throw new Error("Order not found");
+    .maybeSingle();
+  assertNoPgError("Load sale for payment", loadErr);
+  if (!order || String(order.restaurant_id) !== String(r.id)) {
+    throw new Error("Order not found");
+  }
+
+  const paidTableIdEarly = saleFloorTableId(
+    order as Parameters<typeof saleFloorTableId>[0],
+  );
+  if (String(order.status ?? "").toLowerCase() === "paid") {
+    if (paidTableIdEarly) {
+      await updateFloorTableStatusSafe(
+        paidTableIdEarly,
+        "available",
+        "Free table after payment",
+      );
+    }
+    return;
+  }
 
   const orderTotal = Number(order.total ?? 0);
   const prevPaidRaw = (order as { paid_amount?: unknown }).paid_amount;
   const prevPaid =
     Math.round(Math.max(0, Number(prevPaidRaw ?? 0)) * 100) / 100;
-  const fullRemaining =
+  let fullRemaining =
     Math.round(Math.max(0, orderTotal - prevPaid) * 100) / 100;
   const eps = 0.009;
 
@@ -1450,10 +1949,31 @@ export async function payOrder(args: Record<string, unknown>) {
       ? Math.round(Number(rawAmount) * 100) / 100
       : null;
 
-  const portion =
+  let portion =
     requested != null && Number.isFinite(requested) && requested > 0
       ? requested
       : fullRemaining;
+
+  if (portion <= 0) {
+    await recalcSaleTotals(orderId);
+    const { data: refreshed, error: refreshErr } = await supabase
+      .from("sales")
+      .select("total, paid_amount")
+      .eq("id", orderId)
+      .maybeSingle();
+    assertNoPgError("Reload sale totals for payment", refreshErr);
+    const refreshedTotal = Number(refreshed?.total ?? 0);
+    const refreshedPaid =
+      Math.round(
+        Math.max(0, Number((refreshed as { paid_amount?: unknown } | null)?.paid_amount ?? 0)) *
+          100,
+      ) / 100;
+    fullRemaining = Math.round(Math.max(0, refreshedTotal - refreshedPaid) * 100) / 100;
+    portion =
+      requested != null && Number.isFinite(requested) && requested > 0
+        ? requested
+        : fullRemaining;
+  }
 
   if (portion <= 0) {
     throw new Error("Nothing to pay");
@@ -1464,52 +1984,47 @@ export async function payOrder(args: Record<string, unknown>) {
 
   const isFinal = portion >= fullRemaining - eps;
 
+  if (paymentType === "debt") {
+    await assertStaffPermission({
+      licenseKey,
+      staffId: args.staffId as string | undefined,
+      permission: "canChargeDebt",
+    });
+  }
+  if (paymentType === "complimentary") {
+    await assertStaffPermission({
+      licenseKey,
+      staffId: args.staffId as string | undefined,
+      permission: "canMarkComplimentary",
+    });
+  }
+
   if (!isFinal) {
     if (paymentType === "debt" || paymentType === "complimentary") {
       throw new Error(
-        "For split payments, use No receipt or Non-fiscal until the balance is cleared.",
-      );
-    }
-    if (paymentType === "fiscal") {
-      throw new Error(
-        "Fiscal receipt is available only when paying the full remaining balance.",
+        "For split payments, use Cash or Card until the balance is cleared.",
       );
     }
 
-    const settledSaleItemIds = parseSettledSaleItemIds(args);
+    const settledAlloc = parseSettledSaleQuantities(args);
     const staffNameLog =
       String((args.staffName as string | undefined) ?? "").trim() || "System";
 
-    if (settledSaleItemIds.length > 0) {
+    if (settledAlloc.length > 0) {
       const { data: allLines, error: loadAllErr } = await supabase
         .from("sale_items")
         .select("*")
         .eq("sale_id", orderId);
       assertNoPgError("Load sale items for split settle", loadAllErr);
       const lineById = new Map(
-        (allLines ?? []).map((row) => [String(row.id), row]),
+        (allLines ?? []).map((row) => [String(row.id), row as Record<string, unknown>]),
       );
-      let settledSum = 0;
-      const settledRows: Record<string, unknown>[] = [];
-      for (const sid of settledSaleItemIds) {
-        const row = lineById.get(sid);
-        if (!row) throw new Error("Invalid sale line for split payment");
-        if (String(row.sale_id) !== String(orderId)) {
-          throw new Error("Sale line does not belong to this order");
-        }
-        const st = String(row.status ?? "");
-        if (st === "cancelled" || st === "voided") {
-          throw new Error("Cannot pay a cancelled or voided line");
-        }
-        settledSum += Number(row.price) * Number(row.quantity);
-        settledRows.push(row as Record<string, unknown>);
-      }
-      settledSum = Math.round(settledSum * 100) / 100;
-      if (Math.abs(settledSum - portion) > eps) {
+      const plan = buildSettledLinePlan(lineById, orderId, settledAlloc);
+      if (Math.abs(plan.settledSum - portion) > eps) {
         throw new Error("Selected lines do not match the payment amount");
       }
 
-      const needsSnap = settledRows.some((it) => {
+      const needsSnap = plan.stockRows.some((it) => {
         const rawFk = it.menu_item_id as string | null | undefined;
         return !rawFk || String(rawFk).trim() === "";
       });
@@ -1523,20 +2038,15 @@ export async function payOrder(args: Record<string, unknown>) {
       );
       await applyStockSoldForSaleItemRows(
         r.id,
-        settledRows,
+        plan.stockRows,
         staffNameLog,
         order.order_number != null ? `#${order.order_number}` : String(orderId).slice(0, 8),
         menuIdBySnapshot,
         licenseKey,
       );
 
-      const { error: delErr } = await supabase
-        .from("sale_items")
-        .delete()
-        .in("id", settledSaleItemIds);
-      assertNoPgError("Remove paid sale lines", delErr);
-
-      await recalcSaleTotals(orderId);
+      await applySettledLinePlan(plan, orderId);
+      const settledSaleItemIds = plan.settledIds;
 
       const { data: saleAfter, error: saleReloadErr } = await supabase
         .from("sales")
@@ -1717,9 +2227,9 @@ export async function payOrder(args: Record<string, unknown>) {
     return;
   }
 
-  const fullPathSettledIds = parseSettledSaleItemIds(args);
+  const fullPathAlloc = parseSettledSaleQuantities(args);
   if (
-    fullPathSettledIds.length > 0 &&
+    fullPathAlloc.length > 0 &&
     requested != null &&
     paymentType !== "complimentary"
   ) {
@@ -1729,33 +2239,18 @@ export async function payOrder(args: Record<string, unknown>) {
       .eq("sale_id", orderId);
     assertNoPgError("Load sale items for final line settle", loadAllErrF);
     const lineByIdF = new Map(
-      (allLinesF ?? []).map((row) => [String(row.id), row]),
+      (allLinesF ?? []).map((row) => [String(row.id), row as Record<string, unknown>]),
     );
-    let settledSumF = 0;
-    const settledRowsF: Record<string, unknown>[] = [];
-    for (const sid of fullPathSettledIds) {
-      const row = lineByIdF.get(sid);
-      if (!row) throw new Error("Invalid sale line for split payment");
-      if (String(row.sale_id) !== String(orderId)) {
-        throw new Error("Sale line does not belong to this order");
-      }
-      const st = String(row.status ?? "");
-      if (st === "cancelled" || st === "voided") {
-        throw new Error("Cannot pay a cancelled or voided line");
-      }
-      settledSumF += Number(row.price) * Number(row.quantity);
-      settledRowsF.push(row as Record<string, unknown>);
-    }
-    settledSumF = Math.round(settledSumF * 100) / 100;
-    if (Math.abs(settledSumF - portion) > eps) {
+    const planF = buildSettledLinePlan(lineByIdF, orderId, fullPathAlloc);
+    if (Math.abs(planF.settledSum - portion) > eps) {
       throw new Error("Selected lines do not match the payment amount");
     }
-    if (Math.abs(settledSumF - fullRemaining) > eps) {
+    if (Math.abs(planF.settledSum - fullRemaining) > eps) {
       throw new Error(
         "Selected lines must cover the full remaining balance for this payment",
       );
     }
-    const needsSnapF = settledRowsF.some((it) => {
+    const needsSnapF = planF.stockRows.some((it) => {
       const rawFk = it.menu_item_id as string | null | undefined;
       return !rawFk || String(rawFk).trim() === "";
     });
@@ -1764,7 +2259,7 @@ export async function payOrder(args: Record<string, unknown>) {
       : null;
     await applyStockSoldForSaleItemRows(
       r.id,
-      settledRowsF,
+      planF.stockRows,
       String((args.staffName as string | undefined) ?? "").trim() || "System",
       order.order_number != null
         ? `#${order.order_number}`
@@ -1772,12 +2267,7 @@ export async function payOrder(args: Record<string, unknown>) {
       menuIdBySnapshotF,
       licenseKey,
     );
-    const { error: delErrF } = await supabase
-      .from("sale_items")
-      .delete()
-      .in("id", fullPathSettledIds);
-    assertNoPgError("Remove paid sale lines (full settle)", delErrF);
-    await recalcSaleTotals(orderId);
+    await applySettledLinePlan(planF, orderId);
   }
 
   if (prevPaid > 0 && paymentType === "complimentary") {
@@ -1819,6 +2309,17 @@ export async function payOrder(args: Record<string, unknown>) {
         )
         .eq("id", orderId);
       assertNoPgError("Complete order payment", retryErr);
+    } else if (
+      paymentType === "no_receipt" &&
+      isPgCheckConstraintError(fullErr.message, "payment_type")
+    ) {
+      paymentType = "non_fiscal";
+      patch.payment_type = paymentType;
+      const { error: retryTypeErr } = await supabase
+        .from("sales")
+        .update(patch)
+        .eq("id", orderId);
+      assertNoPgError("Complete order payment", retryTypeErr);
     } else {
       assertNoPgError("Complete order payment", fullErr);
     }
@@ -1845,7 +2346,9 @@ export async function payOrder(args: Record<string, unknown>) {
         .eq("sale_id", orderId);
     }
   }
-  assertNoPgError("Load sale items for payment", itemsRes.error);
+  if (itemsRes.error) {
+    console.warn("[POS] payOrder load items:", itemsRes.error.message);
+  }
   const items = itemsRes.data;
 
   const staffNameLog =
@@ -1862,31 +2365,23 @@ export async function payOrder(args: Record<string, unknown>) {
       return !rawFk || String(rawFk).trim() === "";
     });
 
-  const menuIdBySnapshot = needsMenuSnapshot
-    ? await buildMenuItemIdLookupBySnapshot(r.id)
-    : null;
+  let menuIdBySnapshot: Map<string, string> | null = null;
+  try {
+    menuIdBySnapshot = needsMenuSnapshot
+      ? await buildMenuItemIdLookupBySnapshot(r.id)
+      : null;
+  } catch (err) {
+    console.warn("[POS] payOrder menu snapshot:", err);
+  }
 
   const lineIdsToServe: string[] = [];
-  const qtyByMenuId = new Map<string, number>();
+  const payableRows: Record<string, unknown>[] = [];
 
   for (const it of items ?? []) {
     if (it.status === "cancelled" || it.status === "voided") continue;
     lineIdsToServe.push(String(it.id));
-
     if (paymentType === "complimentary") continue;
-
-    const rawFk = it.menu_item_id as string | null | undefined;
-    const fk =
-      rawFk && String(rawFk).trim() !== ""
-        ? String(rawFk).trim()
-        : menuIdBySnapshot?.get(
-            saleLineLookupKey(String(it.name ?? ""), Number(it.price)),
-          ) ?? null;
-
-    if (!fk) continue;
-
-    const qty = Number(it.quantity);
-    qtyByMenuId.set(fk, (qtyByMenuId.get(fk) ?? 0) + qty);
+    payableRows.push(it as Record<string, unknown>);
   }
 
   if (lineIdsToServe.length > 0) {
@@ -1894,87 +2389,40 @@ export async function payOrder(args: Record<string, unknown>) {
       .from("sale_items")
       .update({ status: "served" })
       .in("id", lineIdsToServe);
-    assertNoPgError("Mark sale items served", serveAllErr);
+    if (serveAllErr) {
+      console.warn("[POS] payOrder mark served:", serveAllErr.message);
+    }
   }
 
-  if (qtyByMenuId.size > 0) {
-    const fks = [...qtyByMenuId.keys()];
-    const { data: menuRows, error: menuLoadErr } = await supabase
-      .from("menu_items")
-      .select("id, total_sold, track_stock, current_stock")
-      .in("id", fks);
-    assertNoPgError("Load menu items for payment stock", menuLoadErr);
-    const miById = new Map(
-      (menuRows ?? []).map((m) => [String(m.id), m]),
-    );
-
-    const stockLogRows: Record<string, unknown>[] = await Promise.all(
-      fks.map(async (fk) => {
-        const qty = qtyByMenuId.get(fk) ?? 0;
-        const mi = miById.get(fk);
-        if (!mi) return null;
-
-        const prevSold = Number(mi.total_sold ?? 0);
-        const prevStock = Number(mi.current_stock ?? 0);
-        const track = Boolean(mi.track_stock);
-
-        const updates: Record<string, unknown> = { total_sold: prevSold + qty };
-        let balanceAfter = prevStock;
-        if (track) {
-          balanceAfter = prevStock - qty;
-          updates.current_stock = balanceAfter;
-        }
-
-        const { error: upErr } = await supabase
-          .from("menu_items")
-          .update(updates)
-          .eq("id", fk);
-        assertNoPgError("Update menu item after sale", upErr);
-
-        if (track) {
-          return {
-            restaurant_id: r.id,
-            menu_item_id: fk,
-            staff_name: staffNameLog,
-            type: "sale" as const,
-            change: -qty,
-            balance_after: balanceAfter,
-            note: `Order ${orderLabel}`,
-          };
-        }
-        return null;
-      }),
-    ).then((rows) => rows.filter((x): x is NonNullable<typeof x> => x != null));
-
-    if (stockLogRows.length > 0) {
-      const { error: batchLogErr } = await supabase
-        .from("pos_stock_logs")
-        .insert(stockLogRows);
-      assertNoPgError("Log stock sale (batch)", batchLogErr);
+  if (payableRows.length > 0) {
+    try {
+      await applyStockSoldForSaleItemRows(
+        r.id,
+        payableRows,
+        staffNameLog,
+        orderLabel,
+        menuIdBySnapshot,
+        licenseKey,
+      );
+    } catch (err) {
+      console.warn("[POS] payOrder stock:", err);
     }
-
-    await applySupplyRecipeAfterSale({
-      restaurantId: r.id,
-      qtyByMenuItemId,
-      staffName: staffNameLog,
-      contextNote: `Order ${orderLabel}`,
-      licenseKey,
-    });
   }
 
   const paidTableId = saleFloorTableId(order as Parameters<typeof saleFloorTableId>[0]);
-  const [, tableNameForAudit] = await Promise.all([
-    paidTableId
-      ? updateFloorTableStatusSafe(
-          paidTableId,
-          "available",
-          "Free table after payment",
-        )
-      : Promise.resolve(undefined),
-    paidTableId
-      ? getFloorTableNameOrUnknown(paidTableId)
-      : Promise.resolve("Unknown"),
-  ]);
+  let tableNameForAudit = "Unknown";
+  try {
+    if (paidTableId) {
+      await updateFloorTableStatusSafe(
+        paidTableId,
+        "available",
+        "Free table after payment",
+      );
+      tableNameForAudit = await getFloorTableNameOrUnknown(paidTableId);
+    }
+  } catch (err) {
+    console.warn("[POS] payOrder table cleanup:", err);
+  }
 
   try {
     const originalTotal = Number(order.total ?? 0);
@@ -2168,6 +2616,11 @@ function voidItemIdsFromArgs(args: Record<string, unknown>): string[] {
 
 export async function voidItem(args: Record<string, unknown>) {
   const licenseKey = args.licenseKey as string;
+  await assertStaffPermission({
+    licenseKey,
+    staffId: args.staffId as string | undefined,
+    permission: "canVoidItems",
+  });
   await getRestaurantByLicense(licenseKey);
   const ids = voidItemIdsFromArgs(args);
   if (ids.length === 0) return;
@@ -2184,7 +2637,7 @@ export async function voidItem(args: Record<string, unknown>) {
 
   const { data: voidedLines, error: loadErr } = await supabase
     .from("sale_items")
-    .select("id, name, quantity, price, sale_id")
+    .select("id, name, quantity, price, sale_id, menu_item_id, status, notes")
     .in("id", ids);
   if (loadErr) throw loadErr;
 
@@ -2198,6 +2651,30 @@ export async function voidItem(args: Record<string, unknown>) {
 
   const lines = voidedLines ?? [];
   if (lines.length === 0) return;
+
+  const reasonCode = String(args.reasonCode ?? "").trim();
+  const reasonLabel = String(args.reasonLabel ?? "").trim();
+  const reasonNote = String(args.reasonNote ?? "").trim();
+  const reasonText = [reasonLabel || reasonCode, reasonNote]
+    .filter(Boolean)
+    .join(": ");
+
+  if (reasonText) {
+    for (const row of lines) {
+      const id = String(row.id);
+      const prev = String((row as { notes?: string | null }).notes ?? "").trim();
+      const next = prev
+        ? `${prev}\n${reasonText}`
+        : reasonText;
+      const { error: noteErr } = await supabase
+        .from("sale_items")
+        .update({ notes: next })
+        .eq("id", id);
+      if (noteErr) {
+        console.warn("[POS] void reason note:", noteErr.message);
+      }
+    }
+  }
 
   try {
     const staffIdArg = args.staffId as string | undefined;
@@ -2238,7 +2715,9 @@ export async function voidItem(args: Record<string, unknown>) {
       (row) =>
         `"${String(row.name ?? "")}" x${Number(row.quantity)} ($${Number(row.price).toFixed(2)} each)`,
     );
-    const details = `Voided ${parts.join("; ")} - Table: ${tableName}`;
+    const details = reasonText
+      ? `Voided ${parts.join("; ")} - Table: ${tableName} - Reason: ${reasonText}`
+      : `Voided ${parts.join("; ")} - Table: ${tableName}`;
 
     await insertAuditLog({
       licenseKey,
@@ -2250,6 +2729,8 @@ export async function voidItem(args: Record<string, unknown>) {
         orderId: resolvedSaleId,
         orderNumber,
         tableName,
+        reasonCode: reasonCode || undefined,
+        reason: reasonText || undefined,
         items: lines.map((row) => ({
           name: String(row.name ?? ""),
           quantity: Number(row.quantity),
@@ -2260,6 +2741,351 @@ export async function voidItem(args: Record<string, unknown>) {
   } catch (err) {
     console.warn("[POS] void_item audit log:", err);
   }
+
+  let staffNameForStock = String(args.staffName ?? "").trim();
+  if (!staffNameForStock) {
+    const sid = uuidOrNull(args.staffId as string | undefined);
+    if (sid) {
+      const { data: st } = await supabase
+        .from("staff")
+        .select("name")
+        .eq("id", sid)
+        .maybeSingle();
+      staffNameForStock = (st?.name as string) ?? "Unknown";
+    } else {
+      staffNameForStock = "Unknown";
+    }
+  }
+
+  await deductTrackedStockClamped({
+    licenseKey,
+    staffName: staffNameForStock,
+    note: reasonText
+      ? `Waste / delete — ${reasonText}`
+      : "Waste / delete",
+    logType: "waste",
+    lines: lines.map((row) => ({
+      menu_item_id: row.menu_item_id as string | null,
+      quantity: row.quantity as number | string,
+      status: (row as { status?: string }).status,
+      notes: (row as { notes?: string | null }).notes,
+    })),
+  });
+}
+
+function saleLineIsUnsent(status: unknown): boolean {
+  const st = String(status ?? "")
+    .trim()
+    .toLowerCase();
+  return st === "" || st === "pending";
+}
+
+async function patchSaleItemProductFields(
+  id: string,
+  patch: Record<string, unknown>,
+): Promise<void> {
+  let { error } = await supabase.from("sale_items").update(patch).eq("id", id);
+  if (error && isPostgrestExposeOrCacheError(error.message)) {
+    const fallback: Record<string, unknown> = {
+      name: patch.name,
+      price: patch.price,
+      notes: patch.notes,
+    };
+    if (patch.quantity != null) fallback.quantity = patch.quantity;
+    ({ error } = await supabase.from("sale_items").update(fallback).eq("id", id));
+  }
+  assertNoPgError("Update replaced line", error);
+}
+
+/**
+ * Replace `quantity` units on the given lines.
+ * Unsent (`pending`) units are rewritten in place so they never look voided.
+ * Units already sent to kitchen are voided and the replacement is inserted as sent.
+ */
+export async function replaceOrderItemUnits(args: {
+  licenseKey: string;
+  orderId: string;
+  tableId?: string;
+  staffId?: string;
+  staffName?: string;
+  itemIds: string[];
+  quantity: number;
+  replacement: OrderLineInput;
+}) {
+  void args.tableId;
+  await getRestaurantByLicense(args.licenseKey);
+  const orderId = String(args.orderId ?? "").trim();
+  if (!orderId) throw new Error("Order not found");
+  if (args.staffId) {
+    await assertSaleStaffCanEditForTableMove(orderId, args.staffId);
+  }
+
+  const ids = (args.itemIds ?? []).map((id) => String(id)).filter(Boolean);
+  const wanted = Math.max(0, Math.floor(Number(args.quantity) || 0));
+  if (ids.length === 0 || wanted <= 0) return { swapped: 0, returned: 0 };
+
+  await assertMenuLinesOrderable(args.licenseKey, [
+    { ...args.replacement, quantity: wanted },
+  ]);
+
+  const { data: rows, error: loadErr } = await supabase
+    .from("sale_items")
+    .select("id, quantity, status, sale_id")
+    .in("id", ids);
+  assertNoPgError("Load lines to replace", loadErr);
+
+  const byId = new Map(
+    (rows ?? []).map((row) => [String(row.id), row] as const),
+  );
+
+  let remaining = wanted;
+  const pendingFullIds: string[] = [];
+  const pendingPartial: { id: string; keep: number; take: number }[] = [];
+  const sentIds: string[] = [];
+  let pendingUnits = 0;
+  let sentUnits = 0;
+
+  for (const id of ids) {
+    if (remaining <= 0) break;
+    const row = byId.get(id);
+    if (!row) continue;
+    const st = String(row.status ?? "");
+    if (st === "voided" || st === "cancelled") continue;
+    const q = Number(row.quantity);
+    if (!Number.isFinite(q) || q <= 0) continue;
+    const take = Math.min(q, remaining);
+    if (saleLineIsUnsent(st)) {
+      pendingUnits += take;
+      if (take >= q) pendingFullIds.push(id);
+      else pendingPartial.push({ id, keep: q - take, take });
+    } else {
+      sentUnits += take;
+      sentIds.push(id);
+    }
+    remaining -= take;
+  }
+
+  if (pendingUnits + sentUnits <= 0) return { swapped: 0, returned: 0 };
+
+  const uniqueIds = [...new Set([args.replacement.menuItemId].filter(Boolean))];
+  const menuById = new Map<string, MenuItemSnap>();
+  if (uniqueIds.length > 0) {
+    const { data: menuRows, error: menuErr } = await supabase
+      .from("menu_items")
+      .select("id, name, price, station, vat_rate")
+      .in("id", uniqueIds);
+    if (menuErr) {
+      if (isPostgrestExposeOrCacheError(menuErr.message)) {
+        console.warn(
+          "[POS] menu_items load for replace failed; using line snapshot:",
+          menuErr.message,
+        );
+      } else {
+        assertNoPgError("Load replacement menu item", menuErr);
+      }
+    }
+    for (const m of menuRows ?? []) {
+      menuById.set(m.id as string, m as MenuItemSnap);
+    }
+  }
+
+  const resolved = resolveLineToSaleItemRow(
+    orderId,
+    { ...args.replacement, quantity: 1 },
+    menuById,
+  );
+  const productPatch: Record<string, unknown> = {
+    name: resolved.name,
+    price: resolved.price,
+    notes: resolved.notes,
+    menu_item_id: resolved.menu_item_id,
+    station: resolved.station,
+    vat_rate: resolved.vat_rate,
+    selected_customizations: resolved.selected_customizations ?? [],
+  };
+
+  for (const id of pendingFullIds) {
+    await patchSaleItemProductFields(id, productPatch);
+  }
+  for (const part of pendingPartial) {
+    const { error } = await supabase
+      .from("sale_items")
+      .update({ quantity: part.keep })
+      .eq("id", part.id);
+    assertNoPgError("Split unsent line for replace", error);
+    await insertSaleItemWithSchemaFallback({
+      ...resolved,
+      quantity: part.take,
+      status: "pending",
+    });
+  }
+
+  if (sentUnits > 0) {
+    await voidItemUnits({
+      licenseKey: args.licenseKey,
+      orderId,
+      tableId: args.tableId,
+      staffId: args.staffId,
+      staffName: args.staffName,
+      itemIds: sentIds,
+      quantity: sentUnits,
+      asReplacement: true,
+    });
+    const staffName = String(args.staffName ?? "").trim() || "Unknown";
+    await commitTrackedStockOnSend({
+      licenseKey: args.licenseKey,
+      staffName,
+      note: "Replacement sent",
+      lines: [
+        {
+          menu_item_id: resolved.menu_item_id,
+          quantity: sentUnits,
+          name: resolved.name,
+        },
+      ],
+    });
+    await insertSaleItemWithSchemaFallback({
+      ...resolved,
+      quantity: sentUnits,
+      status: "sent",
+      notes: notesWithStockCommittedMark(resolved.notes),
+    });
+  }
+
+  await recalcSaleTotals(orderId);
+  return { swapped: pendingUnits, returned: sentUnits };
+}
+
+/** Void only `quantity` units from the given sale lines (does not void extra copies). */
+export async function voidItemUnits(args: {
+  licenseKey: string;
+  orderId?: string;
+  tableId?: string;
+  staffId?: string;
+  staffName?: string;
+  itemIds: string[];
+  quantity: number;
+  /** When true, the order list hides these lines (swap, not a visible delete). */
+  asReplacement?: boolean;
+  /** Return unused product — no waste stock deduction. */
+  asReturn?: boolean;
+}) {
+  void args.tableId;
+  await assertStaffPermission({
+    licenseKey: args.licenseKey,
+    staffId: args.staffId,
+    permission: "canVoidItems",
+  });
+  await getRestaurantByLicense(args.licenseKey);
+  const ids = (args.itemIds ?? []).map((id) => String(id)).filter(Boolean);
+  const wanted = Math.max(0, Math.floor(Number(args.quantity) || 0));
+  if (ids.length === 0 || wanted <= 0) return;
+
+  const { data: rows, error: loadErr } = await supabase
+    .from("sale_items")
+    .select("id, name, quantity, price, sale_id, status, notes, menu_item_id")
+    .in("id", ids);
+  assertNoPgError("Load lines to void units", loadErr);
+
+  const open = (rows ?? []).filter((row) => {
+    const st = String(row.status ?? "");
+    return st !== "voided" && st !== "cancelled";
+  });
+  const notesById = new Map(
+    (rows ?? []).map((row) => [String(row.id), row.notes as string | null]),
+  );
+
+  let remaining = wanted;
+  const toVoid: string[] = [];
+  const toReduce: { id: string; quantity: number }[] = [];
+  const restoreQtyByMenuId = new Map<string, number>();
+  for (const row of open) {
+    if (remaining <= 0) break;
+    const q = Number(row.quantity);
+    if (!Number.isFinite(q) || q <= 0) continue;
+    const take = Math.min(q, remaining);
+    if (
+      (args.asReturn || args.asReplacement) &&
+      saleLineStockCommitted(row.notes as string | null) &&
+      !saleLineIsUnsent(row.status)
+    ) {
+      const fk = String(row.menu_item_id ?? "").trim();
+      if (fk) {
+        restoreQtyByMenuId.set(fk, (restoreQtyByMenuId.get(fk) ?? 0) + take);
+      }
+    }
+    if (q <= remaining) {
+      toVoid.push(String(row.id));
+      remaining -= q;
+    } else {
+      toReduce.push({ id: String(row.id), quantity: q - remaining });
+      remaining = 0;
+    }
+  }
+
+  if (toVoid.length > 0) {
+    if (args.asReplacement || args.asReturn) {
+      const markNotes = args.asReturn
+        ? notesWithReturnedMark
+        : notesWithReplacedMark;
+      for (const id of toVoid) {
+        const { error } = await supabase
+          .from("sale_items")
+          .update({
+            status: "voided",
+            notes: markNotes(notesById.get(id)),
+          })
+          .eq("id", id);
+        assertNoPgError("Mark returned units", error);
+      }
+    } else {
+      const { error } = await supabase
+        .from("sale_items")
+        .update({ status: "voided" })
+        .in("id", toVoid);
+      assertNoPgError("Void replaced units", error);
+    }
+  }
+  for (const row of toReduce) {
+    const { error } = await supabase
+      .from("sale_items")
+      .update({ quantity: row.quantity })
+      .eq("id", row.id);
+    assertNoPgError("Reduce remaining units", error);
+  }
+
+  const saleId =
+    args.orderId ??
+    (open[0]?.sale_id as string | undefined) ??
+    undefined;
+  if (saleId) await recalcSaleTotals(saleId);
+
+  if (restoreQtyByMenuId.size > 0) {
+    const staffName = String(args.staffName ?? "").trim() || "Unknown";
+    await restoreTrackedStock({
+      licenseKey: args.licenseKey,
+      staffName,
+      note: args.asReturn ? "Returned unused" : "Replaced item",
+      logType: args.asReturn ? "return" : "adjustment",
+      qtyByMenuId: restoreQtyByMenuId,
+    });
+  }
+}
+
+/** Return unused sent units. Does not deduct stock (product goes back). */
+export async function returnOrderItemUnits(args: {
+  licenseKey: string;
+  orderId?: string;
+  tableId?: string;
+  staffId?: string;
+  staffName?: string;
+  itemIds: string[];
+  quantity: number;
+}) {
+  await voidItemUnits({
+    ...args,
+    asReturn: true,
+  });
 }
 
 export async function updateOrderStatus(_args: Record<string, unknown>) {
@@ -2534,6 +3360,11 @@ export async function transferOrdersToTable(args: {
     throw new Error("Invalid source or target table.");
   }
 
+  await assertStaffPermission({
+    licenseKey: args.licenseKey,
+    staffId: args.staffId,
+    permission: "canTransferTables",
+  });
   const r = await getRestaurantByLicense(args.licenseKey);
   const sourceSales = await loadOpenSalesForTable(r.id, from);
   if (sourceSales.length === 0) {
@@ -2589,6 +3420,11 @@ export async function mergeTableOrders(args: {
     throw new Error("Invalid source or target table.");
   }
 
+  await assertStaffPermission({
+    licenseKey: args.licenseKey,
+    staffId: args.staffId,
+    permission: "canMergeTables",
+  });
   const r = await getRestaurantByLicense(args.licenseKey);
   const sourceRows = await loadOpenSalesForTable(r.id, from);
   const destRows = await loadOpenSalesForTable(r.id, to);

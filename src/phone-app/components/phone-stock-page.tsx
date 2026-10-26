@@ -182,7 +182,7 @@ export default function PhoneStockPage() {
         ) : null}
 
         <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-2xl bg-gradient-to-br from-[#0066FF] to-[#5b4ddb] px-3 py-4 shadow-md shadow-[#0066FF]/20">
+          <div className="rounded-2xl bg-gradient-to-br from-brand to-brand-sky px-3 py-4 shadow-md shadow-brand/20">
             <Box className="mb-2 size-6 text-white/90" strokeWidth={2} />
             <p className="text-2xl font-bold tabular-nums text-white">
               {loading ? "—" : totals.count}

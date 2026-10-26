@@ -321,7 +321,7 @@ export function AdminUserSettingsPanel() {
   if (!s.loaded) {
     return (
       <AdminCard className="flex items-center justify-center py-24">
-        <Loader2 className="size-8 animate-spin text-[#0066FF]" />
+        <Loader2 className="size-8 animate-spin text-brand" />
       </AdminCard>
     );
   }
@@ -335,7 +335,7 @@ export function AdminUserSettingsPanel() {
       <AdminCard className="overflow-visible">
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 px-5 py-4 dark:border-slate-800">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-[#0066FF]">{s.t("workspace")}</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-brand">{s.t("workspace")}</p>
             <h1 className="text-xl font-semibold text-slate-900 dark:text-white">{s.t("settings.title")}</h1>
             <p className="mt-0.5 text-sm text-slate-500">{s.t("settings.subtitle")}</p>
           </div>
@@ -352,9 +352,9 @@ export function AdminUserSettingsPanel() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 bg-slate-50/80 px-5 py-3 dark:border-slate-800 dark:bg-slate-900/40">
-          <Avatar className="size-11 ring-2 ring-[#0066FF]/20">
+          <Avatar className="size-11 ring-2 ring-brand/20">
             <AvatarImage src={s.avatarUrl || undefined} alt="" />
-            <AvatarFallback className="bg-[#0066FF]/10 text-sm font-semibold text-[#0066FF]">
+            <AvatarFallback className="bg-brand/10 text-sm font-semibold text-brand">
               {initials(s.fullName, s.email)}
             </AvatarFallback>
           </Avatar>
@@ -385,7 +385,7 @@ export function AdminUserSettingsPanel() {
                 className={cn(
                   "flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition",
                   activeTab === id
-                    ? "border-[#0066FF] text-[#0066FF]"
+                    ? "border-brand text-brand"
                     : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200",
                 )}
               >
@@ -506,7 +506,7 @@ export function AdminUserSettingsPanel() {
                   type="button"
                   disabled={s.saving}
                   onClick={() => void handleSaveAccount()}
-                  className="h-9 rounded-lg bg-[#0066FF] px-4 text-sm text-white hover:bg-[#0052cc]"
+                  className="h-9 rounded-lg bg-brand px-4 text-sm text-white hover:bg-brand-hover"
                 >
                   {s.saving ? "Saving…" : "Save account"}
                 </Button>
@@ -548,7 +548,7 @@ export function AdminUserSettingsPanel() {
                     type="button"
                     size="sm"
                     disabled={mfaLoading}
-                    className="h-8 w-full rounded-lg bg-[#0066FF] sm:w-auto"
+                    className="h-8 w-full rounded-lg bg-brand sm:w-auto"
                     onClick={() => void startMfaEnroll()}
                   >
                     Enable 2FA
@@ -558,7 +558,7 @@ export function AdminUserSettingsPanel() {
               <SettingsRow label={s.t("security.sessions")} hint={s.t("security.sessionsHint")}>
                 <div className="w-full space-y-2 text-xs">
                   {sessionsLoading ? (
-                    <Loader2 className="size-4 animate-spin text-[#0066FF]" />
+                    <Loader2 className="size-4 animate-spin text-brand" />
                   ) : authSessions.length === 0 ? (
                     <p className="text-slate-500">
                       {sessionInfo?.provider ?? "—"} · {s.t("security.currentSession")}
@@ -649,7 +649,7 @@ export function AdminUserSettingsPanel() {
                       type="button"
                       variant={(theme ?? "system") === id ? "default" : "outline"}
                       size="sm"
-                      className={cn("h-8 rounded-lg text-xs", (theme ?? "system") === id && "bg-[#0066FF]")}
+                      className={cn("h-8 rounded-lg text-xs", (theme ?? "system") === id && "bg-brand")}
                       onClick={() => setTheme(id)}
                     >
                       <Icon className="mr-1 size-3" />
@@ -734,7 +734,7 @@ export function AdminUserSettingsPanel() {
                   type="button"
                   disabled={s.saving}
                   onClick={() => void handleSaveNotifications()}
-                  className="h-9 rounded-lg bg-[#0066FF] px-4 text-sm text-white hover:bg-[#0052cc]"
+                  className="h-9 rounded-lg bg-brand px-4 text-sm text-white hover:bg-brand-hover"
                 >
                   {s.saving ? "Saving…" : "Save notifications"}
                 </Button>

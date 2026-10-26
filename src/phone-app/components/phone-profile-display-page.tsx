@@ -19,7 +19,7 @@ export default function PhoneProfileDisplayPage() {
       >
         <Link
           to="/app/profile"
-          className="flex size-10 shrink-0 items-center justify-center rounded-xl text-slate-700 hover:bg-[#0066FF]/10"
+          className="flex size-10 shrink-0 items-center justify-center rounded-xl text-slate-700 hover:bg-brand/10"
           aria-label={t("phone.profile.backToProfile")}
         >
           <ChevronLeft className="size-6" strokeWidth={2} />
@@ -38,7 +38,7 @@ export default function PhoneProfileDisplayPage() {
             className={cn(
               "rounded-xl border-2 px-3 py-4 text-sm font-semibold transition-colors",
               activeTheme === "light"
-                ? "border-[#0066FF] bg-[#0066FF]/10 text-[#0066FF]"
+                ? "border-brand bg-brand/10 text-brand"
                 : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
             )}
           >
@@ -51,7 +51,7 @@ export default function PhoneProfileDisplayPage() {
             className={cn(
               "rounded-xl border-2 px-3 py-4 text-sm font-semibold transition-colors",
               activeTheme === "dark"
-                ? "border-[#0066FF] bg-[#0066FF]/10 text-[#0066FF]"
+                ? "border-brand bg-brand/10 text-brand"
                 : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
             )}
           >

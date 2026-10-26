@@ -111,8 +111,8 @@ export default function StartShiftScreen({
           Welcome, {staff.name}
         </p>
         <div className="flex items-center gap-2 mb-8">
-          <span className="w-2 h-2 rounded-full bg-[#0066FF] animate-pulse" />
-          <span className="text-[10px] text-[#0066FF] font-medium uppercase tracking-wider">
+          <span className="w-2 h-2 rounded-full bg-brand animate-pulse" />
+          <span className="text-[10px] text-brand font-medium uppercase tracking-wider">
             New Shift
           </span>
         </div>
@@ -126,8 +126,8 @@ export default function StartShiftScreen({
         >
           {/* Icon + Title */}
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-[#0066FF]/10 flex items-center justify-center">
-              <Banknote className="size-6 text-[#0066FF]" />
+            <div className="w-12 h-12 rounded-xl bg-brand/10 flex items-center justify-center">
+              <Banknote className="size-6 text-brand" />
             </div>
             <div>
               <p className="text-white font-semibold text-base">
@@ -168,8 +168,8 @@ export default function StartShiftScreen({
                   onClick={() => setOpeningCash(String(amount))}
                   className={`py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${
                     parsedCash === amount
-                      ? "bg-[#0066FF] text-white"
-                      : "bg-[#0A0F1E] text-[#8b93a7] border border-[#1e2a45] hover:border-[#0066FF]/40 hover:text-white"
+                      ? "bg-brand text-white"
+                      : "bg-[#0A0F1E] text-[#8b93a7] border border-[#1e2a45] hover:border-brand/40 hover:text-white"
                   }`}
                 >
                   {amount === 0 ? "$0" : `$${amount}`}
@@ -182,7 +182,7 @@ export default function StartShiftScreen({
           <Button
             onClick={handleStart}
             disabled={!isValid || starting}
-            className="w-full bg-[#0066FF] hover:bg-[#0055DD] text-white py-6 text-base font-semibold"
+            className="w-full bg-brand hover:bg-brand-hover text-white py-6 text-base font-semibold"
           >
             {starting ? (
               "Starting..."

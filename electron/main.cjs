@@ -4,6 +4,40 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 
+function isBrokenPipeError(err) {
+  if (!err || typeof err !== "object") return false;
+  const code = String(err.code ?? "");
+  const msg = String(err.message ?? "");
+  return (
+    code === "EPIPE" ||
+    code === "ERR_STREAM_DESTROYED" ||
+    msg.includes("EPIPE") ||
+    msg.includes("broken pipe")
+  );
+}
+
+function ignoreBrokenStdoutPipes() {
+  for (const stream of [process.stdout, process.stderr]) {
+    if (!stream || typeof stream.on !== "function") continue;
+    stream.on("error", (err) => {
+      if (isBrokenPipeError(err)) return;
+    });
+  }
+}
+
+ignoreBrokenStdoutPipes();
+
+process.on("uncaughtException", (err) => {
+  if (isBrokenPipeError(err)) return;
+  if (typeof console.error === "function") {
+    try {
+      console.error("[electron] uncaughtException", err);
+    } catch {
+      /* stdout may already be gone */
+    }
+  }
+});
+
 const isDev = !app.isPackaged;
 
 /** Must match package.json build.appId so Windows taskbar / shortcuts use this app, not generic Electron. */
@@ -329,6 +363,7 @@ function registerGetSystemPrintersIpc() {
           deviceName: p.name,
           displayName: String(p.displayName ?? p.name ?? ""),
           isDefault: Boolean(p.isDefault),
+          isOffline: isPrinterOffline(p),
         })),
       };
     } catch (err) {
@@ -390,7 +425,11 @@ function createWindow() {
   if (isDev && process.env.VITE_DEV_SERVER_URL) {
     const devUrl = process.env.VITE_DEV_SERVER_URL;
     win.webContents.on("console-message", (_e, level, message, line, sourceId) => {
-      console.log(`[renderer:${level}] ${message} (${sourceId}:${line})`);
+      try {
+        console.log(`[renderer:${level}] ${message} (${sourceId}:${line})`);
+      } catch (err) {
+        if (!isBrokenPipeError(err)) throw err;
+      }
     });
     win.webContents.on("render-process-gone", (_e, details) => {
       console.error("[electron] render-process-gone", details);
@@ -411,10 +450,100 @@ function createWindow() {
   }
 }
 
+let customerDisplayWindow = null;
+
+function customerDisplayTargetUrl() {
+  const main = BrowserWindow.getAllWindows().find(
+    (win) => win !== customerDisplayWindow && !win.isDestroyed(),
+  );
+  const current = main?.webContents.getURL() || "";
+  const hashIndex = current.indexOf("#");
+  const base = hashIndex >= 0 ? current.slice(0, hashIndex) : current;
+  if (base) return `${base}#/pos/customer-display`;
+  if (isDev && process.env.VITE_DEV_SERVER_URL) {
+    return `${process.env.VITE_DEV_SERVER_URL.replace(/\/$/, "")}/#/pos/customer-display`;
+  }
+  const indexPath = path.join(__dirname, "..", "dist", "index.html");
+  return `${pathToFileURL(indexPath).toString()}#/pos/customer-display`;
+}
+
+function extraCustomerDisplays() {
+  const all = screen.getAllDisplays();
+  const primary = screen.getPrimaryDisplay();
+  return all.filter((d) => d.id !== primary.id);
+}
+
+function registerCustomerDisplayIpc() {
+  ipcMain.handle("customer-display-status", () => {
+    const extra = extraCustomerDisplays();
+    const open = Boolean(customerDisplayWindow && !customerDisplayWindow.isDestroyed());
+    let displayLabel = null;
+    if (open) {
+      const bounds = customerDisplayWindow.getBounds();
+      const hit = screen.getDisplayMatching(bounds);
+      displayLabel = hit?.label || `${hit?.bounds?.width ?? ""}×${hit?.bounds?.height ?? ""}`;
+    }
+    return {
+      open,
+      extraDisplayCount: extra.length,
+      displayLabel,
+    };
+  });
+
+  ipcMain.handle("customer-display-open", () => {
+    const extra = extraCustomerDisplays();
+    const target = extra[0];
+    if (!target) return { ok: false, error: "NO_EXTRA_DISPLAY" };
+
+    if (customerDisplayWindow && !customerDisplayWindow.isDestroyed()) {
+      customerDisplayWindow.setBounds(target.bounds);
+      customerDisplayWindow.setFullScreen(true);
+      customerDisplayWindow.focus();
+      return { ok: true };
+    }
+
+    const iconPath = resolveWindowIconPath();
+    customerDisplayWindow = new BrowserWindow({
+      x: target.bounds.x,
+      y: target.bounds.y,
+      width: target.bounds.width,
+      height: target.bounds.height,
+      fullscreen: true,
+      autoHideMenuBar: true,
+      frame: false,
+      backgroundColor: "#070B16",
+      icon: iconPath,
+      webPreferences: {
+        preload: path.join(__dirname, "preload.cjs"),
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+      },
+    });
+    customerDisplayWindow.setMenuBarVisibility(false);
+    customerDisplayWindow.on("closed", () => {
+      customerDisplayWindow = null;
+    });
+    customerDisplayWindow.loadURL(customerDisplayTargetUrl()).catch((err) => {
+      console.error("[electron] customer-display load failed", err);
+    });
+    return { ok: true };
+  });
+
+  ipcMain.handle("customer-display-close", () => {
+    if (customerDisplayWindow && !customerDisplayWindow.isDestroyed()) {
+      customerDisplayWindow.close();
+    }
+    customerDisplayWindow = null;
+    return { ok: true };
+  });
+}
+
 app.whenReady().then(() => {
   registerPrintHtmlSilentIpc();
   registerGetSystemPrintersIpc();
   registerAppUpdateIpc();
+  registerCustomerDisplayIpc();
   createWindow();
 
   app.on("activate", () => {

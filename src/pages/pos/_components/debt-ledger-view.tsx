@@ -136,8 +136,8 @@ export default function DebtLedgerView({
           icon={Users}
           label={t("debt.active_debtors")}
           value={isLoading ? "..." : String(summary?.activeDebtors ?? 0)}
-          color="text-blue-400"
-          bgColor="bg-blue-500/10"
+          color="text-brand-soft"
+          bgColor="bg-brand/10"
         />
         <SummaryCard
           icon={AlertTriangle}
@@ -375,7 +375,7 @@ function AddDebtorDialog({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="John Smith"
-              className="h-12 rounded-xl border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:border-[#2a7fff] focus-visible:ring-2 focus-visible:ring-[#2a7fff]/45"
+              className="h-12 rounded-xl border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:border-brand focus-visible:ring-2 focus-visible:ring-brand/45"
               autoFocus
             />
           </div>
@@ -385,7 +385,7 @@ function AddDebtorDialog({
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="+1 234 567 890"
-              className="h-12 rounded-xl border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:border-[#2a7fff] focus-visible:ring-2 focus-visible:ring-[#2a7fff]/45"
+              className="h-12 rounded-xl border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:border-brand focus-visible:ring-2 focus-visible:ring-brand/45"
             />
           </div>
           <div>
@@ -397,7 +397,7 @@ function AddDebtorDialog({
               value={creditLimit}
               onChange={(e) => setCreditLimit(e.target.value)}
               placeholder="No limit"
-              className="h-12 rounded-xl border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:border-[#2a7fff] focus-visible:ring-2 focus-visible:ring-[#2a7fff]/45"
+              className="h-12 rounded-xl border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:border-brand focus-visible:ring-2 focus-visible:ring-brand/45"
               min={0}
               step={0.01}
             />
@@ -414,7 +414,7 @@ function AddDebtorDialog({
           <Button
             onClick={handleSubmit}
             disabled={!name.trim() || saving}
-            className="rounded-xl bg-[#1170d8] px-4 text-white hover:bg-[#1f86f5] disabled:bg-[#1f3e69] disabled:text-slate-300"
+            className="rounded-xl bg-brand px-4 text-white hover:bg-brand-sky disabled:bg-[#1f3e69] disabled:text-slate-300"
           >
             {saving ? "Saving..." : "Add Debtor"}
           </Button>

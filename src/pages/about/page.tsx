@@ -41,7 +41,7 @@ export default function AboutPage() {
           </motion.div>
 
           <div className="mb-20">
-            <h3 className="text-sm font-semibold tracking-widest uppercase bg-gradient-to-r from-[#0066FF] to-[#44CC00] bg-clip-text text-transparent text-center mb-10">
+            <h3 className="text-sm font-semibold tracking-widest uppercase bg-gradient-to-r from-brand to-brand-accent bg-clip-text text-transparent text-center mb-10">
               {t("about.valuesLabel")}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -57,7 +57,7 @@ export default function AboutPage() {
                     className="rounded-xl border border-border bg-card p-6"
                   >
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#0066FF]/10 to-[#44CC00]/10 flex items-center justify-center">
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-brand/10 to-brand-accent/10 flex items-center justify-center">
                         <Icon className="size-5 text-primary" />
                       </div>
                       <h4 className="text-lg font-semibold text-foreground">
@@ -74,7 +74,7 @@ export default function AboutPage() {
           </div>
 
           <div>
-            <h3 className="text-sm font-semibold tracking-widest uppercase bg-gradient-to-r from-[#0066FF] to-[#44CC00] bg-clip-text text-transparent text-center mb-10">
+            <h3 className="text-sm font-semibold tracking-widest uppercase bg-gradient-to-r from-brand to-brand-accent bg-clip-text text-transparent text-center mb-10">
               {t("about.journeyLabel")}
             </h3>
             <div className="max-w-2xl mx-auto space-y-0">
@@ -89,7 +89,7 @@ export default function AboutPage() {
                     className="flex gap-6 pb-8 last:pb-0"
                   >
                     <div className="flex flex-col items-center">
-                      <div className="w-3 h-3 rounded-full bg-gradient-to-r from-[#0066FF] to-[#44CC00] shrink-0 mt-1.5" />
+                      <div className="w-3 h-3 rounded-full bg-gradient-to-r from-brand to-brand-accent shrink-0 mt-1.5" />
                       {i < milestones.length - 1 && (
                         <div className="w-px flex-1 bg-border mt-2" />
                       )}

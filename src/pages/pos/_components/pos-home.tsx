@@ -43,11 +43,11 @@ export default function PosHome({ activation }: PosHomeProps) {
         {/* Header */}
         <div className="flex flex-col items-center mb-8">
           <img src={VYNTEX_APP_LOGO_SRC} alt="Vyntex POS" className="h-14 w-14 mb-3" />
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-[#0066FF] to-[#44CC00] bg-clip-text text-transparent">
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-brand to-brand-accent bg-clip-text text-transparent">
             {activation?.businessName ?? "Vyntex POS"}
           </h1>
           <div className="flex items-center gap-2 mt-2">
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[#44CC00] bg-[#44CC00]/10 px-2.5 py-1 rounded-full">
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-accent bg-brand-accent/10 px-2.5 py-1 rounded-full">
               <ShieldCheck className="size-3" />
               Activated
             </span>
@@ -59,8 +59,8 @@ export default function PosHome({ activation }: PosHomeProps) {
 
         {/* POS Coming Soon Card */}
         <div className="bg-[#131A2E] border border-[#1e2a45] rounded-2xl p-8 text-center space-y-6">
-          <div className="inline-flex items-center justify-center size-16 rounded-2xl bg-[#0066FF]/10">
-            <LayoutGrid className="size-8 text-[#0066FF]" />
+          <div className="inline-flex items-center justify-center size-16 rounded-2xl bg-brand/10">
+            <LayoutGrid className="size-8 text-brand" />
           </div>
 
           <div className="space-y-2">

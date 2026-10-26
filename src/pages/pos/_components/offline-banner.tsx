@@ -31,7 +31,7 @@ export default function OfflineBanner() {
           !isOnline
             ? "bg-amber-500/20 border border-amber-500/40 text-amber-300"
             : isSyncing
-              ? "bg-blue-500/20 border border-blue-500/40 text-blue-300"
+              ? "bg-brand/20 border border-brand/40 text-brand-soft"
               : "bg-emerald-500/20 border border-emerald-500/40 text-emerald-300"
         )}
       >

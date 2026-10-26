@@ -4,6 +4,7 @@ import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
@@ -15,6 +16,7 @@ import { cn } from "@/lib/utils.ts";
 import { errorMessageFromUnknown } from "@/lib/supabase-pos/db-errors.ts";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { enUS, sq as sqDateLocale } from "date-fns/locale";
 import {
   Zap,
   FileCheck,
@@ -22,12 +24,14 @@ import {
   Loader2,
 } from "lucide-react";
 import { usePosLocale } from "./pos-locale-provider.tsx";
+import { usePosTheme } from "../_lib/use-pos-theme.ts";
 
 type BulkFiscalizationProps = {
   licenseKey: string;
   staffId: string;
   staffName: string;
   staffRole: string;
+  compact?: boolean;
 };
 
 export default function BulkFiscalizationSheet({
@@ -35,8 +39,11 @@ export default function BulkFiscalizationSheet({
   staffId,
   staffName,
   staffRole,
+  compact = false,
 }: BulkFiscalizationProps) {
-  const { t, formatPrice } = usePosLocale();
+  const { t, formatPrice, language } = usePosLocale();
+  const { theme } = usePosTheme();
+  const light = theme === "light";
   const nonFiscalOrders = useQuery('pos.orders.getNonFiscalOrders', {
     licenseKey,
   });
@@ -162,7 +169,11 @@ export default function BulkFiscalizationSheet({
         <Button
           size="sm"
           disabled={nonFiscalCount === 0}
-          className="bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold px-4 h-8 shadow-sm"
+          className={
+            compact
+              ? "h-8 w-full rounded-xl bg-emerald-600 px-3 text-[10px] font-bold text-[#ffffff] shadow-[0_8px_18px_-10px_rgba(5,150,105,0.9)] hover:bg-emerald-700 hover:text-[#ffffff]"
+              : "h-8 bg-teal-600 px-4 text-xs font-semibold text-[#ffffff] shadow-sm hover:bg-teal-700 hover:text-[#ffffff]"
+          }
         >
           <Zap className="size-3.5 mr-1.5" />
           {t("dashboard.bulk_fiscalize")}
@@ -175,48 +186,126 @@ export default function BulkFiscalizationSheet({
       </SheetTrigger>
 
       <SheetContent
+        data-pos-theme={theme}
         side="right"
-        className="bg-[#131A2E] border-[#1e2a45] text-white w-full sm:max-w-lg p-0 flex flex-col [&>button]:text-[#8b93a7]"
+        className={cn(
+          "flex w-full flex-col gap-0 p-0 sm:max-w-lg",
+          light
+            ? "border-slate-200/80 bg-[linear-gradient(165deg,#f8fafc_0%,#ffffff_32%,#f1f5f9_100%)] text-slate-900 [&>button:last-of-type]:rounded-lg [&>button:last-of-type]:border [&>button:last-of-type]:border-slate-200 [&>button:last-of-type]:bg-white [&>button:last-of-type]:text-slate-500 [&>button:last-of-type]:shadow-sm [&>button:last-of-type]:hover:text-slate-800"
+            : "border-[#1e2a45] bg-[#131A2E] text-white [&>button:last-of-type]:text-[#8b93a7]",
+        )}
       >
-        <SheetHeader className="px-6 pt-6 pb-4 border-b border-[#1e2a45] shrink-0">
-          <SheetTitle className="text-white text-lg flex items-center gap-2">
-            <Zap className="size-5 text-[#0066FF]" />
+        <SheetHeader
+          className={cn(
+            "relative shrink-0 space-y-1 px-5 pb-4 pt-5 pr-14 text-left",
+            light ? "border-b border-slate-200/80" : "border-b border-[#1e2a45]",
+          )}
+        >
+          {light ? (
+            <span
+              className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-emerald-400/70 to-transparent"
+              aria-hidden
+            />
+          ) : null}
+          <SheetTitle
+            className={cn(
+              "flex items-center gap-2.5 text-[17px] font-bold tracking-[-0.02em]",
+              light ? "text-slate-950" : "text-white",
+            )}
+          >
+            <span
+              className={cn(
+                "flex size-9 shrink-0 items-center justify-center rounded-xl",
+                light
+                  ? "border border-white bg-white text-emerald-700 shadow-[0_8px_18px_-10px_rgba(5,150,105,0.85)] ring-1 ring-emerald-600/10"
+                  : "bg-brand/15 text-brand",
+              )}
+            >
+              <Zap className="size-4" />
+            </span>
             {t("dashboard.bulk_title")}
           </SheetTitle>
-          <p className="text-sm text-[#8b93a7]">
+          <SheetDescription
+            className={cn(
+              "text-[12px]",
+              light ? "text-slate-400" : "text-[#8b93a7]",
+            )}
+          >
             {t("dashboard.bulk_subtitle")}
-          </p>
+          </SheetDescription>
         </SheetHeader>
 
         {nonFiscalOrders === undefined ? (
-          <div className="flex-1 p-6 space-y-3">
+          <div className="flex-1 space-y-2.5 p-5">
             {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-14 bg-[#0A0F1E] rounded-lg" />
+              <Skeleton
+                key={i}
+                className={cn(
+                  "h-16 rounded-2xl",
+                  light ? "bg-slate-100" : "bg-[#0A0F1E]",
+                )}
+              />
             ))}
           </div>
         ) : orders.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6">
-            <FileCheck className="size-12 text-emerald-400/30" />
-            <p className="text-[#8b93a7] text-sm text-center">
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6">
+            <span
+              className={cn(
+                "flex size-14 items-center justify-center rounded-2xl",
+                light
+                  ? "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-600/10"
+                  : "bg-emerald-400/10 text-emerald-400/40",
+              )}
+            >
+              <FileCheck className="size-7" />
+            </span>
+            <p
+              className={cn(
+                "text-center text-sm font-medium",
+                light ? "text-slate-500" : "text-[#8b93a7]",
+              )}
+            >
               {t("dashboard.bulk_all_done")}
             </p>
           </div>
         ) : (
           <>
-            {/* Select All + count */}
-            <div className="px-6 py-3 border-b border-[#1e2a45] flex items-center justify-between bg-[#0D1326]">
-              <label className="flex items-center gap-3 cursor-pointer select-none">
+            <div
+              className={cn(
+                "flex shrink-0 items-center justify-between px-5 py-3",
+                light
+                  ? "border-b border-slate-200/80 bg-white/80"
+                  : "border-b border-[#1e2a45] bg-[#0D1326]",
+              )}
+            >
+              <label className="flex cursor-pointer select-none items-center gap-3">
                 <Checkbox
                   checked={allSelected}
                   onCheckedChange={toggleSelectAll}
                   disabled={processing}
-                  className="border-[#3a4560] data-[state=checked]:bg-[#0066FF] data-[state=checked]:border-[#0066FF]"
+                  className={cn(
+                    light
+                      ? "border-slate-300 data-[state=checked]:border-emerald-600 data-[state=checked]:bg-emerald-600"
+                      : "border-[#3a4560] data-[state=checked]:border-brand data-[state=checked]:bg-brand",
+                  )}
                 />
-                <span className="text-sm text-[#c0c7d6] font-medium">
+                <span
+                  className={cn(
+                    "text-sm font-semibold",
+                    light ? "text-slate-700" : "text-[#c0c7d6]",
+                  )}
+                >
                   {t("dashboard.bulk_select_all")}
                 </span>
               </label>
-              <span className="text-xs text-[#5a6580]">
+              <span
+                className={cn(
+                  "rounded-full px-2.5 py-1 text-[11px] font-semibold tabular-nums",
+                  light
+                    ? "bg-slate-100 text-slate-500"
+                    : "text-[#5a6580]",
+                )}
+              >
                 {t("dashboard.bulk_selected_of", {
                   selected: selected.size,
                   total: orders.length,
@@ -224,67 +313,129 @@ export default function BulkFiscalizationSheet({
               </span>
             </div>
 
-            {/* Order list */}
-            <div className="flex-1 overflow-y-auto">
-              {orders.map((order) => (
-                <label
-                  key={order._id}
-                  className={cn(
-                    "flex items-center gap-3 px-6 py-3 border-b border-[#1e2a45]/40 cursor-pointer hover:bg-[#1a2240] transition-colors",
-                    selected.has(order._id as string) && "bg-[#0066FF]/5"
-                  )}
-                >
-                  <Checkbox
-                    checked={selected.has(order._id as string)}
-                    onCheckedChange={() => toggleOrder(order._id as string)}
-                    disabled={processing}
-                    className="border-[#3a4560] data-[state=checked]:bg-[#0066FF] data-[state=checked]:border-[#0066FF] shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-mono font-semibold text-white">
-                        #{order.orderNumber}
-                      </span>
-                      <span className="text-xs text-[#5a6580]">
-                        {order.tableName}
-                      </span>
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto no-scrollbar px-4 py-3">
+              {orders.map((order) => {
+                const isSelected = selected.has(order._id as string);
+                return (
+                  <label
+                    key={order._id}
+                    className={cn(
+                      "flex cursor-pointer items-center gap-3 rounded-2xl border px-3.5 py-3 transition",
+                      light
+                        ? isSelected
+                          ? "border-emerald-200 bg-emerald-50/80 shadow-[0_10px_24px_-18px_rgba(5,150,105,0.55)]"
+                          : "border-slate-200/80 bg-white/90 hover:border-emerald-200 hover:bg-white"
+                        : isSelected
+                          ? "border-brand/20 bg-brand/5"
+                          : "border-transparent hover:bg-[#1a2240]",
+                    )}
+                  >
+                    <Checkbox
+                      checked={isSelected}
+                      onCheckedChange={() => toggleOrder(order._id as string)}
+                      disabled={processing}
+                      className={cn(
+                        "shrink-0",
+                        light
+                          ? "border-slate-300 data-[state=checked]:border-emerald-600 data-[state=checked]:bg-emerald-600"
+                          : "border-[#3a4560] data-[state=checked]:border-brand data-[state=checked]:bg-brand",
+                      )}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            "font-mono text-sm font-bold tabular-nums",
+                            light ? "text-slate-950" : "text-white",
+                          )}
+                        >
+                          #{order.orderNumber}
+                        </span>
+                        <span
+                          className={cn(
+                            "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                            light
+                              ? "bg-slate-100 text-slate-500"
+                              : "text-[#5a6580]",
+                          )}
+                        >
+                          {order.tableName}
+                        </span>
+                      </div>
+                      <div
+                        className={cn(
+                          "mt-1 flex items-center gap-2 text-[11px]",
+                          light ? "text-slate-400" : "text-[#5a6580]",
+                        )}
+                      >
+                        <span>
+                          {order.paidAt
+                            ? format(new Date(order.paidAt), "dd MMM HH:mm", {
+                                locale:
+                                  language === "sq" ? sqDateLocale : enUS,
+                              })
+                            : "—"}
+                        </span>
+                        <span className={light ? "text-slate-300" : "text-[#3a4560]"}>
+                          |
+                        </span>
+                        <span>{order.staffName}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs text-[#5a6580]">
-                        {order.paidAt
-                          ? format(new Date(order.paidAt), "dd MMM HH:mm")
-                          : "—"}
-                      </span>
-                      <span className="text-[10px] text-[#3a4560]">|</span>
-                      <span className="text-xs text-[#5a6580]">
-                        {order.staffName}
-                      </span>
-                    </div>
-                  </div>
-                  <span className="text-sm font-semibold text-white shrink-0">
-                    {formatPrice(order.total)}
-                  </span>
-                </label>
-              ))}
+                    <span
+                      className={cn(
+                        "shrink-0 text-sm font-extrabold tabular-nums",
+                        light ? "text-slate-950" : "text-white",
+                      )}
+                    >
+                      {formatPrice(order.total)}
+                    </span>
+                  </label>
+                );
+              })}
             </div>
 
-            {/* Progress bar (shown during processing) */}
-            {processing && (
-              <div className="px-6 py-3 border-t border-[#1e2a45] bg-[#0D1326]">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-[#0066FF] font-medium">
+            {processing ? (
+              <div
+                className={cn(
+                  "shrink-0 px-5 py-3",
+                  light
+                    ? "border-t border-slate-200/80 bg-white/90"
+                    : "border-t border-[#1e2a45] bg-[#0D1326]",
+                )}
+              >
+                <div className="mb-2 flex items-center justify-between">
+                  <span
+                    className={cn(
+                      "text-xs font-semibold",
+                      light ? "text-emerald-700" : "text-brand",
+                    )}
+                  >
                     {t("dashboard.bulk_processing")}
                   </span>
-                  <span className="text-xs text-white font-bold">
+                  <span
+                    className={cn(
+                      "text-xs font-bold tabular-nums",
+                      light ? "text-slate-700" : "text-white",
+                    )}
+                  >
                     {t("dashboard.bulk_printing", {
                       current: progress.current,
                       total: progress.total,
                     })}
                   </span>
                 </div>
-                <div className="h-2.5 bg-[#1e2a45] rounded-full overflow-hidden">
+                <div
+                  className={cn(
+                    "h-2 overflow-hidden rounded-full",
+                    light ? "bg-slate-100" : "bg-[#1e2a45]",
+                  )}
+                >
                   <div
-                    className="h-full rounded-full bg-[#0066FF] transition-all duration-300"
+                    className={cn(
+                      "h-full rounded-full transition-all duration-300",
+                      light ? "bg-emerald-600" : "bg-brand",
+                    )}
                     style={{
                       width:
                         progress.total > 0
@@ -294,23 +445,34 @@ export default function BulkFiscalizationSheet({
                   />
                 </div>
               </div>
-            )}
+            ) : null}
 
-            {/* Action button */}
-            <div className="px-6 py-4 border-t border-[#1e2a45] shrink-0">
+            <div
+              className={cn(
+                "shrink-0 px-5 pt-3",
+                light
+                  ? "border-t border-slate-200/80 bg-white/95 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
+                  : "border-t border-[#1e2a45] pb-4",
+              )}
+            >
               <Button
                 onClick={handleProcess}
                 disabled={selected.size === 0 || processing}
-                className="w-full bg-[#0066FF] hover:bg-[#0055DD] text-white font-semibold h-12 text-sm"
+                className={cn(
+                  "h-12 w-full text-sm font-bold",
+                  light
+                    ? "rounded-xl bg-emerald-600 text-[#ffffff] shadow-[0_12px_24px_-12px_rgba(5,150,105,0.85)] hover:bg-emerald-700 hover:text-[#ffffff]"
+                    : "bg-brand text-white hover:bg-brand-hover",
+                )}
               >
                 {processing ? (
                   <>
-                    <Loader2 className="size-4 mr-2 animate-spin" />
+                    <Loader2 className="mr-2 size-4 animate-spin" />
                     {t("dashboard.bulk_processing")}
                   </>
                 ) : (
                   <>
-                    <Receipt className="size-4 mr-2" />
+                    <Receipt className="mr-2 size-4" />
                     {selected.size === 1
                       ? t("dashboard.bulk_process", { count: selected.size })
                       : t("dashboard.bulk_process_plural", {

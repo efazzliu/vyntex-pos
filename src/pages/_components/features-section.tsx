@@ -40,7 +40,7 @@ export default function FeaturesSection() {
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
           >
-            <span className="text-sm font-semibold tracking-widest uppercase bg-gradient-to-r from-[#0066FF] to-[#44CC00] bg-clip-text text-transparent">
+            <span className="text-sm font-semibold tracking-widest uppercase bg-gradient-to-r from-brand to-brand-accent bg-clip-text text-transparent">
               {t("home.features.label")}
             </span>
             <h2 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
@@ -65,7 +65,7 @@ export default function FeaturesSection() {
                 className="group relative rounded-xl border border-border bg-card p-6 hover:border-primary/20 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300"
               >
                 <div className="flex items-center gap-4 mb-4">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-[#0066FF]/10 to-[#44CC00]/10 group-hover:from-[#0066FF]/20 group-hover:to-[#44CC00]/20 transition-colors">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-brand/10 to-brand-accent/10 group-hover:from-brand/20 group-hover:to-brand-accent/20 transition-colors">
                     <Icon className="size-5 text-primary" />
                   </div>
                   <h3 className="text-lg font-semibold text-foreground">

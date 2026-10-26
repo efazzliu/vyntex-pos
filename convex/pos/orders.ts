@@ -449,9 +449,10 @@ export const sendOrder = mutation({
     // Split by station and mark as sent
     const kitchenItems = [];
     const barItems = [];
+    const sentAt = new Date().toISOString();
 
     for (const item of pendingItems) {
-      await ctx.db.patch(item._id, { status: "sent" });
+      await ctx.db.patch(item._id, { status: "sent", sentAt });
       if (item.station === "bar") {
         barItems.push(item);
       } else {
@@ -533,9 +534,10 @@ export const sendToKitchen = mutation({
       .withIndex("by_order", (q) => q.eq("orderId", args.orderId))
       .collect();
 
+    const sentAt = new Date().toISOString();
     for (const item of items) {
       if (item.status === "pending") {
-        await ctx.db.patch(item._id, { status: "sent" });
+        await ctx.db.patch(item._id, { status: "sent", sentAt });
       }
     }
 
@@ -832,7 +834,14 @@ export const updateItemStatus = mutation({
     if (!item) {
       throw new ConvexError({ message: "Item not found", code: "NOT_FOUND" });
     }
-    await ctx.db.patch(args.orderItemId, { status: args.status });
+    const now = new Date().toISOString();
+    await ctx.db.patch(args.orderItemId, {
+      status: args.status,
+      ...(args.status === "sent" && !item.sentAt ? { sentAt: now } : {}),
+      ...(args.status === "ready"
+        ? { sentAt: item.sentAt ?? now, readyAt: now }
+        : {}),
+    });
   },
 });
 

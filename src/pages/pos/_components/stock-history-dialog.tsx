@@ -41,6 +41,7 @@ const TYPE_LABELS: Record<string, string> = {
   reset: "Reset",
   staff_consumption: "Staff meal",
   recipe_sale: "Recipe use",
+  waste: "Waste / delete",
 };
 
 const TYPE_ICONS: Record<string, typeof Plus> = {
@@ -51,6 +52,7 @@ const TYPE_ICONS: Record<string, typeof Plus> = {
   reset: Pencil,
   staff_consumption: TrendingDown,
   recipe_sale: TrendingDown,
+  waste: Minus,
 };
 
 type ItemLogRow = {
@@ -94,7 +96,7 @@ export default function StockHistoryDialog({
       >
         <SheetHeader className="border-b border-slate-200 bg-slate-50 pb-4">
           <SheetTitle className="flex items-center gap-2 text-slate-900">
-            <Clock className="size-5 text-blue-500" />
+            <Clock className="size-5 text-brand" />
             Stock History
           </SheetTitle>
           <SheetDescription className="text-slate-500">
@@ -159,7 +161,7 @@ export default function StockHistoryDialog({
                           ? "bg-emerald-500/15 text-emerald-600"
                           : isNegative
                             ? "bg-red-500/15 text-red-600"
-                            : "bg-blue-500/15 text-blue-600",
+                            : "bg-brand/15 text-brand",
                       )}
                     >
                       <Icon className="size-4" />

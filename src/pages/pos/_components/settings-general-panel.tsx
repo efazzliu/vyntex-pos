@@ -1,7 +1,6 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { cn } from "@/lib/utils.ts";
 import { FlagAL, FlagUS } from "@/components/flag-icons.tsx";
-import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import {
@@ -12,32 +11,45 @@ import {
   SelectValue,
 } from "@/components/ui/select.tsx";
 import {
+  Bike,
   Building2,
-  ChevronRight,
+  CalendarDays,
   CircleDollarSign,
   Clock,
-  Coins,
-  CreditCard,
+  Coffee,
+  Dumbbell,
   Globe,
-  HardDrive,
-  Lightbulb,
+  Hash,
+  Hotel,
+  ImageIcon,
+  Info,
+  Languages,
+  Link2,
+  Lock,
+  Mail,
   MapPin,
-  Pencil,
   Phone,
-  ShieldCheck,
-  Store,
-  Users,
-  Wallet,
+  RotateCcw,
+  Save,
+  ShoppingBag,
+  SlidersHorizontal,
+  Trash2,
+  UtensilsCrossed,
+  Wine,
   type LucideIcon,
 } from "lucide-react";
-import type { PosView } from "../_lib/types.ts";
-import type { SettingsCategoryId } from "./pos-settings-categories.ts";
-import AppUpdateSection from "./app-update-section.tsx";
+import type { PosGeneralPrefs } from "./pos-settings-categories.ts";
 
 export type GeneralCompany = {
   name: string;
+  type?: string;
   address: string;
   phone: string;
+  email?: string;
+  website?: string;
+  city?: string;
+  postalCode?: string;
+  country?: string;
   currency: string;
   plan: string;
   licenseStatus: string;
@@ -49,412 +61,514 @@ export type GeneralCompany = {
   currencyDecimals: number;
 };
 
+export type BusinessProfileDraft = {
+  name: string;
+  type: string;
+  phone: string;
+  email: string;
+  website: string;
+  address: string;
+  city: string;
+  postalCode: string;
+  country: string;
+};
+
+export type GeneralLocaleDraft = {
+  language: string;
+  currencySymbol: string;
+  timezone: string;
+};
+
+const BUSINESS_TYPES = [
+  { id: "restaurant", icon: UtensilsCrossed },
+  { id: "cafe", icon: Coffee },
+  { id: "bar", icon: Wine },
+  { id: "hotel", icon: Hotel },
+  { id: "fitness", icon: Dumbbell },
+] as const;
+
+const COUNTRY_OPTIONS = [
+  { value: "XK", label: "Kosovo", flag: "🇽🇰" },
+  { value: "AL", label: "Albania", flag: "🇦🇱" },
+  { value: "MK", label: "North Macedonia", flag: "🇲🇰" },
+  { value: "ME", label: "Montenegro", flag: "🇲🇪" },
+  { value: "RS", label: "Serbia", flag: "🇷🇸" },
+  { value: "HR", label: "Croatia", flag: "🇭🇷" },
+  { value: "BA", label: "Bosnia and Herzegovina", flag: "🇧🇦" },
+  { value: "GR", label: "Greece", flag: "🇬🇷" },
+  { value: "IT", label: "Italy", flag: "🇮🇹" },
+  { value: "DE", label: "Germany", flag: "🇩🇪" },
+  { value: "CH", label: "Switzerland", flag: "🇨🇭" },
+  { value: "AT", label: "Austria", flag: "🇦🇹" },
+  { value: "GB", label: "United Kingdom", flag: "🇬🇧" },
+  { value: "US", label: "United States", flag: "🇺🇸" },
+] as const;
+
+const CURRENCY_OPTIONS = [
+  { value: "€", label: "EUR – Euro (€)" },
+  { value: "$", label: "USD – US Dollar ($)" },
+  { value: "Lek", label: "ALL – Lek" },
+  { value: "£", label: "GBP – Pound (£)" },
+  { value: "CHF", label: "CHF – Swiss Franc" },
+  { value: "din", label: "RSD – Dinar (din)" },
+] as const;
+
+const ORDER_TYPES = [
+  { id: "dine_in", icon: UtensilsCrossed },
+  { id: "takeaway", icon: ShoppingBag },
+  { id: "delivery", icon: Bike },
+] as const;
+
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 
 type SettingsGeneralPanelProps = {
   t: Translate;
-  formatPrice: (n: number) => string;
-  company: GeneralCompany;
-  companyTimezone: string;
+  locale: GeneralLocaleDraft;
   timezoneOptions: string[];
   isAdminStaff: boolean;
   canEditBusinessIdentity: boolean;
   canEditLanguageCurrency: boolean;
   canEditTimezone: boolean;
-  editingCompany: boolean;
   savingCompany: boolean;
-  savingLocale: boolean;
-  draftName: string;
-  draftAddress: string;
-  draftPhone: string;
-  planTierDisplay: (plan: string) => string;
-  licenseStatusDisplay: (status: string) => string;
-  licenseExpiryLine: { text: string; lineClass: string } | null;
-  onDraftName: (v: string) => void;
-  onDraftAddress: (v: string) => void;
-  onDraftPhone: (v: string) => void;
-  onStartEdit: () => void;
+  draft: BusinessProfileDraft;
+  prefs: PosGeneralPrefs;
+  onDraftChange: (field: keyof BusinessProfileDraft, value: string) => void;
+  onPrefsChange: (patch: Partial<PosGeneralPrefs>) => void;
+  onLocaleChange: (field: keyof GeneralLocaleDraft, value: string) => void;
   onCancelEdit: () => void;
   onSaveCompany: () => void;
-  onLocaleChange: (
-    field:
-      | "language"
-      | "currencySymbol"
-      | "currencyPosition"
-      | "currencyDecimals"
-      | "timezone",
-    value: string | number,
-  ) => void;
-  onNavigate?: (view: PosView) => void;
-  onOpenCategory: (id: SettingsCategoryId) => void;
+  logoPreviewSrc: string;
+  logoHasCustom: boolean;
+  logoBusy: boolean;
+  onPickLogo: (file: File) => void;
+  onRemoveLogo: () => void;
 };
 
 function timezoneLabel(tz: string): string {
   try {
-    const off = new Intl.DateTimeFormat("en-US", {
-      timeZone: tz,
-      timeZoneName: "shortOffset",
-    })
-      .formatToParts(new Date())
-      .find((p) => p.type === "timeZoneName")?.value;
-    return off ? `${tz} (${off})` : tz;
+    const raw =
+      new Intl.DateTimeFormat("en-US", {
+        timeZone: tz,
+        timeZoneName: "longOffset",
+      })
+        .formatToParts(new Date())
+        .find((p) => p.type === "timeZoneName")?.value ?? "";
+    const match = raw.match(/(?:GMT|UTC)([+-])(\d{1,2})(?::?(\d{2}))?/);
+    if (match) {
+      const hh = match[2].padStart(2, "0");
+      const mm = (match[3] ?? "00").padStart(2, "0");
+      return `(UTC${match[1]}${hh}:${mm}) ${tz}`;
+    }
+    return raw ? `${tz} (${raw.replace(/^GMT/, "UTC")})` : tz;
   } catch {
     return tz;
   }
 }
 
-function InfoTile({
-  icon: Icon,
-  label,
-  value,
-  valueColor,
-  subline,
-  sublineClassName,
-  hint,
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function useLogoMeta(src: string, custom: boolean) {
+  const [meta, setMeta] = useState<{ width: number; height: number; bytes: number | null } | null>(null);
+  useEffect(() => {
+    if (!custom || !src) {
+      setMeta(null);
+      return;
+    }
+    let cancelled = false;
+    const img = new Image();
+    img.onload = () => {
+      if (cancelled) return;
+      const match = src.match(/^data:[^;]+;base64,(.+)$/);
+      const bytes = match ? Math.floor((match[1].length * 3) / 4) : null;
+      setMeta({ width: img.naturalWidth, height: img.naturalHeight, bytes });
+    };
+    img.src = src;
+    return () => {
+      cancelled = true;
+    };
+  }, [src, custom]);
+  return meta;
+}
+
+function BusinessTypeLock({
+  type,
+  t,
 }: {
-  icon: LucideIcon;
-  label: string;
-  value: string;
-  valueColor?: string;
-  subline?: string;
-  sublineClassName?: string;
-  hint?: string;
+  type: string;
+  t: Translate;
 }) {
+  const known = BUSINESS_TYPES.find((item) => item.id === type);
+  const Icon = known?.icon;
+  const label = known ? t(`settings.type.${known.id}`) : type.trim() || "—";
   return (
-    <div className="flex min-h-[92px] items-start gap-3 rounded-2xl border border-[#1e2a45] bg-[#131A2E] px-4 py-4">
-      <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#1e2a45]/80">
-        <Icon className="size-4 text-[#8b93a7]" strokeWidth={1.75} />
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5a6580]">
-          {label}
-        </p>
-        <p className={cn("mt-1 text-[15px] font-semibold leading-snug text-white", valueColor)}>
-          {value}
-        </p>
-        {subline ? (
-          <p className={cn("mt-1 text-xs leading-snug", sublineClassName ?? "text-[#8b93a7]")}>
-            {subline}
-          </p>
-        ) : null}
-        {hint ? (
-          <p className="mt-1 text-[11px] leading-snug text-[#5a6580]">{hint}</p>
-        ) : null}
-      </div>
+    <div className={cn(selectTriggerClass, "flex cursor-default items-center gap-2 px-3")}>
+      {Icon ? <Icon className="size-4 shrink-0 text-[#94a3b8]" /> : null}
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      <Lock className="size-3.5 shrink-0 text-[#94a3b8]" />
     </div>
   );
 }
 
-function PrefRow({
-  label,
-  description,
+function FieldLabel({
   children,
+  required,
 }: {
-  label: string;
-  description: string;
   children: ReactNode;
+  required?: boolean;
 }) {
   return (
-    <div className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-      <div className="min-w-0 sm:max-w-[46%]">
-        <p className="text-sm font-semibold text-white">{label}</p>
-        {description ? (
-          <p className="mt-0.5 text-xs leading-relaxed text-[#8b93a7]">{description}</p>
-        ) : null}
+    <Label className="text-[13px] font-medium text-[#334155]">
+      {children}
+      {required ? <span className="ml-0.5 text-red-500">*</span> : null}
+    </Label>
+  );
+}
+
+function CardHeading({
+  icon: Icon,
+  title,
+  lead,
+  tint,
+}: {
+  icon: LucideIcon;
+  title: string;
+  lead: string;
+  tint: "purple" | "orange";
+}) {
+  return (
+    <div className="mb-4 flex min-w-0 items-center gap-3">
+      <span
+        className={cn(
+          "flex size-10 shrink-0 items-center justify-center rounded-full",
+          tint === "purple" ? "bg-brand-light text-brand" : "bg-brand-light text-brand",
+        )}
+      >
+        <Icon className="size-5" />
+      </span>
+      <div className="min-w-0">
+        <h2 className="text-[15px] font-semibold text-[#0f172a]">{title}</h2>
+        <p className="mt-0.5 text-xs leading-relaxed text-[#64748b]">{lead}</p>
       </div>
-      <div className="shrink-0 sm:flex sm:justify-end">{children}</div>
     </div>
   );
 }
 
-function QuickAction({
-  icon: Icon,
-  label,
-  onClick,
-}: {
-  icon: LucideIcon;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-[#1e2a45]/50 cursor-pointer"
-    >
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#1e2a45]">
-        <Icon className="size-4 text-[#0066FF]" strokeWidth={1.75} />
-      </span>
-      <span className="min-w-0 flex-1 text-sm font-medium text-white">{label}</span>
-      <ChevronRight className="size-4 shrink-0 text-[#5a6580] transition-transform group-hover:translate-x-0.5 group-hover:text-[#0066FF]" />
-    </button>
-  );
-}
+const fieldInputClass =
+  "h-11 rounded-xl border-[#e6edf5] bg-white text-[#0f172a] shadow-none placeholder:text-[#94a3b8]";
 
 const selectTriggerClass =
-  "h-11 min-w-[220px] rounded-xl bg-[#131A2E] border-[#1e2a45] text-white text-sm";
+  "h-11 w-full rounded-xl border-[#e6edf5] bg-white text-sm text-[#0f172a] shadow-none";
+
+const selectMenuClass =
+  "rounded-xl border-[#e6edf5] bg-white text-[#0f172a]";
+
+const cardClass =
+  "rounded-[22px] border border-[#e6edf5] bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]";
+
+function IconInput({
+  icon: Icon,
+  className,
+  ...props
+}: { icon: LucideIcon } & ComponentProps<typeof Input>) {
+  return (
+    <div className="relative">
+      <Icon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#94a3b8]" />
+      <Input className={cn(fieldInputClass, "pl-10", className)} {...props} />
+    </div>
+  );
+}
+
+function IconSelectTrigger({
+  icon: Icon,
+  children,
+}: {
+  icon: LucideIcon;
+  children?: ReactNode;
+}) {
+  return (
+    <SelectTrigger className={selectTriggerClass}>
+      <span className="flex min-w-0 items-center gap-2">
+        <Icon className="size-4 shrink-0 text-[#94a3b8]" />
+        {children ?? <SelectValue />}
+      </span>
+    </SelectTrigger>
+  );
+}
 
 export default function SettingsGeneralPanel({
   t,
-  formatPrice,
-  company,
-  companyTimezone,
+  locale,
   timezoneOptions,
   isAdminStaff,
   canEditBusinessIdentity,
   canEditLanguageCurrency,
   canEditTimezone,
-  editingCompany,
   savingCompany,
-  savingLocale,
-  draftName,
-  draftAddress,
-  draftPhone,
-  planTierDisplay,
-  licenseStatusDisplay,
-  licenseExpiryLine,
-  onDraftName,
-  onDraftAddress,
-  onDraftPhone,
-  onStartEdit,
+  draft,
+  prefs,
+  onDraftChange,
+  onPrefsChange,
+  onLocaleChange,
   onCancelEdit,
   onSaveCompany,
-  onLocaleChange,
-  onNavigate,
-  onOpenCategory,
+  logoPreviewSrc,
+  logoHasCustom,
+  logoBusy,
+  onPickLogo,
+  onRemoveLogo,
 }: SettingsGeneralPanelProps) {
-  const currencyDisplay = company.currencySymbol
-    ? `${company.currency} (${company.currencySymbol})`
-    : company.currency;
-  const expiryDate =
-    company.licenseExpiry && !Number.isNaN(new Date(company.licenseExpiry).getTime())
-      ? new Date(company.licenseExpiry).toLocaleDateString()
-      : null;
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const locked = !canEditBusinessIdentity;
+  const localeLocked = !canEditLanguageCurrency;
+  const tzLocked = !canEditTimezone;
+  const selectedCountry =
+    COUNTRY_OPTIONS.find((item) => item.value === draft.country) ??
+    COUNTRY_OPTIONS.find(
+      (item) => item.label.toLowerCase() === draft.country.trim().toLowerCase(),
+    );
+  const currencyOptions = CURRENCY_OPTIONS.some(
+    (item) => item.value === locale.currencySymbol,
+  )
+    ? CURRENCY_OPTIONS
+    : [
+        { value: locale.currencySymbol, label: locale.currencySymbol },
+        ...CURRENCY_OPTIONS,
+      ];
+  const canSave =
+    canEditBusinessIdentity || canEditLanguageCurrency || canEditTimezone;
+  const logoMeta = useLogoMeta(logoPreviewSrc, logoHasCustom);
+  const knownType = BUSINESS_TYPES.find((item) => item.id === draft.type);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div className="min-w-0">
-          <h1 className="flex items-center gap-2.5 text-[28px] font-bold tracking-tight text-white">
-            <span className="flex size-10 items-center justify-center rounded-2xl bg-[#0066FF]/12">
-              <Store className="size-5 text-[#0066FF]" />
-            </span>
-            {t("settings.cat.general")}
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[#8b93a7]">
-            {t("settings.general_lead")}
-          </p>
-          {!isAdminStaff ? (
-            <p className="mt-2 text-xs text-amber-400/90">
-              {t("settings.manager_general_hint")}
-            </p>
-          ) : null}
+    <div className="space-y-4">
+      <header className="flex flex-col gap-4 px-1 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brand-light text-brand">
+            <Building2 className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <h1 className="text-[22px] font-bold tracking-tight text-[#0f172a]">
+              {t("settings.cat.general")}
+            </h1>
+            <p className="mt-0.5 text-sm text-[#64748b]">{t("settings.general_lead")}</p>
+            {!isAdminStaff ? (
+              <p className="mt-1 text-xs text-[#d97706]">{t("settings.manager_general_hint")}</p>
+            ) : null}
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
-          {onNavigate ? (
-            <Button
+        {canSave ? (
+          <div className="flex shrink-0 items-center gap-2">
+            <button
               type="button"
-              variant="outline"
-              className="h-10 rounded-xl border-[#0066FF]/35 bg-transparent text-[#0066FF] hover:bg-[#0066FF]/10 hover:text-[#0066FF]"
-              onClick={() => onNavigate("floor")}
+              onClick={onCancelEdit}
+              disabled={savingCompany}
+              className="inline-flex h-10 items-center gap-2 rounded-full border border-[#e6edf5] bg-white px-4 text-sm font-medium text-[#0f172a] disabled:opacity-60"
             >
-              {t("settings.preview_pos")}
-            </Button>
-          ) : null}
-          {editingCompany && canEditBusinessIdentity ? (
-            <Button
+              <RotateCcw className="size-4" />
+              {t("settings.discard_changes")}
+            </button>
+            <button
               type="button"
-              className="h-10 rounded-xl bg-[#0066FF] hover:bg-[#0052CC]"
               onClick={onSaveCompany}
               disabled={savingCompany}
+              className="inline-flex h-10 items-center gap-2 rounded-full bg-brand px-4 text-sm font-semibold disabled:opacity-60"
+              style={{ color: "#ffffff" }}
             >
-              {savingCompany ? "…" : t("settings.company_save")}
-            </Button>
-          ) : null}
-        </div>
-      </div>
+              <Save className="size-4" />
+              {savingCompany ? "…" : t("settings.save_changes")}
+            </button>
+          </div>
+        ) : null}
+      </header>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start">
-        <div className="space-y-6 min-w-0">
-          <section className="rounded-[22px] border border-[#1e2a45] bg-[#0D1326] p-5 sm:p-6 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h2 className="flex items-center gap-2.5 text-lg font-semibold text-white">
-                <span className="flex size-9 items-center justify-center rounded-xl bg-[#0066FF]/12">
-                  <Building2 className="size-[18px] text-[#0066FF]" />
-                </span>
-                {t("settings.company_details")}
-              </h2>
-              {canEditBusinessIdentity ? (
-                editingCompany ? (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-9 rounded-lg border-[#2a3a5a] text-[#8b93a7] hover:text-white"
-                      onClick={onCancelEdit}
-                      disabled={savingCompany}
-                    >
-                      {t("settings.company_cancel")}
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="h-9 rounded-lg bg-[#0066FF] hover:bg-[#0052CC]"
-                      onClick={onSaveCompany}
-                      disabled={savingCompany}
-                    >
-                      {savingCompany ? "…" : t("settings.company_save")}
-                    </Button>
-                  </div>
-                ) : (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-9 rounded-lg border-[#2a3a5a] text-[#8b93a7] hover:text-white shrink-0"
-                    onClick={onStartEdit}
-                  >
-                    <Pencil className="size-3.5 mr-1.5" />
-                    {t("settings.company_edit")}
-                  </Button>
-                )
-              ) : null}
-            </div>
-
-            {editingCompany && canEditBusinessIdentity ? (
-              <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="space-y-2 sm:col-span-2">
-                  <Label className="text-[#8b93a7] text-[11px] font-semibold uppercase tracking-wider">
-                    {t("settings.business_name")}
-                  </Label>
-                  <Input
-                    value={draftName}
-                    onChange={(e) => onDraftName(e.target.value)}
-                    className="h-11 rounded-xl bg-[#0A0F1E] border-[#1e2a45] text-white"
-                    autoComplete="organization"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[#8b93a7] text-[11px] font-semibold uppercase tracking-wider">
-                    {t("settings.address")}
-                  </Label>
-                  <Input
-                    value={draftAddress}
-                    onChange={(e) => onDraftAddress(e.target.value)}
-                    className="h-11 rounded-xl bg-[#0A0F1E] border-[#1e2a45] text-white"
-                    autoComplete="street-address"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[#8b93a7] text-[11px] font-semibold uppercase tracking-wider">
-                    {t("settings.phone")}
-                  </Label>
-                  <Input
-                    value={draftPhone}
-                    onChange={(e) => onDraftPhone(e.target.value)}
-                    className="h-11 rounded-xl bg-[#0A0F1E] border-[#1e2a45] text-white"
-                    inputMode="tel"
-                    autoComplete="tel"
-                  />
-                </div>
+      <div className="grid items-start gap-4 xl:grid-cols-2">
+        <div className="space-y-4">
+          <section className={cardClass}>
+            <CardHeading
+              icon={Building2}
+              tint="purple"
+              title={t("settings.company_details")}
+              lead={t("settings.company_details_lead")}
+            />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <FieldLabel required>{t("settings.business_name")}</FieldLabel>
+                <IconInput
+                  icon={Building2}
+                  value={draft.name}
+                  onChange={(e) => onDraftChange("name", e.target.value)}
+                  disabled={locked}
+                  autoComplete="organization"
+                />
               </div>
-            ) : null}
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {editingCompany && canEditBusinessIdentity ? null : (
-                <>
-                  <InfoTile
-                    icon={Building2}
-                    label={t("settings.business_name")}
-                    value={company.name}
-                  />
-                  <InfoTile
-                    icon={MapPin}
-                    label={t("settings.address")}
-                    value={company.address || t("settings.not_set")}
-                  />
-                  <InfoTile
-                    icon={Phone}
-                    label={t("settings.phone")}
-                    value={company.phone || t("settings.not_set")}
-                  />
-                </>
-              )}
-              <InfoTile icon={Coins} label={t("settings.currency")} value={currencyDisplay} />
-              <InfoTile
-                icon={CreditCard}
-                label={t("settings.plan")}
-                value={planTierDisplay(company.plan)}
-                hint={t("settings.plan_cannot_change_here")}
-              />
-              <InfoTile
-                icon={ShieldCheck}
-                label={t("settings.license")}
-                value={licenseStatusDisplay(String(company.licenseStatus ?? ""))}
-                valueColor={
-                  company.licenseStatus === "active" ? "text-emerald-500" : "text-red-400"
-                }
-                subline={licenseExpiryLine?.text}
-                sublineClassName={licenseExpiryLine?.lineClass}
-              />
+              <div className="space-y-1.5">
+                <FieldLabel>{t("settings.phone_number")}</FieldLabel>
+                <IconInput
+                  icon={Phone}
+                  value={draft.phone}
+                  onChange={(e) => onDraftChange("phone", e.target.value)}
+                  disabled={locked}
+                  inputMode="tel"
+                  autoComplete="tel"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <FieldLabel>{t("settings.email_address")}</FieldLabel>
+                <IconInput
+                  icon={Mail}
+                  type="email"
+                  value={draft.email}
+                  onChange={(e) => onDraftChange("email", e.target.value)}
+                  disabled={locked}
+                  autoComplete="email"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <FieldLabel>{t("settings.website")}</FieldLabel>
+                <IconInput
+                  icon={Link2}
+                  value={draft.website}
+                  onChange={(e) => onDraftChange("website", e.target.value)}
+                  disabled={locked}
+                  autoComplete="url"
+                />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <FieldLabel>{t("settings.address")}</FieldLabel>
+                <IconInput
+                  icon={MapPin}
+                  value={draft.address}
+                  onChange={(e) => onDraftChange("address", e.target.value)}
+                  disabled={locked}
+                  autoComplete="street-address"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <FieldLabel>{t("settings.city")}</FieldLabel>
+                <IconInput
+                  icon={Building2}
+                  value={draft.city}
+                  onChange={(e) => onDraftChange("city", e.target.value)}
+                  disabled={locked}
+                  autoComplete="address-level2"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <FieldLabel>{t("settings.postal_code")}</FieldLabel>
+                <IconInput
+                  icon={Hash}
+                  value={draft.postalCode}
+                  onChange={(e) => onDraftChange("postalCode", e.target.value)}
+                  disabled={locked}
+                  autoComplete="postal-code"
+                />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <FieldLabel required>{t("settings.country")}</FieldLabel>
+                <Select
+                  value={selectedCountry?.value}
+                  onValueChange={(value) => {
+                    const match = COUNTRY_OPTIONS.find((item) => item.value === value);
+                    onDraftChange("country", match?.label ?? value);
+                  }}
+                  disabled={locked}
+                >
+                  <SelectTrigger className={selectTriggerClass}>
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="text-base leading-none">{selectedCountry?.flag ?? "🏳️"}</span>
+                      <span className="truncate">
+                        {selectedCountry?.label || draft.country || t("settings.country")}
+                      </span>
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent align="start" className={selectMenuClass}>
+                    {COUNTRY_OPTIONS.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        <span className="text-base leading-none">{item.flag}</span>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="flex items-start gap-1.5 text-xs leading-relaxed text-[#64748b]">
+                  <Info className="mt-0.5 size-3.5 shrink-0" />
+                  <span>{t("settings.country_tax_note")}</span>
+                </p>
+              </div>
             </div>
           </section>
 
-          <section className="rounded-[22px] border border-[#1e2a45] bg-[#0D1326] p-5 sm:p-6 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-            <h2 className="mb-2 flex items-center gap-2.5 text-lg font-semibold text-white">
-              <span className="flex size-9 items-center justify-center rounded-xl bg-[#0066FF]/12">
-                <Globe className="size-[18px] text-[#0066FF]" />
-              </span>
-              {t("settings.language_currency")}
-            </h2>
-
-            <div className="divide-y divide-[#1e2a45]/80">
-              <PrefRow label={t("settings.language")} description={t("settings.language_desc")}>
-                <div className="flex overflow-hidden rounded-xl border border-[#1e2a45]">
-                  <button
-                    type="button"
-                    onClick={() => onLocaleChange("language", "en")}
-                    disabled={savingLocale || !canEditLanguageCurrency}
-                    className={cn(
-                      "flex h-11 items-center gap-1.5 px-4 text-sm font-medium transition-colors",
-                      company.language === "en"
-                        ? "bg-[#0066FF] text-white"
-                        : "bg-[#131A2E] text-[#5a6580] hover:text-white",
-                      canEditLanguageCurrency ? "cursor-pointer" : "cursor-not-allowed opacity-70",
-                    )}
-                  >
-                    <FlagUS className="h-3.5 w-5" />
-                    English
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onLocaleChange("language", "sq")}
-                    disabled={savingLocale || !canEditLanguageCurrency}
-                    className={cn(
-                      "flex h-11 items-center gap-1.5 px-4 text-sm font-medium transition-colors",
-                      company.language === "sq"
-                        ? "bg-[#0066FF] text-white"
-                        : "bg-[#131A2E] text-[#5a6580] hover:text-white",
-                      canEditLanguageCurrency ? "cursor-pointer" : "cursor-not-allowed opacity-70",
-                    )}
-                  >
-                    <FlagAL className="h-3.5 w-5" />
-                    Albanian
-                  </button>
-                </div>
-              </PrefRow>
-
-              <PrefRow label={t("settings.timezone")} description={t("settings.timezone_desc")}>
+          <section className={cardClass}>
+            <CardHeading
+              icon={Globe}
+              tint="orange"
+              title={t("settings.regional_title")}
+              lead={t("settings.regional_lead")}
+            />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
+              <div className="space-y-1.5 sm:col-span-3">
+                <FieldLabel required>{t("settings.currency")}</FieldLabel>
                 <Select
-                  value={companyTimezone}
-                  onValueChange={(val) => onLocaleChange("timezone", val)}
-                  disabled={savingLocale || !canEditTimezone}
+                  value={locale.currencySymbol}
+                  onValueChange={(value) => onLocaleChange("currencySymbol", value)}
+                  disabled={localeLocked}
+                >
+                  <IconSelectTrigger icon={CircleDollarSign}>
+                    <SelectValue />
+                  </IconSelectTrigger>
+                  <SelectContent align="start" className={selectMenuClass}>
+                    {currencyOptions.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5 sm:col-span-3">
+                <FieldLabel required>{t("settings.language")}</FieldLabel>
+                <Select
+                  value={locale.language === "sq" ? "sq" : "en"}
+                  onValueChange={(value) => onLocaleChange("language", value)}
+                  disabled={localeLocked}
                 >
                   <SelectTrigger className={selectTriggerClass}>
-                    <SelectValue />
+                    <span className="flex min-w-0 items-center gap-2">
+                      {locale.language === "sq" ? (
+                        <FlagAL className="h-3.5 w-5" />
+                      ) : (
+                        <FlagUS className="h-3.5 w-5" />
+                      )}
+                      <span className="truncate">
+                        {locale.language === "sq" ? t("settings.lang_sq") : t("settings.lang_en")}
+                      </span>
+                    </span>
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent align="start" className={selectMenuClass}>
+                    <SelectItem value="en">
+                      <FlagUS className="h-3.5 w-5" />
+                      {t("settings.lang_en")}
+                    </SelectItem>
+                    <SelectItem value="sq">
+                      <FlagAL className="h-3.5 w-5" />
+                      {t("settings.lang_sq")}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <FieldLabel required>{t("settings.timezone")}</FieldLabel>
+                <Select
+                  value={locale.timezone}
+                  onValueChange={(value) => onLocaleChange("timezone", value)}
+                  disabled={tzLocked}
+                >
+                  <IconSelectTrigger icon={Clock} />
+                  <SelectContent align="start" className={selectMenuClass}>
                     {timezoneOptions.map((tz) => (
                       <SelectItem key={tz} value={tz}>
                         {timezoneLabel(tz)}
@@ -462,156 +576,217 @@ export default function SettingsGeneralPanel({
                     ))}
                   </SelectContent>
                 </Select>
-              </PrefRow>
-
-              <PrefRow
-                label={t("settings.currency_symbol")}
-                description={t("settings.currency_symbol_desc")}
-              >
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <FieldLabel>{t("settings.date_format")}</FieldLabel>
                 <Select
-                  value={company.currencySymbol}
-                  onValueChange={(val) => onLocaleChange("currencySymbol", val)}
-                  disabled={savingLocale || !canEditLanguageCurrency}
+                  value={prefs.dateFormat}
+                  onValueChange={(value) =>
+                    onPrefsChange({ dateFormat: value as PosGeneralPrefs["dateFormat"] })
+                  }
+                  disabled={locked}
                 >
-                  <SelectTrigger className={selectTriggerClass}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Lek">Lek (Albanian Lek)</SelectItem>
-                    <SelectItem value="€">€ (Euro)</SelectItem>
-                    <SelectItem value="$">$ (US Dollar)</SelectItem>
-                    <SelectItem value="£">£ (British Pound)</SelectItem>
-                    <SelectItem value="CHF">CHF (Swiss Franc)</SelectItem>
-                    <SelectItem value="din">din (Serbian Dinar)</SelectItem>
+                  <IconSelectTrigger icon={CalendarDays} />
+                  <SelectContent align="start" className={selectMenuClass}>
+                    <SelectItem value="dmy">{t("settings.date_format_dmy")}</SelectItem>
+                    <SelectItem value="mdy">{t("settings.date_format_mdy")}</SelectItem>
+                    <SelectItem value="ymd">{t("settings.date_format_ymd")}</SelectItem>
                   </SelectContent>
                 </Select>
-              </PrefRow>
-
-              <PrefRow
-                label={t("settings.currency_position")}
-                description={t("settings.currency_position_desc")}
-              >
-                <div className="flex overflow-hidden rounded-xl border border-[#1e2a45]">
-                  <button
-                    type="button"
-                    onClick={() => onLocaleChange("currencyPosition", "prefix")}
-                    disabled={savingLocale || !canEditLanguageCurrency}
-                    className={cn(
-                      "flex h-11 items-center gap-1.5 px-3.5 text-sm font-medium transition-colors",
-                      company.currencyPosition === "prefix"
-                        ? "bg-[#0066FF] text-white"
-                        : "bg-[#131A2E] text-[#5a6580] hover:text-white",
-                      canEditLanguageCurrency ? "cursor-pointer" : "cursor-not-allowed opacity-70",
-                    )}
-                  >
-                    <CircleDollarSign className="size-3.5" />
-                    {t("settings.position_prefix")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onLocaleChange("currencyPosition", "suffix")}
-                    disabled={savingLocale || !canEditLanguageCurrency}
-                    className={cn(
-                      "flex h-11 items-center gap-1.5 px-3.5 text-sm font-medium transition-colors",
-                      company.currencyPosition === "suffix"
-                        ? "bg-[#0066FF] text-white"
-                        : "bg-[#131A2E] text-[#5a6580] hover:text-white",
-                      canEditLanguageCurrency ? "cursor-pointer" : "cursor-not-allowed opacity-70",
-                    )}
-                  >
-                    {t("settings.position_suffix")}
-                    <CircleDollarSign className="size-3.5" />
-                  </button>
-                </div>
-              </PrefRow>
-
-              <PrefRow label={t("settings.decimals")} description={t("settings.decimals_desc")}>
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <FieldLabel>{t("settings.time_format")}</FieldLabel>
                 <Select
-                  value={String(company.currencyDecimals)}
-                  onValueChange={(val) => onLocaleChange("currencyDecimals", Number(val))}
-                  disabled={savingLocale || !canEditLanguageCurrency}
+                  value={prefs.timeFormat}
+                  onValueChange={(value) =>
+                    onPrefsChange({ timeFormat: value as PosGeneralPrefs["timeFormat"] })
+                  }
+                  disabled={locked}
                 >
-                  <SelectTrigger className="h-11 w-[160px] rounded-xl bg-[#131A2E] border-[#1e2a45] text-white text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0">0 (100)</SelectItem>
-                    <SelectItem value="1">1 (100.0)</SelectItem>
-                    <SelectItem value="2">2 (100.00)</SelectItem>
-                    <SelectItem value="3">3 (100.000)</SelectItem>
+                  <IconSelectTrigger icon={Clock} />
+                  <SelectContent align="start" className={selectMenuClass}>
+                    <SelectItem value="24h">{t("settings.time_format_24")}</SelectItem>
+                    <SelectItem value="12h">{t("settings.time_format_12")}</SelectItem>
                   </SelectContent>
                 </Select>
-              </PrefRow>
-            </div>
-
-            <div className="mt-5 rounded-2xl border border-[#1e2a45]/70 bg-[#131A2E]/70 px-5 py-4">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#5a6580]">
-                {t("settings.preview_label")}
-              </p>
-              <p className="mt-1 text-2xl font-bold tracking-tight text-white">
-                {formatPrice(1234.56)}
-              </p>
+              </div>
             </div>
           </section>
-
-          <AppUpdateSection />
         </div>
 
-        <aside className="space-y-4 xl:sticky xl:top-4">
-          <section className="rounded-[22px] border border-[#1e2a45] bg-[#0D1326] p-4 sm:p-5">
-            <h3 className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#5a6580]">
-              {t("settings.quick_actions")}
-            </h3>
-            <div className="space-y-0.5">
-              {canEditBusinessIdentity ? (
-                <QuickAction
-                  icon={Pencil}
-                  label={t("settings.quick_edit_business")}
-                  onClick={onStartEdit}
-                />
-              ) : null}
-              <QuickAction
-                icon={Wallet}
-                label={t("settings.cat.payments")}
-                onClick={() => onOpenCategory("payments")}
-              />
-              <QuickAction
-                icon={Users}
-                label={t("settings.cat.users")}
-                onClick={() => {
-                  if (onNavigate) onNavigate("staff");
-                  else onOpenCategory("users");
-                }}
-              />
-              <QuickAction
-                icon={HardDrive}
-                label={t("settings.cat.backup")}
-                onClick={() => onOpenCategory("backup")}
-              />
+        <div className="space-y-4">
+          <section className={cardClass}>
+            <CardHeading
+              icon={ImageIcon}
+              tint="purple"
+              title={t("settings.logo_title")}
+              lead={t("settings.logo_lead")}
+            />
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/svg+xml"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (file) onPickLogo(file);
+              }}
+            />
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+              <div className="relative flex size-[92px] shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#e6edf5] bg-[#f8fafc]">
+                <img src={logoPreviewSrc} alt="" className="max-h-16 max-w-[72px] object-contain" />
+                {logoHasCustom ? (
+                  <span className="absolute bottom-1.5 right-1.5 flex size-5 items-center justify-center rounded-full bg-[#16a34a]">
+                    <span className="text-[10px] font-bold" style={{ color: "#ffffff" }}>✓</span>
+                  </span>
+                ) : null}
+              </div>
+              <div className="min-w-0 flex-1">
+                {logoHasCustom && logoMeta ? (
+                  <p className="text-sm text-[#64748b]">
+                    {logoMeta.width > 0 ? `${logoMeta.width} × ${logoMeta.height}` : null}
+                    {logoMeta.bytes != null
+                      ? `${logoMeta.width > 0 ? " · " : ""}${formatBytes(logoMeta.bytes)}`
+                      : null}
+                  </p>
+                ) : (
+                  <p className="text-sm text-[#64748b]">{t("settings.logo_formats")}</p>
+                )}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={logoBusy || locked || !logoHasCustom}
+                    onClick={onRemoveLogo}
+                    className="inline-flex size-10 items-center justify-center rounded-xl border border-[#e6edf5] bg-white text-[#64748b] disabled:opacity-40"
+                    aria-label={t("settings.logo_remove")}
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={logoBusy || locked}
+                    onClick={() => logoInputRef.current?.click()}
+                    className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#e6edf5] bg-white px-3 text-sm font-medium text-[#0f172a] disabled:opacity-40"
+                  >
+                    {t("settings.logo_change")}
+                  </button>
+                </div>
+                {logoHasCustom ? (
+                  <p className="mt-2 text-xs text-[#94a3b8]">{t("settings.logo_formats")}</p>
+                ) : null}
+              </div>
             </div>
           </section>
 
-          <section className="rounded-[22px] border border-[#1e2a45] bg-[#0D1326] p-5">
-            <h3 className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#5a6580]">
-              <Lightbulb className="size-3.5 text-amber-400" />
-              {t("settings.tips")}
-            </h3>
-            <p className="text-sm leading-relaxed text-[#8b93a7]">{t("settings.tips_autosave")}</p>
+          <section className={cardClass}>
+            <CardHeading
+              icon={knownType?.icon ?? UtensilsCrossed}
+              tint="orange"
+              title={t("settings.business_type")}
+              lead={t("settings.business_type_card_lead")}
+            />
+            <BusinessTypeLock type={draft.type} t={t} />
           </section>
 
-          <section className="rounded-[22px] border border-[#1e2a45] bg-[#0D1326] p-5">
-            <h3 className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#5a6580]">
-              <Clock className="size-3.5" />
-              {t("settings.last_updated")}
-            </h3>
-            <p className="text-sm font-medium text-white">
-              {expiryDate
-                ? t("settings.last_updated_license", { date: expiryDate })
-                : t("settings.last_updated_live")}
+          <section className={cardClass}>
+            <CardHeading
+              icon={SlidersHorizontal}
+              tint="orange"
+              title={t("settings.defaults_title")}
+              lead={t("settings.defaults_lead")}
+            />
+            <div className="space-y-3">
+              <DefaultRow icon={ShoppingBag} label={t("settings.default_order_type")}>
+                <Select
+                  value={prefs.defaultOrderType}
+                  onValueChange={(value) =>
+                    onPrefsChange({
+                      defaultOrderType: value as PosGeneralPrefs["defaultOrderType"],
+                    })
+                  }
+                  disabled={locked}
+                >
+                  <SelectTrigger className={cn(selectTriggerClass, "w-[180px]")}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent align="end" className={selectMenuClass}>
+                    {ORDER_TYPES.map((item) => {
+                      const Icon = item.icon;
+                      return (
+                        <SelectItem key={item.id} value={item.id}>
+                          <Icon className="size-4 text-[#94a3b8]" />
+                          {t(`settings.order_type_${item.id}`)}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </DefaultRow>
+              <DefaultRow icon={UtensilsCrossed} label={t("settings.default_table_service")}>
+                <Select
+                  value={prefs.defaultTableService ? "on" : "off"}
+                  onValueChange={(value) =>
+                    onPrefsChange({ defaultTableService: value === "on" })
+                  }
+                  disabled={locked}
+                >
+                  <SelectTrigger className={cn(selectTriggerClass, "w-[180px]")}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent align="end" className={selectMenuClass}>
+                    <SelectItem value="on">{t("settings.defaults_enabled")}</SelectItem>
+                    <SelectItem value="off">{t("settings.defaults_disabled")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </DefaultRow>
+              <DefaultRow icon={Languages} label={t("settings.receipt_language")}>
+                <Select
+                  value={prefs.receiptLanguage}
+                  onValueChange={(value) =>
+                    onPrefsChange({
+                      receiptLanguage: value as PosGeneralPrefs["receiptLanguage"],
+                    })
+                  }
+                  disabled={locked}
+                >
+                  <SelectTrigger className={cn(selectTriggerClass, "w-[180px]")}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent align="end" className={selectMenuClass}>
+                    <SelectItem value="en">{t("settings.lang_en")}</SelectItem>
+                    <SelectItem value="sq">{t("settings.lang_sq")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </DefaultRow>
+            </div>
+            <p className="mt-4 flex items-start gap-2 text-xs leading-relaxed text-[#64748b]">
+              <Info className="mt-0.5 size-3.5 shrink-0" />
+              <span>{t("settings.defaults_future_note")}</span>
             </p>
           </section>
-        </aside>
+        </div>
       </div>
+    </div>
+  );
+}
+
+function DefaultRow({
+  icon: Icon,
+  label,
+  children,
+}: {
+  icon: LucideIcon;
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 items-center gap-2 text-sm text-[#334155]">
+        <Icon className="size-4 shrink-0 text-[#94a3b8]" />
+        <span>{label}</span>
+      </div>
+      {children}
     </div>
   );
 }

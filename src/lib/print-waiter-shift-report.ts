@@ -1,7 +1,8 @@
 /**
  * Thermal HTML for closing a waiter shift, aligned with Template Manager → Waiter Shift Report.
  */
-import { printHtmlDocumentAsync } from "@/lib/print-html.ts";
+import { PRINT_POWERED_BY, printHtmlDocumentAsync } from "@/lib/print-html.ts";
+import { printDesignCss } from "@/lib/print-design.ts";
 import { format } from "date-fns";
 
 export type WaiterShiftTemplateToggles = {
@@ -244,8 +245,8 @@ export function buildWaiterShiftReportHtml(
     ${footerBlock}
     <div class="ts border-top"${styleAttr("timestamp", styles)}>
       <p>${escapeHtml(nowStr)}</p>
-      <p class="muted">Powered by Vyntex POS</p>
     </div>
+    <div class="powered">${PRINT_POWERED_BY}</div>
   </div>`;
 
   return `<!DOCTYPE html>
@@ -274,6 +275,8 @@ export function buildWaiterShiftReportHtml(
     .foot { text-align: center; font-size: 10px; }
     .ts { text-align: center; font-size: 9px; color: #888; }
     .ts .muted { margin-top: 4px; }
+    .powered { margin-top: 14px; text-align: center; font-size: 9px; color: #888; }
+    ${printDesignCss(styles)}
   </style>
 </head>
 <body>${body}</body>
@@ -284,7 +287,7 @@ export async function printWaiterShiftReport(
   template: WaiterShiftTemplate | null | undefined,
   data: WaiterShiftPrintPayload,
   formatPrice: (amount: number) => string,
-  options?: { subheaderTitle?: string; silent?: boolean },
+  options?: { subheaderTitle?: string; silent?: boolean; deviceName?: string },
 ): Promise<boolean> {
   const merged: WaiterShiftTemplate = template
     ? {
@@ -305,5 +308,6 @@ export async function printWaiterShiftReport(
   );
   return printHtmlDocumentAsync(html, {
     silent: options?.silent ?? true,
+    deviceName: options?.deviceName,
   });
 }

@@ -2,6 +2,7 @@
 
 import { resolveMenuItemImageUrl } from "@/lib/menu-item-photo-urls.ts";
 import { normalizeCustomizationConfig, normalizeSelectedCustomizations } from "@/lib/menu-customizations.ts";
+import { hasPrepConfig, normalizePrepConfig } from "@/lib/menu-prep-config.ts";
 
 export function staffFromRow(r: {
   id: string;
@@ -63,7 +64,9 @@ export function menuCategoryFromRow(r: {
   display_order: number;
   is_active: boolean;
   icon?: string | null;
+  prep_config?: unknown;
 }) {
+  const prepConfig = normalizePrepConfig(r.prep_config);
   return {
     _id: r.id,
     _creationTime: new Date(r.created_at).getTime(),
@@ -72,6 +75,7 @@ export function menuCategoryFromRow(r: {
     displayOrder: r.display_order,
     isActive: r.is_active,
     icon: r.icon?.trim() ? r.icon.trim() : undefined,
+    ...(hasPrepConfig(prepConfig) ? { prepConfig } : {}),
   };
 }
 
@@ -90,6 +94,9 @@ export function menuItemFromRow(r: {
   image_url: string | null;
   is_favorite: boolean | null;
   staff_meal_allowed?: boolean | null;
+  staff_meal_price?: number | string | null;
+  staff_meal_free_qty?: number | string | null;
+  staff_meal_daily_limit?: number | string | null;
   total_sold: number | null;
   track_stock: boolean | null;
   stock_unit: string | null;
@@ -97,6 +104,7 @@ export function menuItemFromRow(r: {
   low_stock_threshold: number | string | null;
   supply_recipe?: unknown;
   customization_config?: unknown;
+  prep_config?: unknown;
 }) {
   const rawRecipe = r.supply_recipe;
   let supplyRecipe:
@@ -116,6 +124,7 @@ export function menuItemFromRow(r: {
   }
 
   const customizationConfig = normalizeCustomizationConfig(r.customization_config);
+  const prepConfig = normalizePrepConfig(r.prep_config);
 
   return {
     _id: r.id,
@@ -134,7 +143,15 @@ export function menuItemFromRow(r: {
       { name: r.name, imageUrl: r.image_url ?? undefined },
     ),
     isFavorite: r.is_favorite ?? false,
-    staffMealAllowed: r.staff_meal_allowed !== false,
+    staffMealAllowed: r.staff_meal_allowed === true,
+    staffMealPrice:
+      r.staff_meal_price != null ? Number(r.staff_meal_price) : undefined,
+    staffMealFreeQty:
+      r.staff_meal_free_qty != null ? Number(r.staff_meal_free_qty) : undefined,
+    staffMealDailyLimit:
+      r.staff_meal_daily_limit != null
+        ? Number(r.staff_meal_daily_limit)
+        : undefined,
     totalSold: r.total_sold ?? 0,
     trackStock: r.track_stock ?? false,
     stockUnit: r.stock_unit as never,
@@ -146,6 +163,7 @@ export function menuItemFromRow(r: {
         : undefined,
     supplyRecipe,
     ...(customizationConfig.length > 0 ? { customizationConfig } : {}),
+    ...(hasPrepConfig(prepConfig) ? { prepConfig } : {}),
   };
 }
 

@@ -14,6 +14,40 @@ import { queryClient } from "@/components/providers/query-client.tsx";
 import { enqueueMutation } from "@/lib/local-db.ts";
 import posI18n from "@/pages/pos/_lib/pos-i18n.ts";
 import { toast } from "sonner";
+import { PHONE_DEVICE_REVOKED } from "@/lib/supabase-pos/waiter-phone-binding.ts";
+import {
+  clearWaiterPhonePair,
+  clearWaiterSession,
+  getWaiterPhonePair,
+  isWaiterDesignPreviewLicense,
+} from "@/phone-app/lib/waiter-session.ts";
+
+function isPhoneWaiterRuntime(): boolean {
+  if (typeof window === "undefined") return false;
+  const path = window.location.pathname.toLowerCase();
+  return (
+    path.includes("phone.html") ||
+    path.includes("/phone/") ||
+    /\/phone\/?$/.test(path)
+  );
+}
+
+function withWaiterPhoneDeviceId(
+  args: Record<string, unknown>,
+): Record<string, unknown> {
+  if (!isPhoneWaiterRuntime()) return args;
+  const pair = getWaiterPhonePair();
+  if (!pair?.deviceId || isWaiterDesignPreviewLicense(pair.licenseKey)) {
+    return args;
+  }
+  return { ...args, phoneDeviceId: pair.deviceId };
+}
+
+function dropRevokedWaiterPhone() {
+  if (!isPhoneWaiterRuntime()) return;
+  clearWaiterSession();
+  clearWaiterPhonePair();
+}
 
 /** Mutations that cannot be replayed offline (need live URL or immediate network). */
 const OFFLINE_POS_MUTATION_DENYLIST = new Set<string>(["pos.menu.generateUploadUrl"]);
@@ -138,6 +172,9 @@ function invalidateAfterOrderMutation(
     });
   } else if (
     mutationId === "pos.orders.voidItem" ||
+    mutationId === "pos.orders.voidItemUnits" ||
+    mutationId === "pos.orders.replaceOrderItemUnits" ||
+    mutationId === "pos.orders.returnOrderItemUnits" ||
     mutationId === "pos.orders.addItemsToOrderBulk" ||
     mutationId === "pos.orders.sendOrder" ||
     mutationId === "pos.orders.submitCartOrder"
@@ -150,10 +187,25 @@ function invalidateAfterOrderMutation(
   });
 
   if (
+    mutationId === "pos.orders.voidItem" ||
+    mutationId === "pos.orders.payOrder" ||
+    mutationId === "pos.orders.sendOrder" ||
+    mutationId === "pos.orders.submitCartOrder" ||
+    mutationId === "pos.orders.returnOrderItemUnits" ||
+    mutationId === "pos.orders.replaceOrderItemUnits"
+  ) {
+    invalidatePosPrefix(qc, "pos.stock.");
+    invalidatePosPrefix(qc, "pos.menu.");
+  }
+
+  if (
     mutationId === "pos.orders.sendOrder" ||
     mutationId === "pos.orders.submitCartOrder" ||
     mutationId === "pos.orders.payOrder" ||
     mutationId === "pos.orders.voidItem" ||
+    mutationId === "pos.orders.voidItemUnits" ||
+    mutationId === "pos.orders.replaceOrderItemUnits" ||
+    mutationId === "pos.orders.returnOrderItemUnits" ||
     mutationId === "pos.orders.fiscalizeOrderBulk" ||
     mutationId === "pos.orders.logBulkFiscalization" ||
     mutationId === "pos.orders.transferOrdersToTable" ||
@@ -186,6 +238,21 @@ function invalidateAfterOrderMutation(
     void qc.invalidateQueries({
       queryKey: posQueryKey("pos.tables.getTables", { licenseKey }),
     });
+  }
+
+  if (
+    mutationId === "pos.orders.payOrder" ||
+    mutationId === "pos.orders.submitCartOrder" ||
+    mutationId === "pos.orders.voidItem" ||
+    mutationId === "pos.orders.voidItemUnits" ||
+    mutationId === "pos.orders.returnOrderItemUnits" ||
+    mutationId === "pos.orders.replaceOrderItemUnits" ||
+    mutationId === "pos.orders.transferOrdersToTable" ||
+    mutationId === "pos.orders.mergeTableOrders"
+  ) {
+    invalidatePosPrefix(qc, "pos.dashboard.getDashboardStats");
+    invalidatePosPrefix(qc, "pos.dashboard.getRevenueOverview");
+    invalidatePosPrefix(qc, "pos.dashboard.getZReport");
   }
 
   if (
@@ -391,6 +458,7 @@ export function useQuery(
     id === "pos.orders.getWaiterKitchenNotifications";
   const refetchDailyDashboard =
     id === "pos.dashboard.getDashboardStats" ||
+    id === "pos.dashboard.getRevenueOverview" ||
     (id === "pos.dashboard.getZReport" &&
       !(typeof norm.date === "string" && String(norm.date).trim() !== ""));
   const refetchAuditLog = id === "pos.dashboard.getAuditLogs";
@@ -400,7 +468,16 @@ export function useQuery(
     queryFn: () => runPosQuery(id!, norm),
     enabled,
     staleTime: id ? posQueryStaleTime(id) : 0,
-    refetchOnWindowFocus: false,
+    refetchOnMount:
+      id === "pos.dashboard.getDashboardStats" ||
+      id === "pos.dashboard.getRevenueOverview" ||
+      id === "pos.dashboard.getZReport"
+        ? "always"
+        : true,
+    refetchOnWindowFocus:
+      id === "pos.dashboard.getDashboardStats" ||
+      id === "pos.dashboard.getRevenueOverview" ||
+      id === "pos.dashboard.getZReport",
     /** Desktop / Electron often reports offline while Supabase still works; don't pause POS reads. */
     networkMode: "always",
     refetchInterval: refetchSummaries || refetchTables
@@ -426,6 +503,7 @@ export function useMutation(ref: unknown) {
   return useCallback(
     async (mutationArgs: Record<string, unknown>) => {
       if (!id) return null;
+      const gatedArgs = withWaiterPhoneDeviceId(mutationArgs);
 
       if (!navigator.onLine && id.startsWith("pos.")) {
         if (OFFLINE_POS_MUTATION_DENYLIST.has(id)) {
@@ -433,17 +511,26 @@ export function useMutation(ref: unknown) {
           toast.error(msg);
           throw new Error(msg);
         }
-        await enqueueMutation(id, mutationArgs);
+        await enqueueMutation(id, gatedArgs);
         toast.info(posI18n.t("common.offline_action_queued"), { duration: 2500 });
         return null;
       }
 
-      const out = await runPosMutation(id, mutationArgs);
+      let out: unknown;
+      try {
+        out = await runPosMutation(id, gatedArgs);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "";
+        if (msg.includes(PHONE_DEVICE_REVOKED) || msg === "PHONE_DEVICE_REVOKED") {
+          dropRevokedWaiterPhone();
+        }
+        throw err;
+      }
 
       if (id === "pos.orders.submitCartOrder" && out && typeof out === "object") {
         const snap = (out as { orderSnapshot?: unknown }).orderSnapshot;
-        const lk = mutationArgs.licenseKey as string | undefined;
-        const tid = mutationArgs.tableId as string | undefined;
+        const lk = gatedArgs.licenseKey as string | undefined;
+        const tid = gatedArgs.tableId as string | undefined;
         if (
           snap &&
           typeof snap === "object" &&
@@ -461,11 +548,27 @@ export function useMutation(ref: unknown) {
 
       /** Defer cache invalidation so the UI can unlock (e.g. stop spinner) before refetch work. */
       queueMicrotask(() => {
-        invalidatePosQueriesAfterMutation(qc, id, mutationArgs);
+        invalidatePosQueriesAfterMutation(qc, id, gatedArgs);
+
+        if (
+          id === "pos.settings.revokeSecurityDevice" ||
+          id === "pos.settings.updateSecuritySettings" ||
+          id === "pos.settings.updateCustomerDisplay" ||
+          id === "pos.settings.revokeWaiterPhone" ||
+          id === "pos.settings.renameWaiterPhone"
+        ) {
+          invalidatePosPrefix(qc, "pos.settings.listSecurityDevices");
+          invalidatePosPrefix(qc, "pos.settings.listWaiterPhones");
+          invalidatePosPrefix(qc, "pos.settings.getCompanyDetails");
+          invalidatePosAuditLogs(qc);
+        }
 
         if (
           id === "pos.orders.payOrder" ||
           id === "pos.orders.voidItem" ||
+          id === "pos.orders.voidItemUnits" ||
+          id === "pos.orders.replaceOrderItemUnits" ||
+          id === "pos.orders.returnOrderItemUnits" ||
           id === "pos.orders.fiscalizeOrderBulk" ||
           id === "pos.expenses.addExpense" ||
           id === "pos.expenses.clearAllExpenses" ||

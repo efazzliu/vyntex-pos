@@ -20,7 +20,7 @@ export default function CTASection() {
         >
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-foreground text-balance">
             {t("home.cta.titleBefore")}{" "}
-            <span className="bg-gradient-to-r from-[#0066FF] to-[#44CC00] bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-brand to-brand-accent bg-clip-text text-transparent">
               {t("home.cta.titleHighlight")}
             </span>
             {t("home.cta.titleAfter")}
@@ -32,7 +32,7 @@ export default function CTASection() {
             <Button
               size="lg"
               asChild
-              className="bg-gradient-to-r from-[#0066FF] to-[#00AACC] hover:from-[#0055DD] hover:to-[#0099BB] text-white border-0 px-8 h-12 text-base shadow-lg shadow-blue-500/25"
+              className="bg-gradient-to-r from-brand to-brand-sky hover:from-brand-hover hover:to-brand-hover text-white border-0 px-8 h-12 text-base shadow-lg shadow-brand/25"
             >
               <Link to={primaryCtaHref} className="inline-flex items-center">
                 {t("home.cta.button")}

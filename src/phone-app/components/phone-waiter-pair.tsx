@@ -353,7 +353,7 @@ export default function PhoneWaiterPair() {
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            "radial-gradient(100% 60% at 50% -5%, rgba(0,102,255,0.4) 0%, transparent 55%), linear-gradient(180deg, #0a1224 0%, #070b14 100%)",
+            "radial-gradient(100% 60% at 50% -5%, rgba(0,91,214,0.4) 0%, transparent 55%), linear-gradient(180deg, #0a1224 0%, #070b14 100%)",
         }}
       />
 
@@ -394,8 +394,8 @@ export default function PhoneWaiterPair() {
 
         {phase === "done" ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-            <CheckCircle2 className="size-14 text-[#44CC00]" />
-            <p className="text-lg font-semibold text-[#44CC00]">
+            <CheckCircle2 className="size-14 text-brand-accent" />
+            <p className="text-lg font-semibold text-brand-accent">
               {t("phone.waiter.pairSuccess")}
             </p>
             {venueName ? (
@@ -404,12 +404,12 @@ export default function PhoneWaiterPair() {
           </div>
         ) : phase === "claiming" ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3">
-            <Loader2 className="size-10 animate-spin text-[#0066FF]" />
+            <Loader2 className="size-10 animate-spin text-brand" />
             <p className="text-sm text-white/60">{t("phone.waiter.pairClaiming")}</p>
           </div>
         ) : phase === "pending" ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 px-4 text-center">
-            <Loader2 className="size-10 animate-spin text-[#0066FF]" />
+            <Loader2 className="size-10 animate-spin text-brand" />
             <p className="text-lg font-semibold text-white">
               {t("phone.waiter.pairLicenseWaiting", {
                 defaultValue: "Waiting for approval",
@@ -436,9 +436,9 @@ export default function PhoneWaiterPair() {
           <>
             <Link
               to="/waiter/account"
-              className="mx-auto mb-5 flex h-auto w-full max-w-[20rem] items-center gap-3 rounded-3xl border border-[#0066FF]/35 bg-[#0066FF]/15 px-4 py-4 text-left transition active:scale-[0.99]"
+              className="mx-auto mb-5 flex h-auto w-full max-w-[20rem] items-center gap-3 rounded-3xl border border-brand/35 bg-brand/15 px-4 py-4 text-left transition active:scale-[0.99]"
             >
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-[#0066FF] text-white">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-brand text-white">
                 <LogIn className="size-5" />
               </span>
               <span className="min-w-0 flex-1">
@@ -459,7 +459,7 @@ export default function PhoneWaiterPair() {
                   muted
                   className="h-full w-full object-cover"
                 />
-                <div className="pointer-events-none absolute inset-8 rounded-2xl border-2 border-[#0066FF]/70" />
+                <div className="pointer-events-none absolute inset-8 rounded-2xl border-2 border-brand/70" />
               </div>
             ) : (
               <button
@@ -467,7 +467,7 @@ export default function PhoneWaiterPair() {
                 onClick={() => void startCamera()}
                 className="mx-auto mb-5 flex h-40 w-full max-w-[20rem] flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-white/20 bg-white/[0.04] transition active:scale-[0.99]"
               >
-                <Camera className="size-8 text-[#7eb6ff]" />
+                <Camera className="size-8 text-brand-soft" />
                 <span className="text-sm font-medium text-white/80">
                   {t("phone.waiter.pairScan")}
                 </span>
@@ -486,14 +486,14 @@ export default function PhoneWaiterPair() {
                     setManual(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8))
                   }
                   placeholder="ABC12XYZ"
-                  className="h-12 min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/[0.06] px-3 font-mono text-center text-base tracking-[0.12em] text-white outline-none placeholder:text-white/20 focus:border-[#0066FF]/60"
+                  className="h-12 min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/[0.06] px-3 font-mono text-center text-base tracking-[0.12em] text-white outline-none placeholder:text-white/20 focus:border-brand/60"
                 />
                 <button
                   type="button"
                   disabled={manual.length < 6 || phase === "claiming"}
                   onClick={() => void claim(manual)}
                   className={cn(
-                    "h-12 w-[5.75rem] shrink-0 rounded-2xl bg-[#44CC00] px-2 text-sm font-semibold text-[#06200a] transition active:scale-[0.97] disabled:opacity-35",
+                    "h-12 w-[5.75rem] shrink-0 rounded-2xl bg-brand-accent px-2 text-sm font-semibold text-[#06200a] transition active:scale-[0.97] disabled:opacity-35",
                   )}
                 >
                   {t("phone.waiter.pairActivate")}
@@ -519,14 +519,14 @@ export default function PhoneWaiterPair() {
                   placeholder="XXXX-XXXX-XXXX-XXXX"
                   autoComplete="off"
                   autoCapitalize="characters"
-                  className="h-12 min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/[0.06] px-3 font-mono text-center text-sm tracking-[0.08em] text-white outline-none placeholder:text-white/20 focus:border-[#0066FF]/60"
+                  className="h-12 min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/[0.06] px-3 font-mono text-center text-sm tracking-[0.08em] text-white outline-none placeholder:text-white/20 focus:border-brand/60"
                 />
                 <button
                   type="button"
                   disabled={licenseKeyLen < 12 || phase === "claiming"}
                   onClick={() => void requestByLicense()}
                   className={cn(
-                    "h-12 w-[5.75rem] shrink-0 rounded-2xl bg-[#0066FF] px-2 text-sm font-semibold text-white transition active:scale-[0.97] disabled:opacity-35",
+                    "h-12 w-[5.75rem] shrink-0 rounded-2xl bg-brand px-2 text-sm font-semibold text-white transition active:scale-[0.97] disabled:opacity-35",
                   )}
                 >
                   {t("phone.waiter.pairLicenseSend", { defaultValue: "Request" })}

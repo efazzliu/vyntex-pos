@@ -3,23 +3,39 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "convex/react";
 import type { Doc } from "@/convex/_generated/dataModel.d.ts";
-import { toast } from "sonner";
 import QRCode from "qrcode";
-import { ChevronRight, QrCode, Search, UtensilsCrossed, LayoutGrid, X } from "lucide-react";
+import { ChevronRight, QrCode, Search, ShoppingBag, UtensilsCrossed, LayoutGrid, X } from "lucide-react";
 import PhoneWaiterItemSheet from "@/phone-app/components/phone-waiter-item-sheet.tsx";
 import { getWaiterSession } from "@/phone-app/lib/waiter-session.ts";
 import { useFingerScroll } from "@/phone-app/hooks/use-finger-scroll.ts";
 import { useWaiterCanPay } from "@/phone-app/hooks/use-waiter-can-pay.ts";
+import { useWaiterMenuSelection } from "@/phone-app/hooks/use-waiter-menu-selection.ts";
+import {
+  addWaiterMenuSelectionLine,
+  clearWaiterMenuSelection,
+  waiterMenuSelectionQty,
+  waiterMenuSelectionQtyForItem,
+} from "@/phone-app/lib/waiter-menu-selection.ts";
 import { emojiForCategoryName } from "@/lib/pos-category-icons.ts";
 import { resolveMenuItemImageUrl } from "@/lib/menu-item-photo-urls.ts";
 import { buildGuestMenuUrl } from "@/lib/guest-menu-url.ts";
 import { cn } from "@/lib/utils.ts";
+import { resolvedMenuItemUnitPrice } from "@/lib/menu-customizations.ts";
+import {
+  getOrderBlockReason,
+  isMenuItemShownForOrdering,
+  resolveOrderAvailabilityRulesFromCompany,
+  type OrderBlockReason,
+} from "@/lib/pos-order-availability.ts";
+import { toast } from "sonner";
 import { usePhoneAccessBranding } from "@/phone-app/hooks/use-phone-access-branding.tsx";
-import { phoneAccessHasBottomNav } from "@/lib/local-db.ts";
+import { phoneAccessHasBottomNav, phoneAccessMenuGridClass } from "@/lib/local-db.ts";
 import {
   phoneAccessThemeTokens,
   waiterIdleChipClass,
   waiterPageTextClass,
+  vyntexSelectedFill,
+  vyntexSelectedBar,
 } from "@/lib/phone-access-theme.ts";
 import type { SelectedCustomization } from "@/lib/menu-customizations.ts";
 
@@ -34,6 +50,8 @@ export default function PhoneWaiterMenu() {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<Doc<"menuItems"> | null>(null);
   const categoryScrollRef = useFingerScroll();
+  const selection = useWaiterMenuSelection();
+  const selectionCount = waiterMenuSelectionQty(selection);
 
   const categories = useQuery(
     "pos.menu.getCategories",
@@ -46,7 +64,19 @@ export default function PhoneWaiterMenu() {
   const company = useQuery(
     "pos.settings.getCompanyDetails",
     licenseKey ? { licenseKey } : "skip",
-  ) as { id?: string; name?: string; paymentSettings?: unknown } | undefined;
+  ) as
+    | {
+        id?: string;
+        name?: string;
+        paymentSettings?: unknown;
+        enforceOrderAvailability?: boolean;
+        stockRules?: unknown;
+      }
+    | undefined;
+  const availabilityRules = resolveOrderAvailabilityRulesFromCompany(
+    company,
+    licenseKey,
+  );
 
   const restaurantId = company?.id ?? "";
   const waiterCanPay = useWaiterCanPay(licenseKey);
@@ -84,7 +114,9 @@ export default function PhoneWaiterMenu() {
     resolveMenuItemImageUrl(item, categoryNameById.get(item.categoryId) ?? "");
 
   const items = useMemo(() => {
-    const list = (menuItems ?? []).filter((i) => i.available);
+    const list = (menuItems ?? []).filter((i) =>
+      isMenuItemShownForOrdering(i, availabilityRules.honorKitchenStop),
+    );
     const q = searchQuery.trim().toLowerCase();
     return list
       .filter((i) => {
@@ -93,39 +125,70 @@ export default function PhoneWaiterMenu() {
         return i.categoryId === activeCategory;
       })
       .sort((a, b) => a.displayOrder - b.displayOrder);
-  }, [menuItems, searchQuery, activeCategory]);
+  }, [
+    menuItems,
+    searchQuery,
+    activeCategory,
+    availabilityRules.honorKitchenStop,
+  ]);
 
   const design = access.menuDesign;
   const showQr = access.showMenuQr;
   const modern = design === "modern";
   const advanced = design === "advanced";
 
+  const toastBlocked = (reason: OrderBlockReason, name: string) => {
+    toast.error(
+      reason === "stock"
+        ? t("phone.waiter.order.blockedStock", { name })
+        : t("phone.waiter.order.blockedStopped", { name }),
+    );
+  };
+
   const openItem = (item: Doc<"menuItems">) => {
+    const blocked = getOrderBlockReason(item, 1, availabilityRules);
+    if (blocked) {
+      toastBlocked(blocked, item.name);
+      return;
+    }
     setSelectedItem(item);
   };
 
-  const addToOrder = (
+  const addToSelection = (
     quantity: number,
     selectedCustomizations?: SelectedCustomization[],
     notes?: string,
+    prepExtraPrice = 0,
   ) => {
     const item = selectedItem;
-    setSelectedItem(null);
-    toast.message(t("phone.waiter.menuPickTable"));
-    navigate("/waiter/floor", {
-      state: item
-        ? {
-            addMenuItemId: item._id,
-            addQuantity: quantity,
-            addCustomizations: selectedCustomizations,
-            addNotes: notes,
-          }
-        : undefined,
+    if (!item) return;
+    const already = waiterMenuSelectionQtyForItem(selection, String(item._id));
+    const blocked = getOrderBlockReason(
+      item,
+      already + quantity,
+      availabilityRules,
+    );
+    if (blocked) {
+      toastBlocked(blocked, item.name);
+      return;
+    }
+    addWaiterMenuSelectionLine({
+      menuItemId: String(item._id),
+      name: item.name,
+      price:
+        resolvedMenuItemUnitPrice(item.price, selectedCustomizations) +
+        prepExtraPrice,
+      quantity,
+      station: item.station,
+      vatRate: item.vatRate,
+      notes,
+      selectedCustomizations,
     });
+    setSelectedItem(null);
   };
 
-  const selectedCategoryName = selectedItem
-    ? (categories ?? []).find((c) => c._id === selectedItem.categoryId)?.name
+  const selectedCategory = selectedItem
+    ? (categories ?? []).find((c) => c._id === selectedItem.categoryId)
     : undefined;
 
   const currency = {
@@ -150,7 +213,13 @@ export default function PhoneWaiterMenu() {
       className={cn(
         "flex h-dvh min-h-0 flex-col overflow-hidden overscroll-none",
         waiterPageTextClass(tokens.isLight),
-        phoneAccessHasBottomNav(access) ? "pb-[5.75rem]" : "pb-6",
+        phoneAccessHasBottomNav(access)
+          ? selectionCount > 0
+            ? "pb-[10.25rem]"
+            : "pb-[5.75rem]"
+          : selectionCount > 0
+            ? "pb-28"
+            : "pb-6",
       )}
     >
       {access.showMenuHeader ? (
@@ -218,9 +287,7 @@ export default function PhoneWaiterMenu() {
                 activeCategory === "all" ? "text-white" : waiterIdleChipClass(tokens.isLight),
               )}
               style={
-                activeCategory === "all"
-                  ? { backgroundColor: access.accentColor }
-                  : undefined
+                activeCategory === "all" ? vyntexSelectedFill({ shadow: false }) : undefined
               }
             >
               {t("phone.waiter.menuAll")}
@@ -236,7 +303,7 @@ export default function PhoneWaiterMenu() {
                     "shrink-0 rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition",
                     sel ? "text-white" : waiterIdleChipClass(tokens.isLight),
                   )}
-                  style={sel ? { backgroundColor: cat.color || access.accentColor } : undefined}
+                  style={sel ? vyntexSelectedFill({ shadow: false }) : undefined}
                 >
                   {cat.name}
                 </button>
@@ -256,10 +323,9 @@ export default function PhoneWaiterMenu() {
               className="shrink-0 pb-1.5 text-[13px] font-medium"
               style={{
                 color: activeCategory === "all" ? "var(--waiter-fg, #fff)" : "var(--waiter-muted, rgba(255,255,255,0.4))",
-                borderBottom:
-                  activeCategory === "all"
-                    ? `2px solid ${access.accentColor}`
-                    : "2px solid transparent",
+                ...(activeCategory === "all"
+                  ? vyntexSelectedBar()
+                  : { borderBottom: "2px solid transparent" }),
               }}
             >
               {t("phone.waiter.menuAll")}
@@ -274,9 +340,7 @@ export default function PhoneWaiterMenu() {
                   className="shrink-0 pb-1.5 text-[13px] font-medium"
                   style={{
                     color: sel ? "var(--waiter-fg, #fff)" : "var(--waiter-muted, rgba(255,255,255,0.4))",
-                    borderBottom: sel
-                      ? `2px solid ${cat.color || access.accentColor}`
-                      : "2px solid transparent",
+                    ...(sel ? vyntexSelectedBar() : { borderBottom: "2px solid transparent" }),
                   }}
                 >
                   {cat.name}
@@ -297,9 +361,12 @@ export default function PhoneWaiterMenu() {
             className={cn(
               "flex h-[3.85rem] w-[4.35rem] shrink-0 flex-col items-center justify-center gap-1 rounded-xl border px-1.5 py-1.5 text-center transition",
               activeCategory === "all"
-                ? "border-transparent bg-[#0066FF] text-white"
+                ? "border-transparent text-white"
                 : "border-white/10 bg-white/[0.05] text-white/60",
             )}
+            style={
+              activeCategory === "all" ? vyntexSelectedFill({ shadow: false }) : undefined
+            }
           >
             <span className="flex size-5 items-center justify-center">
               <LayoutGrid className="size-4" />
@@ -321,7 +388,7 @@ export default function PhoneWaiterMenu() {
                     ? "border-transparent text-white"
                     : "border-white/10 bg-white/[0.05] text-white/60",
                 )}
-                style={sel ? { backgroundColor: cat.color || "#0066FF" } : undefined}
+                style={sel ? vyntexSelectedFill({ shadow: false }) : undefined}
               >
                 <span className="flex size-5 items-center justify-center text-[15px] leading-none">
                   {(cat.icon && cat.icon.trim()) || emojiForCategoryName(cat.name) || (
@@ -346,7 +413,7 @@ export default function PhoneWaiterMenu() {
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t("phone.waiter.order.searchPlaceholder")}
             className={cn(
-              "h-10 w-full border border-white/10 bg-white/[0.05] pl-9 pr-3 text-[14px] text-white outline-none placeholder:text-white/30 focus:border-[#0066FF]/60",
+              "h-10 w-full border border-white/10 bg-white/[0.05] pl-9 pr-3 text-[14px] text-white outline-none placeholder:text-white/30 focus:border-brand/60",
               modern ? "rounded-full" : advanced ? "rounded-lg" : "rounded-xl",
             )}
           />
@@ -361,13 +428,29 @@ export default function PhoneWaiterMenu() {
           </div>
         ) : modern ? (
           <div className="space-y-2 pb-4">
-            {items.map((item) => (
+            {items.map((item) => {
+              const blocked = getOrderBlockReason(item, 1, availabilityRules);
+              const locked = Boolean(blocked);
+              return (
               <button
                 key={item._id}
                 type="button"
+                disabled={locked}
                 onClick={() => openItem(item)}
-                className="flex w-full items-center gap-3 rounded-2xl bg-white/[0.05] px-3 py-2.5 text-left active:scale-[0.99]"
+                className={cn(
+                  "relative flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left",
+                  locked
+                    ? blocked === "stock"
+                      ? "cursor-not-allowed border border-red-400/60 bg-red-500/[0.05]"
+                      : "cursor-not-allowed border border-amber-400/50 bg-amber-500/[0.05]"
+                    : "bg-white/[0.05] active:scale-[0.99]",
+                )}
               >
+                {waiterMenuSelectionQtyForItem(selection, String(item._id)) > 0 ? (
+                  <span className="absolute right-2 top-2 flex size-5 items-center justify-center rounded-full bg-brand text-[10px] font-bold text-white">
+                    {waiterMenuSelectionQtyForItem(selection, String(item._id))}
+                  </span>
+                ) : null}
                 {itemPhotoUrl(item) ? (
                   <img
                     src={itemPhotoUrl(item)}
@@ -377,34 +460,59 @@ export default function PhoneWaiterMenu() {
                 ) : null}
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[14px] font-semibold">{item.name}</p>
-                  {item.description ? (
+                  {item.description && !locked ? (
                     <p className="truncate text-[11px]" style={{ color: "var(--waiter-muted)" }}>
                       {item.description}
                     </p>
                   ) : null}
+                  {locked ? (
+                    <p
+                      className={cn(
+                        "text-[10px] font-semibold",
+                        blocked === "stock" ? "text-red-400" : "text-amber-400",
+                      )}
+                    >
+                      {blocked === "stock"
+                        ? t("phone.waiter.order.outOfStock")
+                        : t("phone.waiter.order.stopped")}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
-                  {waiterCanPay ? (
-                    <span className="text-[13px] font-semibold tabular-nums text-[#7eb6ff]">
+                  {waiterCanPay && !locked ? (
+                    <span className="text-[13px] font-semibold tabular-nums text-brand-soft">
                       {fmt(item.price)}
                     </span>
                   ) : null}
                   <ChevronRight className="size-4 text-white/25" />
                 </div>
               </button>
-            ))}
+              );
+            })}
           </div>
         ) : advanced ? (
           <div className="space-y-1.5 pb-4">
-            {items.map((item) => (
+            {items.map((item) => {
+              const blocked = getOrderBlockReason(item, 1, availabilityRules);
+              const locked = Boolean(blocked);
+              return (
               <button
                 key={item._id}
                 type="button"
+                disabled={locked}
                 onClick={() => openItem(item)}
-                className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left"
+                className="relative flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left disabled:cursor-not-allowed"
                 style={{
-                  background: "rgba(255,255,255,0.04)",
-                  boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.08)",
+                  background: locked
+                    ? blocked === "stock"
+                      ? "rgba(239,68,68,0.05)"
+                      : "rgba(245,158,11,0.08)"
+                    : "rgba(255,255,255,0.04)",
+                  boxShadow: locked
+                    ? blocked === "stock"
+                      ? "inset 0 0 0 1px rgba(248,113,113,0.6)"
+                      : "inset 0 0 0 1px rgba(251,191,36,0.55)"
+                    : "inset 0 0 0 1px rgba(255,255,255,0.08)",
                 }}
               >
                 {itemPhotoUrl(item) ? (
@@ -421,45 +529,111 @@ export default function PhoneWaiterMenu() {
                 )}
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[13px] font-semibold">{item.name}</p>
-                  {item.description ? (
+                  {item.description && !locked ? (
                     <p className="truncate text-[11px]" style={{ color: "var(--waiter-muted)" }}>
                       {item.description}
                     </p>
                   ) : null}
+                  {locked ? (
+                    <p
+                      className={cn(
+                        "text-[10px] font-semibold",
+                        blocked === "stock" ? "text-red-400" : "text-amber-400",
+                      )}
+                    >
+                      {blocked === "stock"
+                        ? t("phone.waiter.order.outOfStock")
+                        : t("phone.waiter.order.stopped")}
+                    </p>
+                  ) : null}
                 </div>
-                {waiterCanPay ? (
-                  <span className="shrink-0 text-[13px] font-bold tabular-nums text-[#7eb6ff]">
+                {waiterCanPay && !locked ? (
+                  <span className="shrink-0 text-[13px] font-bold tabular-nums text-brand-soft">
                     {fmt(item.price)}
                   </span>
                 ) : null}
+                {waiterMenuSelectionQtyForItem(selection, String(item._id)) > 0 && !locked ? (
+                  <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-brand text-[10px] font-bold text-white">
+                    {waiterMenuSelectionQtyForItem(selection, String(item._id))}
+                  </span>
+                ) : null}
               </button>
-            ))}
+              );
+            })}
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-2 pb-4">
-            {items.map((item) => (
+          <div className={cn("grid gap-2 pb-4", phoneAccessMenuGridClass(access.menuCols))}>
+            {items.map((item) => {
+              const blocked = getOrderBlockReason(item, 1, availabilityRules);
+              const locked = Boolean(blocked);
+              return (
               <button
                 key={item._id}
                 type="button"
+                disabled={locked}
                 onClick={() => openItem(item)}
-                className="flex min-h-[4.75rem] min-w-0 flex-col items-center justify-center gap-1 rounded-2xl border border-white/10 bg-white/[0.04] px-2 py-2.5 text-center active:scale-[0.98]"
+                className={cn(
+                  "relative flex min-w-0 flex-col gap-1 rounded-2xl text-center",
+                  locked
+                    ? blocked === "stock"
+                      ? "cursor-not-allowed border border-red-400/60 bg-red-500/[0.05]"
+                      : "cursor-not-allowed border border-amber-400/50 bg-amber-500/[0.05]"
+                    : "border border-white/10 bg-white/[0.04] active:scale-[0.98]",
+                  access.menuCols === 1
+                    ? "min-h-[5.5rem] flex-row items-center px-3 py-2.5 text-left"
+                    : "min-h-[4.75rem] items-center justify-center px-2 py-2.5",
+                )}
               >
+                {waiterMenuSelectionQtyForItem(selection, String(item._id)) > 0 ? (
+                  <span className="absolute right-1.5 top-1.5 flex size-5 items-center justify-center rounded-full bg-brand text-[10px] font-bold text-white">
+                    {waiterMenuSelectionQtyForItem(selection, String(item._id))}
+                  </span>
+                ) : null}
                 <img
                   src={itemPhotoUrl(item)}
                   alt=""
-                  className="mb-0.5 h-14 w-full rounded-lg object-cover"
+                  className={cn(
+                    "rounded-lg object-cover",
+                    access.menuCols === 1
+                      ? "mb-0 h-16 w-20 shrink-0"
+                      : "mb-0.5 h-14 w-full",
+                  )}
                   loading="lazy"
                 />
-                <span className="line-clamp-2 w-full text-[12px] font-medium leading-tight">
-                  {item.name}
-                </span>
-                {waiterCanPay ? (
-                  <span className="text-[12px] font-semibold tabular-nums text-[#7eb6ff]">
-                    {fmt(item.price)}
+                <div
+                  className={cn(
+                    "min-w-0",
+                    access.menuCols === 1 ? "flex-1" : "w-full",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "block w-full text-[12px] font-medium leading-tight",
+                      access.menuCols === 1 ? "line-clamp-2 text-left" : "line-clamp-2",
+                    )}
+                  >
+                    {item.name}
                   </span>
-                ) : null}
+                  {locked ? (
+                    <span
+                      className={cn(
+                        "text-[10px] font-semibold",
+                        blocked === "stock" ? "text-red-400" : "text-amber-400",
+                      )}
+                    >
+                      {blocked === "stock"
+                        ? t("phone.waiter.order.outOfStock")
+                        : t("phone.waiter.order.stopped")}
+                    </span>
+                  ) : waiterCanPay ? (
+                    <span className="text-[12px] font-semibold tabular-nums text-brand-soft">
+                      {fmt(item.price)}
+                    </span>
+                  ) : null}
+                </div>
               </button>
-            ))}
+              );
+            })}
           </div>
         )}
       </main>
@@ -467,14 +641,47 @@ export default function PhoneWaiterMenu() {
       {selectedItem ? (
         <PhoneWaiterItemSheet
           item={selectedItem}
-          categoryName={selectedCategoryName}
+          category={selectedCategory}
           accent={access.accentColor}
           tokens={tokens}
           showPrice
           formatPrice={fmt}
           onClose={() => setSelectedItem(null)}
-          onAdd={addToOrder}
+          onAdd={addToSelection}
         />
+      ) : null}
+
+      {selectionCount > 0 ? (
+        <div
+          className={cn(
+            "fixed inset-x-0 z-20 px-4",
+            phoneAccessHasBottomNav(access)
+              ? "bottom-[4.85rem]"
+              : "bottom-[max(1rem,env(safe-area-inset-bottom))]",
+          )}
+        >
+          <div className="flex items-stretch gap-2">
+            <button
+              type="button"
+              onClick={() => clearWaiterMenuSelection()}
+              className="flex size-12 shrink-0 items-center justify-center rounded-2xl border border-white/12 bg-[#121a2e] text-white/70 active:scale-95"
+              aria-label={t("phone.waiter.menuClearSelection")}
+            >
+              <X className="size-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/waiter/floor")}
+              className="flex min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl px-4 py-3 text-white active:scale-[0.99]"
+              style={{ backgroundColor: access.accentColor }}
+            >
+              <ShoppingBag className="size-4 shrink-0" />
+              <span className="min-w-0 truncate text-[13px] font-semibold">
+                {t("phone.waiter.menuAddProducts", { count: selectionCount })}
+              </span>
+            </button>
+          </div>
+        </div>
       ) : null}
 
       {qrOpen && showQr ? (

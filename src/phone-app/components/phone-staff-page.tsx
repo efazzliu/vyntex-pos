@@ -12,12 +12,14 @@ import { PhoneStaffEditSheet } from "./phone-staff-edit-sheet.tsx";
 import PhoneWaiterQrPanel from "./phone-waiter-qr-panel.tsx";
 import { cn } from "@/lib/utils.ts";
 import { toast } from "sonner";
+import { BRAND } from "@/lib/brand-colors.ts";
 
 type StaffDoc = Awaited<ReturnType<typeof fetchPhoneStaffBundle>>["staff"][number];
 
 const ROLE_COLORS: Record<string, string> = {
-  admin: "#0066FF",
+  admin: BRAND.primary,
   manager: "#7c3aed",
+  cashier: "#16A34A",
   waiter: "#16a34a",
   inventory: "#d97706",
   accountant: "#0891b2",
@@ -139,7 +141,7 @@ export default function PhoneStaffPage() {
         <div className="absolute right-3 top-3 flex gap-1">
           <button
             type="button"
-            className="rounded-lg p-2 text-[#0066FF] hover:bg-[#0066FF]/10"
+            className="rounded-lg p-2 text-brand hover:bg-brand/10"
             aria-label={t("phone.staff.edit")}
             onClick={() => openEdit(member)}
           >
@@ -205,7 +207,7 @@ export default function PhoneStaffPage() {
             <p className="text-2xl font-bold tabular-nums text-white">{loading ? "—" : onlineCount}</p>
             <p className="text-xs font-medium text-white/90">{t("phone.staff.cardOnline")}</p>
           </div>
-          <div className="rounded-2xl bg-gradient-to-br from-[#0066FF] to-[#5b4ddb] px-3 py-4 shadow-md shadow-[#0066FF]/20">
+          <div className="rounded-2xl bg-gradient-to-br from-brand to-brand-sky px-3 py-4 shadow-md shadow-brand/20">
             <Users className="mb-2 size-6 text-white/90" strokeWidth={2} />
             <p className="text-2xl font-bold tabular-nums text-white">{loading ? "—" : totalCount}</p>
             <p className="text-xs font-medium text-white/90">{t("phone.staff.cardTotal")}</p>
@@ -214,7 +216,7 @@ export default function PhoneStaffPage() {
 
         <Button
           type="button"
-          className="h-12 w-full rounded-xl bg-[#0066FF] text-base font-semibold text-white shadow-sm hover:bg-[#0055DD]"
+          className="h-12 w-full rounded-xl bg-brand text-base font-semibold text-white shadow-sm hover:bg-brand-hover"
           onClick={openAdd}
         >
           <Plus className="mr-2 size-5" />

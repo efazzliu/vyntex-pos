@@ -52,6 +52,11 @@ import AdminContacts from "./pages/admin/support-center/page.tsx";
 import AdminFinance from "./pages/admin/finance-legacy/page.tsx";
 import AdminSettings from "./pages/admin/settings-hub/page.tsx";
 import PosLauncher from "./pages/pos/page.tsx";
+import CustomerDisplayScreen from "./pages/pos/_components/customer-display-screen.tsx";
+import {
+  attachUiTextSelectionGuard,
+  setPosSoftwareClass,
+} from "./lib/disable-ui-text-selection.ts";
 
 /** Marketing SPA fallback: `/phone` is rewritten to phone.html on Vercel/Vite; this covers hosts that still serve index.html. */
 function PhoneAppEntryRedirect() {
@@ -74,11 +79,35 @@ function DesktopHomeRoute() {
   return <Index />;
 }
 
+function isPosPath(pathname: string) {
+  return pathname === "/pos" || pathname.startsWith("/pos/");
+}
+
+/** POS / Electron: block click-drag text selection on the whole shell. */
+function AppPosSoftwareClass() {
+  const { pathname } = useLocation();
+  const isElectron =
+    typeof window !== "undefined" &&
+    Boolean((window as Window & { desktop?: { isElectron?: boolean } }).desktop?.isElectron);
+  const enabled = isElectron || isPosPath(pathname);
+
+  useEffect(() => {
+    setPosSoftwareClass(enabled);
+    if (!enabled) return;
+    return attachUiTextSelectionGuard();
+  }, [enabled]);
+
+  useEffect(() => {
+    return () => setPosSoftwareClass(false);
+  }, []);
+
+  return null;
+}
+
 /** POS shell: no on-screen toasts (Sonner). Web dashboard / auth keep toasts. */
 function AppToaster() {
   const { pathname } = useLocation();
-  const isPos = pathname === "/pos" || pathname.startsWith("/pos/");
-  if (isPos) return null;
+  if (isPosPath(pathname)) return null;
   return <Toaster richColors position="top-right" />;
 }
 
@@ -93,11 +122,13 @@ export default function App() {
   return (
     <DefaultProviders>
       <Router basename={isElectron ? undefined : routerBasename}>
+        <AppPosSoftwareClass />
         <AppToaster />
         <Routes>
           {isElectron ? (
             <>
               <Route path="/" element={<Navigate to="/pos" replace />} />
+              <Route path="/pos/customer-display" element={<CustomerDisplayScreen />} />
               <Route path="/pos" element={<PosLauncher />} />
               <Route path="*" element={<Navigate to="/pos" replace />} />
             </>
@@ -159,6 +190,7 @@ export default function App() {
               <Route path="settings" element={<AdminSettings />} />
             </Route>
           </Route>
+          <Route path="/pos/customer-display" element={<CustomerDisplayScreen />} />
           <Route path="/pos" element={<PosLauncher />} />
           <Route path="/phone" element={<PhoneAppEntryRedirect />} />
           <Route path="/phone/" element={<PhoneAppEntryRedirect />} />

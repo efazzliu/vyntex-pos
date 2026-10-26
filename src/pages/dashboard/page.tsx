@@ -76,7 +76,7 @@ function StatCard({
 }) {
   const accent =
     tone === "blue"
-      ? "border-l-blue-500 shadow-[inset_0_1px_0_0_rgba(59,130,246,0.08)]"
+      ? "border-l-brand shadow-[inset_0_1px_0_0_rgba(59,130,246,0.08)]"
       : tone === "green"
         ? "border-l-emerald-500 shadow-[inset_0_1px_0_0_rgba(16,185,129,0.08)]"
         : "border-l-violet-500 shadow-[inset_0_1px_0_0_rgba(139,92,246,0.08)]";
@@ -209,7 +209,7 @@ export default function DashboardOverview() {
 
           <div className="mt-6 rounded-xl border border-zinc-800/80 bg-black/40 p-4">
             <div className="mb-2 flex items-center gap-2 text-sm font-medium text-zinc-200">
-              <KeyRound className="size-4 text-blue-400" />
+              <KeyRound className="size-4 text-brand-soft" />
               License key
             </div>
             <div className="flex items-center gap-2">
@@ -230,14 +230,14 @@ export default function DashboardOverview() {
 
         <div className="rounded-2xl border border-zinc-800/80 bg-zinc-950/50 p-6 shadow-xl shadow-black/20 lg:p-7">
           <div className="mb-5 flex items-center gap-2 text-sm font-medium text-zinc-200">
-            <HardDriveDownload className="size-4 text-blue-400" />
+            <HardDriveDownload className="size-4 text-brand-soft" />
             Restaurant POS Setup
           </div>
 
           <Button
             size="lg"
             onClick={() => openInstallerDownload(installerUrlX64, "x64")}
-            className="h-auto w-full flex-col gap-1 rounded-xl border-0 bg-gradient-to-r from-blue-600 to-blue-500 py-3.5 text-white shadow-lg shadow-blue-950/50 transition hover:from-blue-500 hover:to-blue-400"
+            className="h-auto w-full flex-col gap-1 rounded-xl border-0 bg-gradient-to-r from-brand to-brand py-3.5 text-white shadow-lg shadow-brand-active/50 transition hover:from-brand hover:to-brand-soft"
           >
             <span className="flex items-center gap-2">
               <Download className="size-4" />

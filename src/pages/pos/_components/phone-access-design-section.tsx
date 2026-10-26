@@ -25,6 +25,7 @@ import {
   DEFAULT_PHONE_ACCESS_BRANDING,
   phoneAccessButtonTextColor,
   phoneAccessTableGridClass,
+  phoneAccessMenuGridClass,
   type PhoneAccessBranding,
   type PhoneAccessTheme,
 } from "@/lib/local-db.ts";
@@ -41,10 +42,11 @@ import {
   resolvePinLoginBranding,
 } from "@/lib/supabase-pos/license-sync.ts";
 import posI18n from "../_lib/pos-i18n.ts";
+import { BRAND } from "@/lib/brand-colors.ts";
 
 const ACCENT_PRESETS = [
-  "#0066FF",
-  "#44CC00",
+  BRAND.primary,
+  BRAND.accent,
   "#7C3AED",
   "#EC4899",
   "#F59E0B",
@@ -338,7 +340,7 @@ function TableScreenPreview({
 
   if (design === "modern") {
     return (
-      <WaiterPreviewShell theme={branding.theme} glow="rgba(99,102,241,0.28)">
+      <WaiterPreviewShell theme={branding.theme} glow="rgba(0,91,214,0.28)">
         <div className="flex min-h-0 flex-1 flex-col px-3 pt-1">
           <div className="mb-2 flex items-center gap-2">
             <span
@@ -507,7 +509,7 @@ function TableScreenPreview({
   }
 
   return (
-        <WaiterPreviewShell theme={branding.theme} glow="rgba(0,102,255,0.22)">
+        <WaiterPreviewShell theme={branding.theme} glow="rgba(0,91,214,0.22)">
       <div className="flex min-h-0 flex-1 flex-col px-3 pt-1">
         <div className="mb-2 flex items-center gap-2">
           <span
@@ -628,7 +630,7 @@ function MenuScreenPreview({
 
   if (design === "modern") {
     return (
-      <WaiterPreviewShell theme={branding.theme} glow="rgba(99,102,241,0.28)">
+      <WaiterPreviewShell theme={branding.theme} glow="rgba(0,91,214,0.28)">
         <div className="flex min-h-0 flex-1 flex-col px-3 pt-1">
           <div className="mb-2 flex items-center gap-2">
             <p className="min-w-0 flex-1 truncate text-[15px] font-semibold" style={PREVIEW_FG}>
@@ -820,8 +822,8 @@ function MenuScreenPreview({
           />
           {t("settings.phone_access_preview_search")}
         </div>
-        <div className="grid grid-cols-3 gap-1.5">
-          {dishes.map((name) => (
+        <div className={cn("grid gap-1.5", phoneAccessMenuGridClass(branding.menuCols))}>
+          {(branding.menuCols === 1 ? dishes.slice(0, 2) : dishes).map((name) => (
             <div
               key={name}
               className="flex min-h-[3.6rem] flex-col items-center justify-center gap-1 rounded-2xl px-1.5 py-2 text-center"
@@ -876,8 +878,8 @@ function PhoneAccessPreview({
     cn(
       "cursor-pointer rounded-lg transition-shadow",
       selectedText === id
-        ? "ring-2 ring-[#0066FF] ring-offset-1 ring-offset-transparent"
-        : "hover:ring-1 hover:ring-[#0066FF]/50",
+        ? "ring-2 ring-brand ring-offset-1 ring-offset-transparent"
+        : "hover:ring-1 hover:ring-brand/50",
     );
 
   if (screen === "dashboard") {
@@ -993,7 +995,7 @@ function PhoneAccessPreview({
     }
     if (design === "modern") {
       return (
-        <WaiterPreviewShell theme={branding.theme} glow="rgba(99,102,241,0.28)">
+        <WaiterPreviewShell theme={branding.theme} glow="rgba(0,91,214,0.28)">
           <div className="flex min-h-0 flex-1 flex-col px-3 pt-1">
             {branding.showHomeHeader ? (
               <div className="mb-2 flex items-center gap-2">
@@ -1259,7 +1261,7 @@ function PhoneAccessPreview({
             <img
               src={VYNTEX_APP_LOGO_SRC}
               alt=""
-              className="mb-1 w-auto object-contain drop-shadow-[0_8px_24px_rgba(0,102,255,0.35)]"
+              className="mb-1 w-auto object-contain drop-shadow-[0_8px_24px_rgba(0,91,214,0.35)]"
               style={{ height: Math.min(branding.logoHeightPx, 44) }}
             />
             <p
@@ -1526,7 +1528,7 @@ export default function PhoneAccessDesignSection({
                 className={cn(
                   "pb-1.5 text-[13px] font-medium whitespace-nowrap cursor-pointer",
                   screen === item.id
-                    ? "text-white border-b-2 border-[#0066FF]"
+                    ? "text-white border-b-2 border-brand"
                     : "text-[#8b93a7] hover:text-white",
                 )}
               >
@@ -1620,8 +1622,8 @@ export default function PhoneAccessDesignSection({
                       className={cn(
                         "inline-flex max-w-[15rem] items-center gap-2 rounded-lg border px-2 py-1.5 text-left cursor-pointer transition-colors",
                         on
-                          ? "border-[#0066FF] bg-[#0066FF]/10"
-                          : "border-[#1e2a45] bg-[#131A2E] hover:border-[#0066FF]/40",
+                          ? "border-brand bg-brand/10"
+                          : "border-[#1e2a45] bg-[#131A2E] hover:border-brand/40",
                       )}
                     >
                       <span
@@ -1662,7 +1664,7 @@ export default function PhoneAccessDesignSection({
                       className={cn(
                         "text-[13px] font-medium cursor-pointer",
                         selectedText === item.id
-                          ? "text-white underline decoration-[#0066FF] underline-offset-4"
+                          ? "text-white underline decoration-brand underline-offset-4"
                           : "text-[#8b93a7] hover:text-white",
                       )}
                     >
@@ -1740,8 +1742,8 @@ export default function PhoneAccessDesignSection({
                         className={cn(
                           "inline-flex max-w-[15rem] items-center gap-2 rounded-lg border px-2 py-1.5 text-left cursor-pointer transition-colors",
                           on
-                            ? "border-[#0066FF] bg-[#0066FF]/10"
-                            : "border-[#1e2a45] bg-[#131A2E] hover:border-[#0066FF]/40",
+                            ? "border-brand bg-brand/10"
+                            : "border-[#1e2a45] bg-[#131A2E] hover:border-brand/40",
                         )}
                       >
                         <div className="grid h-8 w-12 shrink-0 grid-cols-3 gap-px">
@@ -1766,7 +1768,7 @@ export default function PhoneAccessDesignSection({
                                 style={{
                                   background:
                                     n === 1
-                                      ? "rgba(0,102,255,0.7)"
+                                      ? "rgba(0,91,214,0.7)"
                                       : "rgba(255,255,255,0.12)",
                                 }}
                               />
@@ -1823,7 +1825,7 @@ export default function PhoneAccessDesignSection({
                       className={cn(
                         "h-8 w-9 text-[13px] font-semibold cursor-pointer",
                         branding.homeTableCols === cols
-                          ? "bg-[#0066FF] text-white"
+                          ? "bg-brand text-white"
                           : "bg-[#131A2E] text-[#8b93a7] hover:text-white",
                       )}
                     >
@@ -1860,7 +1862,7 @@ export default function PhoneAccessDesignSection({
                       onCheckedChange={(v) =>
                         void persist({ ...branding, [key]: v }, false)
                       }
-                      className="data-[state=checked]:bg-[#0066FF] data-[state=checked]:border-[#0066FF]"
+                      className="data-[state=checked]:bg-brand data-[state=checked]:border-brand"
                     />
                   </div>
                 ))}
@@ -1908,8 +1910,8 @@ export default function PhoneAccessDesignSection({
                       className={cn(
                         "inline-flex max-w-[15rem] items-center gap-2 rounded-lg border px-2 py-1.5 text-left cursor-pointer transition-colors",
                         on
-                          ? "border-[#0066FF] bg-[#0066FF]/10"
-                          : "border-[#1e2a45] bg-[#131A2E] hover:border-[#0066FF]/40",
+                          ? "border-brand bg-brand/10"
+                          : "border-[#1e2a45] bg-[#131A2E] hover:border-brand/40",
                       )}
                     >
                       <div className="grid h-8 w-12 shrink-0 grid-cols-3 gap-px">
@@ -1934,7 +1936,7 @@ export default function PhoneAccessDesignSection({
                               style={{
                                 background:
                                   n === 1
-                                    ? "rgba(0,102,255,0.7)"
+                                    ? "rgba(0,91,214,0.7)"
                                     : "rgba(255,255,255,0.12)",
                               }}
                             />
@@ -2013,20 +2015,25 @@ export default function PhoneAccessDesignSection({
                         className={cn(
                           "inline-flex max-w-[15rem] items-center gap-2 rounded-lg border px-2 py-1.5 text-left cursor-pointer transition-colors",
                           on
-                            ? "border-[#0066FF] bg-[#0066FF]/10"
-                            : "border-[#1e2a45] bg-[#131A2E] hover:border-[#0066FF]/40",
+                            ? "border-brand bg-brand/10"
+                            : "border-[#1e2a45] bg-[#131A2E] hover:border-brand/40",
                         )}
                       >
-                        <div className="grid h-8 w-12 shrink-0 grid-cols-3 gap-px">
+                        <div
+                          className={cn(
+                            "grid h-8 w-12 shrink-0 gap-px",
+                            opt.id === "professional" ? "grid-cols-2" : "grid-cols-3",
+                          )}
+                        >
                           {opt.id === "professional" ? (
-                            [1, 2, 3, 4, 5, 6].map((n) => (
+                            [1, 2, 3, 4].map((n) => (
                               <span
                                 key={n}
                                 className="rounded-[2px]"
                                 style={{
                                   background:
                                     n === 1
-                                      ? "rgba(0,102,255,0.75)"
+                                      ? "rgba(0,91,214,0.75)"
                                       : "rgba(255,255,255,0.18)",
                                 }}
                               />
@@ -2039,7 +2046,7 @@ export default function PhoneAccessDesignSection({
                                 style={{
                                   background:
                                     n === 1
-                                      ? "rgba(0,102,255,0.7)"
+                                      ? "rgba(0,91,214,0.7)"
                                       : "rgba(255,255,255,0.12)",
                                 }}
                               />
@@ -2075,6 +2082,38 @@ export default function PhoneAccessDesignSection({
                   })}
                 </div>
               </div>
+              {branding.menuDesign === "professional" ? (
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-sm font-medium text-white">
+                      {t("settings.phone_access_menu_grid")}
+                    </p>
+                    <p className="mt-0.5 text-xs text-[#5a6580]">
+                      {t("settings.phone_access_menu_grid_desc")}
+                    </p>
+                  </div>
+                  <div className="inline-flex overflow-hidden rounded-lg border border-[#1e2a45]">
+                    {([1, 2] as const).map((cols) => (
+                      <button
+                        key={cols}
+                        type="button"
+                        disabled={busy || !canEdit}
+                        onClick={() =>
+                          void persist({ ...branding, menuCols: cols }, false)
+                        }
+                        className={cn(
+                          "h-8 w-9 text-[13px] font-semibold cursor-pointer",
+                          branding.menuCols === cols
+                            ? "bg-brand text-white"
+                            : "bg-[#131A2E] text-[#8b93a7] hover:text-white",
+                        )}
+                      >
+                        {cols}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               <div className="flex items-center justify-between gap-3 rounded-lg border border-[#1e2a45]/50 bg-[#131A2E]/60 px-3 py-2.5">
                 <div className="min-w-0">
                   <p className="text-sm text-white">{t("settings.phone_access_menu_qr")}</p>
@@ -2088,7 +2127,7 @@ export default function PhoneAccessDesignSection({
                   onCheckedChange={(v) =>
                     void persist({ ...branding, showMenuQr: v }, false)
                   }
-                  className="data-[state=checked]:bg-[#0066FF] data-[state=checked]:border-[#0066FF]"
+                  className="data-[state=checked]:bg-brand data-[state=checked]:border-brand"
                 />
               </div>
             </div>

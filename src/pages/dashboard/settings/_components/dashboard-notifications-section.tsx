@@ -63,7 +63,7 @@ export function DashboardNotificationsSection() {
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_20px_50px_-30px_rgba(2,6,23,0.28)] dark:border-slate-700/80 dark:bg-slate-900/90">
       <div className="mb-5 flex items-start gap-3 border-b border-slate-200 pb-4 dark:border-slate-700/80">
-        <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-[#0066FF]/10 to-[#00AACC]/10 p-2.5 text-[#0066FF] dark:border-slate-600 dark:text-cyan-400">
+        <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-brand/10 to-brand-sky/10 p-2.5 text-brand dark:border-slate-600 dark:text-cyan-400">
           <Bell className="size-4" />
         </div>
         <div>
@@ -122,7 +122,7 @@ export function DashboardNotificationsSection() {
           type="button"
           disabled={saving}
           onClick={() => void handleSave()}
-          className="h-10 rounded-xl bg-gradient-to-r from-[#0066FF] to-[#00AACC] px-5 text-white"
+          className="h-10 rounded-xl bg-gradient-to-r from-brand to-brand-sky px-5 text-white"
         >
           {saving ? t("settings.notifications.saving") : t("settings.notifications.save")}
         </Button>

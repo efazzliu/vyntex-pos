@@ -46,10 +46,28 @@ create table if not exists public.menu_items (
 );
 
 alter table public.menu_items
-  add column if not exists staff_meal_allowed boolean not null default true;
+  add column if not exists staff_meal_allowed boolean not null default false;
+
+alter table public.menu_items
+  alter column staff_meal_allowed set default false;
+
+alter table public.menu_items
+  add column if not exists staff_meal_price numeric(12, 2);
+
+alter table public.menu_items
+  add column if not exists staff_meal_free_qty int;
+
+alter table public.menu_items
+  add column if not exists staff_meal_daily_limit int;
 
 alter table public.menu_items
   add column if not exists supply_recipe jsonb not null default '[]'::jsonb;
+
+alter table public.menu_items
+  add column if not exists prep_config jsonb not null default '{}'::jsonb;
+
+alter table public.menu_categories
+  add column if not exists prep_config jsonb not null default '{}'::jsonb;
 
 create table if not exists public.pos_stock_logs (
   id uuid primary key default gen_random_uuid(),

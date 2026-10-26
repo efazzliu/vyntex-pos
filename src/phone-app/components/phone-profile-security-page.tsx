@@ -63,7 +63,7 @@ export default function PhoneProfileSecurityPage() {
       >
         <Link
           to="/app/profile"
-          className="flex size-10 shrink-0 items-center justify-center rounded-xl text-slate-700 hover:bg-[#0066FF]/10"
+          className="flex size-10 shrink-0 items-center justify-center rounded-xl text-slate-700 hover:bg-brand/10"
           aria-label={t("phone.profile.backToProfile")}
         >
           <ChevronLeft className="size-6" strokeWidth={2} />
@@ -93,7 +93,7 @@ export default function PhoneProfileSecurityPage() {
 
         <Button
           type="button"
-          className="h-12 w-full rounded-xl bg-[#0066FF] hover:bg-[#0055DD]"
+          className="h-12 w-full rounded-xl bg-brand hover:bg-brand-hover"
           disabled={loading || sending || !email}
           onClick={() => void sendReset()}
         >

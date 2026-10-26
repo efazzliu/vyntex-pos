@@ -105,9 +105,9 @@ function TimelineBubble({ item }: { item: TimelineItem }) {
     >
       <div
         className={cn(
-          "max-w-[min(100%,520px)] rounded-2xl px-4 py-3 text-sm text-white shadow-[0_16px_48px_-24px_rgba(0,102,255,0.65)]",
+          "max-w-[min(100%,520px)] rounded-2xl px-4 py-3 text-sm text-white shadow-[0_16px_48px_-24px_rgba(0,91,214,0.65)]",
           isChat
-            ? "border border-white/20 bg-gradient-to-br from-[#0066FF] via-[#0088ee] to-[#22c55e]"
+            ? "border border-white/20 bg-gradient-to-br from-brand via-brand-sky to-[#22c55e]"
             : "border border-white/10 bg-gradient-to-br from-slate-600 to-slate-700",
         )}
       >
@@ -216,7 +216,7 @@ export function AdminSupportInbox() {
         value: String(stats.total),
         note: "Unique visitor emails",
         icon: <Inbox className="size-4" />,
-        glow: "from-cyan-400/35 to-blue-600/10",
+        glow: "from-cyan-400/35 to-brand/10",
       },
       {
         title: "Unread signals",
@@ -253,7 +253,7 @@ export function AdminSupportInbox() {
       >
         <div className="pointer-events-none absolute -right-16 -top-20 h-72 w-72 rounded-full bg-cyan-400/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 left-0 h-64 w-64 rounded-full bg-violet-500/15 blur-3xl" />
-        <div className="pointer-events-none absolute right-1/3 top-1/2 h-40 w-40 -translate-y-1/2 rounded-full bg-[#0066FF]/20 blur-2xl" />
+        <div className="pointer-events-none absolute right-1/3 top-1/2 h-40 w-40 -translate-y-1/2 rounded-full bg-brand/20 blur-2xl" />
         <div className="relative z-10 flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-200/90">
@@ -267,7 +267,7 @@ export function AdminSupportInbox() {
             </p>
           </div>
           <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 backdrop-blur-md">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-400/30 to-blue-600/40">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-400/30 to-brand/40">
               <UserRound className="size-4 text-cyan-100" />
             </div>
             <div className="text-left text-xs">
@@ -316,8 +316,8 @@ export function AdminSupportInbox() {
         >
           <div className="flex items-center justify-between gap-2 border-b border-slate-200/60 px-4 py-4 dark:border-slate-700/50">
             <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0066FF]/20 to-cyan-500/20 ring-1 ring-[#0066FF]/25">
-                <Inbox className="size-5 text-[#0066FF] dark:text-cyan-300" />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand/20 to-cyan-500/20 ring-1 ring-brand/25">
+                <Inbox className="size-5 text-brand dark:text-cyan-300" />
               </div>
               <div className="min-w-0">
                 <h2 className="font-semibold tracking-tight text-slate-900 dark:text-white">Queue</h2>
@@ -351,7 +351,7 @@ export function AdminSupportInbox() {
                 className={cn(
                   "rounded-full border px-3.5 py-1.5 text-xs font-semibold transition",
                   filter === x.key
-                    ? "border-cyan-500/40 bg-gradient-to-r from-[#0066FF]/15 to-cyan-500/10 text-[#0a3d6b] shadow-sm dark:border-cyan-400/30 dark:from-cyan-500/20 dark:to-blue-600/10 dark:text-cyan-100"
+                    ? "border-cyan-500/40 bg-gradient-to-r from-brand/15 to-cyan-500/10 text-[#0a3d6b] shadow-sm dark:border-cyan-400/30 dark:from-cyan-500/20 dark:to-brand/10 dark:text-cyan-100"
                     : "border-transparent bg-slate-100/80 text-slate-600 hover:bg-slate-100 dark:bg-slate-800/80 dark:text-slate-400 dark:hover:bg-slate-800",
                 )}
               >
@@ -393,14 +393,14 @@ export function AdminSupportInbox() {
                       className={cn(
                         "mb-2 flex w-full flex-col rounded-2xl border px-3.5 py-3 text-left text-sm transition-all duration-200",
                         active
-                          ? "border-cyan-500/40 bg-gradient-to-br from-[#0066FF]/12 to-cyan-500/8 shadow-[0_12px_32px_-20px_rgba(0,102,255,0.4)] dark:from-cyan-500/15 dark:to-blue-900/20"
+                          ? "border-cyan-500/40 bg-gradient-to-br from-brand/12 to-cyan-500/8 shadow-[0_12px_32px_-20px_rgba(0,91,214,0.4)] dark:from-cyan-500/15 dark:to-brand-active/20"
                           : "border-transparent bg-slate-50/50 hover:border-slate-200/80 hover:bg-white dark:bg-slate-800/40 dark:hover:border-slate-600 dark:hover:bg-slate-800/70",
                       )}
                     >
                       <span className="flex items-center gap-2">
                         <span className="truncate font-semibold text-slate-900 dark:text-white">{c.name}</span>
                         {c.unreadCount > 0 ? (
-                          <span className="ml-auto shrink-0 rounded-full bg-gradient-to-r from-[#0066FF] to-cyan-500 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
+                          <span className="ml-auto shrink-0 rounded-full bg-gradient-to-r from-brand to-cyan-500 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
                             {c.unreadCount}
                           </span>
                         ) : null}
@@ -430,7 +430,7 @@ export function AdminSupportInbox() {
         >
           {!selectedEmail ? (
             <div className="relative flex flex-1 flex-col items-center justify-center gap-4 overflow-hidden p-10 text-center">
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(0,102,255,0.08),transparent_55%)]" />
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(0,91,214,0.08),transparent_55%)]" />
               <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-slate-900 to-slate-800 shadow-[0_20px_50px_-24px_rgba(34,211,238,0.5)]">
                 <MessageCircle className="size-7 text-cyan-300" />
               </div>
@@ -520,7 +520,7 @@ export function AdminSupportInbox() {
                     type="button"
                     disabled={!replyDraft.trim() || sendMutation.isPending}
                     onClick={() => sendMutation.mutate()}
-                    className="rounded-xl bg-gradient-to-r from-[#0066FF] to-[#22c55e] px-5 font-semibold text-white shadow-[0_12px_32px_-16px_rgba(0,102,255,0.55)] hover:opacity-95"
+                    className="rounded-xl bg-gradient-to-r from-brand to-[#22c55e] px-5 font-semibold text-white shadow-[0_12px_32px_-16px_rgba(0,91,214,0.55)] hover:opacity-95"
                   >
                     {sendMutation.isPending ? (
                       "Sending…"

@@ -157,7 +157,7 @@ export default function PhoneProfilePage() {
       <div
         className={cn(
           "px-4 pb-8 pt-[max(0.75rem,env(safe-area-inset-top))]",
-          "rounded-b-[1.75rem] bg-gradient-to-br from-[#0066FF] via-[#5b4ddb] to-[#6d28d9]",
+          "rounded-b-[1.75rem] bg-gradient-to-br from-brand via-brand-sky to-[#6d28d9]",
         )}
       >
         <div className="flex gap-3 pt-2">
@@ -247,7 +247,7 @@ export default function PhoneProfilePage() {
                 />
                 <SettingsRow
                   icon={MoonStar}
-                  iconWrapClass="bg-indigo-100 text-indigo-700"
+                  iconWrapClass="bg-brand-subtle text-brand-hover"
                   label={t("phone.profile.display")}
                   to="/app/profile/display"
                 />
@@ -269,7 +269,7 @@ export default function PhoneProfilePage() {
                 />
                 <SettingsRow
                   icon={Users}
-                  iconWrapClass="bg-indigo-100 text-indigo-700"
+                  iconWrapClass="bg-brand-subtle text-brand-hover"
                   label={t("phone.profile.teamManagement")}
                   to="/app/phone-team"
                 />
@@ -287,7 +287,7 @@ export default function PhoneProfilePage() {
                 />
                 <SettingsRow
                   icon={MoonStar}
-                  iconWrapClass="bg-indigo-100 text-indigo-700"
+                  iconWrapClass="bg-brand-subtle text-brand-hover"
                   label={t("phone.profile.display")}
                   to="/app/profile/display"
                 />
@@ -312,7 +312,7 @@ export default function PhoneProfilePage() {
           {!isPhoneManager ? (
             <button
               type="button"
-              className="flex h-12 w-full items-center justify-center rounded-xl border-2 border-[#0066FF]/35 bg-[#0066FF]/5 text-base font-semibold text-[#0066FF] transition-colors hover:bg-[#0066FF]/10"
+              className="flex h-12 w-full items-center justify-center rounded-xl border-2 border-brand/35 bg-brand/5 text-base font-semibold text-brand transition-colors hover:bg-brand/10"
               onClick={() => navigate("/app")}
             >
               <RefreshCw className="mr-2 size-5" />

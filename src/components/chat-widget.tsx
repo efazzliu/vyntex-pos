@@ -109,7 +109,7 @@ export default function ChatWidget() {
             animate={{ scale: 1 }}
             exit={{ scale: 0 }}
             onClick={() => setIsOpen(true)}
-            className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-gradient-to-r from-[#0066FF] to-[#00AACC] text-white shadow-lg shadow-blue-500/25 flex items-center justify-center cursor-pointer hover:shadow-blue-500/40 transition-shadow"
+            className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-gradient-to-r from-brand to-brand-sky text-white shadow-lg shadow-brand/25 flex items-center justify-center cursor-pointer hover:shadow-brand/40 transition-shadow"
           >
             <MessageCircle className="size-6" />
           </motion.button>
@@ -124,7 +124,7 @@ export default function ChatWidget() {
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             className="fixed bottom-6 right-6 z-50 w-[340px] sm:w-[380px] rounded-2xl border border-border bg-card shadow-2xl flex flex-col overflow-hidden"
           >
-            <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-[#0066FF] to-[#00AACC] text-white">
+            <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-brand to-brand-sky text-white">
               <div className="flex items-center gap-2">
                 <MessageCircle className="size-5" />
                 <span className="font-semibold text-sm">{t("chat.header")}</span>
@@ -147,7 +147,7 @@ export default function ChatWidget() {
                     msg.sender === "team" &&
                       "bg-slate-100 text-foreground border border-slate-200/80 dark:bg-slate-800 dark:border-slate-600",
                     msg.sender === "user" &&
-                      "bg-gradient-to-r from-[#0066FF] to-[#00AACC] text-white ml-auto",
+                      "bg-gradient-to-r from-brand to-brand-sky text-white ml-auto",
                   )}
                 >
                   {msg.sender === "team" ? (
@@ -183,7 +183,7 @@ export default function ChatWidget() {
                   />
                   <Button
                     size="sm"
-                    className="w-full bg-gradient-to-r from-[#0066FF] to-[#00AACC] text-white border-0"
+                    className="w-full bg-gradient-to-r from-brand to-brand-sky text-white border-0"
                     onClick={handleSubmitInfo}
                   >
                     {t("chat.start")}
@@ -205,7 +205,7 @@ export default function ChatWidget() {
                     size="icon"
                     onClick={() => void handleSend()}
                     disabled={sending || !input.trim()}
-                    className="bg-gradient-to-r from-[#0066FF] to-[#00AACC] text-white border-0 shrink-0"
+                    className="bg-gradient-to-r from-brand to-brand-sky text-white border-0 shrink-0"
                   >
                     <Send className="size-4" />
                   </Button>

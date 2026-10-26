@@ -75,7 +75,7 @@ export function DashboardAppearanceSection() {
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_20px_50px_-30px_rgba(2,6,23,0.28)] dark:border-slate-700/80 dark:bg-slate-900/90">
       <div className="mb-5 flex items-start gap-3 border-b border-slate-200 pb-4 dark:border-slate-700/80">
-        <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-[#0066FF]/10 to-[#00AACC]/10 p-2.5 text-[#0066FF] dark:border-slate-600 dark:text-cyan-400">
+        <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-brand/10 to-brand-sky/10 p-2.5 text-brand dark:border-slate-600 dark:text-cyan-400">
           <Palette className="size-4" />
         </div>
         <div>
@@ -110,9 +110,9 @@ export function DashboardAppearanceSection() {
                   disabled={!mounted}
                   onClick={() => handleThemeSelect(id)}
                   className={cn(
-                    "group flex flex-col overflow-hidden rounded-2xl border text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF]/50 disabled:cursor-wait disabled:opacity-60",
+                    "group flex flex-col overflow-hidden rounded-2xl border text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 disabled:cursor-wait disabled:opacity-60",
                     selected
-                      ? "border-[#0066FF] ring-2 ring-[#0066FF]/30 dark:border-cyan-500 dark:ring-cyan-500/25"
+                      ? "border-brand ring-2 ring-brand/30 dark:border-cyan-500 dark:ring-cyan-500/25"
                       : "border-slate-200 hover:border-slate-300 dark:border-slate-600 dark:hover:border-slate-500",
                   )}
                 >
@@ -123,8 +123,8 @@ export function DashboardAppearanceSection() {
                     )}
                   >
                     <div className="flex gap-1">
-                      <span className="size-2 rounded-full bg-[#0066FF]/80" />
-                      <span className="size-2 rounded-full bg-[#00AACC]/80" />
+                      <span className="size-2 rounded-full bg-brand/80" />
+                      <span className="size-2 rounded-full bg-brand-sky/80" />
                       <span
                         className={cn(
                           "size-2 rounded-full",
@@ -144,7 +144,7 @@ export function DashboardAppearanceSection() {
                       {label}
                     </span>
                     {selected ? (
-                      <span className="rounded-full bg-[#0066FF]/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#0066FF] dark:bg-cyan-500/15 dark:text-cyan-400">
+                      <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand dark:bg-cyan-500/15 dark:text-cyan-400">
                         {t("settings.appearance.active")}
                       </span>
                     ) : null}
@@ -158,7 +158,7 @@ export function DashboardAppearanceSection() {
 
         <div>
           <p className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-900 dark:text-white">
-            <Languages className="size-4 text-[#0066FF] dark:text-cyan-400" />
+            <Languages className="size-4 text-brand dark:text-cyan-400" />
             {t("settings.appearance.dashboard_language")}
           </p>
           <div className="flex flex-wrap gap-2">
@@ -171,7 +171,7 @@ export function DashboardAppearanceSection() {
                 className={cn(
                   "h-10 rounded-xl px-4",
                   lang === id &&
-                    "bg-gradient-to-r from-[#0066FF] to-[#00AACC] text-white hover:opacity-95 dark:text-white",
+                    "bg-gradient-to-r from-brand to-brand-sky text-white hover:opacity-95 dark:text-white",
                 )}
                 onClick={() => {
                   setLang(id);

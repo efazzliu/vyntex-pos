@@ -269,7 +269,7 @@ export default function DebtCustomerDetail({
                 <div
                   className={cn(
                     "h-full rounded-full transition-all",
-                    isOverLimit ? "bg-amber-500" : "bg-[#0066FF]"
+                    isOverLimit ? "bg-amber-500" : "bg-brand"
                   )}
                   style={{
                     width: `${Math.min(100, (balance / customer.creditLimit) * 100)}%`,
@@ -498,8 +498,8 @@ function SettleDialog({
       value: "card" as const,
       label: "Card",
       icon: CreditCard,
-      color: "text-blue-400",
-      bg: "bg-blue-500/10 border-blue-500/30",
+      color: "text-brand-soft",
+      bg: "bg-brand/10 border-brand/30",
     },
     {
       value: "other" as const,

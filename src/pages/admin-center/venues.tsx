@@ -66,7 +66,7 @@ export default function DashboardVenuesPage() {
     <AdminPage>
       <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-indigo-500">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand">
             {t("ac.nav.admin_center")}
           </p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
@@ -74,7 +74,7 @@ export default function DashboardVenuesPage() {
           </h1>
           <p className="mt-1 text-sm text-slate-500">{t("ac.venues.subtitle")}</p>
         </div>
-        <Button asChild className="h-10 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700">
+        <Button asChild className="h-10 rounded-xl bg-brand text-white hover:bg-brand-hover">
           <Link to="/app">
             <Plus className="size-4" />
             {t("ac.overview.add_venue")}
@@ -99,12 +99,12 @@ export default function DashboardVenuesPage() {
                   acCard,
                   acCardHover,
                   "p-5",
-                  focused && "ring-2 ring-indigo-400/70",
+                  focused && "ring-2 ring-brand-soft/70",
                 )}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-3">
-                    <span className="flex size-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
+                    <span className="flex size-12 items-center justify-center rounded-2xl bg-brand-light text-brand">
                       <Store className="size-5" />
                     </span>
                     <div className="min-w-0">
@@ -138,7 +138,7 @@ export default function DashboardVenuesPage() {
 
                 <div className="mt-5 flex flex-wrap gap-2">
                   <Button
-                    className="rounded-xl bg-indigo-600 text-white hover:bg-indigo-700"
+                    className="rounded-xl bg-brand text-white hover:bg-brand-hover"
                     onClick={() => {
                       setDashboardRestaurantId(venue.id);
                       navigate("/app/venue");

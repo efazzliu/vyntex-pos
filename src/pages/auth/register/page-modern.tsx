@@ -116,7 +116,7 @@ export default function RegisterPageModern() {
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder={t("auth.register.namePlaceholder")}
-                      className="h-11 rounded-xl border-slate-200 bg-white pl-10 text-slate-900 caret-slate-900 shadow-sm placeholder:text-slate-400 focus-visible:ring-[#0066FF]/40"
+                      className="h-11 rounded-xl border-slate-200 bg-white pl-10 text-slate-900 caret-slate-900 shadow-sm placeholder:text-slate-400 focus-visible:ring-brand/40"
                       required
                     />
                   </div>
@@ -133,7 +133,7 @@ export default function RegisterPageModern() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="you@example.com"
-                      className="h-11 rounded-xl border-slate-200 bg-white pl-10 text-slate-900 caret-slate-900 shadow-sm placeholder:text-slate-400 focus-visible:ring-[#0066FF]/40"
+                      className="h-11 rounded-xl border-slate-200 bg-white pl-10 text-slate-900 caret-slate-900 shadow-sm placeholder:text-slate-400 focus-visible:ring-brand/40"
                       required
                     />
                   </div>
@@ -150,7 +150,7 @@ export default function RegisterPageModern() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
-                      className="h-11 rounded-xl border-slate-200 bg-white pl-10 text-slate-900 caret-slate-900 shadow-sm placeholder:text-slate-400 focus-visible:ring-[#0066FF]/40"
+                      className="h-11 rounded-xl border-slate-200 bg-white pl-10 text-slate-900 caret-slate-900 shadow-sm placeholder:text-slate-400 focus-visible:ring-brand/40"
                       required
                     />
                   </div>
@@ -167,12 +167,12 @@ export default function RegisterPageModern() {
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="••••••••"
-                      className="h-11 rounded-xl border-slate-200 bg-white pl-10 text-slate-900 caret-slate-900 shadow-sm placeholder:text-slate-400 focus-visible:ring-[#0066FF]/40"
+                      className="h-11 rounded-xl border-slate-200 bg-white pl-10 text-slate-900 caret-slate-900 shadow-sm placeholder:text-slate-400 focus-visible:ring-brand/40"
                       required
                     />
                   </div>
                 </div>
-                <Button type="submit" className="h-11 w-full rounded-xl bg-gradient-to-r from-[#0066FF] to-[#00AACC] text-white shadow-lg shadow-blue-500/30 transition hover:scale-[1.01] hover:from-[#0055DD] hover:to-[#0099BB]" disabled={loading || resendingVerification}>
+                <Button type="submit" className="h-11 w-full rounded-xl bg-gradient-to-r from-brand to-brand-sky text-white shadow-lg shadow-brand/30 transition hover:scale-[1.01] hover:from-brand-hover hover:to-brand-hover" disabled={loading || resendingVerification}>
                   {loading
                     ? t("auth.register.submitLoading")
                     : resendingVerification
@@ -184,7 +184,7 @@ export default function RegisterPageModern() {
                 {t("auth.register.alreadyHaveAccount")}{" "}
                 <Link
                   to={searchParams.toString() ? `/login?${searchParams.toString()}` : "/login"}
-                  className="font-medium text-[#0066FF] hover:underline"
+                  className="font-medium text-brand hover:underline"
                 >
                   {t("auth.register.loginLink")}
                 </Link>
@@ -192,7 +192,7 @@ export default function RegisterPageModern() {
             </section>
 
             <section className="relative hidden p-12 md:block">
-              <div className="absolute inset-0 bg-gradient-to-br from-[#0066FF]/20 via-[#00AACC]/10 to-[#44CC00]/15" />
+              <div className="absolute inset-0 bg-gradient-to-br from-brand/20 via-brand-sky/10 to-brand-accent/15" />
               <div className="relative">
                 <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold tracking-wide text-white/85">
                   <Sparkles className="h-3.5 w-3.5" />
@@ -201,11 +201,11 @@ export default function RegisterPageModern() {
                 <h2 className="mt-5 text-4xl font-bold leading-tight text-white">{t("auth.register.heroTitle")}</h2>
                 <ul className="mt-8 space-y-3 text-sm text-white/80">
                   <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-[#66B3FF]" />
+                    <CheckCircle2 className="h-4 w-4 text-brand-soft" />
                     {t("auth.register.heroBullet1")}
                   </li>
                   <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-[#66B3FF]" />
+                    <CheckCircle2 className="h-4 w-4 text-brand-soft" />
                     {t("auth.register.heroBullet2")}
                   </li>
                 </ul>

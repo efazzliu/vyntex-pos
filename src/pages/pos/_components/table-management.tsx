@@ -23,6 +23,7 @@ import {
   MapPin,
 } from "lucide-react";
 import TableDialog from "./table-dialog.tsx";
+import { BRAND } from "@/lib/brand-colors.ts";
 
 type TableManagementProps = {
   licenseKey: string;
@@ -55,10 +56,10 @@ const STATUS_CONFIG = {
   },
   "bill-printed": {
     label: "Bill Printed",
-    borderClass: "border-blue-800/40",
-    bgClass: "bg-blue-950/20",
-    badgeBg: "bg-blue-500/20",
-    badgeText: "text-blue-400",
+    borderClass: "border-brand-active/40",
+    bgClass: "bg-brand-active/20",
+    badgeBg: "bg-brand/20",
+    badgeText: "text-brand-soft",
     dotColor: "#60a5fa",
   },
 } as const;
@@ -193,7 +194,7 @@ export default function TableManagement({ licenseKey }: TableManagementProps) {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <MiniStat label="Total" value={stats.total} color="#0066FF" />
+        <MiniStat label="Total" value={stats.total} color={BRAND.primary} />
         <MiniStat label="Available" value={stats.available} color="#34d399" />
         <MiniStat label="Occupied" value={stats.occupied} color="#f87171" />
         <MiniStat label="Reserved" value={stats.reserved} color="#fbbf24" />
@@ -208,7 +209,7 @@ export default function TableManagement({ licenseKey }: TableManagementProps) {
             className={cn(
               "px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all shrink-0 cursor-pointer",
               activeZone === null
-                ? "bg-[#0066FF] text-white"
+                ? "bg-brand text-white"
                 : "bg-[#131A2E] text-[#8b93a7] hover:text-white border border-[#1e2a45]"
             )}
           >
@@ -221,7 +222,7 @@ export default function TableManagement({ licenseKey }: TableManagementProps) {
               className={cn(
                 "px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all shrink-0 cursor-pointer",
                 activeZone === z
-                  ? "bg-[#0066FF] text-white"
+                  ? "bg-brand text-white"
                   : "bg-[#131A2E] text-[#8b93a7] hover:text-white border border-[#1e2a45]"
               )}
             >

@@ -34,7 +34,7 @@ export default function AdminUsersHubPage() {
     <section className="space-y-5 p-6 lg:p-8">
       <div className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-[linear-gradient(135deg,#ffffff_0%,#f4f9ff_55%,#f4fff6_100%)] p-6 shadow-[0_26px_60px_-40px_rgba(2,6,23,0.35)] dark:border-slate-700/70 dark:bg-[linear-gradient(135deg,#070d1f_0%,#08122a_55%,#0a1620_100%)]">
         <div
-          className="pointer-events-none absolute -right-14 -top-14 h-44 w-44 rounded-full bg-[#0066FF]/20 blur-3xl dark:bg-[#0066FF]/28"
+          className="pointer-events-none absolute -right-14 -top-14 h-44 w-44 rounded-full bg-brand/20 blur-3xl dark:bg-brand/28"
           aria-hidden
         />
         <div className="relative">
@@ -134,7 +134,7 @@ function AdminRow({
       </Badge>
       <div className="flex justify-end">
         {isCurrentUser ? (
-          <Badge className="w-fit border border-blue-500/40 bg-blue-500/12 text-blue-700 dark:text-blue-300">You</Badge>
+          <Badge className="w-fit border border-brand/40 bg-brand/12 text-brand-hover dark:text-brand-soft">You</Badge>
         ) : (
           <span className="text-[11px] text-slate-500 dark:text-slate-300/70">-</span>
         )}
@@ -145,7 +145,7 @@ function AdminRow({
 
 function roleBadgeClass(role: PlatformAdminRole): string {
   if (role === "full") return "w-fit border border-emerald-500/40 bg-emerald-500/12 text-emerald-700 dark:text-emerald-300";
-  if (role === "operations") return "w-fit border border-blue-500/40 bg-blue-500/12 text-blue-700 dark:text-blue-300";
+  if (role === "operations") return "w-fit border border-brand/40 bg-brand/12 text-brand-hover dark:text-brand-soft";
   if (role === "support") return "w-fit border border-cyan-500/40 bg-cyan-500/12 text-cyan-700 dark:text-cyan-300";
   if (role === "finance") return "w-fit border border-violet-500/40 bg-violet-500/12 text-violet-700 dark:text-violet-300";
   return "w-fit border border-amber-500/40 bg-amber-500/12 text-amber-700 dark:text-amber-300";
@@ -164,7 +164,7 @@ function MetricCard({
 }) {
   return (
     <div className="group relative [transform-style:preserve-3d] [transform:perspective(1000px)_rotateX(0deg)_translateY(0)] transition-transform duration-300 hover:[transform:perspective(1000px)_rotateX(5deg)_translateY(-4px)]">
-      <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[#0066FF]/10 to-[#44CC00]/10 blur-xl" aria-hidden />
+      <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-brand/10 to-brand-accent/10 blur-xl" aria-hidden />
       <div className="relative rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-[0_16px_36px_-30px_rgba(2,6,23,0.35)] dark:border-slate-700/70 dark:bg-slate-900/80">
         <div className="mb-2 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200/80 bg-white text-slate-600 dark:border-slate-600/80 dark:bg-slate-800 dark:text-slate-200">
           {icon}

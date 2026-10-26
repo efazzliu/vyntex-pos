@@ -13,9 +13,12 @@ import {
 import { uuidOrNull, staffIdsEqual } from "@/lib/supabase-pos/uuid.ts";
 import { cn } from "@/lib/utils.ts";
 import { useWaiterCanPay } from "@/phone-app/hooks/use-waiter-can-pay.ts";
+import { useWaiterMenuSelection } from "@/phone-app/hooks/use-waiter-menu-selection.ts";
+import { waiterMenuSelectionQty } from "@/phone-app/lib/waiter-menu-selection.ts";
+import PhoneWaiterPendingSendSheet from "@/phone-app/components/phone-waiter-pending-send-sheet.tsx";
 import { usePhoneAccessBranding } from "@/phone-app/hooks/use-phone-access-branding.tsx";
 import { phoneAccessTableGridClass, phoneAccessHasBottomNav } from "@/lib/local-db.ts";
-import { phoneAccessThemeTokens, waiterThemeGlow, waiterIdleChipClass, waiterPageTextClass } from "@/lib/phone-access-theme.ts";
+import { phoneAccessThemeTokens, waiterThemeGlow, waiterIdleChipClass, waiterPageTextClass, vyntexSelectedFill, vyntexSelectedBar } from "@/lib/phone-access-theme.ts";
 
 type TableOrderSummary = {
   staffId: string;
@@ -79,8 +82,8 @@ function tableColors(
   if (hasOpenTicket || status === "occupied" || status === "bill-printed") {
     if (summary && currentStaffId && staffIdsEqual(summary.staffId, currentStaffId)) {
       return isLight
-        ? { bg: "bg-blue-50", border: "border-blue-400", text: "text-blue-700" }
-        : { bg: "bg-blue-500/20", border: "border-blue-400", text: "text-blue-200" };
+        ? { bg: "bg-brand-light", border: "border-brand-soft", text: "text-brand-hover" }
+        : { bg: "bg-brand/20", border: "border-brand-soft", text: "text-brand-soft" };
     }
     if (summary && !uuidOrNull(summary.staffId)) {
       return isLight
@@ -113,6 +116,9 @@ export default function PhoneWaiterFloor() {
   const navigate = useNavigate();
   const session = getWaiterSession();
   const [activeZone, setActiveZone] = useState<string | null>(null);
+  const [pendingSendTable, setPendingSendTable] = useState<FloorTable | null>(null);
+  const selection = useWaiterMenuSelection();
+  const selectionCount = waiterMenuSelectionQty(selection);
 
   const licenseKey = session?.licenseKey ?? "";
   const designPreview = isWaiterDesignPreviewLicense(licenseKey);
@@ -205,6 +211,11 @@ export default function PhoneWaiterFloor() {
       return;
     }
 
+    if (selectionCount > 0) {
+      setPendingSendTable(table);
+      return;
+    }
+
     navigate(`/waiter/table/${table._id}`);
   };
 
@@ -214,15 +225,48 @@ export default function PhoneWaiterFloor() {
   const tokens = phoneAccessThemeTokens(access.theme);
   const pageGlow = waiterThemeGlow(tokens);
   const tilesGlow = waiterThemeGlow(tokens);
+  const pageClass = cn(
+    "relative flex h-dvh min-h-0 flex-col overflow-hidden overscroll-none",
+    waiterPageTextClass(tokens.isLight),
+  );
+  const tablesScrollClass = cn(
+    "relative z-10 min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain",
+    phoneAccessHasBottomNav(access) ? "pb-24" : "pb-6",
+  );
+  const formatPendingPrice = (n: number) => `${n.toFixed(2)} €`;
+  const pendingSendUi =
+    pendingSendTable && selectionCount > 0 ? (
+      <PhoneWaiterPendingSendSheet
+        table={pendingSendTable}
+        lines={selection}
+        licenseKey={licenseKey}
+        staffId={staff.id}
+        staffName={staff.name}
+        tokens={tokens}
+        accent={access.accentColor}
+        waiterCanPay={waiterCanPay}
+        formatPrice={formatPendingPrice}
+        onClose={() => setPendingSendTable(null)}
+        onSent={() => {
+          const id = pendingSendTable._id;
+          setPendingSendTable(null);
+          navigate(`/waiter/table/${id}`);
+        }}
+      />
+    ) : null;
+  const pickHint =
+    selectionCount > 0 ? (
+      <div
+        className="relative z-10 mx-5 mb-2 rounded-xl px-3 py-2 text-[12px] font-medium"
+        style={{ background: "var(--waiter-card)", color: "var(--waiter-fg)" }}
+      >
+        {t("phone.waiter.menuPickTableHint", { count: selectionCount })}
+      </div>
+    ) : null;
 
   if (advanced) {
     return (
-      <div
-        className={cn(
-          "relative flex min-h-dvh flex-col overflow-hidden",
-          waiterPageTextClass(tokens.isLight),
-        )}
-      >
+      <div className={pageClass}>
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0"
@@ -232,7 +276,7 @@ export default function PhoneWaiterFloor() {
         />
 
         {access.showHomeHeader ? (
-          <header className="relative z-10 flex items-center gap-3 px-5 pb-4 pt-[max(1rem,env(safe-area-inset-top))]">
+          <header className="relative z-10 flex shrink-0 items-center gap-3 px-5 pb-4 pt-[max(1rem,env(safe-area-inset-top))]">
             <div
               className="flex size-11 shrink-0 items-center justify-center rounded-full text-[15px] font-semibold"
               style={{
@@ -270,7 +314,7 @@ export default function PhoneWaiterFloor() {
         )}
 
         {zones.length > 0 ? (
-          <div className="relative z-10 flex gap-5 overflow-x-auto px-5 pb-3">
+          <div className="relative z-10 flex shrink-0 gap-5 overflow-x-auto px-5 pb-3">
             {zones.map((zone) => {
               const isActive = activeZone === zone;
               return (
@@ -281,9 +325,7 @@ export default function PhoneWaiterFloor() {
                   className="shrink-0 pb-2 text-[13px] font-medium tracking-tight"
                   style={{
                     color: isActive ? "var(--waiter-fg)" : "var(--waiter-muted)",
-                    borderBottom: isActive
-                      ? `2px solid ${access.accentColor}`
-                      : "2px solid transparent",
+                    ...(isActive ? vyntexSelectedBar() : { borderBottom: "2px solid transparent" }),
                   }}
                 >
                   {zone}
@@ -293,13 +335,12 @@ export default function PhoneWaiterFloor() {
           </div>
         ) : null}
 
+        {pickHint}
+
         <motion.main
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          className={cn(
-            "relative z-10 flex-1 overflow-y-auto overflow-x-hidden px-4",
-            phoneAccessHasBottomNav(access) ? "pb-24" : "pb-6",
-          )}
+          className={cn(tablesScrollClass, "px-4")}
         >
           {resolvedTables.length === 0 ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 py-24 text-center">
@@ -358,13 +399,13 @@ export default function PhoneWaiterFloor() {
                     </span>
                     <span
                       className={cn(
-                        "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                        "max-w-[7.5rem] truncate rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide",
                         colors.bg,
                         colors.text,
                       )}
                     >
-                      {summary && waiterCanPay
-                        ? summary.total.toFixed(0)
+                      {summary
+                        ? summary.staffName || t("phone.waiter.tableOpen")
                         : table.status === "bill-printed"
                           ? t("phone.waiter.order.billRequested")
                           : busy
@@ -381,18 +422,14 @@ export default function PhoneWaiterFloor() {
             </div>
           )}
         </motion.main>
+        {pendingSendUi}
       </div>
     );
   }
 
   if (modern) {
     return (
-      <div
-        className={cn(
-          "relative flex min-h-dvh flex-col overflow-hidden",
-          waiterPageTextClass(tokens.isLight),
-        )}
-      >
+      <div className={pageClass}>
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0"
@@ -400,7 +437,7 @@ export default function PhoneWaiterFloor() {
         />
 
         {access.showHomeHeader ? (
-          <header className="relative z-10 flex items-center gap-3 px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
+          <header className="relative z-10 flex shrink-0 items-center gap-3 px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
             <div className="min-w-0 flex-1">
               <p
                 className="text-[11px] font-semibold uppercase tracking-[0.14em]"
@@ -429,7 +466,7 @@ export default function PhoneWaiterFloor() {
         )}
 
         {zones.length > 0 ? (
-          <div className="relative z-10 flex gap-2 overflow-x-auto px-5 pb-3">
+          <div className="relative z-10 flex shrink-0 gap-2 overflow-x-auto px-5 pb-3">
             {zones.map((zone) => {
               const isActive = activeZone === zone;
               return (
@@ -441,9 +478,7 @@ export default function PhoneWaiterFloor() {
                     "shrink-0 rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition",
                     isActive ? "text-white" : waiterIdleChipClass(tokens.isLight),
                   )}
-                  style={
-                    isActive ? { backgroundColor: access.accentColor } : undefined
-                  }
+                  style={isActive ? vyntexSelectedFill() : undefined}
                 >
                   {zone}
                 </button>
@@ -452,13 +487,12 @@ export default function PhoneWaiterFloor() {
           </div>
         ) : null}
 
+        {pickHint}
+
         <motion.main
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          className={cn(
-            "relative z-10 flex-1 overflow-y-auto overflow-x-hidden px-5",
-            phoneAccessHasBottomNav(access) ? "pb-24" : "pb-6",
-          )}
+          className={cn(tablesScrollClass, "px-5")}
         >
           {resolvedTables.length === 0 ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 py-24 text-center">
@@ -500,9 +534,9 @@ export default function PhoneWaiterFloor() {
                       className={cn("size-2 rounded-full", colors.border.replace("border-", "bg-"))}
                     />
                     <span className="text-[14px] font-semibold tracking-tight">{table.name}</span>
-                    <span className={cn("text-[10px] font-semibold", colors.text)}>
-                      {summary && waiterCanPay
-                        ? summary.total.toFixed(0)
+                    <span className={cn("max-w-full truncate text-[10px] font-semibold", colors.text)}>
+                      {summary
+                        ? summary.staffName || t("phone.waiter.tableOpen")
                         : table.status === "bill-printed"
                           ? t("phone.waiter.order.billRequested")
                           : busy
@@ -522,17 +556,13 @@ export default function PhoneWaiterFloor() {
             </div>
           )}
         </motion.main>
+        {pendingSendUi}
       </div>
     );
   }
 
   return (
-    <div
-      className={cn(
-        "relative flex min-h-dvh flex-col overflow-hidden",
-        waiterPageTextClass(tokens.isLight),
-      )}
-    >
+    <div className={pageClass}>
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"
@@ -542,7 +572,7 @@ export default function PhoneWaiterFloor() {
       />
 
       {access.showHomeHeader ? (
-      <header className="relative z-10 flex items-center justify-between px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
+      <header className="relative z-10 flex shrink-0 items-center justify-between px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
         <div>
           <p
             className="text-[11px] font-semibold uppercase tracking-[0.14em]"
@@ -576,7 +606,7 @@ export default function PhoneWaiterFloor() {
       )}
 
       {zones.length > 0 ? (
-        <div className="relative z-10 grid grid-cols-3 gap-2 overflow-x-hidden px-5 pb-3">
+        <div className="relative z-10 grid shrink-0 grid-cols-3 gap-2 overflow-x-hidden px-5 pb-3">
           {zones.map((zone) => {
             const count = resolvedTables.filter((tb) => tb.zone === zone).length;
             const isActive = activeZone === zone;
@@ -589,14 +619,7 @@ export default function PhoneWaiterFloor() {
                   "flex h-11 min-w-0 items-center justify-between gap-1.5 rounded-xl px-2.5 text-[13px] font-medium transition-all",
                   isActive ? "text-white shadow-lg" : waiterIdleChipClass(tokens.isLight),
                 )}
-                style={
-                  isActive
-                    ? {
-                        backgroundColor: access.accentColor,
-                        boxShadow: `0 10px 20px -8px ${access.accentColor}80`,
-                      }
-                    : undefined
-                }
+                style={isActive ? vyntexSelectedFill() : undefined}
               >
                 <span className="min-w-0 truncate">{zone}</span>
                 <span
@@ -617,13 +640,12 @@ export default function PhoneWaiterFloor() {
         </div>
       ) : null}
 
+      {pickHint}
+
       <motion.main
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className={cn(
-          "relative z-10 flex-1 overflow-y-auto overflow-x-hidden px-5",
-          phoneAccessHasBottomNav(access) ? "pb-24" : "pb-6",
-        )}
+        className={cn(tablesScrollClass, "px-5")}
       >
         {resolvedTables.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 py-24 text-center">
@@ -635,7 +657,7 @@ export default function PhoneWaiterFloor() {
                   : "border-white/10 bg-white/[0.06]",
               )}
             >
-              <MapPinned className="size-7 text-[#7eb6ff]" />
+              <MapPinned className="size-7 text-brand-soft" />
             </div>
             <p className="text-lg font-semibold">
               {t("phone.waiter.noTablesTitle")}
@@ -658,9 +680,7 @@ export default function PhoneWaiterFloor() {
               const summary = orderSummaries?.[table._id];
               const colors = tableColors(table, summary, staff.id, isAdminOrManager, tokens.isLight);
               const statusLine = summary
-                ? waiterCanPay
-                  ? summary.total.toFixed(0)
-                  : t("phone.waiter.tableOpen")
+                ? summary.staffName || t("phone.waiter.tableOpen")
                 : t("phone.waiter.tableFree");
               const readyCount = readyCountByTableId.get(table._id) ?? 0;
               return (
@@ -699,7 +719,7 @@ export default function PhoneWaiterFloor() {
                   </span>
                   <span
                     className={cn(
-                      "max-w-full truncate text-[11px] font-semibold leading-none tabular-nums",
+                      "max-w-full truncate text-[11px] font-semibold leading-none",
                       colors.text,
                     )}
                   >
@@ -708,7 +728,7 @@ export default function PhoneWaiterFloor() {
                   <span
                     className={cn(
                       "h-3 max-w-full truncate text-[10px] font-medium leading-none",
-                      tokens.isLight ? "text-blue-700" : "text-blue-200",
+                      tokens.isLight ? "text-brand-hover" : "text-brand-soft",
                     )}
                   >
                     {table.status === "bill-printed"
@@ -728,6 +748,7 @@ export default function PhoneWaiterFloor() {
           </div>
         )}
       </motion.main>
+      {pendingSendUi}
     </div>
   );
 }

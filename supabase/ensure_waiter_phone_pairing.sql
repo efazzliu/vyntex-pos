@@ -429,6 +429,7 @@ as $$
 declare
   rid uuid;
   existing_kind text;
+  existing_disc timestamptz;
   default_name text;
   request_headers jsonb;
   request_ip text;
@@ -465,10 +466,15 @@ begin
     return;
   end if;
 
-  select d.device_kind into existing_kind
+  select d.device_kind, d.disconnected_at into existing_kind, existing_disc
   from public.pos_devices d
   where d.restaurant_id = rid and d.device_id = p_device_id
   limit 1;
+
+  if existing_kind = 'waiter_phone' and existing_disc is not null then
+    return query select false, true;
+    return;
+  end if;
 
   default_name := case
     when existing_kind = 'waiter_phone' then
@@ -522,7 +528,12 @@ begin
     ip_address = coalesce(excluded.ip_address, public.pos_devices.ip_address),
     last_seen_at = now(),
     last_sync_at = now(),
-    disconnected_at = null,
+    disconnected_at = case
+      when public.pos_devices.device_kind = 'waiter_phone'
+           and public.pos_devices.disconnected_at is not null
+        then public.pos_devices.disconnected_at
+      else null
+    end,
     updated_at = now();
 
   update public.restaurants

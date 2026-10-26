@@ -211,7 +211,7 @@ function AdminSidebar({
                       <span
                         aria-hidden="true"
                         className={cn(
-                          "absolute left-0 top-1/2 h-4 w-[2.5px] -translate-y-1/2 rounded-full bg-[#0066FF] transition-opacity",
+                          "absolute left-0 top-1/2 h-4 w-[2.5px] -translate-y-1/2 rounded-full bg-brand transition-opacity",
                           parentActive ? "opacity-100" : "opacity-0"
                         )}
                       />
@@ -394,8 +394,8 @@ function AdminContentInner({ adminAccess }: { adminAccess: PlatformAdminRole | n
           <Link to="/" className="flex items-center gap-2 min-w-0">
             <img src={VYNTEX_APP_LOGO_SRC} alt="Vyntex POS" className="h-6 w-6" />
             <span className="text-base font-bold tracking-tight">
-              <span className="text-[#0066FF]">Vyntex</span>{" "}
-              <span className="text-[#44CC00]">POS</span>
+              <span className="text-brand">Vyntex</span>{" "}
+              <span className="text-brand-accent">POS</span>
             </span>
           </Link>
           <button

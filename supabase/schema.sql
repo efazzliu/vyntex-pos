@@ -16,6 +16,14 @@ create table if not exists public.restaurants (
   currency_symbol text default '€',
   currency_position text default 'prefix' check (currency_position in ('prefix', 'suffix')),
   currency_decimals int default 2,
+  dashboard_daily_sales_target numeric(12,2),
+  dashboard_target_amount numeric(12,2),
+  dashboard_target_start_at timestamptz,
+  dashboard_target_end_at timestamptz,
+  dashboard_target_period text check (
+    dashboard_target_period is null
+    or dashboard_target_period in ('month', 'six_months', 'custom')
+  ),
   plan text not null check (plan in ('starter', 'professional', 'enterprise')),
   license_key text not null unique,
   license_expiry timestamptz not null,
@@ -39,6 +47,26 @@ alter table public.restaurants
   add column if not exists pos_payment_settings jsonb;
 alter table public.restaurants
   add column if not exists pos_enforce_availability boolean not null default false;
+alter table public.restaurants
+  add column if not exists pos_general_prefs jsonb not null default '{}'::jsonb;
+alter table public.restaurants
+  add column if not exists pos_tax_settings jsonb not null default '{}'::jsonb;
+alter table public.restaurants
+  add column if not exists pos_stock_rules jsonb not null default '{}'::jsonb;
+alter table public.restaurants
+  add column if not exists pos_security_settings jsonb not null default '{}'::jsonb;
+alter table public.restaurants
+  add column if not exists pos_customer_display jsonb not null default '{}'::jsonb;
+alter table public.restaurants
+  add column if not exists dashboard_daily_sales_target numeric(12,2);
+alter table public.restaurants
+  add column if not exists dashboard_target_amount numeric(12,2);
+alter table public.restaurants
+  add column if not exists dashboard_target_start_at timestamptz;
+alter table public.restaurants
+  add column if not exists dashboard_target_end_at timestamptz;
+alter table public.restaurants
+  add column if not exists dashboard_target_period text;
 
 do $$
 begin
@@ -54,7 +82,7 @@ create table if not exists public.staff (
   id uuid primary key default gen_random_uuid(),
   restaurant_id uuid not null references public.restaurants(id) on delete cascade,
   name text not null,
-  role text not null check (role in ('admin', 'manager', 'waiter', 'inventory', 'accountant', 'auditor', 'kitchen')),
+  role text not null check (role in ('admin', 'manager', 'cashier', 'waiter', 'inventory', 'accountant', 'auditor', 'kitchen')),
   pin_hash text not null,
   is_active boolean not null default true,
   permissions jsonb,
@@ -129,6 +157,7 @@ create table if not exists public.sale_items (
   notes text,
   status text not null default 'pending' check (status in ('pending', 'sent', 'preparing', 'ready', 'served', 'cancelled', 'voided')),
   created_at timestamptz not null default now(),
+  sent_at timestamptz,
   ready_at timestamptz,
   served_at timestamptz
 );

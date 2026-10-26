@@ -100,7 +100,7 @@ export default function PosInstallScreen() {
           ].map(({ icon: Icon, text }) => (
             <div key={text} className="flex items-center gap-3 text-gray-300 text-sm">
               <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
-                <Icon className="size-4 text-[#0066FF]" />
+                <Icon className="size-4 text-brand" />
               </div>
               {text}
             </div>
@@ -111,7 +111,7 @@ export default function PosInstallScreen() {
         {status === "waiting" && (
           <div className="space-y-3">
             <div className="flex items-center justify-center gap-2 text-gray-500 text-sm">
-              <div className="w-4 h-4 border-2 border-gray-600 border-t-[#0066FF] rounded-full animate-spin" />
+              <div className="w-4 h-4 border-2 border-gray-600 border-t-brand rounded-full animate-spin" />
               Preparing installation...
             </div>
             <p className="text-xs text-gray-600">
@@ -125,7 +125,7 @@ export default function PosInstallScreen() {
           <Button
             size="lg"
             onClick={handleInstall}
-            className="w-full h-14 text-base bg-gradient-to-r from-[#0066FF] to-[#0055DD] hover:from-[#0055DD] hover:to-[#0044CC] text-white rounded-xl"
+            className="w-full h-14 text-base bg-gradient-to-r from-brand to-brand-hover hover:from-brand-hover hover:to-brand-hover text-white rounded-xl"
           >
             <Download className="size-5 mr-2" />
             Install Now
@@ -134,7 +134,7 @@ export default function PosInstallScreen() {
 
         {status === "installing" && (
           <div className="flex items-center justify-center gap-2 text-gray-400 text-sm">
-            <div className="w-4 h-4 border-2 border-gray-600 border-t-[#0066FF] rounded-full animate-spin" />
+            <div className="w-4 h-4 border-2 border-gray-600 border-t-brand rounded-full animate-spin" />
             Installing...
           </div>
         )}

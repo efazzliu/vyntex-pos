@@ -13,6 +13,7 @@ import * as stock from "./stock-ops.ts";
 import * as templates from "./templates-ops.ts";
 import * as staffConsumption from "./staff-consumption-ops.ts";
 import * as phoneNotify from "./phone-notify-ops.ts";
+import { assertWaiterPhoneAuthorized } from "./waiter-phone-binding.ts";
 
 function argsKey(a: Record<string, unknown>) {
   return JSON.stringify(a, Object.keys(a).sort());
@@ -69,6 +70,19 @@ export async function runPosQuery(
       return settings.getPrinters(args.licenseKey as string);
     case "pos.settings.getCompanyDetails":
       return settings.getCompanyDetails(args.licenseKey as string);
+    case "pos.settings.listSecurityDevices":
+      return settings.listSecurityDevices(
+        args as Parameters<typeof settings.listSecurityDevices>[0],
+      );
+    case "pos.settings.listWaiterPhones":
+      return settings.listWaiterPhones(
+        args as Parameters<typeof settings.listWaiterPhones>[0],
+      );
+    case "pos.dashboard.getRevenueOverview":
+      return dashboard.getRevenueOverview(
+        args.licenseKey as string,
+        args.dayBoundariesIso as string[],
+      );
     case "pos.dashboard.getDashboardStats":
       return dashboard.getDashboardStats(
         args.licenseKey as string,
@@ -78,19 +92,27 @@ export async function runPosQuery(
         args.rangeFromIso as string | undefined,
         args.rangeToExclusiveIso as string | undefined,
         args.operationalDayStartIso as string | undefined,
+        args.staffId as string | undefined,
       );
     case "pos.dashboard.getZReport":
       return dashboard.getZReport({
         licenseKey: args.licenseKey as string,
         date: args.date as string | undefined,
+        staffId: args.staffId as string | undefined,
       });
     case "pos.dashboard.getZReportHistory":
-      return dashboard.getZReportHistory(args.licenseKey as string);
+      return dashboard.getZReportHistory(
+        args.licenseKey as string,
+        args.staffId as string | undefined,
+      );
     case "pos.dashboard.getAuditLogs":
       return dashboard.getAuditLogs({
         licenseKey: args.licenseKey as string,
         limit: args.limit as number | undefined,
+        staffId: args.staffId as string | undefined,
       });
+    case "pos.dashboard.getReportSchedules":
+      return dashboard.getReportSchedules(args.licenseKey as string);
     case "pos.customers.getDebtLedger":
       return customers.getDebtLedger(args.licenseKey as string);
     case "pos.customers.getCustomerStatement":
@@ -125,6 +147,10 @@ export async function runPosQuery(
         licenseKey: args.licenseKey as string,
         staffId: args.staffId as string,
       });
+    case "pos.staffConsumption.getAllUnclearedConsumption":
+      return staffConsumption.getAllUnclearedConsumption({
+        licenseKey: args.licenseKey as string,
+      });
     default:
       return undefined;
   }
@@ -134,6 +160,11 @@ export async function runPosMutation(
   mutationId: string,
   args: Record<string, unknown>,
 ): Promise<unknown> {
+  const phoneDeviceId = String(args.phoneDeviceId ?? "").trim();
+  const licenseKey = String(args.licenseKey ?? "").trim();
+  if (phoneDeviceId && licenseKey) {
+    await assertWaiterPhoneAuthorized(licenseKey, phoneDeviceId);
+  }
   switch (mutationId) {
     case "pos.staff.createStaff":
       return staff.createStaff(args as Parameters<typeof staff.createStaff>[0]);
@@ -237,6 +268,18 @@ export async function runPosMutation(
       );
     case "pos.orders.voidItem":
       return orders.voidItem(args);
+    case "pos.orders.voidItemUnits":
+      return orders.voidItemUnits(
+        args as Parameters<typeof orders.voidItemUnits>[0],
+      );
+    case "pos.orders.replaceOrderItemUnits":
+      return orders.replaceOrderItemUnits(
+        args as Parameters<typeof orders.replaceOrderItemUnits>[0],
+      );
+    case "pos.orders.returnOrderItemUnits":
+      return orders.returnOrderItemUnits(
+        args as Parameters<typeof orders.returnOrderItemUnits>[0],
+      );
     case "pos.orders.updateOrderStatus":
       return orders.updateOrderStatus(args);
     case "pos.orders.updateItemQuantity":
@@ -279,6 +322,10 @@ export async function runPosMutation(
       return settings.updateCompanyProfile(
         args as Parameters<typeof settings.updateCompanyProfile>[0],
       );
+    case "pos.settings.updateGeneralPrefs":
+      return settings.updateGeneralPrefs(
+        args as Parameters<typeof settings.updateGeneralPrefs>[0],
+      );
     case "pos.settings.updateTaxSettings":
       return settings.updateTaxSettings(
         args as Parameters<typeof settings.updateTaxSettings>[0],
@@ -291,10 +338,57 @@ export async function runPosMutation(
       return settings.updateOrderAvailabilitySettings(
         args as Parameters<typeof settings.updateOrderAvailabilitySettings>[0],
       );
+    case "pos.settings.updateSecuritySettings":
+      return settings.updateSecuritySettings(
+        args as Parameters<typeof settings.updateSecuritySettings>[0],
+      );
+    case "pos.settings.updateCustomerDisplay":
+      return settings.updateCustomerDisplay(
+        args as Parameters<typeof settings.updateCustomerDisplay>[0],
+      );
+    case "pos.settings.revokeSecurityDevice":
+      return settings.revokeSecurityDevice(
+        args as Parameters<typeof settings.revokeSecurityDevice>[0],
+      );
+    case "pos.settings.revokeWaiterPhone":
+      return settings.revokeWaiterPhone(
+        args as Parameters<typeof settings.revokeWaiterPhone>[0],
+      );
+    case "pos.settings.renameWaiterPhone":
+      return settings.renameWaiterPhone(
+        args as Parameters<typeof settings.renameWaiterPhone>[0],
+      );
     case "pos.settings.syncDeviceClosePinHash":
       return settings.syncDeviceClosePinHash({
         licenseKey: args.licenseKey as string,
         pinHash: args.pinHash as string,
+      });
+    case "pos.dashboard.updateDailySalesTarget":
+      return dashboard.updateDailySalesTarget({
+        licenseKey: args.licenseKey as string,
+        dailyTarget: Number(args.dailyTarget ?? 0),
+      });
+    case "pos.dashboard.updateTargetPulse":
+      return dashboard.updateTargetPulse({
+        licenseKey: args.licenseKey as string,
+        staffId: args.staffId as string,
+        amount: Number(args.amount ?? 0),
+        startAt: args.startAt as string,
+        endAt: args.endAt as string,
+        period: args.period as dashboard.DashboardTargetPeriod,
+      });
+    case "pos.dashboard.saveReportSchedules":
+      return dashboard.saveReportSchedules({
+        licenseKey: args.licenseKey as string,
+        staffId: args.staffId as string,
+        schedules: args.schedules,
+      });
+    case "pos.dashboard.markReportSchedulesSent":
+      return dashboard.markReportSchedulesSent({
+        licenseKey: args.licenseKey as string,
+        sentIds: Array.isArray(args.sentIds)
+          ? (args.sentIds as string[])
+          : [],
       });
     case "pos.dashboard.insertAuditLog":
       return dashboard.insertAuditLog(

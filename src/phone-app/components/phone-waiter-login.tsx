@@ -39,7 +39,7 @@ import {
   setWaiterVenueKey,
 } from "@/phone-app/lib/waiter-session.ts";
 
-const ORDER_ROLES = new Set<StaffRole>(["waiter", "manager", "admin"]);
+const ORDER_ROLES = new Set<StaffRole>(["waiter", "cashier", "manager", "admin"]);
 
 type StaffRow = {
   _id: string;
@@ -167,6 +167,16 @@ export default function PhoneWaiterLogin() {
     setErrorMsg("");
 
     try {
+      if (pair?.deviceId && !isWaiterDesignPreviewLicense(key) && !isOwnerLocalWaiterPair(pair)) {
+        const status = await fetchWaiterPhoneBindingStatus(key, pair.deviceId);
+        if (!status || status.disconnected || !status.bound) {
+          clearWaiterPhonePair();
+          setPair(null);
+          setError(true);
+          setErrorMsg(t("phone.waiter.deviceRevoked"));
+          return;
+        }
+      }
       setWaiterVenueKey(key);
       const pinHash = await hashString(code);
       const fromCache =
@@ -240,7 +250,7 @@ export default function PhoneWaiterLogin() {
     } finally {
       setVerifying(false);
     }
-  }, [venueKey, waiterName, waiterCode, staffRows, navigate, t]);
+  }, [venueKey, waiterName, waiterCode, staffRows, navigate, t, pair]);
 
   const canSubmit =
     paired &&
@@ -313,7 +323,7 @@ export default function PhoneWaiterLogin() {
           <img
             src={VYNTEX_APP_LOGO_SRC}
             alt=""
-            className="mb-3 w-auto object-contain drop-shadow-[0_8px_24px_rgba(0,102,255,0.35)]"
+            className="mb-3 w-auto object-contain drop-shadow-[0_8px_24px_rgba(0,91,214,0.35)]"
             style={{ height: access.logoHeightPx }}
           />
           <h1
@@ -404,7 +414,7 @@ export default function PhoneWaiterLogin() {
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0 }}
-                  className="mb-5 text-center text-lg font-semibold text-[#44CC00]"
+                  className="mb-5 text-center text-lg font-semibold text-brand-accent"
                   style={{
                     fontFamily: '"Space Grotesk", Geist, system-ui, sans-serif',
                   }}

@@ -2,26 +2,58 @@ import { supabase } from "@/lib/supabase.ts";
 import { assertNoPgError } from "./db-errors.ts";
 import { getRestaurantByLicense } from "./restaurant.ts";
 import { getCategories, getAllItems } from "./menu-ops.ts";
+import {
+  effectiveLowStockThreshold,
+  parsePosStockRules,
+  stockRulesFromRestaurantRow,
+} from "@/lib/pos-order-availability.ts";
 
 export async function getStockItems(licenseKey: string) {
-  const [categories, items] = await Promise.all([
+  const [categories, items, restaurant] = await Promise.all([
     getCategories(licenseKey),
     getAllItems(licenseKey),
+    getRestaurantByLicense(licenseKey),
   ]);
+  const venueLowStock = parsePosStockRules(stockRulesFromRestaurantRow(restaurant))
+    .defaultLowStockThreshold;
   const catMap = new Map(categories.map((c) => [c._id, c]));
   const trackedItems = items.filter((i) => i.trackStock);
+
+  const lastUpdateById = new Map<string, string>();
+  if (trackedItems.length > 0) {
+    const { data: logRows } = await supabase
+      .from("pos_stock_logs")
+      .select("menu_item_id, created_at")
+      .eq("restaurant_id", restaurant.id)
+      .in(
+        "menu_item_id",
+        trackedItems.map((i) => i._id),
+      )
+      .order("created_at", { ascending: false })
+      .limit(5000);
+    for (const row of logRows ?? []) {
+      const id = String(row.menu_item_id ?? "");
+      if (id && !lastUpdateById.has(id)) {
+        lastUpdateById.set(id, String(row.created_at));
+      }
+    }
+  }
 
   const enriched = trackedItems.map((item) => {
     const category = item.categoryId ? catMap.get(item.categoryId) : undefined;
     const current = item.currentStock ?? 0;
-    const lowTh = item.lowStockThreshold;
-    const isLowStock =
-      lowTh !== undefined && current > 0 && current <= lowTh;
+    const lowTh = effectiveLowStockThreshold(
+      item.lowStockThreshold,
+      venueLowStock,
+    );
+    const isLowStock = current > 0 && current <= lowTh;
     const isOutOfStock = current <= 0;
     return {
       ...item,
       categoryName: category?.name ?? "Unknown",
       categoryColor: category?.color ?? "#5a6580",
+      effectiveLowStockThreshold: lowTh,
+      lastStockUpdateAt: lastUpdateById.get(item._id) ?? null,
       isLowStock,
       isOutOfStock,
     };

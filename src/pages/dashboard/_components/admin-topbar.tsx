@@ -102,7 +102,7 @@ export function AdminTopbar() {
             type="button"
             className="inline-flex max-w-[14rem] items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50"
           >
-            <Building2 className="size-4 text-indigo-500" />
+            <Building2 className="size-4 text-brand" />
             <span className="truncate">
               {selectedVenue?.name ?? t("ac.filter.all_venues")}
             </span>
@@ -128,7 +128,7 @@ export function AdminTopbar() {
             type="button"
             className="hidden items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50 sm:inline-flex"
           >
-            <CalendarDays className="size-4 text-indigo-500" />
+            <CalendarDays className="size-4 text-brand" />
             <span>{dateLabel}</span>
             <ChevronDown className="size-3.5 text-slate-400" />
           </button>
@@ -211,7 +211,7 @@ export function AdminTopbar() {
         aria-label={t("ac.nav.notifications")}
       >
         <Bell className="size-4" />
-        <span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-indigo-500" />
+        <span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-brand" />
       </Link>
 
       <DropdownMenu>
@@ -220,7 +220,7 @@ export function AdminTopbar() {
             type="button"
             className="inline-flex items-center gap-2 rounded-xl py-1 pl-1 pr-2 hover:bg-slate-50"
           >
-            <span className="flex size-8 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-blue-600 text-xs font-bold text-white">
+            <span className="flex size-8 items-center justify-center rounded-full bg-gradient-to-br from-brand to-brand text-xs font-bold text-white">
               {initial}
             </span>
             <ChevronDown className="hidden size-3.5 text-slate-400 sm:block" />

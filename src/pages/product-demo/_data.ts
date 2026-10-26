@@ -1,4 +1,5 @@
 import { photoUrlForMenuItem } from "@/lib/menu-item-photo-urls.ts";
+import { BRAND } from "@/lib/brand-colors.ts";
 
 export type DemoTableStatus = "available" | "occupied" | "reserved";
 
@@ -77,8 +78,8 @@ export const DEMO_MENU_ITEMS: DemoMenuItem[] = [
 ];
 
 export const DEMO_STAFF: DemoStaffMember[] = [
-  { id: "s1", name: "Endrit F.", role: "admin", color: "#0066FF" },
-  { id: "s2", name: "Ana K.", role: "manager", color: "#44CC00" },
+  { id: "s1", name: "Endrit F.", role: "admin", color: BRAND.primary },
+  { id: "s2", name: "Ana K.", role: "manager", color: BRAND.accent },
   { id: "s3", name: "Bledi M.", role: "waiter", color: "#00AACC" },
   { id: "s4", name: "Sara L.", role: "waiter", color: "#F59E0B" },
   { id: "s5", name: "Gent P.", role: "kitchen", color: "#EF4444" },

@@ -42,7 +42,7 @@ export function SiteLanguageToggle({
         >
           <FlagAL />
           <span className="flex-1 font-medium">Shqip</span>
-          {language === "sq" ? <Check className="size-4 text-[#0066FF]" /> : null}
+          {language === "sq" ? <Check className="size-4 text-brand" /> : null}
         </DropdownMenuItem>
         <DropdownMenuItem
           className="cursor-pointer gap-2"
@@ -50,7 +50,7 @@ export function SiteLanguageToggle({
         >
           <FlagUS />
           <span className="flex-1 font-medium">English</span>
-          {language === "en" ? <Check className="size-4 text-[#0066FF]" /> : null}
+          {language === "en" ? <Check className="size-4 text-brand" /> : null}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

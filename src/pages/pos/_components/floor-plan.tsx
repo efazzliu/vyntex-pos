@@ -40,6 +40,7 @@ import {
   DoorOpen,
   UtensilsCrossed,
   Menu,
+  Wallet,
 } from "lucide-react";
 import type { TableStatus, TableShape } from "../_lib/types.ts";
 import { useOnlineStatus } from "@/hooks/use-online-status.ts";
@@ -52,6 +53,7 @@ import { errorMessageFromUnknown } from "@/lib/supabase-pos/db-errors.ts";
 import { nextFloorTableSlot, tableFootprint, zoneContentBox, clampTableScale, tableScaleXY, TABLE_SCALE_MIN, TABLE_SCALE_MAX } from "@/lib/pos-floor-layout.ts";
 import ExpenseDialog from "./expense-dialog.tsx";
 import StaffConsumptionDialog from "./staff-consumption-dialog.tsx";
+import DailyCirculationDialog from "./daily-circulation-dialog.tsx";
 import { usePosLocale } from "./pos-locale-provider.tsx";
 import { usePosTheme } from "../_lib/use-pos-theme.ts";
 import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
@@ -69,7 +71,7 @@ type WaiterInfo = {
   licenseKey?: string;
   onLogout: () => void;
   onLogoClick?: () => void;
-  role?: "admin" | "manager" | "waiter";
+  role?: "admin" | "manager" | "waiter" | "cashier";
   canLogStaffConsumption?: boolean;
 };
 
@@ -100,9 +102,9 @@ const STATUS_COLORS: Record<
     text: "text-amber-400",
   },
   "bill-printed": {
-    bg: "bg-blue-500/20",
-    border: "border-blue-500/50",
-    text: "text-blue-400",
+    bg: "bg-brand/20",
+    border: "border-brand/50",
+    text: "text-brand-soft",
   },
 };
 
@@ -640,7 +642,7 @@ function FloorPlanEditor({ licenseKey }: { licenseKey: string }) {
                 className={cn(
                   "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap cursor-pointer",
                   isActive
-                    ? "bg-[#0066FF] text-white shadow-lg shadow-[#0066FF]/25"
+                    ? "bg-brand text-white"
                     : "bg-[#131A2E] text-[#8b93a7] hover:bg-[#1e2a45] hover:text-white border border-[#1e2a45]",
                 )}
               >
@@ -660,7 +662,7 @@ function FloorPlanEditor({ licenseKey }: { licenseKey: string }) {
             <div className="flex items-center gap-1 ml-2 pl-2 border-l border-[#1e2a45]">
               <button
                 onClick={() => { setRenameValue(activeZone); setRenameRoomOpen(true); }}
-                className="p-2 rounded-lg text-[#5a6580] hover:text-[#0066FF] hover:bg-[#0066FF]/10 transition-colors cursor-pointer"
+                className="p-2 rounded-lg text-[#5a6580] hover:text-brand hover:bg-brand/10 transition-colors cursor-pointer"
                 title={t("floor.rename_room")}
               >
                 <Pencil className="size-3.5" />
@@ -755,7 +757,7 @@ function FloorPlanEditor({ licenseKey }: { licenseKey: string }) {
                     config.bg,
                     config.border,
                     tableShape === "circle" ? "rounded-full" : "rounded-xl",
-                    isSelected && "ring-2 ring-[#0066FF]/50 shadow-lg",
+                    isSelected && "ring-2 ring-brand/50 shadow-lg",
                     (isDraggingThis || isResizingThis) && "opacity-90 z-50",
                   )}
                   style={{
@@ -772,7 +774,7 @@ function FloorPlanEditor({ licenseKey }: { licenseKey: string }) {
                     <button
                       type="button"
                       aria-label="Resize table"
-                      className="absolute -right-1.5 -bottom-1.5 size-4 rounded-sm border-2 border-white bg-[#0066FF] shadow cursor-nwse-resize touch-none"
+                      className="absolute -right-1.5 -bottom-1.5 size-4 rounded-sm border-2 border-white bg-brand shadow cursor-nwse-resize touch-none"
                       onPointerDown={(e) => handleResizePointerDown(e, table)}
                       onPointerMove={handlePointerMove}
                       onPointerUp={handlePointerUp}
@@ -1082,7 +1084,7 @@ function EditTableDialog({
   const chipIdle = isLight
     ? "border-slate-200 bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100"
     : "border-[#1e2a45] bg-[#0A0F1E] text-[#8b93a7] hover:text-white";
-  const chipActive = "border-[#0066FF] bg-[#0066FF]/10 text-[#0066FF]";
+  const chipActive = "border-brand bg-brand/10 text-brand";
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -1337,9 +1339,9 @@ function WaiterFloorView({
 
     if (status === "bill-printed") {
       return {
-        bg: "bg-blue-950/60",
-        border: "border-blue-500",
-        text: "text-blue-400",
+        bg: "bg-brand-active/60",
+        border: "border-brand",
+        text: "text-brand-soft",
       };
     }
 
@@ -1350,9 +1352,9 @@ function WaiterFloorView({
       if (summary && currentStaffId && staffIdsEqual(summary.staffId, currentStaffId)) {
         // My table — blue
         return {
-          bg: "bg-blue-950/60",
-          border: "border-blue-500",
-          text: "text-blue-400",
+          bg: "bg-brand-active/60",
+          border: "border-brand",
+          text: "text-brand-soft",
         };
       }
       if (summary && !uuidOrNull(summary.staffId)) {
@@ -1443,7 +1445,7 @@ function WaiterFloorView({
                     className={cn(
                       "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap cursor-pointer",
                       isActive
-                        ? "bg-[#0066FF] text-white shadow-lg shadow-[#0066FF]/25"
+                        ? "bg-brand text-white"
                         : "bg-[#131A2E] text-[#8b93a7] hover:bg-[#1e2a45] hover:text-white border border-[#1e2a45]",
                     )}
                   >
@@ -1536,7 +1538,7 @@ function WaiterFloorView({
                         <span
                           className={cn(
                             "text-xs font-semibold tabular-nums",
-                            showMine && "text-blue-400",
+                            showMine && "text-brand-soft",
                             showOtherWaiter &&
                               (isAdminOrManager
                                 ? "text-amber-400"
@@ -1601,6 +1603,7 @@ function WaiterTopBar({ waiter }: { waiter: WaiterInfo }) {
   const { t } = usePosLocale();
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [consumptionOpen, setConsumptionOpen] = useState(false);
+  const [circulationOpen, setCirculationOpen] = useState(false);
   const isAdmin = waiter.role === "admin" || waiter.role === "manager";
   const showConsumption = isAdmin || !!waiter.canLogStaffConsumption;
   const roleKey = waiter.role ? `staff.role_${waiter.role}` : "";
@@ -1635,7 +1638,7 @@ function WaiterTopBar({ waiter }: { waiter: WaiterInfo }) {
             {waiter.businessName}
           </p>
           {roleText ? (
-            <span className="shrink-0 rounded-md bg-[#0066FF]/12 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#0066FF]">
+            <span className="shrink-0 rounded-md bg-brand/12 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand">
               {roleText}
             </span>
           ) : null}
@@ -1646,6 +1649,18 @@ function WaiterTopBar({ waiter }: { waiter: WaiterInfo }) {
             {waiter.name}
           </p>
         ) : null}
+        {isAdmin && waiter.licenseKey && (
+          <button
+            type="button"
+            onClick={() => setCirculationOpen(true)}
+            className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium text-[#8b93a7] transition-colors hover:bg-[#1e2a45] hover:text-white cursor-pointer"
+          >
+            <Wallet className="size-3.5" />
+            <span className="hidden md:inline">
+              {t("floor.toolbar_daily_circulation")}
+            </span>
+          </button>
+        )}
         {showConsumption && waiter.staffId && waiter.licenseKey && (
           <button
             type="button"
@@ -1698,6 +1713,14 @@ function WaiterTopBar({ waiter }: { waiter: WaiterInfo }) {
           }
           targetStaffName={isAdmin ? undefined : waiter.name}
           selfServiceStaffMeal={!isAdmin}
+        />
+      )}
+
+      {isAdmin && waiter.licenseKey && (
+        <DailyCirculationDialog
+          open={circulationOpen}
+          onOpenChange={setCirculationOpen}
+          licenseKey={waiter.licenseKey}
         />
       )}
     </>

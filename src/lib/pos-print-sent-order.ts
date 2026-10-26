@@ -6,6 +6,7 @@ export type SentOrderTicketLine = {
   name: string;
   quantity: number;
   notes?: string;
+  modifiers?: string;
   station?: "kitchen" | "bar";
   price?: number;
 };
@@ -25,6 +26,8 @@ export type PrintSentOrderTicketOptions = {
   formatPrice: (amount: number) => string;
   /** Electron silent print: OS printer name (Settings → printer Address, else Name). */
   deviceName?: string;
+  licenseKey?: string;
+  tablePrefix?: string;
 };
 
 import {
@@ -35,6 +38,27 @@ import {
   type PrintHtmlAsyncOutcome,
 } from "@/lib/print-html.ts";
 import { enqueueHtmlPrintJob, flushPrintQueueNow } from "@/lib/print-queue.ts";
+import {
+  buildPreBillHtml,
+  formatPreBillMoney,
+  preBillPrintExtras,
+  resolvePreBillCopy,
+  visibilityFromTemplate,
+  type PreBillBusiness,
+} from "@/lib/print-pre-bill.ts";
+import { resolvePinLoginBranding } from "@/lib/supabase-pos/license-sync.ts";
+import { loadPaperPrintDeviceName } from "@/lib/pos-print-device.ts";
+import { runPosQuery } from "@/lib/supabase-pos/pos-router.ts";
+import {
+  buildKitchenTicketHtml,
+  resolveKitchenTicketCopy,
+  visibilityFromKitchenTemplate,
+} from "@/lib/print-kitchen-ticket.ts";
+import {
+  buildBarTicketHtml,
+  resolveBarTicketCopy,
+  visibilityFromBarTemplate,
+} from "@/lib/print-bar-ticket.ts";
 
 function escapeHtml(s: string): string {
   return s
@@ -44,41 +68,125 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
+function kitchenTicketHour12(extra?: Record<string, unknown> | null) {
+  const content =
+    extra?.content && typeof extra.content === "object"
+      ? (extra.content as Record<string, unknown>)
+      : undefined;
+  return content?.timeFormat === "12h";
+}
+
 export async function printSentOrderTicket(
   opts: PrintSentOrderTicketOptions,
 ): Promise<PrintHtmlAsyncOutcome> {
   const lines = opts.lines;
+  const isBar = lines.length > 0 && lines.every((line) => line.station === "bar");
+  const isKitchen =
+    lines.length > 0 && lines.every((line) => line.station !== "bar");
   const allSameStation =
     lines.length > 0 &&
     (lines.every((l) => l.station === "bar") ||
       lines.every((l) => l.station !== "bar"));
 
-  const rows = lines
-    .map((l) => {
-      const station =
-        l.station === "bar" ? opts.stationBar : opts.stationKitchen;
-      const notes = l.notes
-        ? `<div class="notes">${escapeHtml(l.notes)}</div>`
-        : "";
-      const lineTotal =
-        l.price != null ? l.price * l.quantity : null;
-      const priceCol =
-        lineTotal != null
-          ? `<td class="r">${escapeHtml(opts.formatPrice(lineTotal))}</td>`
+  let html = "";
+  if (isKitchen || isBar) {
+    const titleRe = isBar
+      ? /^bar(\s+(order|ticket))?$/i
+      : /^kitchen(\s+(order|ticket))?$/i;
+    const resolveCopy = isBar ? resolveBarTicketCopy : resolveKitchenTicketCopy;
+    const visibilityFromTemplate = isBar
+      ? visibilityFromBarTemplate
+      : visibilityFromKitchenTemplate;
+    const buildHtml = isBar ? buildBarTicketHtml : buildKitchenTicketHtml;
+    const templateType = isBar ? "bar_ticket" : "kitchen_ticket";
+    let visibility = visibilityFromTemplate();
+    let title = titleRe.test(opts.title.trim())
+      ? resolveCopy().title
+      : opts.title;
+    let logoDataUrl: string | null = null;
+    let hour12 = false;
+    let extra: Record<string, unknown> | undefined;
+    if (opts.licenseKey) {
+      try {
+        const templatesList = (await runPosQuery("pos.templates.listTemplates", {
+          licenseKey: opts.licenseKey,
+        })) as Array<{
+          templateType: string;
+          printerId?: string | null;
+          toggles?: {
+            logo?: boolean;
+            waiterName?: boolean;
+            tableNumber?: boolean;
+            timestamp?: boolean;
+            orderNumber?: boolean;
+          };
+          labels?: { headerText?: string; footerText?: string };
+          styles?: Record<string, unknown>;
+        }>;
+        const row = templatesList?.find((x) => x.templateType === templateType);
+        extra =
+          row?.styles && typeof row.styles._design === "object"
+            ? (row.styles._design as Record<string, unknown>)
+            : undefined;
+        visibility = visibilityFromTemplate(row?.toggles, extra);
+        hour12 = kitchenTicketHour12(extra);
+        const copy = resolveCopy(row?.labels);
+        if (titleRe.test(opts.title.trim())) {
+          title = copy.title;
+        }
+        if (typeof extra?.logoDataUrl === "string" && extra.logoDataUrl) {
+          logoDataUrl = extra.logoDataUrl;
+        }
+      } catch {
+        /* use defaults */
+      }
+    }
+    html = buildHtml({
+      lines: lines.map((line) => ({
+        name: line.name,
+        quantity: line.quantity,
+        notes: line.notes,
+        modifiers: line.modifiers,
+      })),
+      orderRef: opts.orderValue,
+      tableName: opts.tableName,
+      waiterName: opts.staffName,
+      printedAt: new Date(),
+      title,
+      tablePrefix: opts.tablePrefix ?? "TABLE",
+      pageTitle: opts.title,
+      logoDataUrl,
+      hour12,
+      visibility,
+      design: extra,
+    });
+  } else {
+    const rows = lines
+      .map((l) => {
+        const station =
+          l.station === "bar" ? opts.stationBar : opts.stationKitchen;
+        const notes = l.notes
+          ? `<div class="notes">${escapeHtml(l.notes)}</div>`
           : "";
-      const stationRow =
-        allSameStation
-          ? ""
-          : `<div class="st">${escapeHtml(station)}</div>`;
-      return `<tr>
+        const lineTotal =
+          l.price != null ? l.price * l.quantity : null;
+        const priceCol =
+          lineTotal != null
+            ? `<td class="r">${escapeHtml(opts.formatPrice(lineTotal))}</td>`
+            : "";
+        const stationRow =
+          allSameStation
+            ? ""
+            : `<div class="st">${escapeHtml(station)}</div>`;
+        return `<tr>
         <td><span class="qty">${l.quantity}×</span> ${escapeHtml(l.name)}${notes}${stationRow}</td>
         ${priceCol}
       </tr>`;
-    })
-    .join("");
+      })
+      .join("");
 
-  const hasPrice = lines.some((l) => l.price != null);
-  const html = `<!DOCTYPE html>
+    const hasPrice = lines.some((l) => l.price != null);
+    html = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8"/>
@@ -110,12 +218,22 @@ export async function printSentOrderTicket(
   </table>
 </body>
 </html>`;
+  }
+
+  const paperType = isBar ? "bar_ticket" : isKitchen ? "kitchen_ticket" : "";
+  const resolvedDevice = opts.licenseKey && paperType
+    ? await loadPaperPrintDeviceName({
+        licenseKey: opts.licenseKey,
+        templateType: paperType,
+        fallback: opts.deviceName,
+      })
+    : opts.deviceName;
 
   const outcome = await tryPrintHtmlDocumentAsync(html, {
     silent: true,
     // Browser / plain Vite: no IPC — must use the print dialog. Electron: silent only.
     allowInteractiveFallback: !hasElectronSilentPrintIpc(),
-    deviceName: opts.deviceName,
+    deviceName: resolvedDevice,
     silentTimeoutMs: DEFAULT_SILENT_PRINT_IPC_TIMEOUT_MS,
   });
 
@@ -125,7 +243,7 @@ export async function printSentOrderTicket(
     // Keep locally; no background OS retry (see initPrintQueueOnStartup).
     void enqueueHtmlPrintJob({
       html,
-      deviceName: opts.deviceName,
+      deviceName: resolvedDevice,
       silent: true,
       allowInteractiveFallback: !hasElectronSilentPrintIpc(),
       jobType: "ticket",
@@ -173,138 +291,130 @@ export type PrintPosBillOptions = {
   combinedTax?: number;
   combinedTotal?: number;
   formatPrice: (amount: number) => string;
+  licenseKey?: string;
+  business?: PreBillBusiness;
+  logoDataUrl?: string | null;
+  guests?: number;
 };
-
-function billRowHtml(
-  l: PosBillLine,
-  formatPrice: (amount: number) => string,
-): string {
-  const notes = l.notes
-    ? `<div class="notes">${escapeHtml(l.notes)}</div>`
-    : "";
-  return `<tr>
-    <td><span class="qty">${l.quantity}×</span> ${escapeHtml(l.name)}${notes}</td>
-    <td class="r mono">${escapeHtml(formatPrice(l.unitPrice))}</td>
-    <td class="r mono">${escapeHtml(formatPrice(l.lineTotal))}</td>
-  </tr>`;
-}
-
-function billTableHtml(
-  title: string,
-  lines: PosBillLine[],
-  colItem: string,
-  colUnit: string,
-  colLine: string,
-  formatPrice: (amount: number) => string,
-): string {
-  if (lines.length === 0) return "";
-  return `<h2 class="sec">${escapeHtml(title)}</h2>
-  <table class="bill">
-    <thead><tr>
-      <th>${escapeHtml(colItem)}</th>
-      <th class="r">${escapeHtml(colUnit)}</th>
-      <th class="r">${escapeHtml(colLine)}</th>
-    </tr></thead>
-    <tbody>${lines.map((l) => billRowHtml(l, formatPrice)).join("")}</tbody>
-  </table>`;
-}
 
 export async function printPosBill(
   opts: PrintPosBillOptions,
 ): Promise<PrintHtmlAsyncOutcome> {
-  const mainTable = billTableHtml(
-    opts.linesSectionTitle,
-    opts.lines,
-    opts.columnItem,
-    opts.columnUnitPrice,
-    opts.columnLineTotal,
-    opts.formatPrice,
-  );
-  const pendingTable =
-    opts.pendingLines && opts.pendingLines.length > 0 && opts.pendingSectionTitle
-      ? billTableHtml(
-          opts.pendingSectionTitle,
-          opts.pendingLines,
-          opts.columnItem,
-          opts.columnUnitPrice,
-          opts.columnLineTotal,
-          opts.formatPrice,
-        )
-      : "";
+  const pending = opts.pendingLines ?? [];
+  const lines = [
+    ...opts.lines,
+    ...pending.map((line) => ({
+      ...line,
+      notes: line.notes || opts.pendingSectionTitle || undefined,
+    })),
+  ];
+  const subtotal = opts.combinedSubtotal ?? opts.subtotal;
+  const total = opts.combinedTotal ?? opts.total;
+  const discount = Math.max(0, Math.round((subtotal - total) * 100) / 100);
 
-  const totalsBlock = (args: {
-    subtotal: number;
-    tax: number;
-    total: number;
-    label?: string;
-  }) => {
-    const head = args.label
-      ? `<div class="tot-head">${escapeHtml(args.label)}</div>`
-      : "";
-    return `${head}
-    <div class="tot-row"><span>${escapeHtml(opts.subtotalLabel)}</span><span class="mono">${escapeHtml(opts.formatPrice(args.subtotal))}</span></div>
-    <div class="tot-row"><span>${escapeHtml(opts.taxLabel)}</span><span class="mono">${escapeHtml(opts.formatPrice(args.tax))}</span></div>
-    <div class="tot-row strong"><span>${escapeHtml(opts.totalLabel)}</span><span class="mono">${escapeHtml(opts.formatPrice(args.total))}</span></div>`;
-  };
-
-  let totalsHtml = totalsBlock({
-    subtotal: opts.subtotal,
-    tax: opts.tax,
-    total: opts.total,
-  });
-
-  if (
-    opts.combinedTotalLabel != null &&
-    opts.combinedSubtotal != null &&
-    opts.combinedTax != null &&
-    opts.combinedTotal != null
-  ) {
-    totalsHtml += `<div class="spacer"></div>${totalsBlock({
-      subtotal: opts.combinedSubtotal,
-      tax: opts.combinedTax,
-      total: opts.combinedTotal,
-      label: opts.combinedTotalLabel,
-    })}`;
+  let logoDataUrl = opts.logoDataUrl ?? null;
+  if (!logoDataUrl && opts.licenseKey) {
+    try {
+      const branding = await resolvePinLoginBranding(opts.licenseKey);
+      logoDataUrl = branding.logoDataUrl ?? null;
+    } catch {
+      /* optional */
+    }
   }
 
-  const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8"/>
-  <title>${escapeHtml(opts.title)}</title>
-  <style>
-    body { font-family: system-ui, Segoe UI, sans-serif; padding: 16px; color: #111; font-size: 14px; }
-    h1 { font-size: 18px; margin: 0 0 8px; }
-    h2.sec { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: #555; margin: 16px 0 8px; }
-    .meta { font-size: 12px; color: #444; margin-bottom: 12px; line-height: 1.5; }
-    table.bill { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
-    table.bill th { text-align: left; font-size: 11px; color: #666; padding: 6px 0; border-bottom: 1px solid #ccc; }
-    table.bill th.r { text-align: right; }
-    table.bill td { vertical-align: top; padding: 8px 0; border-bottom: 1px solid #eee; }
-    table.bill td.r { text-align: right; white-space: nowrap; padding-left: 8px; }
-    .mono { font-variant-numeric: tabular-nums; }
-    .qty { font-weight: 700; }
-    .notes { font-size: 11px; color: #666; margin-top: 4px; }
-    .tot-head { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #333; margin: 12px 0 6px; }
-    .tot-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; }
-    .tot-row.strong { font-weight: 700; font-size: 15px; margin-top: 6px; padding-top: 8px; border-top: 1px solid #ddd; }
-    .spacer { height: 8px; }
-    @media print { body { padding: 8px; } }
-  </style>
-</head>
-<body>
-  <h1>${escapeHtml(opts.title)}</h1>
-  <div class="meta">
-    <div><strong>${escapeHtml(opts.tableLabel)}</strong> ${escapeHtml(opts.tableName)}</div>
-    <div><strong>${escapeHtml(opts.orderLabel)}</strong> ${escapeHtml(opts.orderValue)}</div>
-    <div><strong>${escapeHtml(opts.staffLabel)}</strong> ${escapeHtml(opts.staffName)}</div>
-    <div><strong>${escapeHtml(opts.printedLabel)}</strong> ${escapeHtml(new Date().toLocaleString())}</div>
-  </div>
-  ${mainTable}
-  ${pendingTable}
-  <div class="totals">${totalsHtml}</div>
-</body>
-</html>`;
+  let visibility = visibilityFromTemplate();
+  let copy = resolvePreBillCopy();
+  let website = opts.business?.website;
+  let address = opts.business?.address;
+  let extras = preBillPrintExtras();
+  let extra: Record<string, unknown> | undefined;
+  if (opts.licenseKey) {
+    try {
+      const templatesList = (await runPosQuery("pos.templates.listTemplates", {
+        licenseKey: opts.licenseKey,
+      })) as Array<{
+        templateType: string;
+        toggles?: {
+          logo?: boolean;
+          footerText?: boolean;
+          waiterName?: boolean;
+          tableNumber?: boolean;
+          timestamp?: boolean;
+          taxDetails?: boolean;
+          orderNumber?: boolean;
+          unitPrices?: boolean;
+        };
+        labels?: { headerText?: string; footerText?: string };
+        styles?: Record<string, unknown>;
+      }>;
+      const row = templatesList?.find((x) => x.templateType === "non_fiscal_receipt");
+      extra =
+        row?.styles && typeof row.styles._design === "object"
+          ? (row.styles._design as Record<string, unknown>)
+          : undefined;
+      visibility = visibilityFromTemplate(row?.toggles, extra);
+      extras = preBillPrintExtras(extra);
+      copy = resolvePreBillCopy({
+        ...row?.labels,
+        subtitle: extras.content.subtitle,
+        legalText: extras.content.legalText,
+        tagline: extras.content.motto,
+      });
+      if (typeof extra?.website === "string" && extra.website.trim()) {
+        website = extra.website.trim();
+      }
+      if (typeof extra?.address === "string" && extra.address.trim()) {
+        address = extra.address.trim();
+      }
+      if (typeof extra?.logoDataUrl === "string" && extra.logoDataUrl) {
+        logoDataUrl = extra.logoDataUrl;
+      }
+    } catch {
+      /* use defaults */
+    }
+  }
+
+  const html = buildPreBillHtml({
+    ...copy,
+    venueLine: extras.venueLine,
+    itemsHeading: extras.itemsHeading,
+    showQtyPrefix: extras.showQtyPrefix,
+    dateFormat: extras.dateFormat,
+    hour12: extras.hour12,
+    lines,
+    subtotal,
+    discount,
+    tax: opts.combinedTax ?? opts.tax,
+    total,
+    orderRef: opts.orderValue,
+    tableName: opts.tableName,
+    waiterName: opts.staffName,
+    operatorName: opts.staffName,
+    guests: opts.guests,
+    printedAt: new Date(),
+    formatPrice: (n) => formatPreBillMoney(n, extras.content, opts.formatPrice),
+    logoDataUrl: visibility.logo ? logoDataUrl : null,
+    business: opts.business
+      ? {
+          ...opts.business,
+          name: extras.content.storeName || opts.business.name,
+          website,
+          address,
+        }
+      : { name: extras.content.storeName || "VYNTEX", website, address },
+    visibility,
+    design: extra,
+    fieldLabels: {
+      ...extras.fieldLabels,
+      table: extras.fieldLabels.table || opts.tableLabel,
+      order: opts.orderLabel,
+      waiter: extras.fieldLabels.waiter || opts.staffLabel,
+      subtotal: extras.fieldLabels.subtotal || opts.subtotalLabel,
+      tax: opts.taxLabel,
+      total: extras.fieldLabels.total || opts.totalLabel,
+    },
+    pageTitle: opts.title,
+  });
 
   const outcome = await tryPrintHtmlDocumentAsync(html, {
     silent: true,
@@ -344,6 +454,7 @@ export async function printStaffMealTickets(opts: {
   formatPrice: (amount: number) => string;
   kitchenDevice?: string;
   barDevice?: string;
+  licenseKey?: string;
 }): Promise<{ ok: boolean; error?: string }> {
   const kitchenLines = opts.lines.filter((l) => l.station !== "bar");
   const barLines = opts.lines.filter((l) => l.station === "bar");
@@ -367,6 +478,8 @@ export async function printStaffMealTickets(opts: {
       lines,
       formatPrice: opts.formatPrice,
       deviceName,
+      licenseKey: opts.licenseKey,
+      tablePrefix: opts.forLabel,
     });
 
   let printFailed = false;

@@ -20,11 +20,13 @@ import posI18n from "../_lib/pos-i18n.ts";
 type WaiterPhonePairSectionProps = {
   licenseKey: string;
   canActivate?: boolean;
+  refreshRef?: { current: (() => void) | null };
 };
 
 export default function WaiterPhonePairSection({
   licenseKey,
   canActivate = true,
+  refreshRef,
 }: WaiterPhonePairSectionProps) {
   const t = useCallback(
     (key: string, opts?: Record<string, unknown>) => posI18n.t(key, opts),
@@ -106,6 +108,16 @@ export default function WaiterPhonePairSection({
       setBusy(false);
     }
   }, [resolvePosIds, t]);
+
+  useEffect(() => {
+    if (!refreshRef) return;
+    refreshRef.current = () => {
+      void refresh();
+    };
+    return () => {
+      refreshRef.current = null;
+    };
+  }, [refresh, refreshRef]);
 
   useEffect(() => {
     if (!canActivate) return;
@@ -196,7 +208,7 @@ export default function WaiterPhonePairSection({
     return (
       <section className="rounded-2xl border border-[#1e2a45] bg-[#0D1326] p-6 space-y-2">
         <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-          <Smartphone className="size-5 text-[#0066FF]" />
+          <Smartphone className="size-5 text-brand" />
           {t("settings.waiter_pair_title")}
         </h2>
         <p className="text-sm text-[#8b93a7]">
@@ -222,8 +234,8 @@ export default function WaiterPhonePairSection({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-              <span className="flex size-9 items-center justify-center rounded-xl bg-[#0066FF]/15">
-                <Smartphone className="size-4 text-[#0066FF]" />
+              <span className="flex size-9 items-center justify-center rounded-xl bg-brand/15">
+                <Smartphone className="size-4 text-brand" />
               </span>
               {t("settings.waiter_pair_title")}
             </h2>
@@ -237,7 +249,7 @@ export default function WaiterPhonePairSection({
             size="sm"
             disabled={busy}
             onClick={() => void refresh()}
-            className="border-[#2a3a5a] text-[#0066FF] hover:border-[#0066FF]/40 hover:text-[#0066FF] shrink-0"
+            className="border-[#2a3a5a] text-brand hover:border-brand/40 hover:text-brand shrink-0"
           >
             <RefreshCw className={`size-3.5 mr-1.5 ${busy ? "animate-spin" : ""}`} />
             {t("settings.waiter_pair_refresh")}
@@ -293,7 +305,7 @@ export default function WaiterPhonePairSection({
                 className="border-[#2a3a5a] text-[#8b93a7] hover:text-white"
               >
                 {copied ? (
-                  <Check className="size-3.5 mr-1.5 text-[#44CC00]" />
+                  <Check className="size-3.5 mr-1.5 text-brand-accent" />
                 ) : (
                   <Copy className="size-3.5 mr-1.5" />
                 )}
@@ -332,7 +344,7 @@ export default function WaiterPhonePairSection({
               key={key}
               className="flex items-start gap-3 rounded-xl border border-[#1e2a45] bg-[#0A0F1E] px-3.5 py-3"
             >
-              <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-[#0066FF]/15 text-xs font-bold text-[#0066FF]">
+              <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-brand/15 text-xs font-bold text-brand">
                 {i + 1}
               </span>
               <p className="text-sm leading-snug text-[#8b93a7] pt-0.5">{t(key)}</p>
@@ -343,8 +355,8 @@ export default function WaiterPhonePairSection({
 
       <section className="rounded-2xl border border-[#1e2a45] bg-[#0D1326] p-5 sm:p-6 space-y-4">
         <div className="flex items-start gap-3">
-          <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#0066FF]/15">
-            <KeyRound className="size-4 text-[#0066FF]" />
+          <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand/15">
+            <KeyRound className="size-4 text-brand" />
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
@@ -352,7 +364,7 @@ export default function WaiterPhonePairSection({
                 {t("settings.waiter_pair_license_title")}
               </p>
               {pendingPhones.length > 0 ? (
-                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#0066FF] px-1.5 text-[10px] font-bold text-white">
+                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-[10px] font-bold text-white">
                   {pendingPhones.length}
                 </span>
               ) : null}
@@ -379,8 +391,8 @@ export default function WaiterPhonePairSection({
                 key={row.id}
                 className="flex flex-wrap items-center gap-3 rounded-xl border border-[#1e2a45] bg-[#0A0F1E] px-3.5 py-3"
               >
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#0066FF]/15">
-                  <Smartphone className="size-4 text-[#0066FF]" />
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand/15">
+                  <Smartphone className="size-4 text-brand" />
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-white">
@@ -397,7 +409,7 @@ export default function WaiterPhonePairSection({
                   size="sm"
                   disabled={actingId === row.id}
                   onClick={() => void decidePending(row.id, "approve")}
-                  className="h-8 bg-[#44CC00] px-2.5 text-[#06200a] hover:bg-[#3bb300]"
+                  className="h-8 bg-brand-accent px-2.5 text-[#06200a] hover:bg-[#3bb300]"
                 >
                   <Check className="size-3.5 mr-1" />
                   {t("settings.waiter_pair_license_approve")}

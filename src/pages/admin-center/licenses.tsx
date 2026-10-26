@@ -29,7 +29,7 @@ export default function DashboardLicensesPage() {
   return (
     <AdminPage>
       <header className="mb-6">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-indigo-500">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand">
           {t("ac.nav.admin_center")}
         </p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">{t("ac.nav.licenses")}</h1>
@@ -69,7 +69,7 @@ export default function DashboardLicensesPage() {
           <article key={venue.id} className={cn(acCard, "p-5")}>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex items-start gap-3">
-                <span className="flex size-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
+                <span className="flex size-11 items-center justify-center rounded-2xl bg-brand-light text-brand">
                   <KeyRound className="size-5" />
                 </span>
                 <div>

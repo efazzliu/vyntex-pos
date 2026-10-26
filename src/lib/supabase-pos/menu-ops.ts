@@ -18,6 +18,36 @@ import {
 } from "@/lib/pos-locale-defaults.ts";
 import { resolveMenuItemImageUrl } from "@/lib/menu-item-photo-urls.ts";
 import { customizationConfigForDb } from "@/lib/menu-customizations.ts";
+import { prepConfigForDb } from "@/lib/menu-prep-config.ts";
+import {
+  getCountryTaxCatalog,
+  isVatRateAllowed,
+  parsePosTaxSettings,
+} from "@/lib/pos-tax-config.ts";
+import type { RestaurantRow } from "./restaurant.ts";
+
+function assertVenueVatRate(restaurant: RestaurantRow, vatRate: unknown) {
+  if (vatRate === undefined) return;
+  const fraction = Number(vatRate);
+  if (!Number.isFinite(fraction) || fraction < 0 || fraction > 1) {
+    throw new Error("VAT rate is invalid.");
+  }
+  if (!getCountryTaxCatalog(restaurant.country)) return;
+  const settings = parsePosTaxSettings(restaurant.pos_tax_settings, {
+    country: restaurant.country ?? "",
+    businessType: restaurant.type ?? "restaurant",
+    fallbackVatFraction: Number(restaurant.default_vat_rate ?? 0.2),
+  });
+  if (!isVatRateAllowed(fraction, settings, {
+    country: restaurant.country ?? "",
+    businessType: restaurant.type ?? "restaurant",
+    fallbackVatFraction: Number(restaurant.default_vat_rate ?? 0.2),
+  })) {
+    throw new Error(
+      "This tax rate is not enabled for this venue's country. Configure Tax & VAT in Settings.",
+    );
+  }
+}
 
 function pgMissingColumnMessage(error: { message?: string }, column: string): boolean {
   const m = String(error.message ?? "").toLowerCase();
@@ -28,6 +58,52 @@ function pgMissingColumnMessage(error: { message?: string }, column: string): bo
     m.includes("could not find") ||
     m.includes("schema cache")
   );
+}
+
+function staffMealDbFields(args: Record<string, unknown>): Record<string, unknown> {
+  if (args.staffMealAllowed === undefined) return {};
+  const allowed = args.staffMealAllowed === true;
+  if (!allowed) {
+    return {
+      staff_meal_allowed: false,
+      staff_meal_price: null,
+      staff_meal_free_qty: null,
+      staff_meal_daily_limit: null,
+    };
+  }
+  const price = Number(args.staffMealPrice);
+  const freeQty = Number(args.staffMealFreeQty);
+  const dailyLimit = Number(args.staffMealDailyLimit);
+  return {
+    staff_meal_allowed: true,
+    staff_meal_price: Number.isFinite(price) && price >= 0 ? price : 0,
+    staff_meal_free_qty:
+      Number.isFinite(freeQty) && freeQty > 0 ? Math.floor(freeQty) : 0,
+    staff_meal_daily_limit:
+      Number.isFinite(dailyLimit) && dailyLimit > 0 ? Math.floor(dailyLimit) : 0,
+  };
+}
+
+function omitMissingStaffMealColumns(
+  payload: Record<string, unknown>,
+  error: { message?: string } | null,
+): Record<string, unknown> | null {
+  if (!error) return null;
+  const cols = [
+    "staff_meal_allowed",
+    "staff_meal_price",
+    "staff_meal_free_qty",
+    "staff_meal_daily_limit",
+  ];
+  const next = { ...payload };
+  let changed = false;
+  for (const col of cols) {
+    if (col in next && pgMissingColumnMessage(error, col)) {
+      delete next[col];
+      changed = true;
+    }
+  }
+  return changed ? next : null;
 }
 
 function isRlsViolation(error: { message?: string; code?: string }): boolean {
@@ -222,6 +298,7 @@ export async function createCategory(args: {
   name: string;
   color: string;
   icon?: string;
+  prepConfig?: unknown;
 }) {
   const r = await getRestaurantByLicense(args.licenseKey);
   const { count } = await supabase
@@ -229,7 +306,8 @@ export async function createCategory(args: {
     .select("*", { count: "exact", head: true })
     .eq("restaurant_id", r.id);
 
-  const base = {
+  const prepNorm = prepConfigForDb(args.prepConfig as never);
+  const base: Record<string, unknown> = {
     restaurant_id: r.id,
     name: args.name.trim(),
     color: args.color,
@@ -240,17 +318,29 @@ export async function createCategory(args: {
     args.icon !== undefined && String(args.icon).trim() !== ""
       ? { ...base, icon: String(args.icon).trim() }
       : base;
+  const withPrep =
+    prepNorm !== undefined ? { ...withIcon, prep_config: prepNorm } : withIcon;
 
   let { data, error } = await supabase
     .from("menu_categories")
-    .insert(withIcon)
+    .insert(withPrep)
     .select("id")
     .single();
 
-  if (error && isMissingPgColumnError(error.message ?? "", "icon")) {
+  if (error && pgMissingColumnMessage(error, "prep_config")) {
+    const { prep_config: _pc, ...withoutPrep } = withPrep as Record<string, unknown>;
     ({ data, error } = await supabase
       .from("menu_categories")
-      .insert(base)
+      .insert(withoutPrep)
+      .select("id")
+      .single());
+  }
+
+  if (error && isMissingPgColumnError(error.message ?? "", "icon")) {
+    const { icon: _icon, ...withoutIcon } = (withPrep as Record<string, unknown>);
+    ({ data, error } = await supabase
+      .from("menu_categories")
+      .insert(withoutIcon)
       .select("id")
       .single());
   }
@@ -266,6 +356,7 @@ export async function updateCategory(args: {
   color: string;
   icon?: string;
   isActive?: boolean;
+  prepConfig?: unknown;
 }) {
   await getRestaurantByLicense(args.licenseKey);
   const patch: Record<string, unknown> = {
@@ -276,11 +367,23 @@ export async function updateCategory(args: {
   if (args.icon !== undefined) {
     patch.icon = String(args.icon).trim() || null;
   }
+  const prepNorm = prepConfigForDb(args.prepConfig as never);
+  if (prepNorm !== undefined) {
+    patch.prep_config = prepNorm;
+  }
 
   let { error } = await supabase
     .from("menu_categories")
     .update(patch)
     .eq("id", args.categoryId);
+
+  if (error && pgMissingColumnMessage(error, "prep_config")) {
+    delete patch.prep_config;
+    ({ error } = await supabase
+      .from("menu_categories")
+      .update(patch)
+      .eq("id", args.categoryId));
+  }
 
   if (error && isMissingPgColumnError(error.message ?? "", "icon")) {
     delete patch.icon;
@@ -329,6 +432,7 @@ export async function createItem(args: Record<string, unknown>) {
   const licenseKey = args.licenseKey as string;
   const r = await getRestaurantByLicense(licenseKey);
   assertMenuItemStation(args.station);
+  assertVenueVatRate(r, args.vatRate);
 
   const { data: orderRow } = await supabase
     .from("menu_items")
@@ -352,9 +456,9 @@ export async function createItem(args: Record<string, unknown>) {
     available: (args.available as boolean) ?? true,
     display_order: displayOrderFallback,
     station: args.station as string,
-    vat_rate: (args.vatRate as number) ?? 0.2,
+    vat_rate: (args.vatRate as number) ?? (r.default_vat_rate ?? 0.2),
     is_favorite: (args.isFavorite as boolean) ?? false,
-    staff_meal_allowed: (args.staffMealAllowed as boolean) !== false,
+    ...staffMealDbFields(args),
     track_stock: (args.trackStock as boolean) ?? false,
     stock_unit: (args.stockUnit as string) ?? null,
     current_stock: (args.currentStock as number) ?? null,
@@ -382,6 +486,11 @@ export async function createItem(args: Record<string, unknown>) {
     payload.customization_config = customizationNorm;
   }
 
+  const prepNorm = prepConfigForDb(args.prepConfig as never);
+  if (prepNorm !== undefined) {
+    payload.prep_config = prepNorm;
+  }
+
   let { data, error } = await supabase
     .from("menu_items")
     .insert(payload)
@@ -406,8 +515,17 @@ export async function createItem(args: Record<string, unknown>) {
       .single());
   }
 
-  if (error && pgMissingColumnMessage(error, "staff_meal_allowed")) {
-    const { staff_meal_allowed: _s, ...withoutStaffMeal } = payload;
+  if (error && pgMissingColumnMessage(error, "prep_config")) {
+    const { prep_config: _pc, ...withoutPrep } = payload;
+    ({ data, error } = await supabase
+      .from("menu_items")
+      .insert(withoutPrep)
+      .select("id")
+      .single());
+  }
+
+  const withoutStaffMeal = omitMissingStaffMealColumns(payload, error);
+  if (withoutStaffMeal) {
     ({ data, error } = await supabase
       .from("menu_items")
       .insert(withoutStaffMeal)
@@ -429,6 +547,7 @@ export async function createItem(args: Record<string, unknown>) {
 export async function updateItem(args: Record<string, unknown>) {
   const r = await getRestaurantByLicense(args.licenseKey as string);
   assertMenuItemStation(args.station);
+  assertVenueVatRate(r, args.vatRate);
 
   const patch: Record<string, unknown> = {
     name: args.name,
@@ -440,7 +559,7 @@ export async function updateItem(args: Record<string, unknown>) {
     category_id: args.categoryId,
     menu_id: args.menuId,
     is_favorite: args.isFavorite,
-    staff_meal_allowed: args.staffMealAllowed,
+    ...staffMealDbFields(args),
     track_stock: args.trackStock,
     stock_unit: args.stockUnit,
     current_stock: args.currentStock,
@@ -469,6 +588,11 @@ export async function updateItem(args: Record<string, unknown>) {
     patch.customization_config = customizationNormUpdate;
   }
 
+  const prepNormUpdate = prepConfigForDb(args.prepConfig as never);
+  if (prepNormUpdate !== undefined) {
+    patch.prep_config = prepNormUpdate;
+  }
+
   Object.keys(patch).forEach((k) => {
     if (patch[k] === undefined) delete patch[k];
   });
@@ -493,11 +617,19 @@ export async function updateItem(args: Record<string, unknown>) {
       .eq("id", args.itemId as string));
   }
 
-  if (error && pgMissingColumnMessage(error, "staff_meal_allowed")) {
-    const { staff_meal_allowed: _s, ...rest } = patch;
+  if (error && pgMissingColumnMessage(error, "prep_config")) {
+    const { prep_config: _pc, ...withoutPrep } = patch;
     ({ error } = await supabase
       .from("menu_items")
-      .update(rest)
+      .update(withoutPrep)
+      .eq("id", args.itemId as string));
+  }
+
+  const withoutStaffMealPatch = omitMissingStaffMealColumns(patch, error);
+  if (withoutStaffMealPatch) {
+    ({ error } = await supabase
+      .from("menu_items")
+      .update(withoutStaffMealPatch)
       .eq("id", args.itemId as string));
   }
 

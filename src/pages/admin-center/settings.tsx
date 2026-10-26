@@ -53,7 +53,7 @@ export default function DashboardSettingsModern() {
       <div className="space-y-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-indigo-500">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand">
               {t("ac.nav.account")}
             </p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
@@ -79,10 +79,10 @@ export default function DashboardSettingsModern() {
                   active ? "text-slate-900" : "text-slate-500 hover:text-slate-700",
                 )}
               >
-                <Icon className={cn("size-4", active ? "text-indigo-600" : "opacity-70")} />
+                <Icon className={cn("size-4", active ? "text-brand" : "opacity-70")} />
                 {t(labelKey)}
                 {active ? (
-                  <span className="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-indigo-500" aria-hidden />
+                  <span className="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-brand" aria-hidden />
                 ) : null}
               </button>
             );

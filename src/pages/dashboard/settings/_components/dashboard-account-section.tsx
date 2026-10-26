@@ -97,7 +97,7 @@ function LinkLicensePanel({ onLinked }: { onLinked: () => void }) {
   return (
     <div className="mt-6 rounded-2xl border border-sky-200 bg-sky-50/60 p-4 dark:border-sky-500/30 dark:bg-sky-950/40">
       <p className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
-        <Link2 className="size-4 text-[#0066FF] dark:text-cyan-400" />
+        <Link2 className="size-4 text-brand dark:text-cyan-400" />
         {t("settings.account.link_license_title")}
       </p>
       <p className="mt-1.5 text-xs leading-relaxed text-slate-600 dark:text-slate-400">
@@ -116,7 +116,7 @@ function LinkLicensePanel({ onLinked }: { onLinked: () => void }) {
           type="button"
           disabled={claiming}
           onClick={() => void handleClaim()}
-          className="h-11 shrink-0 rounded-xl bg-[#0066FF] px-5 text-white hover:bg-[#0052cc]"
+          className="h-11 shrink-0 rounded-xl bg-brand px-5 text-white hover:bg-brand-hover"
         >
           {claiming ? (
             <>
@@ -136,7 +136,7 @@ const fieldClass =
   "h-11 rounded-xl border-slate-200 bg-white dark:border-slate-600 dark:bg-slate-950";
 
 function ActivityIcon({ id }: { id: string }) {
-  if (id === "last-login") return <Clock3 className="size-4 text-[#0066FF] dark:text-cyan-400" />;
+  if (id === "last-login") return <Clock3 className="size-4 text-brand dark:text-cyan-400" />;
   if (id === "password-changed") return <KeyRound className="size-4 text-amber-600 dark:text-amber-400" />;
   return <Monitor className="size-4 text-emerald-600 dark:text-emerald-400" />;
 }
@@ -146,7 +146,7 @@ function ActivityFeed({ items }: { items: DashboardActivityItem[] }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-950/50">
       <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
-        <Activity className="size-4 text-[#0066FF] dark:text-cyan-400" />
+        <Activity className="size-4 text-brand dark:text-cyan-400" />
         {t("settings.account.activity_feed")}
       </p>
       <ul className="space-y-3">
@@ -166,7 +166,7 @@ function ActivityFeed({ items }: { items: DashboardActivityItem[] }) {
                 className={cn(
                   "mt-0.5 text-sm font-medium text-slate-900 dark:text-slate-100",
                   item.tone === "warning" && "text-amber-700 dark:text-amber-400",
-                  item.tone === "info" && "text-[#0066FF] dark:text-cyan-400",
+                  item.tone === "info" && "text-brand dark:text-cyan-400",
                 )}
               >
                 {item.value}
@@ -312,7 +312,7 @@ export function DashboardAccountSection({
     <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_20px_50px_-30px_rgba(2,6,23,0.2)] dark:border-slate-700/80 dark:bg-slate-900/90">
       <div className="border-b border-slate-200 px-6 py-5 dark:border-slate-700/80">
         <div className="flex items-start gap-3">
-          <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-[#0066FF]/10 to-[#00AACC]/10 p-2.5 text-[#0066FF] dark:border-slate-600 dark:text-cyan-400">
+          <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-brand/10 to-brand-sky/10 p-2.5 text-brand dark:border-slate-600 dark:text-cyan-400">
             <User className="size-4" />
           </div>
           <div>
@@ -368,7 +368,7 @@ export function DashboardAccountSection({
                 ) : (
                   <span>{t("settings.account.email_unverified")}</span>
                 )}{" "}
-                <a href={SUPPORT_MAILTO_HREF} className="text-[#0066FF] hover:underline dark:text-cyan-400">
+                <a href={SUPPORT_MAILTO_HREF} className="text-brand hover:underline dark:text-cyan-400">
                   {t("settings.account.contact_prefix")} {SUPPORT_EMAIL}
                 </a>{" "}
                 {t("settings.account.contact_suffix")}
@@ -418,7 +418,7 @@ export function DashboardAccountSection({
               <Button
                 type="submit"
                 disabled={saving}
-                className="h-11 rounded-xl bg-gradient-to-r from-[#0066FF] to-[#00AACC] px-6 text-white"
+                className="h-11 rounded-xl bg-gradient-to-r from-brand to-brand-sky px-6 text-white"
               >
                 {saving ? (
                   <>
@@ -456,13 +456,13 @@ export function DashboardAccountSection({
               <p className="text-sm font-semibold text-slate-900 dark:text-white">
                 {t("settings.account.completion")}
               </p>
-              <span className="text-sm font-bold tabular-nums text-[#0066FF] dark:text-cyan-400">
+              <span className="text-sm font-bold tabular-nums text-brand dark:text-cyan-400">
                 {completeness}%
               </span>
             </div>
             <Progress
               value={completeness}
-              className="h-2 bg-slate-100 dark:bg-slate-800 [&>[data-slot=progress-indicator]]:bg-gradient-to-r [&>[data-slot=progress-indicator]]:from-[#0066FF] [&>[data-slot=progress-indicator]]:to-[#00AACC]"
+              className="h-2 bg-slate-100 dark:bg-slate-800 [&>[data-slot=progress-indicator]]:bg-gradient-to-r [&>[data-slot=progress-indicator]]:from-brand [&>[data-slot=progress-indicator]]:to-brand-sky"
             />
             <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
               {t("settings.account.completion_hint", { percent: completeness })}

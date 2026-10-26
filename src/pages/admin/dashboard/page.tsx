@@ -156,25 +156,25 @@ export default function AdminDashboardPage() {
         ) : kpiQuery.data ? (
           <>
             <KpiCard
-              icon={<Euro className="size-4 text-[#0066FF]" />}
+              icon={<Euro className="size-4 text-brand" />}
               label="Lifetime revenue"
               value={eurFmt.format(kpiQuery.data.totalRevenueEst)}
               hint="Paddle net collected"
             />
             <KpiCard
-              icon={<Repeat className="size-4 text-[#44CC00]" />}
+              icon={<Repeat className="size-4 text-brand-accent" />}
               label="MRR"
               value={eurFmtDecimals.format(kpiQuery.data.mrr)}
               hint="Active subscriptions"
             />
             <KpiCard
-              icon={<Users className="size-4 text-[#0066FF]" />}
+              icon={<Users className="size-4 text-brand" />}
               label="Active clients"
               value={String(kpiQuery.data.totalClients)}
               hint="Distinct owners"
             />
             <KpiCard
-              icon={<KeyRound className="size-4 text-[#44CC00]" />}
+              icon={<KeyRound className="size-4 text-brand-accent" />}
               label="Active licenses"
               value={String(kpiQuery.data.activeLicenses)}
               hint="Non-expired venues"
@@ -222,7 +222,7 @@ export default function AdminDashboardPage() {
                         {item.hint}
                       </span>
                     </span>
-                    <ArrowUpRight className="size-3.5 shrink-0 text-slate-300 transition-colors group-hover:text-[#0066FF] dark:text-white/25" />
+                    <ArrowUpRight className="size-3.5 shrink-0 text-slate-300 transition-colors group-hover:text-brand dark:text-white/25" />
                   </Link>
                 ))}
               </div>

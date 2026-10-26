@@ -8,6 +8,7 @@ import {
 } from "@/lib/supabase-pos/admin-ops.ts";
 import { adminCardClass } from "@/pages/admin/_lib/admin-ui.ts";
 import { cn } from "@/lib/utils.ts";
+import { BRAND } from "@/lib/brand-colors.ts";
 
 type PlanSplitChartCardProps = {
   period: AdminPlanDistributionRange;
@@ -23,8 +24,8 @@ export function PlanSplitChartCard({ period }: PlanSplitChartCardProps) {
     const d = planDistributionQuery.data;
     if (!d) return [];
     return [
-      { key: "starter", name: "Starter", value: d.starter, color: "#0066FF" },
-      { key: "professional", name: "Professional", value: d.professional, color: "#44CC00" },
+      { key: "starter", name: "Starter", value: d.starter, color: BRAND.primary },
+      { key: "professional", name: "Professional", value: d.professional, color: BRAND.accent },
       { key: "enterprise", name: "Enterprise", value: d.enterprise, color: "#7C3AED" },
     ];
   }, [planDistributionQuery.data]);

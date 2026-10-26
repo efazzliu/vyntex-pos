@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { BRAND, LEGACY_BRAND_BLUE } from "@/lib/brand-colors.ts";
 
 export const PHONE_ACCESS_THEME_IDS = [
   "midnight",
@@ -45,12 +46,12 @@ const THEMES: Record<PhoneAccessTheme, PhoneAccessThemeTokens> = {
     faint: "rgba(255,255,255,0.3)",
     card: "rgba(255,255,255,0.05)",
     border: "rgba(255,255,255,0.1)",
-    glow: "rgba(0,102,255,0.28)",
-    glow2: "rgba(68,204,0,0.12)",
+    glow: "rgba(0,121,235,0.28)",
+    glow2: "rgba(18,201,89,0.12)",
     nav: "#0a1224",
     sheet: "#0d1326",
     loginTitle: "#FFFFFF",
-    loginSubtitle: "#0066FF",
+    loginSubtitle: BRAND.primary,
     loginHint: "#8B93A7",
     loginField: "#94A3B8",
   },
@@ -66,12 +67,12 @@ const THEMES: Record<PhoneAccessTheme, PhoneAccessThemeTokens> = {
     faint: "rgba(15,23,42,0.35)",
     card: "rgba(15,23,42,0.04)",
     border: "rgba(15,23,42,0.1)",
-    glow: "rgba(0,102,255,0.14)",
-    glow2: "rgba(0,102,255,0.05)",
+    glow: "rgba(0,91,214,0.14)",
+    glow2: "rgba(0,91,214,0.05)",
     nav: "rgba(255,255,255,0.94)",
     sheet: "#ffffff",
     loginTitle: "#0F172A",
-    loginSubtitle: "#0066FF",
+    loginSubtitle: BRAND.primary,
     loginHint: "#64748B",
     loginField: "#475569",
   },
@@ -184,6 +185,44 @@ export function waiterPageTextClass(isLight: boolean): string {
   return isLight ? "text-slate-900" : "text-white";
 }
 
+/** Vyntex POS logo: blue V + lime-green V. */
+export const VYNTEX_LOGO_BLUE = BRAND.primary;
+export const VYNTEX_LOGO_CYAN = BRAND.sky;
+export const VYNTEX_LOGO_GREEN = BRAND.accent;
+
+export function vyntexLogoGradient(): string {
+  return `linear-gradient(135deg, ${BRAND.primary} 0%, ${BRAND.sky} 52%, ${BRAND.accent} 100%)`;
+}
+
+/** Selected chips / tiles — logo fill. */
+export function vyntexSelectedFill(opts?: { shadow?: boolean }): CSSProperties {
+  return {
+    backgroundImage: vyntexLogoGradient(),
+    backgroundColor: VYNTEX_LOGO_BLUE,
+    color: "#ffffff",
+    boxShadow:
+      opts?.shadow === false ? undefined : "0 10px 18px -8px rgba(0,91,214, 0.45)",
+  };
+}
+
+/** Soft selected pill (bottom nav). */
+export function vyntexSelectedSoft(): CSSProperties {
+  return {
+    backgroundImage:
+      "linear-gradient(135deg, rgba(0,91,214,0.18), rgba(18,201,89,0.18))",
+  };
+}
+
+/** Underline for advanced tab selection. */
+export function vyntexSelectedBar(): CSSProperties {
+  return {
+    backgroundImage: `linear-gradient(90deg, ${BRAND.primary}, ${BRAND.accent})`,
+    backgroundSize: "100% 2px",
+    backgroundPosition: "left bottom",
+    backgroundRepeat: "no-repeat",
+  };
+}
+
 function loginMatchesPreset(
   b: {
     loginTitleColor: string;
@@ -195,7 +234,8 @@ function loginMatchesPreset(
 ): boolean {
   return (
     b.loginTitleColor === preset.loginTitle &&
-    b.loginSubtitleColor === preset.loginSubtitle &&
+    (b.loginSubtitleColor === preset.loginSubtitle ||
+      (b.loginSubtitleColor === LEGACY_BRAND_BLUE && preset.loginSubtitle === BRAND.primary)) &&
     b.loginHintColor === preset.loginHint &&
     b.loginFieldColor === preset.loginField
   );
@@ -216,7 +256,8 @@ export function brandingWithAccessTheme<
   );
   const stillFactory =
     branding.loginTitleColor === "#FFFFFF" &&
-    branding.loginSubtitleColor === "#0066FF" &&
+    (branding.loginSubtitleColor === BRAND.primary ||
+      branding.loginSubtitleColor === LEGACY_BRAND_BLUE) &&
     branding.loginHintColor === "#8B93A7" &&
     branding.loginFieldColor === "#94A3B8";
   if (!currentPreset && !stillFactory) {

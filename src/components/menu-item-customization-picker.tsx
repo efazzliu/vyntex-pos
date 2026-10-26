@@ -104,7 +104,7 @@ export default function MenuItemCustomizationPicker({
                   className={cn(
                     "rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
                     active
-                      ? accentClassName ?? "border-[#0066FF] bg-[#0066FF]/10 text-[#0066FF]"
+                      ? accentClassName ?? "border-brand bg-brand/10 text-brand"
                       : "border-slate-300 bg-white text-slate-700 hover:border-slate-400",
                   )}
                   style={active ? accentStyle : undefined}

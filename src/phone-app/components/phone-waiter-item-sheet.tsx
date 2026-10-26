@@ -1,20 +1,31 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronLeft, Minus, Plus, UtensilsCrossed } from "lucide-react";
+import { ChefHat, ChevronLeft, Minus, Plus, UtensilsCrossed } from "lucide-react";
 import type { Doc } from "@/convex/_generated/dataModel.d.ts";
 import { resolveMenuItemImageUrl } from "@/lib/menu-item-photo-urls.ts";
 import MenuItemCustomizationPicker from "@/components/menu-item-customization-picker.tsx";
+import PhoneWaiterPrepScreen from "@/phone-app/components/phone-waiter-prep-screen.tsx";
 import {
   getMenuItemCustomizationGroups,
   hasMenuItemCustomizations,
   type SelectedCustomization,
 } from "@/lib/menu-customizations.ts";
+import {
+  hasPrepConfig,
+  prepExtrasPrice,
+  resolveItemPrepConfig,
+  type PrepSelections,
+} from "@/lib/menu-prep-config.ts";
+import { fallbackPrepConfig } from "@/phone-app/lib/waiter-prep-fallback.ts";
 import { cn } from "@/lib/utils.ts";
 import type { PhoneAccessThemeTokens } from "@/lib/phone-access-theme.ts";
 
 type Props = {
-  item: Doc<"menuItems"> & { customizationConfig?: unknown };
-  categoryName?: string;
+  item: Doc<"menuItems"> & {
+    customizationConfig?: unknown;
+    prepConfig?: unknown;
+  };
+  category?: Pick<Doc<"menuCategories">, "name" | "prepConfig">;
   accent: string;
   tokens: PhoneAccessThemeTokens;
   showPrice: boolean;
@@ -24,12 +35,13 @@ type Props = {
     quantity: number,
     selectedCustomizations?: SelectedCustomization[],
     notes?: string,
+    prepExtraPrice?: number,
   ) => void;
 };
 
 export default function PhoneWaiterItemSheet({
   item,
-  categoryName,
+  category,
   accent,
   tokens,
   showPrice,
@@ -39,17 +51,56 @@ export default function PhoneWaiterItemSheet({
 }: Props) {
   const { t } = useTranslation("site");
   const [qty, setQty] = useState(1);
+  const [prepOpen, setPrepOpen] = useState(false);
+  const [pendingCustomizations, setPendingCustomizations] = useState<
+    SelectedCustomization[] | undefined
+  >();
+  const [pendingNotes, setPendingNotes] = useState<string | undefined>();
   const customizationGroups = useMemo(
     () => getMenuItemCustomizationGroups(item),
     [item],
   );
   const showCustomization = hasMenuItemCustomizations(item);
+  const prepConfig = useMemo(() => {
+    const resolved = resolveItemPrepConfig(item, category);
+    return hasPrepConfig(resolved)
+      ? resolved
+      : fallbackPrepConfig((key) => String(t(key)));
+  }, [item, category, t]);
 
   useEffect(() => {
     setQty(1);
+    setPrepOpen(false);
+    setPendingCustomizations(undefined);
+    setPendingNotes(undefined);
   }, [item._id]);
 
-  const photoUrl = resolveMenuItemImageUrl(item, categoryName ?? "");
+  const photoUrl = resolveMenuItemImageUrl(item, category?.name ?? "");
+
+  const continueAfterCustomization = (
+    selections: SelectedCustomization[],
+    notes?: string,
+  ) => {
+    setPendingCustomizations(selections);
+    setPendingNotes(notes);
+    setPrepOpen(true);
+  };
+
+  const finishPrep = (
+    prepNotes: string | undefined,
+    selections: PrepSelections,
+  ) => {
+    const notes = [pendingNotes, prepNotes]
+      .map((value) => value?.trim())
+      .filter((value): value is string => Boolean(value))
+      .join(", ");
+    onAdd(
+      qty,
+      pendingCustomizations,
+      notes || undefined,
+      prepExtrasPrice(prepConfig, selections),
+    );
+  };
 
   return (
     <>
@@ -100,9 +151,9 @@ export default function PhoneWaiterItemSheet({
                   className="size-10"
                   style={{ color: tokens.faint }}
                 />
-                {categoryName ? (
+                {category?.name ? (
                   <span className="text-[12px] font-medium" style={{ color: tokens.muted }}>
-                    {categoryName}
+                    {category.name}
                   </span>
                 ) : null}
               </div>
@@ -177,16 +228,16 @@ export default function PhoneWaiterItemSheet({
                   optionalNote: t("phone.waiter.customizationNote"),
                   notePlaceholder: t("phone.waiter.customizationNotePh"),
                   requiredError: t("phone.waiter.customizationRequired"),
-                  confirm: t("phone.waiter.menuItemAddToOrder"),
+                  confirm: t("phone.waiter.order.prepContinue"),
                   cancel: t("phone.waiter.menuItemClose"),
                 }}
                 onCancel={onClose}
-                onConfirm={(selections, notes) => onAdd(qty, selections, notes)}
+                onConfirm={continueAfterCustomization}
               />
             </div>
           ) : null}
 
-          {categoryName ? (
+          {category?.name ? (
             <div
               className="flex items-center justify-between gap-3 border-t py-3.5"
               style={{ borderColor: tokens.border }}
@@ -195,7 +246,7 @@ export default function PhoneWaiterItemSheet({
                 {t("phone.waiter.menuItemCategory")}
               </span>
               <span className="text-[13px] font-semibold" style={{ color: tokens.fg }}>
-                {categoryName}
+                {category.name}
               </span>
             </div>
           ) : null}
@@ -203,7 +254,7 @@ export default function PhoneWaiterItemSheet({
 
         {!showCustomization ? (
           <div
-            className="flex shrink-0 items-center gap-3 border-t px-5 pb-[max(1.1rem,env(safe-area-inset-bottom))] pt-3"
+            className="flex shrink-0 items-center gap-2.5 border-t px-5 pb-[max(1.1rem,env(safe-area-inset-bottom))] pt-3"
             style={{ borderColor: tokens.border, background: tokens.sheet }}
           >
             <div
@@ -237,17 +288,45 @@ export default function PhoneWaiterItemSheet({
             </div>
             <button
               type="button"
+              onClick={() => setPrepOpen(true)}
+              className="flex size-12 shrink-0 items-center justify-center rounded-xl border active:scale-95"
+              style={{
+                borderColor: accent,
+                color: accent,
+                backgroundColor: `${accent}14`,
+              }}
+              aria-label={t("phone.waiter.menuItemCustomize")}
+            >
+              <ChefHat className="size-5" strokeWidth={2.1} />
+            </button>
+            <button
+              type="button"
               onClick={() => onAdd(qty)}
               className={cn(
                 "flex h-12 min-w-0 flex-1 items-center justify-center rounded-xl px-4 text-[15px] font-bold text-white active:scale-[0.99]",
               )}
               style={{ backgroundColor: accent }}
             >
-              {t("phone.waiter.menuItemAddToOrder")}
+              {t("phone.waiter.menuItemSelect")}
             </button>
           </div>
         ) : null}
       </div>
+      {prepOpen ? (
+        <PhoneWaiterPrepScreen
+          itemName={item.name}
+          config={prepConfig}
+          applyQty={1}
+          maxQty={1}
+          continueMode={false}
+          accent={accent}
+          tokens={tokens}
+          formatPrice={formatPrice}
+          onApplyQtyChange={() => undefined}
+          onClose={() => setPrepOpen(false)}
+          onSave={finishPrep}
+        />
+      ) : null}
     </>
   );
 }

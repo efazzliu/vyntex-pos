@@ -57,12 +57,12 @@ export default function AdminSubscriptionsPage() {
     const d = planSplitQuery.data;
     if (!d || d.total <= 0) return [];
     return [
-      { label: "Starter", value: d.starter, pct: (d.starter / d.total) * 100, color: "bg-[#0066FF]" },
+      { label: "Starter", value: d.starter, pct: (d.starter / d.total) * 100, color: "bg-brand" },
       {
         label: "Professional",
         value: d.professional,
         pct: (d.professional / d.total) * 100,
-        color: "bg-[#44CC00]",
+        color: "bg-brand-accent",
       },
       { label: "Enterprise", value: d.enterprise, pct: (d.enterprise / d.total) * 100, color: "bg-[#7C3AED]" },
     ];
@@ -72,11 +72,11 @@ export default function AdminSubscriptionsPage() {
     <section className="space-y-5 p-6 lg:p-8">
       <div className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-[linear-gradient(140deg,#ffffff_0%,#f3f9ff_52%,#f5fff1_100%)] p-6 shadow-[0_26px_64px_-40px_rgba(2,6,23,0.38)] dark:border-slate-700/70 dark:bg-[linear-gradient(140deg,#070d1f_0%,#08142c_50%,#0b1824_100%)]">
         <div
-          className="pointer-events-none absolute -right-10 -top-8 h-44 w-44 rounded-full bg-[#0066FF]/20 blur-3xl dark:bg-[#0066FF]/30"
+          className="pointer-events-none absolute -right-10 -top-8 h-44 w-44 rounded-full bg-brand/20 blur-3xl dark:bg-brand/30"
           aria-hidden
         />
         <div
-          className="pointer-events-none absolute -bottom-14 left-4 h-44 w-44 rounded-full bg-[#44CC00]/15 blur-3xl dark:bg-[#44CC00]/20"
+          className="pointer-events-none absolute -bottom-14 left-4 h-44 w-44 rounded-full bg-brand-accent/15 blur-3xl dark:bg-brand-accent/20"
           aria-hidden
         />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
@@ -91,7 +91,7 @@ export default function AdminSubscriptionsPage() {
               MRR, ARR, plan mix dhe pagesat e fundit ne nje panel modern.
             </p>
           </div>
-          <Badge className="rounded-full bg-[#0066FF] px-3 py-1 text-white">Live Snapshot</Badge>
+          <Badge className="rounded-full bg-brand px-3 py-1 text-white">Live Snapshot</Badge>
         </div>
       </div>
 
@@ -238,9 +238,9 @@ function Metric3DCard({
 }) {
   const toneClass =
     tone === "blue"
-      ? "from-[#0066FF]/16 to-cyan-400/12 dark:from-[#0066FF]/24 dark:to-cyan-400/14"
+      ? "from-brand/16 to-cyan-400/12 dark:from-brand/24 dark:to-cyan-400/14"
       : tone === "green"
-        ? "from-[#44CC00]/14 to-emerald-400/10 dark:from-[#44CC00]/22 dark:to-emerald-400/12"
+        ? "from-brand-accent/14 to-emerald-400/10 dark:from-brand-accent/22 dark:to-emerald-400/12"
         : tone === "violet"
           ? "from-violet-500/14 to-fuchsia-400/10 dark:from-violet-500/22 dark:to-fuchsia-400/12"
           : "from-slate-400/14 to-slate-300/10 dark:from-slate-500/22 dark:to-slate-400/10";

@@ -5,6 +5,7 @@
  */
 
 import { normalizePhoneAccessTheme } from "@/lib/phone-access-theme.ts";
+import { BRAND } from "@/lib/brand-colors.ts";
 
 const DB_NAME = "vyntex-local";
 const DB_VERSION = 4;
@@ -607,6 +608,27 @@ export async function incrementMutationRetry(id: number): Promise<void> {
   });
 }
 
+/** Reset retry counters before a user-requested synchronization retry. */
+export async function resetOfflineQueueRetries(): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(OFFLINE_QUEUE_STORE, "readwrite");
+    const store = tx.objectStore(OFFLINE_QUEUE_STORE);
+    const request = store.getAll();
+    request.onsuccess = () => {
+      const items = request.result as QueuedMutation[];
+      for (const item of items) {
+        if (item.retries > 0) {
+          store.put({ ...item, retries: 0 });
+        }
+      }
+    };
+    request.onerror = () => reject(request.error);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
 /**
  * Clear all queued mutations (e.g. after successful sync or on user reset).
  */
@@ -844,6 +866,7 @@ export type PhoneAccessBranding = {
   showOrdersHeader: boolean;
   showNotificationsHeader: boolean;
   homeTableCols: 2 | 3 | 4;
+  menuCols: 1 | 2;
   floorDesign: PhoneAccessFloorDesign;
   tableDesign: PhoneAccessTableDesign;
   menuDesign: PhoneAccessMenuDesign;
@@ -858,11 +881,11 @@ export const DEFAULT_PHONE_ACCESS_BRANDING: PhoneAccessBranding = {
   logoDataUrl: null,
   logoHeightPx: 56,
   theme: "midnight",
-  accentColor: "#0066FF",
+  accentColor: BRAND.primary,
   showVyntexMark: true,
-  signInColor: "#44CC00",
+  signInColor: BRAND.accent,
   loginTitleColor: "#FFFFFF",
-  loginSubtitleColor: "#0066FF",
+  loginSubtitleColor: BRAND.primary,
   loginHintColor: "#8B93A7",
   loginFieldColor: "#94A3B8",
   showNameLabel: true,
@@ -872,6 +895,7 @@ export const DEFAULT_PHONE_ACCESS_BRANDING: PhoneAccessBranding = {
   showOrdersHeader: true,
   showNotificationsHeader: true,
   homeTableCols: 2,
+  menuCols: 2,
   floorDesign: "professional",
   tableDesign: "professional",
   menuDesign: "professional",
@@ -949,6 +973,10 @@ export function normalizePhoneAccessBranding(
   } else {
     merged.homeTableCols = 2;
   }
+  const menuCols = Number(
+    (raw as { menuCols?: unknown } | null | undefined)?.menuCols,
+  );
+  merged.menuCols = menuCols === 1 ? 1 : 2;
   merged.accentColor = normalizeAccentHex(raw?.accentColor ?? merged.accentColor);
   merged.signInColor = normalizeAccentHex(
     raw?.signInColor ?? merged.signInColor,
@@ -993,6 +1021,10 @@ export function phoneAccessTableGridClass(cols: 2 | 3 | 4): string {
   if (cols === 4) return "grid-cols-4";
   if (cols === 3) return "grid-cols-3";
   return "grid-cols-2";
+}
+
+export function phoneAccessMenuGridClass(cols: 1 | 2): string {
+  return cols === 1 ? "grid-cols-1" : "grid-cols-2";
 }
 
 export function phoneAccessHasBottomNav(b: PhoneAccessBranding): boolean {

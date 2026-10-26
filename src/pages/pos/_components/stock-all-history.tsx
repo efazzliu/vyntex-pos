@@ -60,7 +60,7 @@ export default function StockAllHistory({
         </Button>
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2">
-            <Clock className="size-5 md:size-6 text-blue-400" />
+            <Clock className="size-5 md:size-6 text-brand-soft" />
             Stock History
           </h1>
           <p className="text-sm text-[#5a6580] mt-0.5">
@@ -168,7 +168,7 @@ export default function StockAllHistory({
                         ? "text-emerald-400"
                         : isNegative
                           ? "text-red-400"
-                          : "text-blue-400",
+                          : "text-brand-soft",
                     )}
                   >
                     {changeLabel}
@@ -176,6 +176,12 @@ export default function StockAllHistory({
                   <span className="text-sm text-white truncate">
                     {log.itemName}
                   </span>
+                  {(log.type === "waste" || log.note) && (
+                    <p className="text-[11px] text-[#8b93a7] truncate mt-0.5">
+                      {log.type === "waste" ? "Waste / delete" : log.type}
+                      {log.note ? ` · ${log.note}` : ""}
+                    </p>
+                  )}
                 </div>
               </div>
             );

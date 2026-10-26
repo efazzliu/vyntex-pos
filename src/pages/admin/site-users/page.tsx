@@ -327,7 +327,7 @@ function UserMobileCard({
   return (
     <article className="rounded-xl border border-slate-200 bg-slate-50/60 p-3.5 dark:border-slate-800 dark:bg-slate-900/40">
       <div className="flex items-start gap-3">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#0066FF]/12 text-sm font-semibold text-[#0066FF] dark:bg-blue-500/15 dark:text-blue-300">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brand/12 text-sm font-semibold text-brand dark:bg-brand/15 dark:text-brand-soft">
           {initial}
         </span>
         <div className="min-w-0 flex-1">
@@ -417,7 +417,7 @@ function UserDesktopRow({
         {clientHref ? (
           <Link
             to={clientHref}
-            className="text-[11px] font-medium text-[#0f4cb8] hover:underline dark:text-blue-300"
+            className="text-[11px] font-medium text-[#0f4cb8] hover:underline dark:text-brand-soft"
           >
             View
           </Link>

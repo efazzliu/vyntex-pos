@@ -96,7 +96,7 @@ function KitchenStopPanel({ licenseKey }: { licenseKey: string }) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t("kitchen.stop_search")}
-            className="w-full pl-9 pr-3 py-2 rounded-lg bg-[#0A0F1E] border border-[#1e2a45] text-white text-sm placeholder:text-[#5a6580] focus:outline-none focus:border-[#0066FF]"
+            className="w-full pl-9 pr-3 py-2 rounded-lg bg-[#0A0F1E] border border-[#1e2a45] text-white text-sm placeholder:text-[#5a6580] focus:outline-none focus:border-brand"
           />
         </div>
       </div>
@@ -289,7 +289,7 @@ export default function KitchenDisplayView({
                         <p className="text-lg font-bold text-white">
                           #{ticket.orderNumber}
                         </p>
-                        <p className="text-xs text-[#0066FF] font-medium">
+                        <p className="text-xs text-brand font-medium">
                           {ticket.tableName}
                         </p>
                       </div>
@@ -309,7 +309,7 @@ export default function KitchenDisplayView({
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-white font-medium">
-                              <span className="text-[#0066FF] tabular-nums">
+                              <span className="text-brand tabular-nums">
                                 {line.quantity}×
                               </span>{" "}
                               {line.name}

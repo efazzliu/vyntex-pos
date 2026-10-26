@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useMutation, useQuery } from "convex/react";
 import type { Doc, Id } from "@/convex/_generated/dataModel.d.ts";
 import { toast } from "sonner";
+import { errorMessageFromUnknown } from "@/lib/supabase-pos/db-errors.ts";
 import {
   ArrowLeft,
   ChefHat,
@@ -19,12 +20,11 @@ import {
   Wine,
   Banknote,
   CreditCard,
-  QrCode,
   X,
 } from "lucide-react";
 import { getWaiterSession } from "@/phone-app/lib/waiter-session.ts";
 import { usePhoneAccessBranding } from "@/phone-app/hooks/use-phone-access-branding.tsx";
-import { phoneAccessThemeTokens, waiterThemeGlow, waiterThemeStyle } from "@/lib/phone-access-theme.ts";
+import { phoneAccessThemeTokens, waiterThemeGlow, waiterThemeStyle, vyntexSelectedFill, vyntexSelectedBar } from "@/lib/phone-access-theme.ts";
 import { emojiForCategoryName } from "@/lib/pos-category-icons.ts";
 import { uuidOrNull, staffIdsEqual } from "@/lib/supabase-pos/uuid.ts";
 import { cn } from "@/lib/utils.ts";
@@ -37,9 +37,10 @@ import {
   getOrderBlockReason,
   isMenuItemShownForOrdering,
   parseOrderBlockError,
-  resolveEnforceOrderAvailability,
+  resolveOrderAvailabilityRulesFromCompany,
 } from "@/lib/pos-order-availability.ts";
 import MenuItemCustomizationPicker from "@/components/menu-item-customization-picker.tsx";
+import PhoneWaiterPrepScreen from "@/phone-app/components/phone-waiter-prep-screen.tsx";
 import {
   cartLineKey,
   formatCustomizationsForDisplay,
@@ -48,6 +49,14 @@ import {
   resolvedMenuItemUnitPrice,
   type SelectedCustomization,
 } from "@/lib/menu-customizations.ts";
+import {
+  hasPrepConfig,
+  prepExtrasPrice,
+  resolveItemPrepConfig,
+  type PrepSelections,
+} from "@/lib/menu-prep-config.ts";
+import { fallbackPrepConfig } from "@/phone-app/lib/waiter-prep-fallback.ts";
+import { BRAND } from "@/lib/brand-colors.ts";
 
 type CartItem = {
   menuItemId: string;
@@ -58,6 +67,8 @@ type CartItem = {
   vatRate?: number;
   notes?: string;
   selectedCustomizations?: SelectedCustomization[];
+  prepSelections?: PrepSelections;
+  prepExtraPrice?: number;
 };
 
 type SentLine = {
@@ -160,6 +171,7 @@ export default function PhoneWaiterOrder() {
         currencyDecimals?: number;
         paymentSettings?: unknown;
         enforceOrderAvailability?: boolean;
+        stockRules?: unknown;
       }
     | undefined;
 
@@ -212,6 +224,9 @@ export default function PhoneWaiterOrder() {
   const [noteApplyQty, setNoteApplyQty] = useState(1);
   const [noteMaxQty, setNoteMaxQty] = useState(1);
   const [noteContinue, setNoteContinue] = useState(false);
+  const [notePrepSelections, setNotePrepSelections] = useState<PrepSelections | undefined>(
+    undefined,
+  );
 
   useEffect(() => {
     if (!centerNotice) return;
@@ -241,10 +256,11 @@ export default function PhoneWaiterOrder() {
   const paymentSettings = parsePosPaymentSettings(company?.paymentSettings);
   const waiterCanPay = waiterPhoneCanCollectPayment(paymentSettings);
   const billRequested = currentTable?.status === "bill-printed";
-  const enforceAvailability = resolveEnforceOrderAvailability(
-    company?.enforceOrderAvailability,
+  const availabilityRules = resolveOrderAvailabilityRulesFromCompany(
+    company,
     licenseKey,
   );
+  const enforceAvailability = availabilityRules.honorKitchenStop;
 
   const manualFavorites = useMemo(
     () =>
@@ -324,7 +340,7 @@ export default function PhoneWaiterOrder() {
     const blocked = getOrderBlockReason(
       item,
       existingQty + 1,
-      enforceAvailability,
+      availabilityRules,
     );
     if (blocked) {
       toast.error(
@@ -359,6 +375,15 @@ export default function PhoneWaiterOrder() {
   };
 
   const addToCart = (item: Doc<"menuItems"> & { customizationConfig?: unknown }) => {
+    const blocked = getOrderBlockReason(item, 1, availabilityRules);
+    if (blocked) {
+      toast.error(
+        blocked === "stock"
+          ? t("phone.waiter.order.blockedStock", { name: item.name })
+          : t("phone.waiter.order.blockedStopped", { name: item.name }),
+      );
+      return;
+    }
     if (hasMenuItemCustomizations(item)) {
       setCustomizationPickerItem(item);
       return;
@@ -372,7 +397,7 @@ export default function PhoneWaiterOrder() {
       const item = (menuItems ?? []).find((i) => i._id === line?.menuItemId);
       const nextQty = (line?.quantity ?? 0) + delta;
       if (item) {
-        const blocked = getOrderBlockReason(item, nextQty, enforceAvailability);
+        const blocked = getOrderBlockReason(item, nextQty, availabilityRules);
         if (blocked) {
           toast.error(
             blocked === "stock"
@@ -395,6 +420,7 @@ export default function PhoneWaiterOrder() {
   const openNoteDialog = (line: CartItem) => {
     setNoteCartKey(cartLineKey(line));
     setNoteText(line.notes ?? "");
+    setNotePrepSelections(line.prepSelections);
     setNoteMaxQty(line.quantity);
     // Default to 1 when adding a note to a multi-qty line so only one item is special.
     setNoteApplyQty(line.notes ? line.quantity : 1);
@@ -404,31 +430,10 @@ export default function PhoneWaiterOrder() {
   const closeNoteDialog = () => {
     setNoteCartKey(null);
     setNoteText("");
+    setNotePrepSelections(undefined);
     setNoteApplyQty(1);
     setNoteMaxQty(1);
     setNoteContinue(false);
-  };
-
-  const noteParts = (text: string) =>
-    text
-      .split(",")
-      .map((p) => p.trim())
-      .filter(Boolean);
-
-  const noteHasPreset = (text: string, preset: string) =>
-    noteParts(text).some((p) => p.toLowerCase() === preset.toLowerCase());
-
-  const toggleNotePreset = (preset: string) => {
-    setNoteText((prev) => {
-      const parts = noteParts(prev);
-      const idx = parts.findIndex((p) => p.toLowerCase() === preset.toLowerCase());
-      if (idx >= 0) {
-        parts.splice(idx, 1);
-      } else {
-        parts.push(preset);
-      }
-      return parts.join(", ");
-    });
   };
 
   const foldCartLines = (lines: CartItem[]): CartItem[] => {
@@ -445,20 +450,43 @@ export default function PhoneWaiterOrder() {
     return folded;
   };
 
-  const saveNote = () => {
+  const saveNote = (
+    nextNotes?: string,
+    nextPrep?: PrepSelections,
+    continueToNext = false,
+  ) => {
     if (!noteCartKey) return;
-    const nextNotes = noteText.trim() || undefined;
     const applyQty = Math.min(Math.max(1, noteApplyQty), noteMaxQty);
+    const sourceIndex = cart.findIndex(
+      (c) => cartLineKey(c) === noteCartKey,
+    );
     const source = cart.find((c) => cartLineKey(c) === noteCartKey);
     if (!source) {
       closeNoteDialog();
       return;
     }
+    const nextOriginal =
+      sourceIndex >= 0 && sourceIndex < cart.length - 1
+        ? cart[sourceIndex + 1]
+        : undefined;
+    const nextExtraPrice = prepExtrasPrice(notePrepConfig, nextPrep);
+    const nextUnitPrice =
+      Math.round(
+        (source.price - (source.prepExtraPrice ?? 0) + nextExtraPrice) * 100,
+      ) / 100;
 
     let next: CartItem[];
     if (applyQty >= source.quantity) {
       next = cart.map((c) =>
-        cartLineKey(c) === noteCartKey ? { ...c, notes: nextNotes } : c,
+        cartLineKey(c) === noteCartKey
+          ? {
+              ...c,
+              price: nextUnitPrice,
+              notes: nextNotes,
+              prepSelections: nextPrep,
+              prepExtraPrice: nextExtraPrice,
+            }
+          : c,
       );
     } else {
       // Split: keep remaining with the old note, carve out applyQty with the new note.
@@ -466,8 +494,15 @@ export default function PhoneWaiterOrder() {
         if (cartLineKey(c) !== noteCartKey) return [c];
         const remaining = c.quantity - applyQty;
         return [
+          {
+            ...c,
+            price: nextUnitPrice,
+            quantity: applyQty,
+            notes: nextNotes,
+            prepSelections: nextPrep,
+            prepExtraPrice: nextExtraPrice,
+          },
           { ...c, quantity: remaining },
-          { ...c, quantity: applyQty, notes: nextNotes },
         ];
       });
     }
@@ -475,19 +510,33 @@ export default function PhoneWaiterOrder() {
     const folded = foldCartLines(next);
     setCart(folded);
 
-    // Keep dialog open on the leftover qty so another different note can be added
-    // (e.g. 4 pizzas → 1 no mushrooms, 1 well done, 1 light, 1 plain).
-    if (applyQty < source.quantity) {
-      const remainingKey = cartLineKey(source);
-      const remaining = folded.find((c) => cartLineKey(c) === remainingKey);
-      if (remaining && remaining.quantity > 0) {
-        setNoteCartKey(cartLineKey(remaining));
-        setNoteText("");
-        setNoteMaxQty(remaining.quantity);
-        setNoteApplyQty(1);
-        setNoteContinue(true);
-        return;
-      }
+    if (!continueToNext) {
+      closeNoteDialog();
+      return;
+    }
+
+    // Continue one by one: remaining quantity of the same product comes first,
+    // then move to the next product line in the cart.
+    const remaining =
+      applyQty < source.quantity
+        ? folded.find((c) => cartLineKey(c) === cartLineKey(source))
+        : undefined;
+    const following =
+      remaining ??
+      (nextOriginal
+        ? folded.find(
+            (c) => cartLineKey(c) === cartLineKey(nextOriginal),
+          )
+        : undefined);
+
+    if (following) {
+      setNoteCartKey(cartLineKey(following));
+      setNoteText(following.notes ?? "");
+      setNotePrepSelections(following.prepSelections);
+      setNoteMaxQty(following.quantity);
+      setNoteApplyQty(following.notes ? following.quantity : 1);
+      setNoteContinue(true);
+      return;
     }
 
     closeNoteDialog();
@@ -574,12 +623,43 @@ export default function PhoneWaiterOrder() {
       setHistoryOpen(false);
       setCenterNotice(t("phone.waiter.order.paid"));
       window.setTimeout(() => navigate(backTo, { replace: true }), 700);
-    } catch {
-      toast.error(t("phone.waiter.order.payFailed"));
+    } catch (err) {
+      const detail = errorMessageFromUnknown(err, "").trim();
+      console.error("[phone pay]", err);
+      toast.error(
+        detail
+          ? `${t("phone.waiter.order.payFailed")} ${detail}`
+          : t("phone.waiter.order.payFailed"),
+      );
     } finally {
       setPayBusy(false);
     }
   };
+
+  const noteLine = noteCartKey
+    ? cart.find((c) => cartLineKey(c) === noteCartKey)
+    : undefined;
+  const noteMenuItem = noteLine
+    ? (menuItems ?? []).find((item) => String(item._id) === noteLine.menuItemId)
+    : undefined;
+  const noteCategory = noteMenuItem
+    ? (categories ?? []).find((c) => String(c._id) === String(noteMenuItem.categoryId))
+    : undefined;
+  const notePrepConfig = useMemo(() => {
+    const resolved = resolveItemPrepConfig(noteMenuItem, noteCategory);
+    return hasPrepConfig(resolved)
+      ? resolved
+      : fallbackPrepConfig((key) => String(t(key)));
+  }, [noteMenuItem, noteCategory, t]);
+  const noteLineIndex = noteCartKey
+    ? cart.findIndex((line) => cartLineKey(line) === noteCartKey)
+    : -1;
+  const noteNextLine =
+    noteLine && noteApplyQty < noteLine.quantity
+      ? noteLine
+      : noteLineIndex >= 0 && noteLineIndex < cart.length - 1
+        ? cart[noteLineIndex + 1]
+        : undefined;
 
   if (!session) return null;
 
@@ -587,8 +667,8 @@ export default function PhoneWaiterOrder() {
     tableDesign === "advanced"
       ? "rgba(212,175,55,0.18)"
       : tableDesign === "modern"
-        ? "rgba(99,102,241,0.26)"
-        : "rgba(0,102,255,0.22)";
+        ? "rgba(0,91,214,0.26)"
+        : "rgba(0,91,214,0.22)";
   const accent = access.accentColor;
   const tokens = phoneAccessThemeTokens(access.theme);
   const light = tokens.isLight;
@@ -671,7 +751,7 @@ export default function PhoneWaiterOrder() {
             <h1 className="truncate text-lg font-semibold tracking-tight">
               {currentTable?.name ?? t("phone.waiter.order.title")}
               {existingOrder ? (
-                <span className="ml-2 text-[13px] font-medium text-[#7eb6ff]">
+                <span className="ml-2 text-[13px] font-medium text-brand-soft">
                   #{existingOrder.orderNumber}
                 </span>
               ) : null}
@@ -693,7 +773,9 @@ export default function PhoneWaiterOrder() {
                   : "bg-white/[0.08] text-white/55",
               )}
               style={
-                selectedCategory === "favorites" ? { backgroundColor: accent } : undefined
+                selectedCategory === "favorites"
+                  ? vyntexSelectedFill({ shadow: false })
+                  : undefined
               }
             >
               {t("phone.waiter.order.favorites")}
@@ -709,7 +791,7 @@ export default function PhoneWaiterOrder() {
                     "shrink-0 rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition",
                     sel ? "text-white" : "bg-white/[0.08] text-white/55",
                   )}
-                  style={sel ? { backgroundColor: cat.color || accent } : undefined}
+                  style={sel ? vyntexSelectedFill({ shadow: false }) : undefined}
                 >
                   {cat.name}
                 </button>
@@ -724,10 +806,9 @@ export default function PhoneWaiterOrder() {
               className="shrink-0 pb-1.5 text-[13px] font-medium"
               style={{
                 color: selectedCategory === "favorites" ? "var(--waiter-fg)" : "var(--waiter-muted)",
-                borderBottom:
-                  selectedCategory === "favorites"
-                    ? `2px solid ${accent}`
-                    : "2px solid transparent",
+                ...(selectedCategory === "favorites"
+                  ? vyntexSelectedBar()
+                  : { borderBottom: "2px solid transparent" }),
               }}
             >
               {t("phone.waiter.order.favorites")}
@@ -742,9 +823,7 @@ export default function PhoneWaiterOrder() {
                   className="shrink-0 pb-1.5 text-[13px] font-medium"
                   style={{
                     color: sel ? "var(--waiter-fg)" : "var(--waiter-muted)",
-                    borderBottom: sel
-                      ? `2px solid ${cat.color || accent}`
-                      : "2px solid transparent",
+                    ...(sel ? vyntexSelectedBar() : { borderBottom: "2px solid transparent" }),
                   }}
                 >
                   {cat.name}
@@ -761,9 +840,14 @@ export default function PhoneWaiterOrder() {
                 className={cn(
                   "flex h-[3.85rem] min-w-0 flex-col items-center justify-center gap-1 rounded-xl border px-1 py-1.5 text-center transition",
                   selectedCategory === "favorites"
-                    ? "border-transparent bg-amber-500 text-white"
+                    ? "border-transparent text-white"
                     : "border-white/10 bg-white/[0.05] text-white/60",
                 )}
+                style={
+                  selectedCategory === "favorites"
+                    ? vyntexSelectedFill({ shadow: false })
+                    : undefined
+                }
               >
                 <span className="flex size-5 items-center justify-center">
                   <Star className="size-4" />
@@ -785,7 +869,7 @@ export default function PhoneWaiterOrder() {
                         ? "text-white border-transparent"
                         : "border-white/10 bg-white/[0.05] text-white/60",
                     )}
-                    style={sel ? { backgroundColor: cat.color } : undefined}
+                    style={sel ? vyntexSelectedFill({ shadow: false }) : undefined}
                   >
                     <span className="flex size-5 items-center justify-center text-[15px] leading-none">
                       {(cat.icon && cat.icon.trim()) ||
@@ -812,7 +896,7 @@ export default function PhoneWaiterOrder() {
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t("phone.waiter.order.searchPlaceholder")}
             className={cn(
-              "h-10 w-full border border-white/10 bg-white/[0.05] pl-9 pr-8 text-[14px] text-white outline-none placeholder:text-white/30 focus:border-[#0066FF]/60",
+              "h-10 w-full border border-white/10 bg-white/[0.05] pl-9 pr-8 text-[14px] text-white outline-none placeholder:text-white/30 focus:border-brand/60",
               tableDesign === "modern"
                 ? "rounded-full"
                 : tableDesign === "advanced"
@@ -859,7 +943,7 @@ export default function PhoneWaiterOrder() {
                       cartLineKey(c) ===
                       cartLineKey({ menuItemId: String(item._id) }),
                   );
-              const visualBlock = getOrderBlockReason(item, 1, enforceAvailability);
+              const visualBlock = getOrderBlockReason(item, 1, availabilityRules);
               return (
                 <button
                   key={item._id}
@@ -867,12 +951,14 @@ export default function PhoneWaiterOrder() {
                   onClick={() => addToCart(item)}
                   disabled={Boolean(visualBlock)}
                   className={cn(
-                    "flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition active:scale-[0.99]",
-                    visualBlock
-                      ? "bg-white/[0.03] opacity-55"
-                      : inCart
-                        ? "bg-white/[0.08]"
-                        : "bg-white/[0.05]",
+                    "flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition",
+                    visualBlock === "stock"
+                      ? "cursor-not-allowed border border-red-400/60 bg-red-500/[0.05]"
+                      : visualBlock
+                        ? "cursor-not-allowed bg-white/[0.03] opacity-55"
+                        : inCart
+                          ? "bg-white/[0.08] active:scale-[0.99]"
+                          : "bg-white/[0.05] active:scale-[0.99]",
                   )}
                 >
                   <span className="min-w-0 flex-1">
@@ -883,7 +969,12 @@ export default function PhoneWaiterOrder() {
                       <span className="text-[12px] text-white/45">{formatPrice(item.price)}</span>
                     ) : null}
                     {visualBlock ? (
-                      <span className="block text-[10px] font-semibold text-amber-400">
+                      <span
+                        className={cn(
+                          "block text-[10px] font-semibold",
+                          visualBlock === "stock" ? "text-red-400" : "text-amber-400",
+                        )}
+                      >
                         {visualBlock === "stock"
                           ? t("phone.waiter.order.outOfStock")
                           : t("phone.waiter.order.stopped")}
@@ -919,17 +1010,27 @@ export default function PhoneWaiterOrder() {
                       cartLineKey(c) ===
                       cartLineKey({ menuItemId: String(item._id) }),
                   );
-              const visualBlock = getOrderBlockReason(item, 1, enforceAvailability);
+              const visualBlock = getOrderBlockReason(item, 1, availabilityRules);
               return (
                 <div
                   key={item._id}
                   className={cn(
                     "flex items-center gap-2 rounded-xl px-2 py-2",
-                    visualBlock ? "opacity-55" : "",
+                    visualBlock === "stock"
+                      ? "ring-1 ring-red-400/60 ring-inset"
+                      : visualBlock
+                        ? "opacity-55"
+                        : "",
                   )}
                   style={{
-                    background: "var(--waiter-card)",
-                    boxShadow: "inset 0 0 0 1px var(--waiter-border)",
+                    background:
+                      visualBlock === "stock"
+                        ? "rgba(239,68,68,0.05)"
+                        : "var(--waiter-card)",
+                    boxShadow:
+                      visualBlock === "stock"
+                        ? "inset 0 0 0 1px rgba(248,113,113,0.6)"
+                        : "inset 0 0 0 1px var(--waiter-border)",
                   }}
                 >
                   <span
@@ -954,7 +1055,12 @@ export default function PhoneWaiterOrder() {
                       {waiterCanPay ? formatPrice(item.price) : item.station === "bar" ? "Bar" : "Kitchen"}
                     </p>
                     {visualBlock ? (
-                      <p className="text-[10px] font-semibold text-amber-400">
+                      <p
+                        className={cn(
+                          "text-[10px] font-semibold",
+                          visualBlock === "stock" ? "text-red-400" : "text-amber-400",
+                        )}
+                      >
                         {visualBlock === "stock"
                           ? t("phone.waiter.order.outOfStock")
                           : t("phone.waiter.order.stopped")}
@@ -1017,20 +1123,23 @@ export default function PhoneWaiterOrder() {
               const visualBlock = getOrderBlockReason(
                 item,
                 1,
-                enforceAvailability,
+                availabilityRules,
               );
               return (
                 <button
                   key={item._id}
                   type="button"
                   onClick={() => addToCart(item)}
+                  disabled={Boolean(visualBlock)}
                   className={cn(
-                    "relative flex flex-col items-start gap-1 rounded-2xl border p-3 text-left transition active:scale-[0.98]",
-                    visualBlock
-                      ? "border-white/8 bg-white/[0.02] opacity-55"
-                      : inCart
-                        ? "border-[#0066FF]/60 bg-[#0066FF]/12"
-                        : "border-white/10 bg-white/[0.04]",
+                    "relative flex flex-col items-start gap-1 rounded-2xl border p-3 text-left transition",
+                    visualBlock === "stock"
+                      ? "cursor-not-allowed border-red-400/60 bg-red-500/[0.05]"
+                      : visualBlock
+                        ? "cursor-not-allowed border-white/8 bg-white/[0.02] opacity-55"
+                        : inCart
+                          ? "border-brand/60 bg-brand/12 active:scale-[0.98]"
+                          : "border-white/10 bg-white/[0.04] active:scale-[0.98]",
                   )}
                 >
                   {item.station ? (
@@ -1049,17 +1158,22 @@ export default function PhoneWaiterOrder() {
                   ) : null}
                   <p className="line-clamp-2 text-[13px] font-semibold text-white">{item.name}</p>
                   {waiterCanPay ? (
-                    <p className="text-[13px] font-bold text-[#7eb6ff]">{formatPrice(item.price)}</p>
+                    <p className="text-[13px] font-bold text-brand-soft">{formatPrice(item.price)}</p>
                   ) : null}
                   {visualBlock ? (
-                    <p className="text-[10px] font-semibold text-amber-400">
+                    <p
+                      className={cn(
+                        "text-[10px] font-semibold",
+                        visualBlock === "stock" ? "text-red-400" : "text-amber-400",
+                      )}
+                    >
                       {visualBlock === "stock"
                         ? t("phone.waiter.order.outOfStock")
                         : t("phone.waiter.order.stopped")}
                     </p>
                   ) : null}
                   {inCart && !visualBlock ? (
-                    <span className="absolute right-2 top-2 flex size-6 items-center justify-center rounded-full bg-[#0066FF] text-[11px] font-bold text-white">
+                    <span className="absolute right-2 top-2 flex size-6 items-center justify-center rounded-full bg-brand text-[11px] font-bold text-white">
                       {inCart.quantity}
                     </span>
                   ) : null}
@@ -1087,7 +1201,7 @@ export default function PhoneWaiterOrder() {
                     {t("phone.waiter.order.currentOrder")}
                   </p>
                   {waiterCanPay ? (
-                    <p className="text-[13px] font-bold text-[#7eb6ff]">
+                    <p className="text-[13px] font-bold text-brand-soft">
                       {formatPrice(cartTotal)}
                     </p>
                   ) : null}
@@ -1116,7 +1230,7 @@ export default function PhoneWaiterOrder() {
                             </p>
                           ) : null}
                         </div>
-                        <div className="flex shrink-0 items-center gap-1.5">
+                        <div className="flex shrink-0 items-center gap-1">
                           <button
                             type="button"
                             onClick={() => openNoteDialog(item)}
@@ -1126,17 +1240,17 @@ export default function PhoneWaiterOrder() {
                                 : t("phone.waiter.order.addNote")
                             }
                             className={cn(
-                              "flex size-7 items-center justify-center rounded-lg transition active:scale-95",
+                              "flex size-6 items-center justify-center rounded-lg transition active:scale-95",
                               item.notes
                                 ? light
                                   ? "bg-amber-100 text-amber-700"
                                   : "bg-amber-500/25 text-amber-300"
                                 : light
-                                  ? "bg-slate-100 text-slate-700 ring-1 ring-slate-200"
+                                  ? "bg-slate-100 text-slate-700"
                                   : "bg-white/[0.08] text-white/80",
                             )}
                           >
-                            <Pencil className="size-3.5" strokeWidth={2.25} />
+                            <Pencil className="size-3" strokeWidth={2.25} />
                           </button>
                           <button
                             type="button"
@@ -1169,7 +1283,11 @@ export default function PhoneWaiterOrder() {
                   <div
                     className={cn(
                       "flex min-w-0 items-center gap-1.5 border border-white/12 bg-[#121a2e] px-2.5 py-2",
-                      showCartBar ? "w-1/2" : "w-full",
+                      showCartBar
+                        ? "w-1/2"
+                        : waiterCanPay && existingOrder
+                          ? "min-w-0 flex-1"
+                          : "w-full",
                       tableDesign === "modern" ? "rounded-full" : "rounded-2xl",
                     )}
                   >
@@ -1196,17 +1314,8 @@ export default function PhoneWaiterOrder() {
                       </span>
                     </button>
                     {!showCartBar && existingOrder ? (
-                      waiterCanPay ? (
-                        <button
-                          type="button"
-                          onClick={() => setPayOpen(true)}
-                          disabled={payBusy}
-                          className="shrink-0 rounded-xl bg-emerald-600 px-3 py-2 text-[12px] font-semibold text-white active:scale-95 disabled:opacity-50"
-                        >
-                          {t("phone.waiter.order.payment")}
-                        </button>
-                      ) : billRequested ? (
-                        <span className="shrink-0 max-w-[7.5rem] text-right text-[11px] font-semibold leading-tight text-[#7eb6ff]">
+                      billRequested ? (
+                        <span className="shrink-0 max-w-[7.5rem] text-right text-[11px] font-semibold leading-tight text-brand-soft">
                           {t("phone.waiter.order.billRequested")}
                         </span>
                       ) : (
@@ -1214,13 +1323,32 @@ export default function PhoneWaiterOrder() {
                           type="button"
                           onClick={() => void handleRequestBill()}
                           disabled={payBusy}
-                          className="shrink-0 rounded-xl bg-[#0066FF] px-3 py-2 text-[12px] font-semibold text-white active:scale-95 disabled:opacity-50"
+                          className="shrink-0 rounded-xl bg-brand px-3 py-2 text-[12px] font-semibold text-white active:scale-95 disabled:opacity-50"
                         >
                           {t("phone.waiter.order.requestBill")}
                         </button>
                       )
                     ) : null}
                   </div>
+                ) : null}
+
+                {!showCartBar && existingOrder && waiterCanPay ? (
+                  <button
+                    type="button"
+                    onClick={() => setPayOpen(true)}
+                    disabled={payBusy}
+                    className={cn(
+                      "flex shrink-0 items-center justify-center gap-1.5 px-4 text-[13px] font-semibold text-white active:scale-[0.99] disabled:opacity-50",
+                      tableDesign === "modern" ? "rounded-full" : "rounded-2xl",
+                    )}
+                    style={{
+                      backgroundColor:
+                        tableDesign === "professional" ? BRAND.primary : accent,
+                    }}
+                  >
+                    <CreditCard className="size-4 shrink-0" />
+                    {t("phone.waiter.order.payment")}
+                  </button>
                 ) : null}
 
                 {showCartBar ? (
@@ -1234,7 +1362,7 @@ export default function PhoneWaiterOrder() {
                     )}
                     style={{
                       backgroundColor:
-                        tableDesign === "professional" ? "#0066FF" : accent,
+                        tableDesign === "professional" ? BRAND.primary : accent,
                     }}
                   >
                     <ShoppingBag className="size-4 shrink-0" />
@@ -1306,7 +1434,16 @@ export default function PhoneWaiterOrder() {
                           </p>
                         ) : null}
                         {waiterCanPay ? (
-                          <p className="text-[12px] text-white/40">{formatPrice(item.price)}</p>
+                          <p className="text-[12px] text-white/40">
+                            {formatPrice(item.price)}
+                            {(item.prepExtraPrice ?? 0) > 0
+                              ? ` · +${formatPrice(item.prepExtraPrice ?? 0)}`
+                              : ""}
+                          </p>
+                        ) : (item.prepExtraPrice ?? 0) > 0 ? (
+                          <p className="text-[12px] text-white/40">
+                            +{formatPrice(item.prepExtraPrice ?? 0)}
+                          </p>
                         ) : null}
                       </div>
                       <div className="flex items-center gap-2">
@@ -1371,7 +1508,7 @@ export default function PhoneWaiterOrder() {
                 type="button"
                 onClick={handleSend}
                 disabled={cart.length === 0 || isSubmitting}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0066FF] py-3.5 text-[15px] font-semibold text-white transition active:scale-[0.98] disabled:opacity-50"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3.5 text-[15px] font-semibold text-white transition active:scale-[0.98] disabled:opacity-50"
               >
                 <Send className="size-4" />
                 {isSubmitting
@@ -1384,114 +1521,122 @@ export default function PhoneWaiterOrder() {
       ) : null}
 
       {historyOpen ? (
-        <div className="fixed inset-0 z-30 flex flex-col justify-end bg-black/60">
-          <button
-            type="button"
-            aria-label={t("btn.cancel")}
-            className="absolute inset-0"
-            onClick={() => setHistoryOpen(false)}
-          />
-          <div className="relative z-10 flex max-h-[88vh] flex-col rounded-t-3xl border-t border-white/10 bg-[#0d1326] pb-[max(1rem,env(safe-area-inset-bottom))]">
-            <div className="flex items-center justify-between px-4 py-3.5">
-              <h2 className="text-[15px] font-semibold text-white">
-                {t("phone.waiter.order.previousOrders")}
-              </h2>
+        <div
+          className="fixed inset-0 z-30 flex flex-col overflow-hidden"
+          style={{ background: tokens.page, color: tokens.fg }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="waiter-combined-orders-title"
+        >
+          <header className="flex shrink-0 items-center justify-between px-4 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
+            <h2 id="waiter-combined-orders-title" className="text-[18px] font-semibold tracking-tight">
+              {t("phone.waiter.order.previousOrders")}
+            </h2>
+            <button
+              type="button"
+              onClick={() => setHistoryOpen(false)}
+              className="flex size-10 items-center justify-center rounded-full active:scale-95"
+              style={{ background: tokens.card, color: tokens.muted }}
+              aria-label={t("btn.cancel")}
+            >
+              <X className="size-4" />
+            </button>
+          </header>
+
+          <div className="mx-4 mb-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-[#f3efe6] text-[#141820] shadow-sm">
+            <div className="border-b border-black/10 px-5 py-3 text-center">
+              <h3 className="text-[16px] font-semibold tracking-tight">
+                {company?.name || t("phone.waiter.order.billTitle", { defaultValue: "Fatura" })}
+              </h3>
+              <p className="mt-1 text-[12px] text-black/55">
+                {[currentTable?.zone, currentTable?.name, existingOrder ? `#${existingOrder.orderNumber}` : null]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto no-scrollbar px-3 py-2">
+              {groupedSent.length === 0 ? (
+                <p className="py-8 text-center text-[13px] text-black/40">
+                  {t("phone.waiter.order.cartEmpty")}
+                </p>
+              ) : (
+                <>
+                  <div className="mb-1 grid grid-cols-[minmax(0,1fr)_4.1rem_2.4rem_4.6rem] items-center gap-x-1.5 px-1 text-[10px] font-medium text-black/40">
+                    <span className="truncate">{t("phone.waiter.order.billItem", { defaultValue: "Produkti" })}</span>
+                    <span className="text-right">{t("phone.waiter.order.billUnit", { defaultValue: "Çmimi" })}</span>
+                    <span className="text-center">{t("phone.waiter.order.billQty", { defaultValue: "Sasia" })}</span>
+                    <span className="text-right">{t("phone.waiter.order.billLine", { defaultValue: "Totali" })}</span>
+                  </div>
+                  <div className="divide-y divide-black/10">
+                    {groupedSent.map((g) => (
+                      <div
+                        key={g.key}
+                        className="grid grid-cols-[minmax(0,1fr)_4.1rem_2.4rem_4.6rem] items-center gap-x-1.5 px-1 py-2.5"
+                      >
+                        <span className="min-w-0 truncate text-[13px] font-medium leading-snug">{g.name}</span>
+                        <span className="text-right text-[11px] tabular-nums text-black/50">
+                          {formatPrice(g.price)}
+                        </span>
+                        <span className="text-center text-[13px] font-semibold tabular-nums">{g.qty}</span>
+                        <span className="text-right text-[13px] font-semibold tabular-nums">
+                          {formatPrice(g.price * g.qty)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="border-t border-dashed border-black/20 px-4 py-4">
+              <div className="flex items-end justify-between gap-3">
+                <span className="text-[12px] font-medium text-black/50">
+                  {t("phone.waiter.order.billDue", { defaultValue: "Për t'u paguar" })}
+                </span>
+                <span className="text-[22px] font-bold tabular-nums leading-none">
+                  {formatPrice(orderWithItems?.total ?? billTotal)}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {existingOrder ? (
+            <div className="flex shrink-0 gap-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
               <button
                 type="button"
-                onClick={() => setHistoryOpen(false)}
-                className="flex size-8 items-center justify-center rounded-lg text-white/50"
+                onClick={() => void handleRequestBill()}
+                disabled={payBusy}
+                className={cn(
+                  "flex items-center justify-center rounded-xl bg-brand py-3.5 text-[15px] font-semibold text-white disabled:opacity-50",
+                  waiterCanPay ? "min-w-0 flex-1" : "w-full",
+                )}
               >
-                <X className="size-4" />
+                {billRequested
+                  ? t("phone.waiter.order.billRequested")
+                  : t("phone.waiter.order.requestBill")}
               </button>
+              {waiterCanPay ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHistoryOpen(false);
+                    setPayOpen(true);
+                  }}
+                  className="flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl py-3.5 text-[15px] font-semibold text-white"
+                  style={{
+                    backgroundColor:
+                      tableDesign === "professional" ? BRAND.primary : accent,
+                  }}
+                >
+                  <CreditCard className="size-4" />
+                  {t("phone.waiter.order.payment")}
+                </button>
+              ) : null}
             </div>
-
-            <div className="mx-4 mb-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-[#f3efe6] text-[#141820]">
-              <div className="border-b border-black/10 px-5 py-3 text-center">
-                <h3 className="text-[16px] font-semibold tracking-tight">
-                  {company?.name || t("phone.waiter.order.billTitle", { defaultValue: "Fatura" })}
-                </h3>
-                <p className="mt-1 text-[12px] text-black/55">
-                  {[currentTable?.zone, currentTable?.name, existingOrder ? `#${existingOrder.orderNumber}` : null]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-              </div>
-
-              <div className="min-h-0 flex-1 overflow-y-auto no-scrollbar px-3 py-2">
-                {groupedSent.length === 0 ? (
-                  <p className="py-8 text-center text-[13px] text-black/40">
-                    {t("phone.waiter.order.cartEmpty")}
-                  </p>
-                ) : (
-                  <>
-                    <div className="mb-1 grid grid-cols-[minmax(0,1fr)_4.1rem_2.4rem_4.6rem] items-center gap-x-1.5 px-1 text-[10px] font-medium text-black/40">
-                      <span className="truncate">{t("phone.waiter.order.billItem", { defaultValue: "Produkti" })}</span>
-                      <span className="text-right">{t("phone.waiter.order.billUnit", { defaultValue: "Çmimi" })}</span>
-                      <span className="text-center">{t("phone.waiter.order.billQty", { defaultValue: "Sasia" })}</span>
-                      <span className="text-right">{t("phone.waiter.order.billLine", { defaultValue: "Totali" })}</span>
-                    </div>
-                    <div className="divide-y divide-black/10">
-                      {groupedSent.map((g) => (
-                        <div
-                          key={g.key}
-                          className="grid grid-cols-[minmax(0,1fr)_4.1rem_2.4rem_4.6rem] items-center gap-x-1.5 px-1 py-2.5"
-                        >
-                          <span className="min-w-0 truncate text-[13px] font-medium leading-snug">{g.name}</span>
-                          <span className="text-right text-[11px] tabular-nums text-black/50">
-                            {formatPrice(g.price)}
-                          </span>
-                          <span className="text-center text-[13px] font-semibold tabular-nums">{g.qty}</span>
-                          <span className="text-right text-[13px] font-semibold tabular-nums">
-                            {formatPrice(g.price * g.qty)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-
-              <div className="border-t border-dashed border-black/20 px-4 py-4">
-                <div className="flex items-end justify-between gap-3">
-                  <span className="text-[12px] font-medium text-black/50">
-                    {t("phone.waiter.order.billDue", { defaultValue: "Për t'u paguar" })}
-                  </span>
-                  <span className="text-[22px] font-bold tabular-nums leading-none">
-                    {formatPrice(orderWithItems?.total ?? billTotal)}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {existingOrder ? (
-              <div className="px-4">
-                {waiterCanPay ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setHistoryOpen(false);
-                      setPayOpen(true);
-                    }}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3.5 text-[15px] font-semibold text-white"
-                  >
-                    <CreditCard className="size-4" />
-                    {t("phone.waiter.order.payment")}
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => void handleRequestBill()}
-                    disabled={payBusy}
-                    className="flex w-full items-center justify-center rounded-xl bg-[#0066FF] py-3.5 text-[15px] font-semibold text-white disabled:opacity-50"
-                  >
-                    {billRequested
-                      ? t("phone.waiter.order.billRequested")
-                      : t("phone.waiter.order.requestBill")}
-                  </button>
-                )}
-              </div>
-            ) : null}
-          </div>
+          ) : (
+            <div className="pb-[max(1rem,env(safe-area-inset-bottom))]" />
+          )}
         </div>
       ) : null}
 
@@ -1519,12 +1664,11 @@ export default function PhoneWaiterOrder() {
             <p className="mb-4 text-[13px] text-white/45">
               {t("phone.waiter.order.closeTable")} · {formatPrice(orderWithItems?.total ?? 0)}
             </p>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {(
                 [
                   { id: "cash" as const, method: "cash" as const, icon: Banknote, label: t("phone.waiter.order.payCash") },
                   { id: "card" as const, method: "card" as const, icon: CreditCard, label: t("phone.waiter.order.payCard") },
-                  { id: "other" as const, method: "qr" as const, icon: QrCode, label: t("phone.waiter.order.payQr") },
                 ]
               )
                 .filter((opt) =>
@@ -1538,7 +1682,7 @@ export default function PhoneWaiterOrder() {
                   onClick={() => void handlePhonePay(opt.id)}
                   className="flex flex-col items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] py-4 text-white active:scale-[0.98] disabled:opacity-50"
                 >
-                  <opt.icon className="size-5 text-[#7eb6ff]" />
+                  <opt.icon className="size-5 text-brand-soft" />
                   <span className="text-[12px] font-semibold">{opt.label}</span>
                 </button>
               ))}
@@ -1585,136 +1729,29 @@ export default function PhoneWaiterOrder() {
         </div>
       ) : null}
 
-      {noteCartKey ? (
-        <div className="fixed inset-0 z-[95] flex items-end justify-center bg-black/60 p-4">
-          <button
-            type="button"
-            aria-label={t("phone.waiter.order.cancel")}
-            className="absolute inset-0"
-            onClick={closeNoteDialog}
-          />
-          <div className="relative z-10 w-full max-w-md rounded-2xl border border-white/10 bg-[#0d1326] p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-            <div className="mb-3 flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h3 className="text-[16px] font-semibold text-white">
-                  {noteContinue
-                    ? t("phone.waiter.order.noteTitleContinue")
-                    : t("phone.waiter.order.noteTitle")}
-                </h3>
-                <p className="mt-0.5 text-[12px] text-white/50">
-                  {noteContinue
-                    ? t("phone.waiter.order.noteContinueDesc", {
-                        count: noteMaxQty,
-                      })
-                    : t("phone.waiter.order.noteDesc")}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={closeNoteDialog}
-                className="flex size-8 shrink-0 items-center justify-center rounded-lg text-white/50"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-            <input
-              value={noteText}
-              onChange={(e) => setNoteText(e.target.value)}
-              placeholder={t("phone.waiter.order.notePlaceholder")}
-              autoFocus
-              className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-[14px] text-white outline-none placeholder:text-white/35 focus:border-[#0066FF]/60"
-            />
-            {noteMaxQty > 1 ? (
-              <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5">
-                <div className="min-w-0">
-                  <p className="text-[13px] font-medium text-white">
-                    {t("phone.waiter.order.noteApplyTo")}
-                  </p>
-                  <p className="text-[11px] text-white/45">
-                    {t("phone.waiter.order.noteApplyHint", {
-                      count: noteApplyQty,
-                      total: noteMaxQty,
-                    })}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setNoteApplyQty((q) => Math.max(1, q - 1))}
-                    disabled={noteApplyQty <= 1}
-                    className="flex size-8 items-center justify-center rounded-lg bg-white/[0.06] text-white/70 disabled:opacity-35"
-                  >
-                    <Minus className="size-3.5" />
-                  </button>
-                  <span className="w-6 text-center text-[14px] font-semibold text-white">
-                    {noteApplyQty}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setNoteApplyQty((q) => Math.min(noteMaxQty, q + 1))
-                    }
-                    disabled={noteApplyQty >= noteMaxQty}
-                    className="flex size-8 items-center justify-center rounded-lg bg-white/[0.06] text-white/70 disabled:opacity-35"
-                  >
-                    <Plus className="size-3.5" />
-                  </button>
-                </div>
-              </div>
-            ) : null}
-            <div className="mt-3 flex flex-wrap gap-2">
-              {(
-                [
-                  "phone.waiter.order.notePresetWellDone",
-                  "phone.waiter.order.notePresetLight",
-                  "phone.waiter.order.notePresetMedium",
-                  "phone.waiter.order.notePresetNoMushrooms",
-                  "phone.waiter.order.notePresetNoOnions",
-                  "phone.waiter.order.notePresetNoVeggies",
-                  "phone.waiter.order.notePresetWithSauce",
-                  "phone.waiter.order.notePresetExtraSpicy",
-                  "phone.waiter.order.notePresetNoCheese",
-                  "phone.waiter.order.notePresetAllergy",
-                ] as const
-              ).map((presetKey) => {
-                const preset = t(presetKey);
-                const selected = noteHasPreset(noteText, preset);
-                return (
-                  <button
-                    key={presetKey}
-                    type="button"
-                    onClick={() => toggleNotePreset(preset)}
-                    aria-pressed={selected}
-                    className={cn(
-                      "rounded-lg border px-2.5 py-1.5 text-[12px] active:scale-95",
-                      selected
-                        ? "border-[#0066FF]/50 bg-[#0066FF]/20 text-white"
-                        : "border-white/10 bg-white/[0.04] text-white/70",
-                    )}
-                  >
-                    {preset}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="mt-4 flex gap-2">
-              <button
-                type="button"
-                onClick={closeNoteDialog}
-                className="flex-1 rounded-xl border border-white/10 py-3 text-[14px] font-semibold text-white/60"
-              >
-                {t("phone.waiter.order.cancel")}
-              </button>
-              <button
-                type="button"
-                onClick={saveNote}
-                className="flex-1 rounded-xl bg-[#0066FF] py-3 text-[14px] font-semibold text-white active:scale-[0.98]"
-              >
-                {t("phone.waiter.order.saveNote")}
-              </button>
-            </div>
-          </div>
-        </div>
+      {noteCartKey && noteLine ? (
+        <PhoneWaiterPrepScreen
+          key={`${noteCartKey}-${noteContinue}-${noteMaxQty}`}
+          itemName={noteLine.name}
+          config={notePrepConfig}
+          initialNotes={noteText}
+          initialSelections={notePrepSelections}
+          applyQty={noteApplyQty}
+          maxQty={noteMaxQty}
+          continueMode={noteContinue}
+          accent={accent}
+          tokens={tokens}
+          formatPrice={formatPrice}
+          nextItemName={noteNextLine?.name}
+          onApplyQtyChange={setNoteApplyQty}
+          onClose={closeNoteDialog}
+          onSave={(notes, prep) => saveNote(notes, prep, false)}
+          onSaveAndNext={
+            noteNextLine
+              ? (notes, prep) => saveNote(notes, prep, true)
+              : undefined
+          }
+        />
       ) : null}
 
       {centerNotice ? (

@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import {
   Sheet,
@@ -17,11 +16,19 @@ import { cn } from "@/lib/utils.ts";
 import { toast } from "sonner";
 import { getDataCache, saveDataCache } from "@/lib/local-db.ts";
 import { CATEGORY_ICON_PICKER } from "@/lib/pos-category-icons.ts";
+import { usePosLocale } from "./pos-locale-provider.tsx";
+import { MenuItemPrepEditor } from "@/components/menu-item-prep-editor.tsx";
+import {
+  emptyPrepConfig,
+  normalizePrepConfig,
+  type PrepConfig,
+} from "@/lib/menu-prep-config.ts";
+import { BRAND } from "@/lib/brand-colors.ts";
 
 const CATEGORY_COLORS = [
   "#F4A0B7",
-  "#0066FF",
-  "#44CC00",
+  BRAND.primary,
+  BRAND.accent,
   "#FF6B00",
   "#FF3366",
   "#9945FF",
@@ -35,6 +42,7 @@ type CategoryData = {
   color: string;
   icon?: string;
   isActive: boolean;
+  prepConfig?: PrepConfig;
 };
 
 type CategoryDialogProps = {
@@ -52,10 +60,12 @@ export default function CategoryDialog({
   editing,
   onSaved,
 }: CategoryDialogProps) {
+  const { t } = usePosLocale();
   const [name, setName] = useState("");
   const [color, setColor] = useState(CATEGORY_COLORS[0]);
   const [icon, setIcon] = useState(CATEGORY_ICON_PICKER[0].emoji);
   const [isActive, setIsActive] = useState(true);
+  const [prepConfig, setPrepConfig] = useState<PrepConfig>(emptyPrepConfig());
   const [saving, setSaving] = useState(false);
 
   const createCategory = useMutation('pos.menu.createCategory');
@@ -68,11 +78,13 @@ export default function CategoryDialog({
         setColor(editing.color);
         setIcon(editing.icon ?? CATEGORY_ICON_PICKER[0].emoji);
         setIsActive(editing.isActive);
+        setPrepConfig(normalizePrepConfig(editing.prepConfig));
       } else {
         setName("");
         setColor(CATEGORY_COLORS[0]);
         setIcon(CATEGORY_ICON_PICKER[0].emoji);
         setIsActive(true);
+        setPrepConfig(emptyPrepConfig());
       }
     }
   }, [editing, open]);
@@ -93,6 +105,7 @@ export default function CategoryDialog({
           color,
           icon,
           isActive,
+          prepConfig,
         });
         const updatedCategory: CategoryData = {
           _id: editing._id,
@@ -100,6 +113,7 @@ export default function CategoryDialog({
           color,
           icon,
           isActive,
+          prepConfig,
         };
         const cached =
           (await getDataCache<CategoryData[]>(`categories:${licenseKey}`)) ?? [];
@@ -119,6 +133,7 @@ export default function CategoryDialog({
           name: name.trim(),
           color,
           icon,
+          prepConfig,
         });
         const cached =
           (await getDataCache<CategoryData[]>(`categories:${licenseKey}`)) ?? [];
@@ -128,6 +143,7 @@ export default function CategoryDialog({
           color,
           icon,
           isActive: true,
+          prepConfig,
         };
         await saveDataCache(`categories:${licenseKey}`, [...cached, newCategory]);
         onSaved?.(newCategory, "create");
@@ -175,7 +191,7 @@ export default function CategoryDialog({
                   className={cn(
                     "w-10 h-10 rounded-lg flex items-center justify-center text-xl transition-all cursor-pointer",
                     icon === item.emoji
-                      ? "bg-[#0066FF]/10 ring-2 ring-[#0066FF] scale-105"
+                      ? "bg-brand/10 ring-2 ring-brand scale-105"
                       : "bg-white hover:bg-slate-100 border border-slate-200"
                   )}
                   title={item.label}
@@ -197,7 +213,7 @@ export default function CategoryDialog({
                   className={cn(
                     "w-9 h-9 rounded-lg transition-all cursor-pointer",
                     color === c
-                      ? "ring-2 ring-[#0066FF] ring-offset-2 ring-offset-white scale-110"
+                      ? "ring-2 ring-brand ring-offset-2 ring-offset-white scale-110"
                       : "opacity-70 hover:opacity-100"
                   )}
                   style={{ backgroundColor: c }}
@@ -212,6 +228,34 @@ export default function CategoryDialog({
               <Switch checked={isActive} onCheckedChange={setIsActive} />
             </div>
           )}
+
+          <MenuItemPrepEditor
+            config={prepConfig}
+            onChange={setPrepConfig}
+            labels={{
+              title: t("menu.prep_title"),
+              hint: t("menu.prep_hint_category"),
+              choiceTitle: t("menu.prep_choice_title"),
+              choiceHint: t("menu.prep_choice_hint"),
+              addChoiceGroup: t("menu.prep_add_choice_group"),
+              groupName: t("menu.prep_group_name"),
+              addOption: t("menu.prep_add_option"),
+              optionName: t("menu.prep_option_name"),
+              togglesTitle: t("menu.prep_toggles_title"),
+              togglesHint: t("menu.prep_toggles_hint"),
+              toggleGroupName: t("menu.prep_toggle_group_name"),
+              addToggle: t("menu.prep_add_toggle"),
+              paidExtrasTitle: t("menu.prep_paid_extras_title"),
+              paidExtrasHint: t("menu.prep_paid_extras_hint"),
+              addPaidExtra: t("menu.prep_add_paid_extra"),
+              priceDelta: t("menu.customization_price_delta"),
+              allowCustomInstructions: t("menu.prep_allow_custom_instructions"),
+              allowCustomInstructionsHint: t("menu.prep_allow_custom_instructions_hint"),
+              quickTitle: t("menu.prep_quick_title"),
+              quickHint: t("menu.prep_quick_hint"),
+              addQuick: t("menu.prep_add_quick"),
+            }}
+          />
         </div>
 
         <SheetFooter className="shrink-0 border-t border-slate-200 bg-white px-6 py-4 sm:flex-row sm:justify-end">
@@ -225,7 +269,7 @@ export default function CategoryDialog({
           <Button
             onClick={handleSubmit}
             disabled={saving}
-            className="bg-gradient-to-r from-[#0066FF] to-[#22c55e] text-white hover:opacity-95"
+            className="bg-gradient-to-r from-brand to-[#22c55e] text-white hover:opacity-95"
           >
             {editing ? "Save Changes" : "Add Category"}
           </Button>

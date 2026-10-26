@@ -120,7 +120,7 @@ export function RenewLicenseDialog() {
                       className={cn(
                         "flex cursor-pointer items-center justify-between rounded-2xl border px-4 py-3 transition",
                         active
-                          ? "border-indigo-300 bg-indigo-50/70 shadow-sm"
+                          ? "border-brand-soft bg-brand-light/70 shadow-sm"
                           : "border-slate-200 hover:border-slate-300 hover:bg-slate-50",
                       )}
                     >
@@ -167,7 +167,7 @@ export function RenewLicenseDialog() {
             {t("ac.common.cancel")}
           </Button>
           <Button
-            className="rounded-xl bg-indigo-600 text-white hover:bg-indigo-700"
+            className="rounded-xl bg-brand text-white hover:bg-brand-hover"
             disabled={busy}
             onClick={() => void submit()}
           >

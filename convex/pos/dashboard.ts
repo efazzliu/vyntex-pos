@@ -11,6 +11,11 @@ const dashboardPeriodValidator = v.union(
   v.literal("month"),
   v.literal("year"),
 );
+const dashboardTargetPeriodValidator = v.union(
+  v.literal("month"),
+  v.literal("six_months"),
+  v.literal("custom"),
+);
 
 type DashboardPeriod = "day" | "week" | "month" | "year";
 
@@ -51,6 +56,28 @@ function summarizePaidOrders(
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+const DASHBOARD_KPI_BUCKETS = 12;
+
+function kpiBucketIndex(at: string, startIso: string, endIso: string): number {
+  const start = Date.parse(startIso);
+  const end = Date.parse(endIso);
+  const value = Date.parse(at);
+  if (
+    !Number.isFinite(start) ||
+    !Number.isFinite(end) ||
+    !Number.isFinite(value) ||
+    end <= start ||
+    value < start ||
+    value >= end
+  ) {
+    return -1;
+  }
+  return Math.min(
+    DASHBOARD_KPI_BUCKETS - 1,
+    Math.floor(((value - start) / (end - start)) * DASHBOARD_KPI_BUCKETS),
+  );
 }
 
 type OrderForChart = {
@@ -375,6 +402,91 @@ function buildLast7DaysPaidRevenueByDay(
   return out;
 }
 
+type RevenueOverviewPoint = {
+  currentRevenue: number;
+  previousRevenue: number;
+};
+
+function parseRevenueDayBoundaries(dayBoundariesIso: string[]): string[] {
+  if (dayBoundariesIso.length < 3 || dayBoundariesIso.length % 2 === 0) {
+    throw new ConvexError(
+      "Revenue overview requires an odd number of ordered boundaries",
+    );
+  }
+  const boundaries = dayBoundariesIso.map((value) => String(value).trim());
+  for (let index = 0; index < boundaries.length; index += 1) {
+    if (!Number.isFinite(Date.parse(boundaries[index]))) {
+      throw new ConvexError("Invalid revenue overview date");
+    }
+    if (index > 0 && boundaries[index] <= boundaries[index - 1]) {
+      throw new ConvexError("Revenue overview dates must be ordered");
+    }
+  }
+  return boundaries;
+}
+
+function buildRevenueOverview(
+  paid: OrderForChart[],
+  dayBoundariesIso: string[],
+) {
+  const boundaries = parseRevenueDayBoundaries(dayBoundariesIso);
+  const bucketCount = (boundaries.length - 1) / 2;
+  const points: RevenueOverviewPoint[] = [];
+  let currentTotal = 0;
+  let previousTotal = 0;
+
+  for (let dayIndex = 0; dayIndex < bucketCount; dayIndex += 1) {
+    const previous = sumBucketPaid(
+      paid,
+      boundaries[dayIndex],
+      boundaries[dayIndex + 1],
+    );
+    const current = sumBucketPaid(
+      paid,
+      boundaries[dayIndex + bucketCount],
+      boundaries[dayIndex + bucketCount + 1],
+    );
+    points.push({
+      currentRevenue: current.revenue,
+      previousRevenue: previous.revenue,
+    });
+    currentTotal += current.revenue;
+    previousTotal += previous.revenue;
+  }
+
+  return {
+    currentTotal: round2(currentTotal),
+    previousTotal: round2(previousTotal),
+    points,
+  };
+}
+
+export const getRevenueOverview = query({
+  args: {
+    licenseKey: v.string(),
+    dayBoundariesIso: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const restaurant = await getRestaurantByLicense(ctx, args.licenseKey);
+    const orders = await ctx.db
+      .query("orders")
+      .withIndex("by_restaurant", (q) =>
+        q.eq("restaurantId", restaurant._id)
+      )
+      .collect();
+    const paid = orders
+      .filter((order) => order.status === "paid")
+      .map((order) => ({
+        createdAt: String(order.paidAt ?? "").trim() || order.createdAt,
+        total: order.total,
+        paymentType: order.paymentType,
+        originalTotal: order.originalTotal,
+      }));
+
+    return buildRevenueOverview(paid, args.dayBoundariesIso);
+  },
+});
+
 export const getDashboardStats = query({
   args: {
     licenseKey: v.string(),
@@ -387,6 +499,7 @@ export const getDashboardStats = query({
     rangeToExclusiveIso: v.optional(v.string()),
     /** Start of the last calendar day in the range (ISO), for open-order / status widgets. */
     operationalDayStartIso: v.optional(v.string()),
+    staffId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const restaurant = await getRestaurantByLicense(ctx, args.licenseKey);
@@ -415,15 +528,73 @@ export const getDashboardStats = query({
       rangeToExclusiveIso.length > 0 &&
       rangeToExclusiveIso > rangeFromIso;
 
-    const paidInRange = (createdAt: string) =>
-      createdAt >= rangeFromIso && createdAt < rangeToExclusiveIso;
+    const kpiStartIso = useRangeFilter ? rangeFromIso : starts.day;
+    const kpiEndIso = useRangeFilter
+      ? rangeToExclusiveIso
+      : addLocalDays(new Date(starts.day), 1).toISOString();
+    const kpiDurationMs = Math.max(
+      1,
+      Date.parse(kpiEndIso) - Date.parse(kpiStartIso),
+    );
+    const kpiDayCount = Math.max(
+      1,
+      Math.round(kpiDurationMs / 86_400_000),
+    );
+    const previousKpiStartIso = new Date(
+      Date.parse(kpiStartIso) - kpiDurationMs,
+    ).toISOString();
+    const previousKpiEndIso = kpiStartIso;
+
+    const collectedAt = (o: { createdAt: string; paidAt?: string }) =>
+      String(o.paidAt ?? "").trim() || o.createdAt;
+
+    const configuredTargetAmount = Number(
+      restaurant.dashboardTargetAmount ?? 0,
+    );
+    const targetStartMs = Date.parse(
+      String(restaurant.dashboardTargetStartAt ?? ""),
+    );
+    const targetEndMs = Date.parse(
+      String(restaurant.dashboardTargetEndAt ?? ""),
+    );
+    const configuredTargetStartAt = Number.isFinite(targetStartMs)
+      ? new Date(targetStartMs).toISOString()
+      : null;
+    const configuredTargetEndAt = Number.isFinite(targetEndMs)
+      ? new Date(targetEndMs).toISOString()
+      : null;
+    const configuredTargetPeriod =
+      restaurant.dashboardTargetPeriod ?? null;
+    const hasConfiguredTarget =
+      Number.isFinite(configuredTargetAmount) &&
+      configuredTargetAmount > 0 &&
+      configuredTargetStartAt !== null &&
+      configuredTargetEndAt !== null &&
+      configuredTargetEndAt > configuredTargetStartAt &&
+      configuredTargetPeriod !== null;
+    const targetRevenue = hasConfiguredTarget
+      ? allOrders.reduce((sum, order) => {
+          if (order.status !== "paid") return sum;
+          const paidAt = collectedAt(order);
+          if (
+            paidAt < configuredTargetStartAt! ||
+            paidAt >= configuredTargetEndAt!
+          ) {
+            return sum;
+          }
+          return sum + Math.max(0, Number(order.total ?? 0));
+        }, 0)
+      : 0;
+
+    const paidInRange = (at: string) =>
+      at >= rangeFromIso && at < rangeToExclusiveIso;
 
     const lc = chartLocaleTag(args.locale);
 
     const paidOrdersForCharts = (
       useRangeFilter
         ? allOrders.filter(
-            (o) => o.status === "paid" && paidInRange(o.createdAt),
+            (o) => o.status === "paid" && paidInRange(collectedAt(o)),
           )
         : allOrders.filter((o) => o.status === "paid")
     ) as OrderForChart[];
@@ -431,7 +602,9 @@ export const getDashboardStats = query({
     const salesChart = buildSalesChartBundle(paidOrdersForCharts, now, lc);
 
     const paidFrom = (startIso: string) =>
-      allOrders.filter((o) => o.status === "paid" && o.createdAt >= startIso);
+      allOrders.filter(
+        (o) => o.status === "paid" && collectedAt(o) >= startIso,
+      );
 
     const periodSummaries = useRangeFilter
       ? (() => {
@@ -453,13 +626,54 @@ export const getDashboardStats = query({
     const detailPeriod: DashboardPeriod = args.viewPeriod ?? "day";
     const detailPaid = useRangeFilter
       ? allOrders.filter(
-          (o) => o.status === "paid" && paidInRange(o.createdAt),
+          (o) => o.status === "paid" && paidInRange(collectedAt(o)),
         )
       : paidFrom(starts[detailPeriod]);
 
     const todayRevenue = periodSummaries.day.revenue;
     const todayPaidCount = periodSummaries.day.paidCount;
     const avgOrderValue = periodSummaries.day.avgOrderValue;
+    const kpiCurrentPaid = allOrders.filter((o) => {
+      if (o.status !== "paid") return false;
+      const at = collectedAt(o);
+      return at >= kpiStartIso && at < kpiEndIso;
+    });
+    const kpiPreviousPaid = allOrders.filter((o) => {
+      if (o.status !== "paid") return false;
+      const at = collectedAt(o);
+      return at >= previousKpiStartIso && at < previousKpiEndIso;
+    });
+    const currentKpiSummary = summarizePaidOrders(kpiCurrentPaid);
+    const previousKpiSummary = summarizePaidOrders(kpiPreviousPaid);
+    const kpiSeries = {
+      revenue: Array.from({ length: DASHBOARD_KPI_BUCKETS }, () => 0),
+      orders: Array.from({ length: DASHBOARD_KPI_BUCKETS }, () => 0),
+      bar: Array.from({ length: DASHBOARD_KPI_BUCKETS }, () => 0),
+      kitchen: Array.from({ length: DASHBOARD_KPI_BUCKETS }, () => 0),
+    };
+    const currentKpiOrderIds = new Set(
+      kpiCurrentPaid.map((order) => order._id as string),
+    );
+    for (const order of kpiCurrentPaid) {
+      const bucket = kpiBucketIndex(
+        collectedAt(order),
+        kpiStartIso,
+        kpiEndIso,
+      );
+      if (bucket < 0) continue;
+      kpiSeries.revenue[bucket] += order.total;
+      kpiSeries.orders[bucket] += 1;
+    }
+
+    const openSales = allOrders.filter(
+      (o) => o.status !== "paid" && o.status !== "cancelled",
+    );
+    const openUnpaidTotal = openSales.reduce(
+      (sum, o) => sum + Math.max(0, Number(o.total ?? 0)),
+      0,
+    );
+    const paidCirculation = todayRevenue;
+    const totalCirculation = paidCirculation + openUnpaidTotal;
 
     // Filter today's orders (operational widgets) — last day of selected range, or real "today"
     const todayOrders =
@@ -496,6 +710,19 @@ export const getDashboardStats = query({
       revenueByMethod[method].total += order.total;
     }
 
+    const paymentMix = { cash: 0, card: 0, debt: 0, other: 0 };
+    for (const order of detailPaid) {
+      const amount = Math.max(0, Number(order.total ?? 0));
+      if (order.paymentType === "debt") paymentMix.debt += amount;
+      else if (order.paymentMethod === "card") paymentMix.card += amount;
+      else if (
+        order.paymentMethod === "cash" ||
+        order.paymentMethod === undefined
+      ) {
+        paymentMix.cash += amount;
+      } else paymentMix.other += amount;
+    }
+
     // Active tables
     const tables = await ctx.db
       .query("tables")
@@ -504,9 +731,15 @@ export const getDashboardStats = query({
       )
       .collect();
 
-    const activeTables = tables.filter(
+    const occupiedTables = tables.filter(
       (t) => t.status === "occupied" || t.status === "bill-printed"
     ).length;
+    const reservedTables = tables.filter((t) => t.status === "reserved").length;
+    const availableTables = Math.max(
+      0,
+      tables.length - occupiedTables - reservedTables,
+    );
+    const activeTables = occupiedTables;
     const totalTables = tables.length;
 
     // Active orders (not paid, not cancelled)
@@ -523,27 +756,95 @@ export const getDashboardStats = query({
     // Top selling items today
     const itemCounts: Record<
       string,
-      { name: string; quantity: number; revenue: number }
+      { menuItemId: string; name: string; quantity: number; revenue: number }
     > = {};
+    let barRevenue = 0;
+    let kitchenRevenue = 0;
+    let previousBarRevenue = 0;
+    let previousKitchenRevenue = 0;
+    let voidedItemsInPeriod = 0;
+    let totalPreparationMinutes = 0;
+    let preparationSampleCount = 0;
+    const kitchenOrderIds = new Set<string>();
+    const barOrderIds = new Set<string>();
     for (const order of detailPaid) {
       const items = await ctx.db
         .query("orderItems")
         .withIndex("by_order", (q) => q.eq("orderId", order._id))
         .collect();
       for (const item of items) {
-        if (item.status === "voided" || item.status === "cancelled") continue;
-        const key = item.menuItemId;
+        if (item.status === "voided" || item.status === "cancelled") {
+          if (
+            item.status === "voided" &&
+            currentKpiOrderIds.has(order._id as string)
+          ) {
+            voidedItemsInPeriod += item.quantity;
+          }
+          continue;
+        }
+        const sentMs = Date.parse(String(item.sentAt ?? ""));
+        const readyMs = Date.parse(String(item.readyAt ?? ""));
+        if (
+          Number.isFinite(sentMs) &&
+          Number.isFinite(readyMs) &&
+          readyMs >= sentMs
+        ) {
+          const minutes = (readyMs - sentMs) / 60_000;
+          if (minutes <= 12 * 60) {
+            totalPreparationMinutes += minutes;
+            preparationSampleCount += 1;
+          }
+        }
+        const itemRevenue = item.price * item.quantity;
+        if (item.station === "bar") {
+          barOrderIds.add(order._id as string);
+        } else {
+          kitchenOrderIds.add(order._id as string);
+        }
+        if (currentKpiOrderIds.has(order._id as string)) {
+          const bucket = kpiBucketIndex(
+            collectedAt(order),
+            kpiStartIso,
+            kpiEndIso,
+          );
+          if (item.station === "bar") {
+            barRevenue += itemRevenue;
+            if (bucket >= 0) kpiSeries.bar[bucket] += itemRevenue;
+          } else {
+            kitchenRevenue += itemRevenue;
+            if (bucket >= 0) kpiSeries.kitchen[bucket] += itemRevenue;
+          }
+        }
+        const key = item.menuItemId as string;
         if (!itemCounts[key]) {
-          itemCounts[key] = { name: item.name, quantity: 0, revenue: 0 };
+          itemCounts[key] = {
+            menuItemId: key,
+            name: item.name,
+            quantity: 0,
+            revenue: 0,
+          };
         }
         itemCounts[key].quantity += item.quantity;
-        itemCounts[key].revenue += item.price * item.quantity;
+        itemCounts[key].revenue += itemRevenue;
       }
     }
+    const averagePreparationMinutes =
+      preparationSampleCount > 0
+        ? totalPreparationMinutes / preparationSampleCount
+        : 0;
 
-    const topItems = Object.values(itemCounts)
-      .sort((a, b) => b.quantity - a.quantity)
-      .slice(0, 10);
+    for (const order of kpiPreviousPaid) {
+      const items = await ctx.db
+        .query("orderItems")
+        .withIndex("by_order", (q) => q.eq("orderId", order._id))
+        .collect();
+      for (const item of items) {
+        if (item.status === "voided" || item.status === "cancelled") continue;
+        const itemRevenue = item.price * item.quantity;
+        if (item.station === "bar") previousBarRevenue += itemRevenue;
+        else previousKitchenRevenue += itemRevenue;
+      }
+    }
 
     // Staff performance today
     const staffPerf: Record<
@@ -566,6 +867,41 @@ export const getDashboardStats = query({
 
     const staffPerformance = Object.values(staffPerf).sort(
       (a, b) => b.revenue - a.revenue
+    );
+    const recentOrderCandidates = allOrders
+      .filter((order) => {
+        const activityAt =
+          order.status === "paid" ? collectedAt(order) : order.createdAt;
+        return activityAt >= kpiStartIso && activityAt < kpiEndIso;
+      })
+      .sort((a, b) => {
+        const aAt = a.status === "paid" ? collectedAt(a) : a.createdAt;
+        const bAt = b.status === "paid" ? collectedAt(b) : b.createdAt;
+        return bAt.localeCompare(aAt);
+      })
+      .slice(0, 6);
+    const recentOrders = await Promise.all(
+      recentOrderCandidates.map(async (order) => {
+        const [table, staff] = await Promise.all([
+          ctx.db.get(order.tableId),
+          ctx.db.get(order.staffId),
+        ]);
+        return {
+          id: order._id as string,
+          orderNumber: order.orderNumber,
+          tableName: table?.name ?? "—",
+          staffName: staff?.name ?? "—",
+          customerName: order.customerName ?? "",
+          status: order.status,
+          total:
+            order.paymentType === "complimentary"
+              ? (order.originalTotal ?? 0)
+              : order.total,
+          paymentMethod: order.paymentMethod ?? "",
+          activityAt:
+            order.status === "paid" ? collectedAt(order) : order.createdAt,
+        };
+      }),
     );
 
     // ── Fiscal vs Non-Fiscal summary ──
@@ -597,6 +933,83 @@ export const getDashboardStats = query({
         q.eq("restaurantId", restaurant._id),
       )
       .collect();
+    const menuCategories = await ctx.db
+      .query("menuCategories")
+      .withIndex("by_restaurant", (q) =>
+        q.eq("restaurantId", restaurant._id),
+      )
+      .collect();
+    const menuItemById = new Map(
+      menuItems.map((item) => [item._id as string, item]),
+    );
+    const priceByMenuItem = new Map(
+      menuItems.map((item) => [item._id as string, item.price]),
+    );
+    const categoryById = new Map(
+      menuCategories.map((category) => [
+        category._id as string,
+        category,
+      ]),
+    );
+    const fallbackCategoryName =
+      args.locale === "sq" ? "Të tjera" : "Other";
+    const categorySalesById = new Map<
+      string,
+      { name: string; color: string; quantity: number; revenue: number }
+    >();
+    const enrichedItems = Object.values(itemCounts).map((item) => {
+      const menuItem = menuItemById.get(item.menuItemId);
+      const categoryId = menuItem?.categoryId as string | undefined;
+      const category = categoryId ? categoryById.get(categoryId) : undefined;
+      const categoryKey = categoryId ?? "__other__";
+      const categoryRow = categorySalesById.get(categoryKey) ?? {
+        name: category?.name ?? fallbackCategoryName,
+        color: category?.color ?? "#64748b",
+        quantity: 0,
+        revenue: 0,
+      };
+      categoryRow.quantity += item.quantity;
+      categoryRow.revenue += item.revenue;
+      categorySalesById.set(categoryKey, categoryRow);
+
+      const recipe = menuItem?.supplyRecipe ?? [];
+      let estimatedUnitCost = 0;
+      let hasCostEstimate = false;
+      for (const recipeLine of recipe) {
+        const supplyPrice = priceByMenuItem.get(
+          recipeLine.supplyMenuItemId as string,
+        );
+        if (supplyPrice === undefined || recipeLine.qtyPerUnit <= 0) continue;
+        estimatedUnitCost += supplyPrice * recipeLine.qtyPerUnit;
+        hasCostEstimate = true;
+      }
+      const estimatedCost = estimatedUnitCost * item.quantity;
+      const estimatedProfit = hasCostEstimate
+        ? round2(item.revenue - estimatedCost)
+        : null;
+      const marginPercent =
+        estimatedProfit !== null && item.revenue > 0
+          ? round2((estimatedProfit / item.revenue) * 100)
+          : null;
+
+      return {
+        ...item,
+        quantity: Math.round(item.quantity * 1000) / 1000,
+        revenue: round2(item.revenue),
+        estimatedProfit,
+        marginPercent,
+      };
+    });
+    const topItems = enrichedItems
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 10);
+    const categorySales = [...categorySalesById.values()]
+      .map((category) => ({
+        ...category,
+        quantity: Math.round(category.quantity * 1000) / 1000,
+        revenue: round2(category.revenue),
+      }))
+      .sort((a, b) => b.revenue - a.revenue);
 
     const stockLogs = await ctx.db
       .query("stockLogs")
@@ -604,6 +1017,113 @@ export const getDashboardStats = query({
         q.eq("restaurantId", restaurant._id),
       )
       .collect();
+
+    const liveOrderItemGroups = await Promise.all(
+      openSales.map((order) =>
+        ctx.db
+          .query("orderItems")
+          .withIndex("by_order", (q) => q.eq("orderId", order._id))
+          .collect(),
+      ),
+    );
+    const liveOrderItems = liveOrderItemGroups.flat();
+    const liveQueueStatuses = new Set(["sent", "preparing"]);
+    let kitchenQueueItems = 0;
+    let barQueueItems = 0;
+    let readyItems = 0;
+    let delayedItems = 0;
+    let totalQueueAgeMinutes = 0;
+    let agedQueueItems = 0;
+    const liveNowMs = Date.now();
+    for (const item of liveOrderItems) {
+      if (item.status === "voided") voidedItemsInPeriod += item.quantity;
+      if (item.status === "ready") readyItems += item.quantity;
+      if (!liveQueueStatuses.has(item.status)) continue;
+      if (item.station === "bar") barQueueItems += item.quantity;
+      else kitchenQueueItems += item.quantity;
+      const ageMinutes = Math.max(
+        0,
+        (liveNowMs - item._creationTime) / 60_000,
+      );
+      totalQueueAgeMinutes += ageMinutes;
+      agedQueueItems += 1;
+      if (ageMinutes >= 15) delayedItems += item.quantity;
+    }
+    const averageQueueAgeMinutes =
+      agedQueueItems > 0 ? totalQueueAgeMinutes / agedQueueItems : 0;
+
+    const trackedMenuItems = menuItems.filter((item) => item.trackStock);
+    const outOfStockItems = trackedMenuItems.filter(
+      (item) => Number(item.currentStock ?? 0) <= 0,
+    );
+    const lowStockItems = trackedMenuItems.filter((item) => {
+      const current = Number(item.currentStock ?? 0);
+      const threshold = Number(item.lowStockThreshold ?? 5);
+      return current > 0 && current <= threshold;
+    });
+    const costMovementTypes = new Set([
+      "sale",
+      "recipe_sale",
+      "staff_consumption",
+    ]);
+    let estimatedStockCost = 0;
+    for (const log of stockLogs) {
+      if (
+        log.createdAt < kpiStartIso ||
+        log.createdAt >= kpiEndIso ||
+        log.change >= 0 ||
+        !costMovementTypes.has(log.type)
+      ) {
+        continue;
+      }
+      estimatedStockCost +=
+        Math.abs(log.change) *
+        (priceByMenuItem.get(log.menuItemId as string) ?? 0);
+    }
+    const expenses = await ctx.db
+      .query("expenses")
+      .withIndex("by_restaurant", (q) =>
+        q.eq("restaurantId", restaurant._id),
+      )
+      .collect();
+    const operatingExpenses = expenses
+      .filter(
+        (expense) =>
+          expense.createdAt >= kpiStartIso &&
+          expense.createdAt < kpiEndIso,
+      )
+      .reduce((sum, expense) => sum + Math.max(0, expense.amount), 0);
+    const estimatedProfit =
+      currentKpiSummary.revenue - estimatedStockCost - operatingExpenses;
+    const marginPercent =
+      currentKpiSummary.revenue > 0
+        ? (estimatedProfit / currentKpiSummary.revenue) * 100
+        : 0;
+    const cancelledOrdersInPeriod = allOrders.filter(
+      (order) =>
+        order.status === "cancelled" &&
+        order.createdAt >= kpiStartIso &&
+        order.createdAt < kpiEndIso,
+    ).length;
+    const ordersCreatedInPeriod = allOrders.filter(
+      (order) =>
+        order.createdAt >= kpiStartIso &&
+        order.createdAt < kpiEndIso,
+    ).length;
+    const cancellationRatePercent =
+      ordersCreatedInPeriod > 0
+        ? (cancelledOrdersInPeriod / ordersCreatedInPeriod) * 100
+        : 0;
+    const tableTurnsPerDay =
+      totalTables > 0
+        ? kpiCurrentPaid.length / totalTables / kpiDayCount
+        : 0;
+    const dailySalesTarget =
+      Number.isFinite(Number(restaurant.dailySalesTarget)) &&
+      Number(restaurant.dailySalesTarget) > 0
+        ? Number(restaurant.dailySalesTarget)
+        : 0;
+    const periodSalesTarget = dailySalesTarget * kpiDayCount;
 
     const supplyProfitChart = buildSupplyProfitLast6Months(
       now,
@@ -633,12 +1153,118 @@ export const getDashboardStats = query({
       trackedItemCount,
     };
 
+    for (const series of Object.values(kpiSeries)) {
+      for (let i = 0; i < series.length; i++) {
+        series[i] = round2(series[i]);
+      }
+    }
+
     return {
       periodSummaries,
       viewPeriod: detailPeriod,
       todayRevenue: Math.round(todayRevenue * 100) / 100,
+      paidCirculation: Math.round(paidCirculation * 100) / 100,
+      openUnpaidTotal: Math.round(openUnpaidTotal * 100) / 100,
+      totalCirculation: Math.round(totalCirculation * 100) / 100,
       todayOrderCount: todayOrders.length,
       todayPaidCount,
+      dashboardKpis: {
+        totalRevenue: currentKpiSummary.revenue,
+        previousRevenue: previousKpiSummary.revenue,
+        totalOrders: currentKpiSummary.paidCount,
+        previousOrders: previousKpiSummary.paidCount,
+        barRevenue: round2(barRevenue),
+        previousBarRevenue: round2(previousBarRevenue),
+        kitchenRevenue: round2(kitchenRevenue),
+        previousKitchenRevenue: round2(previousKitchenRevenue),
+        series: kpiSeries,
+      },
+      enterpriseOverview: {
+        liveOperations: {
+          activeTables,
+          totalTables,
+          availableTables,
+          occupiedTables,
+          reservedTables,
+          kitchenOrders: kitchenOrderIds.size,
+          barOrders: barOrderIds.size,
+          activeOrders: openSales.length,
+          kitchenQueueItems: Math.round(kitchenQueueItems),
+          barQueueItems: Math.round(barQueueItems),
+          readyItems: Math.round(readyItems),
+          delayedItems: Math.round(delayedItems),
+          averageQueueAgeMinutes: round2(averageQueueAgeMinutes),
+        },
+        targetPulse: {
+          amount: hasConfiguredTarget
+            ? round2(configuredTargetAmount)
+            : 0,
+          currentRevenue: round2(targetRevenue),
+          startAt: hasConfiguredTarget
+            ? configuredTargetStartAt
+            : null,
+          endAt: hasConfiguredTarget ? configuredTargetEndAt : null,
+          period: hasConfiguredTarget
+            ? configuredTargetPeriod
+            : null,
+        },
+        profitability: {
+          revenue: currentKpiSummary.revenue,
+          estimatedStockCost: round2(estimatedStockCost),
+          operatingExpenses: round2(operatingExpenses),
+          estimatedProfit: round2(estimatedProfit),
+          marginPercent: round2(marginPercent),
+        },
+        performance: {
+          averageOrderValue: currentKpiSummary.avgOrderValue,
+          previousAverageOrderValue: previousKpiSummary.avgOrderValue,
+          averagePreparationMinutes: round2(averagePreparationMinutes),
+          preparationSampleCount,
+          tableTurnsPerDay: round2(tableTurnsPerDay),
+          cancellationRatePercent: round2(cancellationRatePercent),
+          dailySalesTarget: round2(dailySalesTarget),
+          periodSalesTarget: round2(periodSalesTarget),
+        },
+        paymentMix: {
+          cash: round2(paymentMix.cash),
+          card: round2(paymentMix.card),
+          debt: round2(paymentMix.debt),
+          other: round2(paymentMix.other),
+        },
+        smartAlerts: {
+          outOfStockCount: outOfStockItems.length,
+          outOfStockNames: outOfStockItems
+            .slice(0, 3)
+            .map((item) => item.name),
+          outOfStockItems: outOfStockItems.slice(0, 3).map((item) => ({
+            id: item._id as string,
+            name: item.name,
+            currentStock: round2(Number(item.currentStock ?? 0)),
+            lowStockThreshold: round2(
+              Number(item.lowStockThreshold ?? 0),
+            ),
+            stockUnit: item.stockUnit ?? "pc",
+            imageUrl: null,
+          })),
+          lowStockCount: lowStockItems.length,
+          lowStockNames: lowStockItems
+            .slice(0, 3)
+            .map((item) => item.name),
+          lowStockItems: lowStockItems.slice(0, 3).map((item) => ({
+            id: item._id as string,
+            name: item.name,
+            currentStock: round2(Number(item.currentStock ?? 0)),
+            lowStockThreshold: round2(
+              Number(item.lowStockThreshold ?? 0),
+            ),
+            stockUnit: item.stockUnit ?? "pc",
+            imageUrl: null,
+          })),
+          delayedItems: Math.round(delayedItems),
+          cancelledOrders: cancelledOrdersInPeriod,
+          voidedItems: Math.round(voidedItemsInPeriod),
+        },
+      },
       avgOrderValue: Math.round(avgOrderValue * 100) / 100,
       activeOrders: activeOrders.length,
       activeTables,
@@ -647,7 +1273,9 @@ export const getDashboardStats = query({
       revenueByMethod,
       ordersByStatus,
       topItems,
+      categorySales,
       staffPerformance,
+      recentOrders,
       fiscalSummary,
       salesChart,
       weekDayRevenue,
@@ -657,12 +1285,154 @@ export const getDashboardStats = query({
   },
 });
 
+export const updateDailySalesTarget = mutation({
+  args: {
+    licenseKey: v.string(),
+    dailyTarget: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const restaurant = await getRestaurantByLicense(ctx, args.licenseKey);
+    if (!Number.isFinite(args.dailyTarget) || args.dailyTarget < 0) {
+      throw new ConvexError(
+        "Daily sales target must be zero or greater.",
+      );
+    }
+    await ctx.db.patch(restaurant._id, {
+      dailySalesTarget:
+        args.dailyTarget > 0 ? round2(args.dailyTarget) : 0,
+    });
+    return { ok: true as const };
+  },
+});
+
+export const updateTargetPulse = mutation({
+  args: {
+    licenseKey: v.string(),
+    staffId: v.string(),
+    amount: v.number(),
+    startAt: v.string(),
+    endAt: v.string(),
+    period: dashboardTargetPeriodValidator,
+  },
+  handler: async (ctx, args) => {
+    const restaurant = await getRestaurantByLicense(ctx, args.licenseKey);
+    const startMs = Date.parse(args.startAt);
+    const endMs = Date.parse(args.endAt);
+    if (!Number.isFinite(args.amount) || args.amount <= 0) {
+      throw new ConvexError("Target amount must be greater than zero.");
+    }
+    if (
+      !Number.isFinite(startMs) ||
+      !Number.isFinite(endMs) ||
+      endMs <= startMs
+    ) {
+      throw new ConvexError("Target dates are invalid.");
+    }
+
+    if (args.staffId !== "local-admin") {
+      let admin: Doc<"staff"> | null = null;
+      try {
+        admin = await ctx.db.get(args.staffId as Id<"staff">);
+      } catch {
+        admin = null;
+      }
+      if (
+        !admin ||
+        admin.restaurantId !== restaurant._id ||
+        !admin.isActive ||
+        admin.role !== "admin"
+      ) {
+        throw new ConvexError("Only an active admin can update Target Pulse.");
+      }
+    }
+
+    await ctx.db.patch(restaurant._id, {
+      dashboardTargetAmount: round2(args.amount),
+      dashboardTargetStartAt: new Date(startMs).toISOString(),
+      dashboardTargetEndAt: new Date(endMs).toISOString(),
+      dashboardTargetPeriod: args.period,
+    });
+    return { ok: true as const };
+  },
+});
+
+export const getReportSchedules = query({
+  args: { licenseKey: v.string() },
+  handler: async (ctx, args) => {
+    const restaurant = await getRestaurantByLicense(ctx, args.licenseKey);
+    return {
+      venueName: restaurant.name,
+      schedules: Array.isArray(restaurant.dashboardReportSchedules)
+        ? restaurant.dashboardReportSchedules
+        : [],
+    };
+  },
+});
+
+export const saveReportSchedules = mutation({
+  args: {
+    licenseKey: v.string(),
+    staffId: v.string(),
+    schedules: v.array(v.any()),
+  },
+  handler: async (ctx, args) => {
+    const restaurant = await getRestaurantByLicense(ctx, args.licenseKey);
+    if (args.staffId !== "local-admin") {
+      let admin: Doc<"staff"> | null = null;
+      try {
+        admin = await ctx.db.get(args.staffId as Id<"staff">);
+      } catch {
+        admin = null;
+      }
+      if (
+        !admin ||
+        admin.restaurantId !== restaurant._id ||
+        !admin.isActive ||
+        admin.role !== "admin"
+      ) {
+        throw new ConvexError("Only an active admin can update report schedules.");
+      }
+    }
+    await ctx.db.patch(restaurant._id, {
+      dashboardReportSchedules: args.schedules,
+    });
+    return { ok: true as const, schedules: args.schedules };
+  },
+});
+
+export const markReportSchedulesSent = mutation({
+  args: {
+    licenseKey: v.string(),
+    sentIds: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const restaurant = await getRestaurantByLicense(ctx, args.licenseKey);
+    const sent = new Set(args.sentIds);
+    const today = new Date();
+    const todayYmd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    const current = Array.isArray(restaurant.dashboardReportSchedules)
+      ? restaurant.dashboardReportSchedules
+      : [];
+    const schedules = current.map((item) => {
+      if (!item || typeof item !== "object") return item;
+      const row = item as { id?: string };
+      if (!row.id || !sent.has(String(row.id))) return item;
+      return { ...row, lastSentYmd: todayYmd };
+    });
+    await ctx.db.patch(restaurant._id, {
+      dashboardReportSchedules: schedules,
+    });
+    return { ok: true as const, schedules };
+  },
+});
+
 // ── Z-Report (End of Day) ───────────────────────────
 
 export const getZReport = query({
   args: {
     licenseKey: v.string(),
     date: v.optional(v.string()),
+    staffId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const restaurant = await getRestaurantByLicense(ctx, args.licenseKey);
@@ -1017,7 +1787,10 @@ export const getZReport = query({
 // ── Past Z-Reports (shift history) ─────────────────
 
 export const getZReportHistory = query({
-  args: { licenseKey: v.string() },
+  args: {
+    licenseKey: v.string(),
+    staffId: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     const restaurant = await getRestaurantByLicense(ctx, args.licenseKey);
     const reports = await ctx.db
@@ -1224,6 +1997,7 @@ export const getAuditLogs = query({
   args: {
     licenseKey: v.string(),
     limit: v.optional(v.number()),
+    staffId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const restaurant = await getRestaurantByLicense(ctx, args.licenseKey);

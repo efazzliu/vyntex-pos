@@ -18,6 +18,7 @@ import {
   type AdminMrrTrendPoint,
   type AdminPlanDistributionRange,
 } from "@/lib/supabase-pos/admin-ops.ts";
+import { BRAND } from "@/lib/brand-colors.ts";
 
 const headlineFmt = new Intl.NumberFormat("en-EU", {
   style: "currency",
@@ -48,7 +49,7 @@ function RevenueTooltip({ active, payload }: TooltipProps) {
   if (!active || !payload?.[0]) return null;
   const row = payload[0].payload;
   return (
-    <div className="rounded-xl border border-border/60 bg-popover/90 px-3.5 py-2.5 shadow-[0_16px_40px_-20px_rgba(0,102,255,0.35)] backdrop-blur-md dark:border-slate-600/60 dark:bg-slate-950/90">
+    <div className="rounded-xl border border-border/60 bg-popover/90 px-3.5 py-2.5 shadow-[0_16px_40px_-20px_rgba(0,91,214,0.35)] backdrop-blur-md dark:border-slate-600/60 dark:bg-slate-950/90">
       <p className="text-[11px] font-medium text-muted-foreground">{row.monthTitle}</p>
       <div className="mt-1 flex items-center justify-between gap-8 text-sm">
         <span className="text-muted-foreground">Total Revenue</span>
@@ -97,7 +98,7 @@ export function TotalRevenueChartCard({ currentMrrEur, period }: TotalRevenueCha
   return (
     <div className={cn(adminCardClass, "relative overflow-hidden")}>
       <div
-        className="pointer-events-none absolute -right-24 -top-24 size-[320px] rounded-full bg-[#0066FF]/[0.07] blur-3xl dark:bg-[#0066FF]/10"
+        className="pointer-events-none absolute -right-24 -top-24 size-[320px] rounded-full bg-brand/[0.07] blur-3xl dark:bg-brand/10"
         aria-hidden
       />
       <div className="relative p-6 pb-2 sm:p-7 sm:pb-3">
@@ -156,12 +157,12 @@ export function TotalRevenueChartCard({ currentMrrEur, period }: TotalRevenueCha
             <AreaChart data={trendQuery.data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#0066FF" stopOpacity={0.35} />
-                  <stop offset="55%" stopColor="#0066FF" stopOpacity={0.08} />
-                  <stop offset="100%" stopColor="#0066FF" stopOpacity={0} />
+                  <stop offset="0%" stopColor={BRAND.primary} stopOpacity={0.35} />
+                  <stop offset="55%" stopColor={BRAND.primary} stopOpacity={0.08} />
+                  <stop offset="100%" stopColor={BRAND.primary} stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id={strokeId} x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#0066FF" />
+                  <stop offset="0%" stopColor={BRAND.primary} />
                   <stop offset="100%" stopColor="#00C2FF" />
                 </linearGradient>
               </defs>
@@ -203,7 +204,7 @@ export function TotalRevenueChartCard({ currentMrrEur, period }: TotalRevenueCha
                 dot={false}
                 activeDot={{
                   r: 6,
-                  fill: "#0066FF",
+                  fill: BRAND.primary,
                   stroke: "var(--card, #ffffff)",
                   strokeWidth: 2,
                 }}

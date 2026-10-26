@@ -245,7 +245,7 @@ export default function PricingPage() {
                 {t("pricing.annual")}
               </span>
               {isAnnual && (
-                <Badge className="bg-[#44CC00]/10 text-[#44CC00] border-[#44CC00]/20 hover:bg-[#44CC00]/15">
+                <Badge className="bg-brand-accent/10 text-brand-accent border-brand-accent/20 hover:bg-brand-accent/15">
                   {t("pricing.save")}
                 </Badge>
               )}
@@ -285,13 +285,13 @@ export default function PricingPage() {
                   className={cn(
                     "relative flex flex-col rounded-2xl border bg-card p-6 lg:p-8 h-full",
                     isPro
-                      ? "border-[#0066FF]/40 shadow-lg shadow-primary/10 md:scale-[1.02] md:z-[1]"
+                      ? "border-brand/40 shadow-lg shadow-primary/10 md:scale-[1.02] md:z-[1]"
                       : "border-border",
                   )}
                 >
                   {isPro && (
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap">
-                      <Badge className="bg-gradient-to-r from-[#0066FF] to-[#00AACC] text-white border-0 hover:from-[#0055DD] hover:to-[#0099BB]">
+                      <Badge className="bg-gradient-to-r from-brand to-brand-sky text-white border-0 hover:from-brand-hover hover:to-brand-hover">
                         {t("pricing.mostPopular")}
                       </Badge>
                     </div>
@@ -324,7 +324,7 @@ export default function PricingPage() {
                     className={cn(
                       "w-full mb-6 shrink-0",
                       isPro &&
-                        "bg-gradient-to-r from-[#0066FF] to-[#00AACC] hover:from-[#0055DD] hover:to-[#0099BB] text-white border-0 shadow-none",
+                        "bg-gradient-to-r from-brand to-brand-sky hover:from-brand-hover hover:to-brand-hover text-white border-0 shadow-none",
                     )}
                     variant={isPro ? "default" : "outline"}
                   >
@@ -335,13 +335,13 @@ export default function PricingPage() {
                   <ul className="space-y-2.5 flex-1 border-t border-border/70 pt-5">
                     {tier.features.map((feature) => (
                       <li key={feature} className="flex items-start gap-2">
-                        <Check className="size-4 text-[#44CC00] mt-0.5 shrink-0" />
+                        <Check className="size-4 text-brand-accent mt-0.5 shrink-0" />
                         <span className="text-sm text-muted-foreground">{feature}</span>
                       </li>
                     ))}
                     {mobileAddon && (
                       <li className="flex items-start gap-2">
-                        <Smartphone className="size-4 text-[#0066FF] mt-0.5 shrink-0" />
+                        <Smartphone className="size-4 text-brand mt-0.5 shrink-0" />
                         <span className="text-sm text-foreground font-medium">
                           {t("pricing.mobileFeature")}
                         </span>

@@ -164,7 +164,7 @@ export default function TableDialog({
                   className={cn(
                     "flex-1 py-2.5 rounded-lg border text-sm font-medium transition-all cursor-pointer",
                     shape === opt.value
-                      ? "border-[#0066FF] bg-[#0066FF]/10 text-[#0066FF]"
+                      ? "border-brand bg-brand/10 text-brand"
                       : "border-[#1e2a45] bg-[#0A0F1E] text-[#8b93a7] hover:text-white"
                   )}
                 >
