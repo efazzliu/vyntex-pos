@@ -106,7 +106,7 @@ function AdminNavBody({
       onClick={onLogoClick}
       className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
     >
-      <img src={VYNTEX_APP_LOGO_SRC} alt="Vyntex POS" className="h-10 w-10 shrink-0" />
+      <img src={VYNTEX_APP_LOGO_SRC} alt="Vyntex POS" className="h-10 w-10 shrink-0 short:h-8 short:w-8" />
       <div className="min-w-0 text-left">
         {pinned ? (
           <>
@@ -149,7 +149,7 @@ function AdminNavBody({
       {pinned ? (
         <div
           className={cn(
-            "p-5 pb-4 border-b",
+            "p-5 pb-4 border-b short:px-4 short:py-3",
             light ? "border-slate-200" : "border-[#1e2a45]",
           )}
         >
@@ -166,7 +166,7 @@ function AdminNavBody({
         </SheetHeader>
       )}
 
-      <nav className="flex-1 overflow-auto p-3 space-y-1">
+      <nav className="flex-1 overflow-auto p-3 space-y-1 short:py-2 tiny:space-y-0.5">
         {NAV_ITEMS.filter(
           (item) =>
             (item.id !== "audit-log" || canViewAuditLog) &&
@@ -181,7 +181,7 @@ function AdminNavBody({
                 type="button"
                 onClick={() => toast.info(t("msg.kitchen_coming_soon"))}
                 className={cn(
-                  "flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium transition-colors",
+                  "flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium transition-colors short:py-2 tiny:py-1.5",
                   light
                     ? "cursor-default text-slate-400 hover:bg-slate-50"
                     : "cursor-default text-[#5a6580] hover:bg-[#1e2a45]/40",
@@ -206,7 +206,7 @@ function AdminNavBody({
               type="button"
               onClick={() => onNav(item.id)}
               className={cn(
-                "flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer",
+                "flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer short:py-2 tiny:py-1.5",
                 activeView === item.id
                   ? "bg-brand/15 text-brand"
                   : light
@@ -228,7 +228,7 @@ function AdminNavBody({
 
       <div
         className={cn(
-          "p-3 border-t",
+          "p-3 border-t short:p-2",
           light ? "border-slate-200" : "border-[#1e2a45]",
         )}
       >
@@ -236,7 +236,7 @@ function AdminNavBody({
           type="button"
           onClick={onLogout}
           className={cn(
-            "flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer",
+            "flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer short:py-2 tiny:py-1.5",
             light
               ? "text-amber-600 hover:bg-amber-500/10"
               : "text-amber-400 hover:bg-amber-500/10",

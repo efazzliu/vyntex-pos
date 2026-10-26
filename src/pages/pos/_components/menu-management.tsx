@@ -57,6 +57,10 @@ import { emojiForCategoryName } from "@/lib/pos-category-icons.ts";
 import { BRAND } from "@/lib/brand-colors.ts";
 
 const ACCENT_BLUE = BRAND.primary;
+
+/** Below 1280px the category column folds under the product name so names never collapse. */
+const MENU_TABLE_GRID =
+  "grid items-center gap-2 grid-cols-[32px_minmax(120px,1fr)_76px_80px_96px_100px] xl:gap-3 xl:grid-cols-[44px_1fr_140px_120px_90px_110px_118px]";
 const ACCENT_GREEN = "#22c55e";
 
 /** Same names as supply auto-category (`ensureSupplyCategory`); hidden from product category strip. */
@@ -955,7 +959,7 @@ export default function MenuManagement({
       {filteredItems && filteredItems.length > 0 && (
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           {/* Table header */}
-          <div className="grid grid-cols-[44px_1fr_140px_120px_90px_110px_118px] items-center gap-3 bg-slate-50 px-4 py-3">
+          <div className={cn(MENU_TABLE_GRID, "bg-slate-50 px-4 py-3")}>
             <div className="flex justify-center">
               {canDeleteMenuItems ? (
                 <Checkbox checked={allChecked} onCheckedChange={toggleAll} />
@@ -967,7 +971,7 @@ export default function MenuManagement({
             <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 text-center">
               {t("menu_page.col_stock")}
             </span>
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 text-center">
+            <span className="hidden text-[11px] font-semibold uppercase tracking-wider text-slate-500 text-center xl:block">
               {t("menu_page.col_category")}
             </span>
             <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 text-right">
@@ -1007,7 +1011,8 @@ export default function MenuManagement({
               <div
                 key={item._id}
                 className={cn(
-                  "grid grid-cols-[44px_1fr_140px_120px_90px_110px_118px] items-center gap-3 px-4 py-3 border-t border-slate-200 transition-colors",
+                  MENU_TABLE_GRID,
+                  "px-4 py-3 border-t border-slate-200 transition-colors",
                   isChecked
                     ? "bg-brand/5"
                     : "bg-white hover:bg-slate-50"
@@ -1052,6 +1057,12 @@ export default function MenuManagement({
                         {item.description}
                       </p>
                     )}
+                    <p
+                      className="truncate text-[11px] font-semibold xl:hidden"
+                      style={{ color: catColor }}
+                    >
+                      {category?.name ?? "\u2014"}
+                    </p>
                   </div>
                 </div>
 
@@ -1084,7 +1095,7 @@ export default function MenuManagement({
                 </div>
 
                 {/* Category */}
-                <div className="flex min-w-0 justify-center">
+                <div className="hidden min-w-0 justify-center xl:flex">
                   <span
                     className="text-[11px] font-semibold px-2.5 py-1 rounded-full truncate max-w-[120px]"
                     style={{

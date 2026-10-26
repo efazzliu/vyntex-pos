@@ -621,7 +621,7 @@ export default function StockManagement({
           })}
         </div>
 
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <SummaryCard
             icon={<Layers className="size-4" />}
             label={t("stock_page.sum_total")}
@@ -769,16 +769,16 @@ export default function StockManagement({
           ) : (
             <>
               <div className="hidden overflow-x-auto md:block">
-                <table className="w-full min-w-[860px] text-sm">
+                <table className="w-full text-sm xl:min-w-[860px]">
                   <thead>
                     <tr className="bg-[#f8fafc] text-left text-[12px] font-medium text-[#64748b]">
                       <th className="px-4 py-2.5 font-medium">{t("stock_page.col_item")}</th>
                       <th className="px-3 py-2.5 font-medium">{t("stock_page.col_category")}</th>
                       <th className="px-3 py-2.5 text-right font-medium">{t("stock_page.col_on_hand")}</th>
                       <th className="px-3 py-2.5 text-right font-medium">{t("stock_page.col_minimum")}</th>
-                      <th className="px-3 py-2.5 font-medium">{t("stock_page.col_unit")}</th>
+                      <th className="hidden px-3 py-2.5 font-medium xl:table-cell">{t("stock_page.col_unit")}</th>
                       <th className="px-3 py-2.5 font-medium">{t("stock_page.col_status")}</th>
-                      <th className="px-3 py-2.5 font-medium">{t("stock_page.col_last_update")}</th>
+                      <th className="hidden px-3 py-2.5 font-medium xl:table-cell">{t("stock_page.col_last_update")}</th>
                       <th className="w-12 px-3 py-2.5" />
                     </tr>
                   </thead>
@@ -808,15 +808,18 @@ export default function StockManagement({
                             )}
                           >
                             {formatQty(row.currentStock)}
+                            <span className="ml-1 font-normal text-[#64748b] xl:hidden">{rowUnit(row)}</span>
                           </td>
                           <td className="px-3 py-2.5 text-right tabular-nums text-[#64748b]">
                             {formatQty(row.effectiveLowStockThreshold ?? row.lowStockThreshold)}
                           </td>
-                          <td className="px-3 py-2.5 text-[#64748b]">{rowUnit(row)}</td>
+                          <td className="hidden px-3 py-2.5 text-[#64748b] xl:table-cell">{rowUnit(row)}</td>
                           <td className="px-3 py-2.5">
                             <StatusBadge status={status} label={statusLabel(status)} />
                           </td>
-                          <td className="px-3 py-2.5 text-[#64748b]">{lastUpdateLabel(row.lastStockUpdateAt)}</td>
+                          <td className="hidden px-3 py-2.5 text-[#64748b] xl:table-cell">
+                            {lastUpdateLabel(row.lastStockUpdateAt)}
+                          </td>
                           <td className="px-3 py-2.5 text-right">{rowActions(row)}</td>
                         </tr>
                       );

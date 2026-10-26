@@ -3,6 +3,9 @@
 @plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
+/* Short screens: 1366×768 laptops at 125% scaling, 1280×720, small touch monitors. */
+@custom-variant short (@media (max-height: 760px));
+@custom-variant tiny (@media (max-height: 620px));
 
 @theme inline {
   --font-sans:

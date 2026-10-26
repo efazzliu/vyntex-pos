@@ -30,7 +30,7 @@ export default function PosPrioritySupportNav({
           <button
             type="button"
             className={cn(
-              "flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer",
+              "flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer short:py-2 tiny:py-1.5",
               light
                 ? "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                 : "text-[#8b93a7] hover:bg-[#1e2a45]/60 hover:text-white",

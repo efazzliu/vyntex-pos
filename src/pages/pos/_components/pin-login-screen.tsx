@@ -68,7 +68,7 @@ function LogoAndName({
       animate={{ scale: 1, opacity: 1 }}
       transition={{ delay: 0.1 }}
       className={cn(
-        "flex flex-col gap-2 mb-2",
+        "flex flex-col gap-2 mb-2 tiny:gap-1 tiny:mb-1",
         align,
         isCorner && "mb-0 max-w-[min(42vw,280px)]",
       )}
@@ -85,7 +85,7 @@ function LogoAndName({
             : `min(92vw, ${Math.max(200, Math.round(branding.logoHeightPx * 2.4))}px)`,
         }}
         className={cn(
-          "object-contain",
+          "object-contain short:!max-h-[18dvh] tiny:!max-h-[13dvh]",
           !isCorner && "mx-auto",
           placement === "top-left" && "self-start",
           placement === "top-right" && "self-end",
@@ -412,7 +412,7 @@ export default function PinLoginScreen({
   const wifiRow = (
     <div
       className={cn(
-        "flex items-center gap-1.5",
+        "flex items-center gap-1.5 short:mb-4 tiny:mb-2",
         showLogoInColumnTop && !showLogoCenterBand ? "mb-8" : "mb-8 mt-2",
       )}
     >
@@ -440,7 +440,7 @@ export default function PinLoginScreen({
     <div
       data-pos-theme={posTheme}
       className={cn(
-        "min-h-screen flex flex-col relative p-4 select-none",
+        "min-h-screen flex flex-col relative p-4 select-none short:p-3 tiny:p-2",
         isLightPos ? "bg-slate-100" : "bg-[#0A0F1E]",
       )}
     >
@@ -561,7 +561,7 @@ export default function PinLoginScreen({
 
           <p
             className={cn(
-              "text-lg font-semibold mb-6",
+              "text-lg font-semibold mb-6 short:mb-3 tiny:mb-2 tiny:text-base",
               isLightPos ? "text-slate-900" : "text-white",
             )}
           >
@@ -599,7 +599,7 @@ export default function PinLoginScreen({
             aria-label={tPin("pin.placeholder")}
             aria-invalid={error}
             className={cn(
-              "select-text mb-10 w-full max-w-[17rem] h-12 rounded-2xl px-4 text-center font-mono text-lg tracking-normal shadow-none transition-[border-color]",
+              "select-text mb-10 w-full max-w-[17rem] h-12 rounded-2xl px-4 text-center font-mono text-lg tracking-normal shadow-none transition-[border-color] short:mb-4 short:h-11 tiny:mb-3 tiny:h-10",
               "focus-visible:ring-0 focus-visible:ring-offset-0 aria-invalid:ring-0 dark:aria-invalid:ring-0",
               isLightPos
                 ? "border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:border-slate-300"
@@ -619,9 +619,9 @@ export default function PinLoginScreen({
             </motion.p>
           )}
 
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 short:gap-2">
             {NUMPAD_KEYS.map((row, ri) => (
-              <div key={ri} className="flex gap-3 justify-center">
+              <div key={ri} className="flex gap-3 justify-center short:gap-2">
                 {row.map((key) => {
                   const isAction = key === "clear" || key === "delete";
                   return (
@@ -631,7 +631,7 @@ export default function PinLoginScreen({
                       onClick={() => handleKeyPress(key)}
                       disabled={verifying || !!success}
                       className={cn(
-                        "w-20 h-14 rounded-2xl font-semibold text-xl transition-all active:scale-95 cursor-pointer disabled:opacity-50",
+                        "w-20 h-14 rounded-2xl font-semibold text-xl transition-all active:scale-95 cursor-pointer disabled:opacity-50 short:h-12 tiny:h-11",
                         isAction
                           ? isLightPos
                             ? "bg-slate-200/90 text-slate-700 hover:bg-slate-300 border border-slate-300"
@@ -662,7 +662,7 @@ export default function PinLoginScreen({
               disabled={
                 verifying || !isValidStaffPinLength(pin.length)
               }
-              className="mt-2 w-full max-w-[17rem] h-12 rounded-2xl font-semibold bg-brand-accent hover:bg-[#3db80a] disabled:opacity-40 disabled:pointer-events-none transition-all active:scale-[0.98]"
+              className="mt-2 w-full max-w-[17rem] h-12 rounded-2xl font-semibold bg-brand-accent hover:bg-[#3db80a] disabled:opacity-40 disabled:pointer-events-none transition-all active:scale-[0.98] short:h-11 tiny:h-10"
             >
               <span className={isLightPos ? "text-[#f8fafc]" : "text-white"}>
                 {tPin("pin.sign_in")}
