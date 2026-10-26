@@ -15,6 +15,7 @@ import { Switch } from "@/components/ui/switch.tsx";
 import { cn } from "@/lib/utils.ts";
 import { toast } from "sonner";
 import { getDataCache, saveDataCache } from "@/lib/local-db.ts";
+import { errorMessageFromUnknown } from "@/lib/supabase-pos/db-errors.ts";
 import { CATEGORY_ICON_PICKER } from "@/lib/pos-category-icons.ts";
 import { usePosLocale } from "./pos-locale-provider.tsx";
 import { MenuItemPrepEditor } from "@/components/menu-item-prep-editor.tsx";
@@ -150,8 +151,8 @@ export default function CategoryDialog({
         toast.success("Category created");
       }
       onOpenChange(false);
-    } catch {
-      toast.error("Failed to save category");
+    } catch (err) {
+      toast.error(errorMessageFromUnknown(err, "Failed to save category"));
     } finally {
       setSaving(false);
     }

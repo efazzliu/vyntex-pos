@@ -321,32 +321,35 @@ export async function createCategory(args: {
   const withPrep =
     prepNorm !== undefined ? { ...withIcon, prep_config: prepNorm } : withIcon;
 
-  let { data, error } = await supabase
-    .from("menu_categories")
-    .insert(withPrep)
-    .select("id")
-    .single();
-
-  if (error && pgMissingColumnMessage(error, "prep_config")) {
-    const { prep_config: _pc, ...withoutPrep } = withPrep as Record<string, unknown>;
-    ({ data, error } = await supabase
-      .from("menu_categories")
-      .insert(withoutPrep)
-      .select("id")
-      .single());
-  }
-
-  if (error && isMissingPgColumnError(error.message ?? "", "icon")) {
-    const { icon: _icon, ...withoutIcon } = (withPrep as Record<string, unknown>);
-    ({ data, error } = await supabase
-      .from("menu_categories")
-      .insert(withoutIcon)
-      .select("id")
-      .single());
-  }
+  const { data, error } = await writeCategoryDroppingMissingColumns(withPrep, (payload) =>
+    supabase.from("menu_categories").insert(payload).select("id").single(),
+  );
 
   if (error) throw error;
-  return data!.id as string;
+  return (data as { id: string }).id;
+}
+
+/** Older venues may lack `icon` / `prep_config`; retry without each missing column. */
+const OPTIONAL_CATEGORY_COLUMNS = ["prep_config", "icon"] as const;
+
+async function writeCategoryDroppingMissingColumns<T>(
+  payload: Record<string, unknown>,
+  write: (payload: Record<string, unknown>) => PromiseLike<{ data: T; error: { message?: string } | null }>,
+): Promise<{ data: T; error: { message?: string } | null }> {
+  let current = { ...payload };
+  for (;;) {
+    const result = await write(current);
+    if (!result.error) return result;
+    const missing = OPTIONAL_CATEGORY_COLUMNS.find(
+      (column) =>
+        column in current &&
+        (pgMissingColumnMessage(result.error!, column) ||
+          isMissingPgColumnError(result.error!.message ?? "", column)),
+    );
+    if (!missing) return result;
+    const { [missing]: _dropped, ...rest } = current;
+    current = rest;
+  }
 }
 
 export async function updateCategory(args: {
@@ -372,26 +375,9 @@ export async function updateCategory(args: {
     patch.prep_config = prepNorm;
   }
 
-  let { error } = await supabase
-    .from("menu_categories")
-    .update(patch)
-    .eq("id", args.categoryId);
-
-  if (error && pgMissingColumnMessage(error, "prep_config")) {
-    delete patch.prep_config;
-    ({ error } = await supabase
-      .from("menu_categories")
-      .update(patch)
-      .eq("id", args.categoryId));
-  }
-
-  if (error && isMissingPgColumnError(error.message ?? "", "icon")) {
-    delete patch.icon;
-    ({ error } = await supabase
-      .from("menu_categories")
-      .update(patch)
-      .eq("id", args.categoryId));
-  }
+  const { error } = await writeCategoryDroppingMissingColumns(patch, (payload) =>
+    supabase.from("menu_categories").update(payload).eq("id", args.categoryId),
+  );
 
   if (error) throw error;
 }
