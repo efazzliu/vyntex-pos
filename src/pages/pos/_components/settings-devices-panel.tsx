@@ -272,14 +272,8 @@ export default function SettingsDevicesPanel({
   }, [printersQuery]);
 
   const invokeSystemPrinters = useMemo(() => getDesktopSystemPrintersInvoker(), []);
-  const webBluetoothSupported = useMemo(
-    () => typeof navigator !== "undefined" && "bluetooth" in navigator,
-    [],
-  );
-
   const [addIpOpen, setAddIpOpen] = useState(false);
   const [systemOpen, setSystemOpen] = useState(false);
-  const [scanning, setScanning] = useState(false);
   const [testingId, setTestingId] = useState<string | null>(null);
   const [editing, setEditing] = useState<PosPrinter | null>(null);
   const [routingTick, setRoutingTick] = useState(0);
@@ -306,47 +300,10 @@ export default function SettingsDevicesPanel({
     return () => window.clearInterval(id);
   }, [refreshQueue]);
 
-  const handleBluetoothScan = async () => {
-    if (!("bluetooth" in navigator)) {
-      toast.error(t("msg.bluetooth_unavailable"));
-      return;
-    }
-    setScanning(true);
-    try {
-      const bt = (
-        navigator as Navigator & {
-          bluetooth?: {
-            requestDevice: (opts: unknown) => Promise<{ name?: string; id: string }>;
-          };
-        }
-      ).bluetooth;
-      if (!bt) {
-        toast.error(t("msg.bluetooth_unavailable"));
-        return;
-      }
-      const device = await bt.requestDevice({
-        acceptAllDevices: true,
-        optionalServices: ["battery_service"],
-      });
-      const label = (device.name ?? "").trim() || `BT-${device.id.slice(0, 8)}`;
-      await addPrinter({
-        licenseKey,
-        name: label,
-        type: "bluetooth",
-        address: device.id,
-        role: "receipt",
-      });
-      toast.success(`${t("settings.printer_added")}: ${label}. ${t("settings.printer_test_required")}`);
-    } catch (err) {
-      if (err instanceof Error && err.name === "NotFoundError") return;
-      if (err instanceof Error && err.name === "SecurityError") {
-        toast.error(t("msg.bluetooth_permission_denied"));
-        return;
-      }
-      toast.error(t("msg.bluetooth_unavailable"));
-    } finally {
-      setScanning(false);
-    }
+  /** Printing goes through Windows print queues, so a Bluetooth printer must be paired in Windows first. */
+  const handleBluetoothPrinter = () => {
+    toast.info(t("msg.bluetooth_desktop_use_system"), { duration: 7000 });
+    if (invokeSystemPrinters) setSystemOpen(true);
   };
 
   const handleTestPrint = async (printer: PosPrinter) => {
@@ -469,14 +426,10 @@ export default function SettingsDevicesPanel({
           <Wifi className="size-4 text-brand" />
           {t("settings.add_ip_printer")}
         </DropdownMenuItem>
-        {webBluetoothSupported ? (
-          <DropdownMenuItem
-            className="gap-2"
-            disabled={scanning}
-            onSelect={() => void handleBluetoothScan()}
-          >
+        {invokeSystemPrinters ? (
+          <DropdownMenuItem className="gap-2" onSelect={handleBluetoothPrinter}>
             <Bluetooth className="size-4 text-brand" />
-            {scanning ? t("settings.scanning") : t("settings.scan_bluetooth")}
+            {t("settings.add_bluetooth_printer")}
           </DropdownMenuItem>
         ) : null}
       </DropdownMenuContent>
