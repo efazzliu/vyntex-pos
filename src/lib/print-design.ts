@@ -128,7 +128,12 @@ export function printDesignCss(source?: unknown): string {
   const mm = paperWidthMm(d);
   const width = d.orientation === "landscape" ? `${Math.round(mm * 1.18)}mm` : `${mm}mm`;
   const dashStyle = d.dividerStyle === "none" ? "none" : d.dividerStyle;
-  const page = d.orientation === "landscape" ? "landscape" : `${mm}mm auto`;
+  // Tall default page: Chromium often ignores `auto` height and clips to Letter.
+  // Electron/dialog paths overwrite with a measured @page before printing.
+  const page =
+    d.orientation === "landscape"
+      ? "landscape"
+      : `${mm}mm 2000mm`;
   return `
     :root {
       --print-align: ${d.align};
@@ -143,18 +148,39 @@ export function printDesignCss(source?: unknown): string {
       --print-margin: ${marginPx(d)};
     }
     @page { size: ${page}; margin: 0; }
+    html, body {
+      height: auto !important;
+      min-height: 0 !important;
+      overflow: visible !important;
+    }
     body {
       font-family: var(--print-font) !important;
       font-size: var(--print-size) !important;
       line-height: var(--print-lh) !important;
       text-align: var(--print-align);
       padding: var(--print-margin) !important;
+      width: var(--print-width) !important;
+      max-width: var(--print-width) !important;
+      margin: 0 auto !important;
+      box-sizing: border-box !important;
     }
     .sheet, .wrap {
+      width: 100% !important;
       max-width: var(--print-width) !important;
       margin-left: auto !important;
       margin-right: auto !important;
       padding: var(--print-margin) !important;
+      overflow: visible !important;
+      page-break-inside: auto;
+      break-inside: auto;
+    }
+    @media print {
+      html, body {
+        height: auto !important;
+        overflow: visible !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
     }
     .dash, hr.dash {
       border: none !important;

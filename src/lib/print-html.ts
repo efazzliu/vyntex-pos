@@ -58,13 +58,80 @@ export async function canAttemptSilentPrint(): Promise<boolean> {
   return count === null ? true : count > 0;
 }
 
+/** Wait until document + images are ready so long layouts print completely. */
+function whenPrintDocumentReady(doc: Document, win: Window): Promise<void> {
+  const images = Array.from(doc.images ?? []);
+  const imageWait = Promise.all(
+    images.map(
+      (img) =>
+        img.complete
+          ? Promise.resolve()
+          : new Promise<void>((resolve) => {
+              img.addEventListener("load", () => resolve(), { once: true });
+              img.addEventListener("error", () => resolve(), { once: true });
+            }),
+    ),
+  );
+  const fontsWait =
+    "fonts" in doc && doc.fonts?.ready
+      ? doc.fonts.ready.then(() => undefined).catch(() => undefined)
+      : Promise.resolve();
+  return Promise.all([imageWait, fontsWait]).then(() => {
+    // Two frames: let layout settle at the real iframe size (not 0×0).
+    return new Promise<void>((resolve) => {
+      win.requestAnimationFrame(() => {
+        win.requestAnimationFrame(() => resolve());
+      });
+    });
+  });
+}
+
+/** Grow iframe + inject exact @page size so the dialog does not clip the ticket. */
+function fitPrintIframeToContent(iframe: HTMLIFrameElement, doc: Document): void {
+  const body = doc.body;
+  const html = doc.documentElement;
+  if (!body || !html) return;
+
+  const widthPx = Math.max(
+    body.scrollWidth || 0,
+    html.scrollWidth || 0,
+    body.offsetWidth || 0,
+    320,
+  );
+  const heightPx = Math.max(
+    body.scrollHeight || 0,
+    html.scrollHeight || 0,
+    body.offsetHeight || 0,
+    600,
+  );
+  iframe.style.width = `${Math.ceil(widthPx + 24)}px`;
+  iframe.style.height = `${Math.ceil(heightPx + 48)}px`;
+
+  const root = doc.defaultView?.getComputedStyle(html);
+  const varW = (root?.getPropertyValue("--print-width") || "").trim();
+  const mmMatch = varW.match(/([\d.]+)\s*mm/i);
+  const widthMm = mmMatch ? Math.min(120, Math.max(48, Number(mmMatch[1]) || 80)) : 80;
+  const heightMm = Math.max(40, (heightPx * 25.4) / 96 + 8);
+
+  let styleEl = doc.getElementById("vyntex-print-page-size");
+  if (!styleEl) {
+    styleEl = doc.createElement("style");
+    styleEl.id = "vyntex-print-page-size";
+    doc.head.appendChild(styleEl);
+  }
+  styleEl.textContent =
+    `@page{size:${widthMm}mm ${heightMm.toFixed(2)}mm;margin:0}` +
+    `html,body{height:auto!important;overflow:visible!important}`;
+}
+
 /** Interactive print (browser/Electron print dialog). */
 export function printHtmlDocument(htmlFullDocument: string): boolean {
   htmlFullDocument = ensurePrintPoweredByFooter(htmlFullDocument);
   const iframe = document.createElement("iframe");
   iframe.setAttribute("aria-hidden", "true");
+  // Off-screen but real size: zero-size iframes clip multi-page thermal content.
   iframe.style.cssText =
-    "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;";
+    "position:fixed;left:-10000px;top:0;width:480px;height:3200px;border:0;opacity:0;pointer-events:none;";
   document.body.appendChild(iframe);
   const win = iframe.contentWindow;
   const doc = iframe.contentDocument;
@@ -86,16 +153,20 @@ export function printHtmlDocument(htmlFullDocument: string): boolean {
 
   const runPrint = () => {
     try {
+      fitPrintIframeToContent(iframe, doc);
       win.focus();
       win.print();
     } catch {
       cleanup();
       return;
     }
-    setTimeout(cleanup, 1000);
+    // Keep iframe alive briefly so the print pipeline can snapshot full HTML.
+    setTimeout(cleanup, 4000);
   };
 
-  setTimeout(runPrint, 0);
+  void whenPrintDocumentReady(doc, win)
+    .then(runPrint)
+    .catch(runPrint);
   return true;
 }
 
@@ -103,11 +174,11 @@ export type PrintHtmlAsyncOutcome = { ok: boolean; error?: string };
 
 /**
  * Max wait for Electron silent-print IPC before treating as timeout.
- * Must be ≥ main-process print cap (`SILENT_PRINT_JOB_MAX_MS` in `electron/main.cjs`) so the
- * renderer does not abandon the invoke while a hidden print window is still open (Windows
- * can show a blocking "Waiting for printer connection…" dialog until that job ends).
+ * Must cover main-process start + spool windows (`SILENT_PRINT_START_MAX_MS` +
+ * `SILENT_PRINT_SPOOL_MAX_MS` in `electron/main.cjs`) so long thermal layouts can
+ * finish spooling instead of being cut off when the renderer gives up early.
  */
-export const DEFAULT_SILENT_PRINT_IPC_TIMEOUT_MS = 2200;
+export const DEFAULT_SILENT_PRINT_IPC_TIMEOUT_MS = 30_000;
 
 /** Errors after which we keep HTML in the local print queue for retry (Electron / offline printer). */
 export function isSilentPrintQueueableError(error: string | undefined): boolean {
