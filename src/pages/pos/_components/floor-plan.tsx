@@ -158,6 +158,8 @@ function FloorPlanEditor({ licenseKey }: { licenseKey: string }) {
   // Dialogs
   const [addRoomOpen, setAddRoomOpen] = useState(false);
   const [newRoomName, setNewRoomName] = useState("");
+  const [addRoomError, setAddRoomError] = useState<string | null>(null);
+  const [creatingRoom, setCreatingRoom] = useState(false);
   const [renameRoomOpen, setRenameRoomOpen] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -391,56 +393,68 @@ function FloorPlanEditor({ licenseKey }: { licenseKey: string }) {
 
   // ── Room actions ──────────────────────────────────────
 
-  const handleAddRoom = () => {
+  const handleAddRoom = async () => {
     const roomName = newRoomName.trim();
     if (!roomName) {
+      setAddRoomError("Enter a room name");
       toast.error("Enter a room name");
       return;
     }
     if (zones.some((z) => z.toLowerCase() === roomName.toLowerCase())) {
+      setAddRoomError("Room already exists");
       toast.error("Room already exists");
       return;
     }
+    setAddRoomError(null);
+    setCreatingRoom(true);
     const firstSlot = nextFloorTableSlot(0);
-    createTable({
-      licenseKey,
-      seats: 4,
-      zone: roomName,
-      posX: firstSlot.posX,
-      posY: firstSlot.posY,
-    })
-      .then((newId) => {
-        if (typeof newId !== "string" || !newId) {
-          toast.error("Failed to create room");
-          return;
-        }
-        const newTable: Doc<"tables"> = {
-          _id: newId as Id<"tables">,
-          _creationTime: Date.now(),
-          licenseKey,
-          name: "T1",
-          seats: 4,
-          zone: roomName,
-          status: "available",
-          posX: firstSlot.posX,
-          posY: firstSlot.posY,
-          shape: "square",
-          tableScale: 1,
-          tableScaleY: 1,
-        };
-        setLocalTables((prev) => [...prev, newTable]);
-        void getDataCache<Doc<"tables">[]>(posTablesIndexedDbKey(licenseKey)).then((cached) =>
-          saveDataCache(posTablesIndexedDbKey(licenseKey), [...(cached ?? []), newTable]),
-        );
-        toast.success(`Room "${roomName}" created`);
-        setActiveZone(roomName);
-        setNewRoomName("");
-        setAddRoomOpen(false);
-      })
-      .catch((e: unknown) => {
-        console.error("[POS] create room:", e);
-        toast.error(errorMessageFromUnknown(e, "Failed to create room"));
+    try {
+      const newId = await createTable({
+        licenseKey,
+        seats: 4,
+        zone: roomName,
+        posX: firstSlot.posX,
+        posY: firstSlot.posY,
+        shape: "square",
       });
+      // Offline queue returns null after enqueue — keep optimistic local room so UI unlocks.
+      const tableId =
+        typeof newId === "string" && newId
+          ? newId
+          : typeof crypto !== "undefined" && "randomUUID" in crypto
+            ? crypto.randomUUID()
+            : `pending-room-${Date.now()}`;
+      const newTable: Doc<"tables"> = {
+        _id: tableId as Id<"tables">,
+        _creationTime: Date.now(),
+        licenseKey,
+        name: "T1",
+        seats: 4,
+        zone: roomName,
+        status: "available",
+        posX: firstSlot.posX,
+        posY: firstSlot.posY,
+        shape: "square",
+        tableScale: 1,
+        tableScaleY: 1,
+      };
+      setLocalTables((prev) => [...prev, newTable]);
+      void getDataCache<Doc<"tables">[]>(posTablesIndexedDbKey(licenseKey)).then((cached) =>
+        saveDataCache(posTablesIndexedDbKey(licenseKey), [...(cached ?? []), newTable]),
+      );
+      toast.success(`Room "${roomName}" created`);
+      setActiveZone(roomName);
+      setNewRoomName("");
+      setAddRoomError(null);
+      setAddRoomOpen(false);
+    } catch (e: unknown) {
+      console.error("[POS] create room:", e);
+      const msg = errorMessageFromUnknown(e, "Failed to create room");
+      setAddRoomError(msg);
+      toast.error(msg);
+    } finally {
+      setCreatingRoom(false);
+    }
   };
 
   const handleRenameRoom = async () => {
@@ -622,7 +636,14 @@ function FloorPlanEditor({ licenseKey }: { licenseKey: string }) {
               {t("floor.add_table")}
             </Button>
           )}
-          <Button size="sm" variant="secondary" onClick={() => setAddRoomOpen(true)}>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              setAddRoomError(null);
+              setAddRoomOpen(true);
+            }}
+          >
             <DoorOpen className="size-4 mr-1" />
             {t("floor.add_room")}
           </Button>
@@ -689,7 +710,13 @@ function FloorPlanEditor({ licenseKey }: { licenseKey: string }) {
               <EmptyDescription>{t("floor.no_rooms_desc")}</EmptyDescription>
             </EmptyHeader>
             <EmptyContent>
-              <Button size="sm" onClick={() => setAddRoomOpen(true)}>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setAddRoomError(null);
+                  setAddRoomOpen(true);
+                }}
+              >
                 <Plus className="size-4 mr-1" />
                 {t("floor.add_room")}
               </Button>
@@ -719,11 +746,11 @@ function FloorPlanEditor({ licenseKey }: { licenseKey: string }) {
         </div>
       )}
 
-      {/* Canvas */}
+      {/* Canvas — overflow-auto so large rooms stay scrollable */}
       {activeZone && displayTables.length > 0 && (
         <div
           ref={floorRef}
-          className="flex-1 min-h-0 overflow-hidden rounded-xl border border-[#1e2a45] bg-[#0D1326] relative select-none w-full"
+          className="relative min-h-0 w-full flex-1 select-none overflow-auto overscroll-contain rounded-xl border border-[#1e2a45] bg-[#0D1326]"
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onClick={() => setSelectedTable(null)}
@@ -816,43 +843,71 @@ function FloorPlanEditor({ licenseKey }: { licenseKey: string }) {
       {/* ── Dialogs ──────────────────────────────────────── */}
 
       {/* Add Room */}
-      <Sheet open={addRoomOpen} onOpenChange={setAddRoomOpen}>
+      <Sheet
+        open={addRoomOpen}
+        onOpenChange={(open) => {
+          setAddRoomOpen(open);
+          if (!open) {
+            setAddRoomError(null);
+            setCreatingRoom(false);
+          }
+        }}
+      >
         <SheetContent
           side="right"
-          className="w-full border-l border-slate-200 bg-white p-0 text-slate-900 sm:max-w-md"
+          className="flex h-dvh max-h-dvh w-full flex-col gap-0 overflow-hidden border-l border-slate-200 bg-white p-0 text-slate-900 sm:max-w-md"
         >
-          <SheetHeader className="border-b border-slate-200 bg-slate-50 pb-4">
+          <SheetHeader className="shrink-0 border-b border-slate-200 bg-slate-50 pb-4">
             <SheetTitle className="text-slate-900">New Room</SheetTitle>
             <SheetDescription className="text-slate-500">
               Create a new room/zone for floor tables.
             </SheetDescription>
           </SheetHeader>
-          <div className="space-y-3 p-4">
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4">
+            <label className="mb-1.5 block text-xs font-semibold tracking-wide text-slate-600">
+              Room name
+            </label>
             <Input
               autoFocus
               value={newRoomName}
-              onChange={(e) => setNewRoomName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleAddRoom(); }}
+              onChange={(e) => {
+                setNewRoomName(e.target.value);
+                if (addRoomError) setAddRoomError(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !creatingRoom) void handleAddRoom();
+              }}
               placeholder="e.g., Main Floor, VIP Room, Terrace"
+              aria-invalid={Boolean(addRoomError)}
               className="h-11 rounded-xl border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:ring-emerald-500/70"
             />
-            <p className="text-xs text-slate-500">
-              A first table will be auto-created in the new room.
-            </p>
+            {addRoomError ? (
+              <p className="text-sm text-red-600" role="alert">
+                {addRoomError}
+              </p>
+            ) : (
+              <p className="text-xs text-slate-500">
+                A first table will be auto-created in the new room.
+              </p>
+            )}
           </div>
-          <SheetFooter className="border-t border-slate-200 bg-slate-50 p-4 sm:flex-row sm:justify-end">
+          <SheetFooter className="shrink-0 border-t border-slate-200 bg-slate-50 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex-row sm:justify-end">
             <Button
+              type="button"
               variant="ghost"
               onClick={() => setAddRoomOpen(false)}
+              disabled={creatingRoom}
               className="rounded-xl text-slate-600 hover:bg-slate-200 hover:text-slate-900"
             >
               Cancel
             </Button>
             <Button
-              onClick={handleAddRoom}
-              className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-500"
+              type="button"
+              onClick={() => void handleAddRoom()}
+              disabled={creatingRoom || !newRoomName.trim()}
+              className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-50"
             >
-              Create Room
+              {creatingRoom ? "Creating..." : "Create Room"}
             </Button>
           </SheetFooter>
         </SheetContent>
@@ -1459,7 +1514,7 @@ function WaiterFloorView({
             </div>
       ) : null}
 
-      <div className="flex-1 min-h-0 overflow-hidden rounded-xl border border-[#1e2a45] bg-[#0D1326]">
+      <div className="min-h-0 flex-1 overflow-auto overscroll-contain rounded-xl border border-[#1e2a45] bg-[#0D1326]">
         <div
           className="relative select-none"
           style={{ width: zoneBox.width, height: zoneBox.height }}
