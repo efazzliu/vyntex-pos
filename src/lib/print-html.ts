@@ -58,13 +58,42 @@ export async function canAttemptSilentPrint(): Promise<boolean> {
   return count === null ? true : count > 0;
 }
 
+/** Wait until document + images are ready so long layouts print completely. */
+function whenPrintDocumentReady(doc: Document, win: Window): Promise<void> {
+  const images = Array.from(doc.images ?? []);
+  const imageWait = Promise.all(
+    images.map(
+      (img) =>
+        img.complete
+          ? Promise.resolve()
+          : new Promise<void>((resolve) => {
+              img.addEventListener("load", () => resolve(), { once: true });
+              img.addEventListener("error", () => resolve(), { once: true });
+            }),
+    ),
+  );
+  const fontsWait =
+    "fonts" in doc && doc.fonts?.ready
+      ? doc.fonts.ready.then(() => undefined).catch(() => undefined)
+      : Promise.resolve();
+  return Promise.all([imageWait, fontsWait]).then(() => {
+    // Two frames: let layout settle at the real iframe size (not 0×0).
+    return new Promise<void>((resolve) => {
+      win.requestAnimationFrame(() => {
+        win.requestAnimationFrame(() => resolve());
+      });
+    });
+  });
+}
+
 /** Interactive print (browser/Electron print dialog). */
 export function printHtmlDocument(htmlFullDocument: string): boolean {
   htmlFullDocument = ensurePrintPoweredByFooter(htmlFullDocument);
   const iframe = document.createElement("iframe");
   iframe.setAttribute("aria-hidden", "true");
+  // Off-screen but real size: zero-size iframes clip multi-page thermal content.
   iframe.style.cssText =
-    "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;";
+    "position:fixed;left:-10000px;top:0;width:480px;height:2400px;border:0;opacity:0;pointer-events:none;";
   document.body.appendChild(iframe);
   const win = iframe.contentWindow;
   const doc = iframe.contentDocument;
@@ -92,10 +121,13 @@ export function printHtmlDocument(htmlFullDocument: string): boolean {
       cleanup();
       return;
     }
-    setTimeout(cleanup, 1000);
+    // Keep iframe alive briefly so the print pipeline can snapshot full HTML.
+    setTimeout(cleanup, 2500);
   };
 
-  setTimeout(runPrint, 0);
+  void whenPrintDocumentReady(doc, win)
+    .then(runPrint)
+    .catch(runPrint);
   return true;
 }
 
@@ -103,11 +135,11 @@ export type PrintHtmlAsyncOutcome = { ok: boolean; error?: string };
 
 /**
  * Max wait for Electron silent-print IPC before treating as timeout.
- * Must be ≥ main-process print cap (`SILENT_PRINT_JOB_MAX_MS` in `electron/main.cjs`) so the
- * renderer does not abandon the invoke while a hidden print window is still open (Windows
- * can show a blocking "Waiting for printer connection…" dialog until that job ends).
+ * Must cover main-process start + spool windows (`SILENT_PRINT_START_MAX_MS` +
+ * `SILENT_PRINT_SPOOL_MAX_MS` in `electron/main.cjs`) so long thermal layouts can
+ * finish spooling instead of being cut off when the renderer gives up early.
  */
-export const DEFAULT_SILENT_PRINT_IPC_TIMEOUT_MS = 2200;
+export const DEFAULT_SILENT_PRINT_IPC_TIMEOUT_MS = 30_000;
 
 /** Errors after which we keep HTML in the local print queue for retry (Electron / offline printer). */
 export function isSilentPrintQueueableError(error: string | undefined): boolean {

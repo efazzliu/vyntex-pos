@@ -922,17 +922,20 @@ html[data-dashboard-reduced-motion] *::after {
   transform: rotateY(-18deg) rotateX(7deg) rotateZ(2deg) scale(0.86);
 }
 .pos-receipt-stage--preview {
-  min-height: 0;
-  height: 100%;
+  height: auto;
+  min-height: 100%;
   perspective: 980px;
   padding: 1.1rem 0.9rem 1.25rem;
-  align-items: center;
+  align-items: flex-start;
 }
 .pos-receipt-stage--preview .pos-receipt-sheet {
   width: 22.5rem;
   padding: 1.45rem 1.25rem 1.6rem;
   transform: rotateY(-10deg) rotateX(3.5deg) rotateZ(1.2deg);
   transition: width 200ms ease, transform 200ms ease;
+  /* Full ticket height — do not clip long print layouts in the preview pane */
+  max-height: none;
+  overflow: visible;
 }
 .pos-receipt-stage--landscape .pos-receipt-sheet {
   transform: rotateY(-10deg) rotateX(3deg) rotateZ(0.8deg);

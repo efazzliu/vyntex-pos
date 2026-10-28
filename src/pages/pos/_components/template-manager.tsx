@@ -5282,7 +5282,7 @@ function TemplateEditor({
           )}
         </section>
         <section className={cn(
-          "flex min-h-0 min-w-0 items-center justify-center overflow-hidden rounded-[1.75rem] border border-slate-200/80 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.35)]",
+          "flex min-h-0 min-w-0 items-start justify-center overflow-y-auto overscroll-contain rounded-[1.75rem] border border-slate-200/80 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.35)]",
           meta.id === "complimentary_slip"
             ? "bg-[linear-gradient(180deg,#fff4e8_0%,#fffaf4_100%)]"
             : meta.id === "debt_voucher"

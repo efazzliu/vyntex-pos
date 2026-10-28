@@ -62,11 +62,15 @@ function resolveWindowIconPath() {
 const MAX_SILENT_PRINT_HTML = 4 * 1024 * 1024;
 
 /**
- * Max time for one silent print job (hidden window + OS print).
- * Must be bounded: otherwise Windows may show "Waiting for printer connection…"
- * and block the waiter while the renderer has already moved on.
+ * Max time to start a silent print job (load HTML + call webContents.print).
+ * Once print() is in flight we extend this so long thermal receipts can spool
+ * fully before the hidden window is destroyed (destroy mid-job truncates output).
  */
-const SILENT_PRINT_JOB_MAX_MS = 2000;
+const SILENT_PRINT_START_MAX_MS = 4000;
+/** Extra time after print() is invoked for the OS/driver to accept the full job. */
+const SILENT_PRINT_SPOOL_MAX_MS = 25000;
+/** Keep the hidden window briefly after success so drivers finish reading HTML. */
+const SILENT_PRINT_DESTROY_DELAY_MS = 750;
 
 /** Drivers that open "Save as…" / file dialogs — never use these for POS silent print. */
 const VIRTUAL_PRINTER_RE =
@@ -233,10 +237,11 @@ function registerPrintHtmlSilentIpc() {
     }
 
     return await new Promise((resolve) => {
+      // Tall off-screen window so long thermal layouts lay out fully before print.
       const printWin = new BrowserWindow({
         show: false,
-        width: 420,
-        height: 720,
+        width: 480,
+        height: 2400,
         webPreferences: {
           sandbox: true,
           nodeIntegration: false,
@@ -246,6 +251,8 @@ function registerPrintHtmlSilentIpc() {
 
       let settled = false;
       let timeoutId = null;
+      let destroyDelayId = null;
+      let printStarted = false;
 
       const canUsePrintWindow = () =>
         !settled &&
@@ -254,21 +261,36 @@ function registerPrintHtmlSilentIpc() {
         printWin.webContents &&
         !printWin.webContents.isDestroyed();
 
-      const finish = (ok, error) => {
-        if (settled) return;
-        settled = true;
-        if (timeoutId) clearTimeout(timeoutId);
+      const destroyPrintWindow = () => {
         try {
           if (printWin && !printWin.isDestroyed()) printWin.destroy();
         } catch {
           /* ignore */
         }
+      };
+
+      const finish = (ok, error) => {
+        if (settled) return;
+        settled = true;
+        if (timeoutId) clearTimeout(timeoutId);
+        if (destroyDelayId) clearTimeout(destroyDelayId);
+        // Delay destroy on success so Windows thermal drivers can finish reading.
+        if (ok) {
+          destroyDelayId = setTimeout(destroyPrintWindow, SILENT_PRINT_DESTROY_DELAY_MS);
+        } else {
+          destroyPrintWindow();
+        }
         resolve({ ok, error });
       };
 
-      timeoutId = setTimeout(() => {
-        finish(false, "timeout");
-      }, SILENT_PRINT_JOB_MAX_MS);
+      const armTimeout = (ms) => {
+        if (timeoutId) clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          finish(false, "timeout");
+        }, ms);
+      };
+
+      armTimeout(SILENT_PRINT_START_MAX_MS);
 
       const done = (ok, error) => {
         finish(ok, error);
@@ -284,6 +306,10 @@ function registerPrintHtmlSilentIpc() {
           return;
         }
         try {
+          if (!printStarted) {
+            printStarted = true;
+            armTimeout(SILENT_PRINT_SPOOL_MAX_MS);
+          }
           printWin.webContents.print(opts, (success, failureReason) => {
             if (settled) return;
             cb(success, failureReason);
@@ -298,11 +324,16 @@ function registerPrintHtmlSilentIpc() {
           if (!canUsePrintWindow()) return;
 
           const name = deviceNameFromMain;
-          const win32 = process.platform === "win32";
           // One attempt per job: retries belong in the renderer queue with backoff.
-          const attempts = win32
-            ? [{ printBackground: true }]
-            : [{ printBackground: true }];
+          // preferCSSPageSize + no margins: honor @page thermal width/height so
+          // long receipts are not clipped to Letter/A4.
+          const attempts = [
+            {
+              printBackground: true,
+              preferCSSPageSize: true,
+              margins: { marginType: "none" },
+            },
+          ];
 
           const normalize = (list) =>
             list.map((ex) => {
@@ -340,7 +371,7 @@ function registerPrintHtmlSilentIpc() {
           };
 
           runChain(0, undefined);
-        }, 150);
+        }, 250);
       });
 
       const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
