@@ -249,10 +249,13 @@ async function silentPrintHtml(
 }
 
 async function loadPaidOrder(licenseKey: string, orderId: string) {
-  return (await runPosQuery("pos.orders.getOrderWithItems", {
+  const { resolveOrderWithItemsForPrint } = await import(
+    "@/lib/supabase-pos/order-print-cache.ts"
+  );
+  return (await resolveOrderWithItemsForPrint(
     licenseKey,
     orderId,
-  })) as SaleOrderRow;
+  )) as SaleOrderRow;
 }
 
 export async function printComplimentarySlipForPay(args: {

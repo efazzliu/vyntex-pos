@@ -356,15 +356,20 @@ async function printPosSalesReceipt(args: {
     deviceName,
   } = args;
 
-  const templatesList = (await runPosQuery("pos.templates.listTemplates", {
-    licenseKey,
-  })) as Array<{
+  let templatesList: Array<{
     templateType: string;
     printerId?: string | null;
     toggles?: TemplateToggles;
     labels?: TemplateLabels;
     styles?: Record<string, Record<string, unknown>>;
-  }>;
+  }> = [];
+  try {
+    templatesList = (await runPosQuery("pos.templates.listTemplates", {
+      licenseKey,
+    })) as typeof templatesList;
+  } catch {
+    /* offline — use default receipt layout */
+  }
 
   const templateRow = templatesList?.find((x) => x.templateType === templateType);
   const defaults =
@@ -377,26 +382,10 @@ async function printPosSalesReceipt(args: {
     defaults.labels,
   );
 
-  const raw = (await runPosQuery("pos.orders.getOrderWithItems", {
-    licenseKey,
-    orderId,
-  })) as {
-    items: Array<{
-      name: string;
-      price: number;
-      quantity: number;
-      notes?: string;
-      station?: string;
-      status: string;
-    }>;
-    tableName?: string;
-    staffName?: string;
-    orderNumber?: number;
-    subtotal: number;
-    tax: number;
-    total: number;
-    _id: string;
-  };
+  const { resolveOrderWithItemsForPrint } = await import(
+    "@/lib/supabase-pos/order-print-cache.ts"
+  );
+  const raw = await resolveOrderWithItemsForPrint(licenseKey, orderId);
 
   const mergeKey = (item: (typeof raw.items)[number]) => {
     const notes = (item.notes ?? "").trim().toLowerCase();

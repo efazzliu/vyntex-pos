@@ -383,7 +383,7 @@ const DICT: Record<DashboardLang, Record<string, string>> = {
       "Keep Vyntex POS updated for the latest security fixes, printer compatibility, and synchronization improvements.",
     "downloads.latest_version": "Latest version: {{version}}",
     "downloads.offline_note":
-      "Internet is required for activation and cloud synchronization. POS continues to support offline operation after setup.",
+      "Internet is required for activation and cloud synchronization. After setup, POS keeps working offline — including orders, bill printing, and menu photos (photos upload when back online).",
     "downloads.platform": "Platform",
     "downloads.recommended": "Recommended download",
     "downloads.req_cpu": "Intel or AMD 64-bit processor",
@@ -1201,7 +1201,7 @@ const DICT: Record<DashboardLang, Record<string, string>> = {
       "Mbaje Vyntex POS të përditësuar për rregullimet e fundit të sigurisë, përputhshmërinë e printerëve dhe përmirësimet e sinkronizimit.",
     "downloads.latest_version": "Versioni më i fundit: {{version}}",
     "downloads.offline_note":
-      "Interneti nevojitet për aktivizim dhe sinkronizim cloud. POS vazhdon të funksionojë offline pas konfigurimit.",
+      "Interneti nevojitet për aktivizim dhe sinkronizim cloud. Pas konfigurimit, POS vazhdon offline — përfshirë porositë, printimin e faturës dhe fotot e menusë (fotot ngarkohen kur kthehet interneti).",
     "downloads.platform": "Platforma",
     "downloads.recommended": "Shkarkimi i rekomanduar",
     "downloads.req_cpu": "Procesor Intel ose AMD 64-bit",

@@ -16,7 +16,7 @@ import { Switch } from "@/components/ui/switch.tsx";
 import { cn } from "@/lib/utils.ts";
 import { toast } from "sonner";
 import { errorMessageFromUnknown } from "@/lib/supabase-pos/db-errors.ts";
-import { uploadMenuItemPhoto } from "@/lib/supabase-pos/menu-photo-storage.ts";
+import { resolveMenuItemPhotoForSave } from "@/lib/supabase-pos/menu-photo-storage.ts";
 import {
   ChefHat,
   Wine,
@@ -634,14 +634,23 @@ export default function ItemDialog({
     try {
       let finalImageUrl: string | null | undefined = undefined;
       if (imageFile) {
-        finalImageUrl = await uploadMenuItemPhoto({
+        const photo = await resolveMenuItemPhotoForSave({
           licenseKey,
           file: imageFile,
           itemId: editing?._id ? String(editing._id) : undefined,
         });
+        finalImageUrl = photo.imageUrl;
+        // Offline saves already toast via the mutation queue; only tip when
+        // upload failed while the browser still reported online.
+        if (photo.deferredUpload && navigator.onLine) {
+          toast.info(t("common.need_online_for_upload"), { duration: 2500 });
+        }
       } else if (imageRemoved) {
         finalImageUrl = null;
-      } else if (imagePreview && !imagePreview.startsWith("blob:")) {
+      } else if (
+        imagePreview &&
+        !imagePreview.startsWith("blob:")
+      ) {
         finalImageUrl = imagePreview;
       }
       const finalImageStorageId = currentImageStorageId;
