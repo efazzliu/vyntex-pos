@@ -39,7 +39,7 @@ export function tableScaleXY(t: {
   return { x, y };
 }
 
-/** Bounding box of one room’s tables, padded — used to fit the floor on screen without scroll. */
+/** Bounding box of one room’s tables, padded — floor canvas scrolls when this exceeds the viewport. */
 export function zoneContentBox(
   tables: {
     posX?: number | null;
