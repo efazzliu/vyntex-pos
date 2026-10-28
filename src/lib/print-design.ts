@@ -126,14 +126,21 @@ function logoMargin(align: PrintDesign["align"]): string {
 export function printDesignCss(source?: unknown): string {
   const d = readPrintDesign(source);
   const mm = paperWidthMm(d);
-  const width = d.orientation === "landscape" ? `${Math.round(mm * 1.18)}mm` : `${mm}mm`;
+  // Portrait = exact roll width. Landscape may widen slightly for wide layouts.
+  const widthMm =
+    d.orientation === "landscape" ? Math.round(mm * 1.18) : mm;
+  const width = `${widthMm}mm`;
   const dashStyle = d.dividerStyle === "none" ? "none" : d.dividerStyle;
-  // Tall default page: Chromium often ignores `auto` height and clips to Letter.
-  // Electron/dialog paths overwrite with a measured @page before printing.
+  // Tall portrait page sized to paper width so Chromium does not fall back to Letter.
+  // Electron/dialog paths overwrite height with a measured @page before printing.
   const page =
     d.orientation === "landscape"
-      ? "landscape"
-      : `${mm}mm 2000mm`;
+      ? `landscape`
+      : `${widthMm}mm 2000mm`;
+  // Thermal portrait: pin to the left edge of the paper (qyshi i letres) — never center
+  // on a wider canvas or the printer shifts / clips the ticket.
+  const blockMargin =
+    d.orientation === "portrait" ? "0" : "0 auto";
   return `
     :root {
       --print-align: ${d.align};
@@ -142,13 +149,19 @@ export function printDesignCss(source?: unknown): string {
       --print-size: ${d.fontSize}px;
       --print-lh: ${d.lineHeight};
       --print-width: ${width};
+      --print-width-mm: ${widthMm};
+      --print-orientation: ${d.orientation};
       --print-dash-style: ${dashStyle};
       --print-dash-width: ${d.dividerStyle === "none" ? "0" : dashWidth(d)};
       --print-section: ${sectionPx(d)};
       --print-margin: ${marginPx(d)};
     }
     @page { size: ${page}; margin: 0; }
-    html, body {
+    html {
+      width: ${width} !important;
+      max-width: ${width} !important;
+      margin: 0 !important;
+      padding: 0 !important;
       height: auto !important;
       min-height: 0 !important;
       overflow: visible !important;
@@ -159,23 +172,29 @@ export function printDesignCss(source?: unknown): string {
       line-height: var(--print-lh) !important;
       text-align: var(--print-align);
       padding: var(--print-margin) !important;
-      width: var(--print-width) !important;
-      max-width: var(--print-width) !important;
-      margin: 0 auto !important;
+      width: ${width} !important;
+      max-width: ${width} !important;
+      min-width: 0 !important;
+      margin: ${blockMargin} !important;
       box-sizing: border-box !important;
+      height: auto !important;
+      overflow: visible !important;
     }
     .sheet, .wrap {
       width: 100% !important;
-      max-width: var(--print-width) !important;
-      margin-left: auto !important;
-      margin-right: auto !important;
-      padding: var(--print-margin) !important;
+      max-width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
       overflow: visible !important;
       page-break-inside: auto;
       break-inside: auto;
+      box-sizing: border-box !important;
     }
     @media print {
       html, body {
+        width: ${width} !important;
+        max-width: ${width} !important;
+        margin: 0 !important;
         height: auto !important;
         overflow: visible !important;
         -webkit-print-color-adjust: exact;
@@ -214,15 +233,19 @@ export function printDesignInlineBody(source?: unknown): string {
   const d = readPrintDesign(source);
   const mm = paperWidthMm(d);
   const width = d.orientation === "landscape" ? Math.round(mm * 1.18) : mm;
+  // Portrait: flush to paper left edge so thermal print starts at the roll width.
+  const margin = d.orientation === "portrait" ? "0" : "0 auto";
   return [
     `font-family:${printFontFamily(d)}`,
     `font-size:${d.fontSize}px`,
     `line-height:${d.lineHeight}`,
     `text-align:${d.align}`,
     `color:#111`,
+    `width:${width}mm`,
     `max-width:${width}mm`,
-    `margin:0 auto`,
+    `margin:${margin}`,
     `padding:${marginPx(d)}`,
+    `box-sizing:border-box`,
     `background:#fff`,
   ].join(";");
 }

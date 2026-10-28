@@ -86,31 +86,51 @@ function whenPrintDocumentReady(doc: Document, win: Window): Promise<void> {
   });
 }
 
-/** Grow iframe + inject exact @page size so the dialog does not clip the ticket. */
+/** Grow iframe to paper width + inject exact @page so portrait fills the roll edge-to-edge. */
 function fitPrintIframeToContent(iframe: HTMLIFrameElement, doc: Document): void {
   const body = doc.body;
   const html = doc.documentElement;
   if (!body || !html) return;
 
-  const widthPx = Math.max(
-    body.scrollWidth || 0,
-    html.scrollWidth || 0,
-    body.offsetWidth || 0,
-    320,
+  const root = doc.defaultView?.getComputedStyle(html);
+  const varMm = (root?.getPropertyValue("--print-width-mm") || "").trim();
+  const varW = (root?.getPropertyValue("--print-width") || "").trim();
+  const mmFromVar = Number(varMm);
+  const mmMatch = varW.match(/([\d.]+)\s*mm/i);
+  const widthMm = Math.min(
+    120,
+    Math.max(
+      48,
+      Number.isFinite(mmFromVar) && mmFromVar > 0
+        ? mmFromVar
+        : mmMatch
+          ? Number(mmMatch[1]) || 80
+          : 80,
+    ),
   );
+  // ~96dpi: mm → CSS px so the iframe matches the thermal paper width.
+  const widthPx = Math.ceil((widthMm * 96) / 25.4) + 2;
+
+  let pinEl = doc.getElementById("vyntex-print-paper-pin");
+  if (!pinEl) {
+    pinEl = doc.createElement("style");
+    pinEl.id = "vyntex-print-paper-pin";
+    doc.head.appendChild(pinEl);
+  }
+  pinEl.textContent =
+    `html,body{width:${widthMm}mm!important;max-width:${widthMm}mm!important;` +
+    `margin:0!important;box-sizing:border-box!important;overflow:visible!important}` +
+    `.sheet,.wrap{width:100%!important;max-width:100%!important;margin:0!important;padding:0!important}`;
+
   const heightPx = Math.max(
     body.scrollHeight || 0,
     html.scrollHeight || 0,
     body.offsetHeight || 0,
     600,
   );
-  iframe.style.width = `${Math.ceil(widthPx + 24)}px`;
+  iframe.style.width = `${widthPx}px`;
   iframe.style.height = `${Math.ceil(heightPx + 48)}px`;
 
-  const root = doc.defaultView?.getComputedStyle(html);
-  const varW = (root?.getPropertyValue("--print-width") || "").trim();
-  const mmMatch = varW.match(/([\d.]+)\s*mm/i);
-  const widthMm = mmMatch ? Math.min(120, Math.max(48, Number(mmMatch[1]) || 80)) : 80;
   const heightMm = Math.max(40, (heightPx * 25.4) / 96 + 8);
 
   let styleEl = doc.getElementById("vyntex-print-page-size");
@@ -121,7 +141,8 @@ function fitPrintIframeToContent(iframe: HTMLIFrameElement, doc: Document): void
   }
   styleEl.textContent =
     `@page{size:${widthMm}mm ${heightMm.toFixed(2)}mm;margin:0}` +
-    `html,body{height:auto!important;overflow:visible!important}`;
+    `html,body{width:${widthMm}mm!important;max-width:${widthMm}mm!important;` +
+    `margin:0!important;height:auto!important;overflow:visible!important}`;
 }
 
 /** Interactive print (browser/Electron print dialog). */
@@ -129,9 +150,9 @@ export function printHtmlDocument(htmlFullDocument: string): boolean {
   htmlFullDocument = ensurePrintPoweredByFooter(htmlFullDocument);
   const iframe = document.createElement("iframe");
   iframe.setAttribute("aria-hidden", "true");
-  // Off-screen but real size: zero-size iframes clip multi-page thermal content.
+  // Off-screen at ~80mm paper width so portrait lays out to the roll, not a wide page.
   iframe.style.cssText =
-    "position:fixed;left:-10000px;top:0;width:480px;height:3200px;border:0;opacity:0;pointer-events:none;";
+    "position:fixed;left:-10000px;top:0;width:302px;height:3200px;border:0;opacity:0;pointer-events:none;";
   document.body.appendChild(iframe);
   const win = iframe.contentWindow;
   const doc = iframe.contentDocument;

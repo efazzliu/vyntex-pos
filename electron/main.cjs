@@ -77,7 +77,7 @@ const CSS_PX_TO_MICRON = 25400 / 96;
 
 /**
  * Measure laid-out receipt size and map to Chromium pageSize (microns).
- * `@page { size: Nmm auto }` is unreliable on Windows — explicit size avoids Letter clipping.
+ * Portrait uses the Design paper width (58/80mm) flush to the left edge — never Letter.
  */
 async function measurePrintPageSize(webContents) {
   try {
@@ -86,34 +86,44 @@ async function measurePrintPageSize(webContents) {
         const body = document.body;
         const html = document.documentElement;
         if (!body || !html) return null;
-        const widthPx = Math.max(
-          body.scrollWidth || 0,
-          html.scrollWidth || 0,
-          body.offsetWidth || 0,
-          html.clientWidth || 0,
-        );
+        const root = getComputedStyle(html);
+        const bodyCs = getComputedStyle(body);
+        const varW = (root.getPropertyValue("--print-width") || "").trim();
+        const varMm = (root.getPropertyValue("--print-width-mm") || "").trim();
+        const maxW = (bodyCs.maxWidth || bodyCs.width || "").trim();
+        const orient = (root.getPropertyValue("--print-orientation") || "portrait").trim();
+        const parseMm = (s) => {
+          const m = String(s).match(/([\\d.]+)\\s*mm/i);
+          return m ? Number(m[1]) : NaN;
+        };
+        let widthMm = Number(varMm);
+        if (!Number.isFinite(widthMm)) widthMm = parseMm(varW);
+        if (!Number.isFinite(widthMm)) widthMm = parseMm(maxW);
+        if (!Number.isFinite(widthMm) || widthMm < 40) widthMm = 80;
+        widthMm = Math.min(120, Math.max(48, widthMm));
+        // Pin content to paper width (left edge) before measuring height.
+        const id = "vyntex-print-paper-pin";
+        let pin = document.getElementById(id);
+        if (!pin) {
+          pin = document.createElement("style");
+          pin.id = id;
+          document.head.appendChild(pin);
+        }
+        pin.textContent =
+          "html,body{width:" + widthMm + "mm!important;max-width:" + widthMm +
+          "mm!important;margin:0!important;padding-left:0!important;padding-right:0!important;" +
+          "box-sizing:border-box!important;overflow:visible!important}" +
+          ".sheet,.wrap{width:100%!important;max-width:100%!important;margin:0!important;padding:0!important}";
         const heightPx = Math.max(
           body.scrollHeight || 0,
           html.scrollHeight || 0,
           body.offsetHeight || 0,
           html.clientHeight || 0,
         );
-        const root = getComputedStyle(html);
-        const bodyCs = getComputedStyle(body);
-        const varW = (root.getPropertyValue("--print-width") || "").trim();
-        const maxW = (bodyCs.maxWidth || bodyCs.width || "").trim();
-        const parseMm = (s) => {
-          const m = String(s).match(/([\\d.]+)\\s*mm/i);
-          return m ? Number(m[1]) : NaN;
-        };
-        let widthMm = parseMm(varW);
-        if (!Number.isFinite(widthMm)) widthMm = parseMm(maxW);
-        if (!Number.isFinite(widthMm) || widthMm < 40) widthMm = 80;
-        widthMm = Math.min(120, Math.max(48, widthMm));
         return {
-          widthPx: Math.max(1, widthPx),
           heightPx: Math.max(1, heightPx),
           widthMm,
+          orientation: orient === "landscape" ? "landscape" : "portrait",
         };
       })()
     `);
@@ -125,7 +135,7 @@ async function measurePrintPageSize(webContents) {
     const heightMm = Math.max(40, (heightPx * CSS_PX_TO_MICRON) / 1000 + 8);
     const widthMicrons = Math.round(widthMm * 1000);
     const heightMicrons = Math.round(heightMm * 1000);
-    // Inject exact @page so CSS path matches pageSize when preferCSSPageSize is on.
+    // Exact @page = paper width × content height; flush to left (thermal origin).
     await webContents.executeJavaScript(`
       (() => {
         const id = "vyntex-print-page-size";
@@ -135,7 +145,10 @@ async function measurePrintPageSize(webContents) {
           el.id = id;
           document.head.appendChild(el);
         }
-        el.textContent = "@page{size:${widthMm}mm ${heightMm.toFixed(2)}mm;margin:0}html,body{height:auto!important;overflow:visible!important}";
+        el.textContent =
+          "@page{size:${widthMm}mm ${heightMm.toFixed(2)}mm;margin:0}" +
+          "html,body{width:${widthMm}mm!important;max-width:${widthMm}mm!important;" +
+          "margin:0!important;height:auto!important;overflow:visible!important}";
         return true;
       })()
     `);
@@ -311,11 +324,13 @@ function registerPrintHtmlSilentIpc() {
     }
 
     return await new Promise((resolve) => {
-      // Tall off-screen window so long thermal layouts lay out fully before print.
+      // Narrow off-screen window (~80mm @ 96dpi) so portrait layouts to paper width,
+      // not a wide Letter-like canvas that recenters the ticket.
       const printWin = new BrowserWindow({
         show: false,
-        width: 480,
+        width: 340,
         height: 2400,
+        useContentSize: true,
         webPreferences: {
           sandbox: true,
           nodeIntegration: false,
