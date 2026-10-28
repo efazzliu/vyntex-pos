@@ -128,7 +128,12 @@ export function printDesignCss(source?: unknown): string {
   const mm = paperWidthMm(d);
   const width = d.orientation === "landscape" ? `${Math.round(mm * 1.18)}mm` : `${mm}mm`;
   const dashStyle = d.dividerStyle === "none" ? "none" : d.dividerStyle;
-  const page = d.orientation === "landscape" ? "landscape" : `${mm}mm auto`;
+  // Tall default page: Chromium often ignores `auto` height and clips to Letter.
+  // Electron/dialog paths overwrite with a measured @page before printing.
+  const page =
+    d.orientation === "landscape"
+      ? "landscape"
+      : `${mm}mm 2000mm`;
   return `
     :root {
       --print-align: ${d.align};

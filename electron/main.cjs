@@ -70,7 +70,81 @@ const SILENT_PRINT_START_MAX_MS = 4000;
 /** Extra time after print() is invoked for the OS/driver to accept the full job. */
 const SILENT_PRINT_SPOOL_MAX_MS = 25000;
 /** Keep the hidden window briefly after success so drivers finish reading HTML. */
-const SILENT_PRINT_DESTROY_DELAY_MS = 750;
+const SILENT_PRINT_DESTROY_DELAY_MS = 1500;
+
+/** CSS px → microns (1in = 96 CSS px = 25_400 microns). */
+const CSS_PX_TO_MICRON = 25400 / 96;
+
+/**
+ * Measure laid-out receipt size and map to Chromium pageSize (microns).
+ * `@page { size: Nmm auto }` is unreliable on Windows — explicit size avoids Letter clipping.
+ */
+async function measurePrintPageSize(webContents) {
+  try {
+    const metrics = await webContents.executeJavaScript(`
+      (() => {
+        const body = document.body;
+        const html = document.documentElement;
+        if (!body || !html) return null;
+        const widthPx = Math.max(
+          body.scrollWidth || 0,
+          html.scrollWidth || 0,
+          body.offsetWidth || 0,
+          html.clientWidth || 0,
+        );
+        const heightPx = Math.max(
+          body.scrollHeight || 0,
+          html.scrollHeight || 0,
+          body.offsetHeight || 0,
+          html.clientHeight || 0,
+        );
+        const root = getComputedStyle(html);
+        const bodyCs = getComputedStyle(body);
+        const varW = (root.getPropertyValue("--print-width") || "").trim();
+        const maxW = (bodyCs.maxWidth || bodyCs.width || "").trim();
+        const parseMm = (s) => {
+          const m = String(s).match(/([\\d.]+)\\s*mm/i);
+          return m ? Number(m[1]) : NaN;
+        };
+        let widthMm = parseMm(varW);
+        if (!Number.isFinite(widthMm)) widthMm = parseMm(maxW);
+        if (!Number.isFinite(widthMm) || widthMm < 40) widthMm = 80;
+        widthMm = Math.min(120, Math.max(48, widthMm));
+        return {
+          widthPx: Math.max(1, widthPx),
+          heightPx: Math.max(1, heightPx),
+          widthMm,
+        };
+      })()
+    `);
+    if (!metrics || typeof metrics !== "object") return null;
+    const widthMm = Number(metrics.widthMm) || 80;
+    const heightPx = Number(metrics.heightPx) || 0;
+    if (!(heightPx > 0)) return null;
+    // Pad so powered-by / last lines are never clipped by driver rounding.
+    const heightMm = Math.max(40, (heightPx * CSS_PX_TO_MICRON) / 1000 + 8);
+    const widthMicrons = Math.round(widthMm * 1000);
+    const heightMicrons = Math.round(heightMm * 1000);
+    // Inject exact @page so CSS path matches pageSize when preferCSSPageSize is on.
+    await webContents.executeJavaScript(`
+      (() => {
+        const id = "vyntex-print-page-size";
+        let el = document.getElementById(id);
+        if (!el) {
+          el = document.createElement("style");
+          el.id = id;
+          document.head.appendChild(el);
+        }
+        el.textContent = "@page{size:${widthMm}mm ${heightMm.toFixed(2)}mm;margin:0}html,body{height:auto!important;overflow:visible!important}";
+        return true;
+      })()
+    `);
+    return { width: widthMicrons, height: heightMicrons };
+  } catch (err) {
+    if (isDev) console.warn("[print-html-silent] measurePrintPageSize:", err);
+    return null;
+  }
+}
 
 /** Drivers that open "Save as…" / file dialogs — never use these for POS silent print. */
 const VIRTUAL_PRINTER_RE =
@@ -320,20 +394,37 @@ function registerPrintHtmlSilentIpc() {
       };
 
       printWin.webContents.once("did-finish-load", () => {
-        setTimeout(() => {
+        setTimeout(async () => {
           if (!canUsePrintWindow()) return;
 
           const name = deviceNameFromMain;
-          // One attempt per job: retries belong in the renderer queue with backoff.
-          // preferCSSPageSize + no margins: honor @page thermal width/height so
-          // long receipts are not clipped to Letter/A4.
-          const attempts = [
-            {
-              printBackground: true,
-              preferCSSPageSize: true,
-              margins: { marginType: "none" },
-            },
-          ];
+          const pageSize = await measurePrintPageSize(printWin.webContents);
+          if (!canUsePrintWindow()) return;
+
+          // Explicit micron pageSize beats Letter/A4 clipping; CSS @page injected to match.
+          // Fallback attempt keeps preferCSSPageSize if the driver rejects custom size.
+          const attempts = pageSize
+            ? [
+                {
+                  printBackground: true,
+                  preferCSSPageSize: true,
+                  margins: { marginType: "none" },
+                  pageSize,
+                },
+                {
+                  printBackground: true,
+                  preferCSSPageSize: false,
+                  margins: { marginType: "none" },
+                  pageSize,
+                },
+              ]
+            : [
+                {
+                  printBackground: true,
+                  preferCSSPageSize: true,
+                  margins: { marginType: "none" },
+                },
+              ];
 
           const normalize = (list) =>
             list.map((ex) => {
@@ -371,7 +462,7 @@ function registerPrintHtmlSilentIpc() {
           };
 
           runChain(0, undefined);
-        }, 250);
+        }, 300);
       });
 
       const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;

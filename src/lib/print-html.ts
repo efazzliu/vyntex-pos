@@ -86,6 +86,44 @@ function whenPrintDocumentReady(doc: Document, win: Window): Promise<void> {
   });
 }
 
+/** Grow iframe + inject exact @page size so the dialog does not clip the ticket. */
+function fitPrintIframeToContent(iframe: HTMLIFrameElement, doc: Document): void {
+  const body = doc.body;
+  const html = doc.documentElement;
+  if (!body || !html) return;
+
+  const widthPx = Math.max(
+    body.scrollWidth || 0,
+    html.scrollWidth || 0,
+    body.offsetWidth || 0,
+    320,
+  );
+  const heightPx = Math.max(
+    body.scrollHeight || 0,
+    html.scrollHeight || 0,
+    body.offsetHeight || 0,
+    600,
+  );
+  iframe.style.width = `${Math.ceil(widthPx + 24)}px`;
+  iframe.style.height = `${Math.ceil(heightPx + 48)}px`;
+
+  const root = doc.defaultView?.getComputedStyle(html);
+  const varW = (root?.getPropertyValue("--print-width") || "").trim();
+  const mmMatch = varW.match(/([\d.]+)\s*mm/i);
+  const widthMm = mmMatch ? Math.min(120, Math.max(48, Number(mmMatch[1]) || 80)) : 80;
+  const heightMm = Math.max(40, (heightPx * 25.4) / 96 + 8);
+
+  let styleEl = doc.getElementById("vyntex-print-page-size");
+  if (!styleEl) {
+    styleEl = doc.createElement("style");
+    styleEl.id = "vyntex-print-page-size";
+    doc.head.appendChild(styleEl);
+  }
+  styleEl.textContent =
+    `@page{size:${widthMm}mm ${heightMm.toFixed(2)}mm;margin:0}` +
+    `html,body{height:auto!important;overflow:visible!important}`;
+}
+
 /** Interactive print (browser/Electron print dialog). */
 export function printHtmlDocument(htmlFullDocument: string): boolean {
   htmlFullDocument = ensurePrintPoweredByFooter(htmlFullDocument);
@@ -93,7 +131,7 @@ export function printHtmlDocument(htmlFullDocument: string): boolean {
   iframe.setAttribute("aria-hidden", "true");
   // Off-screen but real size: zero-size iframes clip multi-page thermal content.
   iframe.style.cssText =
-    "position:fixed;left:-10000px;top:0;width:480px;height:2400px;border:0;opacity:0;pointer-events:none;";
+    "position:fixed;left:-10000px;top:0;width:480px;height:3200px;border:0;opacity:0;pointer-events:none;";
   document.body.appendChild(iframe);
   const win = iframe.contentWindow;
   const doc = iframe.contentDocument;
@@ -115,6 +153,7 @@ export function printHtmlDocument(htmlFullDocument: string): boolean {
 
   const runPrint = () => {
     try {
+      fitPrintIframeToContent(iframe, doc);
       win.focus();
       win.print();
     } catch {
@@ -122,7 +161,7 @@ export function printHtmlDocument(htmlFullDocument: string): boolean {
       return;
     }
     // Keep iframe alive briefly so the print pipeline can snapshot full HTML.
-    setTimeout(cleanup, 2500);
+    setTimeout(cleanup, 4000);
   };
 
   void whenPrintDocumentReady(doc, win)
