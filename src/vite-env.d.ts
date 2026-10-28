@@ -18,6 +18,7 @@ type GetSystemPrintersIpcResult =
         displayName: string;
         isDefault: boolean;
         isOffline?: boolean;
+        paperWidthMm?: number;
       }[];
     }
   | { ok: false; error: string };

@@ -204,7 +204,8 @@ const EDITOR_TABS = ["design", "content"] as const;
 type EditorTab = (typeof EDITOR_TABS)[number];
 
 type DesignSettings = {
-  paperWidth: "58" | "80" | "custom";
+  /** auto = use assigned OS printer media width at print time */
+  paperWidth: "auto" | "58" | "80" | "custom";
   customWidth: string;
   orientation: "portrait" | "landscape";
   font: "default" | "mono" | "sans";
@@ -486,7 +487,7 @@ function readFontSize(value: unknown) {
 }
 
 const DEFAULT_DESIGN: DesignSettings = {
-  paperWidth: "80",
+  paperWidth: "auto",
   customWidth: "80",
   orientation: "portrait",
   font: "default",
@@ -1249,7 +1250,7 @@ function readDesign(styles: TemplateRecord["styles"]): DesignSettings {
       ? (value as T)
       : fallback;
   return {
-    paperWidth: pick(o.paperWidth, ["58", "80", "custom"] as const, "80"),
+    paperWidth: pick(o.paperWidth, ["auto", "58", "80", "custom"] as const, "auto"),
     customWidth: typeof o.customWidth === "string" ? o.customWidth : "80",
     orientation: pick(o.orientation, ["portrait", "landscape"] as const, "portrait"),
     font: pick(o.font, ["default", "mono", "sans"] as const, "default"),
@@ -1277,6 +1278,7 @@ const PAPER_MM_VALUES = Array.from(
 const PAPER_WHEEL_ITEM = 36;
 
 function paperMmValue(design: DesignSettings) {
+  if (design.paperWidth === "auto") return 80; // preview placeholder until printer is known
   if (design.paperWidth === "58") return 58;
   if (design.paperWidth === "80") return 80;
   const n = Number(design.customWidth);
@@ -1559,6 +1561,22 @@ function DesignPanel({
               {t("templates.design.paper_width_hint")}
             </p>
             <div className="flex overflow-hidden rounded-xl border border-slate-200 bg-white">
+              <button
+                type="button"
+                onClick={() => {
+                  setWidthOpen(false);
+                  onChange({ ...design, paperWidth: "auto" });
+                }}
+                className={cn(
+                  "flex-[1.2] py-1.5 text-[12px] font-semibold transition",
+                  !widthOpen && design.paperWidth === "auto"
+                    ? "bg-brand text-[#f8fafc]"
+                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-800",
+                )}
+                title={t("templates.design.paper_width_auto_hint")}
+              >
+                {t("templates.design.paper_width_auto")}
+              </button>
               {(["58", "80"] as const).map((id) => (
                 <button
                   key={id}
@@ -1574,7 +1592,7 @@ function DesignPanel({
                       : "text-slate-500 hover:bg-slate-50 hover:text-slate-800",
                   )}
                 >
-                  {id} mm
+                  {id}
                 </button>
               ))}
               <Popover
@@ -1602,7 +1620,7 @@ function DesignPanel({
                     )}
                   >
                     {design.paperWidth === "custom"
-                      ? `${currentMm} mm`
+                      ? `${currentMm}`
                       : t("templates.design.custom")}
                   </button>
                 </PopoverTrigger>
