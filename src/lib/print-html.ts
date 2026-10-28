@@ -3,7 +3,18 @@
  * Avoids popup blockers and Windows/Electron trying to resolve about:blank as an OS protocol.
  */
 
+import {
+  applyPaperWidthMmToPrintHtml,
+  resolvePrinterPaperWidthMm,
+} from "@/lib/print-paper-width.ts";
+
 export const PRINT_POWERED_BY = "Powered by: www.vyntexpos.net";
+
+function htmlWantsAutoPaperWidth(html: string): boolean {
+  if (/--print-paper-mode\s*:\s*auto/i.test(html)) return true;
+  if (!/--print-paper-mode\s*:/i.test(html)) return true;
+  return false;
+}
 
 export function ensurePrintPoweredByFooter(html: string): string {
   if (/www\.vyntexpos\.net/i.test(html) && /powered by/i.test(html)) {
@@ -235,6 +246,37 @@ export async function tryPrintHtmlDocumentAsync(
       ? options.silentTimeoutMs
       : DEFAULT_SILENT_PRINT_IPC_TIMEOUT_MS;
 
+  // Design Auto: size ticket to the assigned OS printer's media before printing.
+  if (htmlWantsAutoPaperWidth(htmlFullDocument)) {
+    const inv = getDesktopSystemPrintersInvoker();
+    if (inv) {
+      try {
+        const listed = await inv();
+        if (listed.ok && listed.printers.length) {
+          const want = (deviceName ?? "").toLowerCase();
+          const match =
+            (want
+              ? listed.printers.find(
+                  (p) =>
+                    p.deviceName.toLowerCase() === want ||
+                    p.displayName.toLowerCase() === want,
+                )
+              : null) ??
+            listed.printers.find((p) => p.isDefault) ??
+            listed.printers[0];
+          const mm = resolvePrinterPaperWidthMm({
+            deviceName: match.deviceName,
+            displayName: match.displayName,
+            paperWidthMm: match.paperWidthMm,
+          });
+          htmlFullDocument = applyPaperWidthMmToPrintHtml(htmlFullDocument, mm);
+        }
+      } catch {
+        /* keep design CSS */
+      }
+    }
+  }
+
   if (wantSilent && silentApi) {
     if (!(await canAttemptSilentPrint())) {
       return { ok: false, error: "no-physical-printer" };
@@ -300,6 +342,8 @@ export type DesktopSystemPrinterInfo = {
   displayName: string;
   isDefault: boolean;
   isOffline?: boolean;
+  /** Detected thermal paper width in mm (58/80/…) when known */
+  paperWidthMm?: number;
 };
 
 export type GetSystemPrintersResult =

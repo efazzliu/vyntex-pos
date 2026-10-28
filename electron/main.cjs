@@ -1,5 +1,10 @@
 const { app, BrowserWindow, shell, ipcMain, screen } = require("electron");
 const { registerAppUpdateIpc } = require("./app-update.cjs");
+const {
+  resolvePrinterPaperWidthMm,
+  applyPaperWidthMmToPrintHtml,
+  htmlWantsAutoPaperWidth,
+} = require("./print-paper-width.cjs");
 const fs = require("node:fs");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
@@ -323,6 +328,20 @@ function registerPrintHtmlSilentIpc() {
       return { ok: false, error: "printer-offline" };
     }
 
+    // Auto paper width: size the ticket to whatever media the OS printer reports.
+    let htmlForPrint = html;
+    if (htmlWantsAutoPaperWidth(html) || /--print-paper-mode\s*:\s*auto/i.test(html)) {
+      const paperMm = resolvePrinterPaperWidthMm(
+        targetPrinter || { name: deviceNameFromMain, deviceName: deviceNameFromMain },
+      );
+      htmlForPrint = applyPaperWidthMmToPrintHtml(html, paperMm);
+      if (isDev) {
+        console.log(
+          `[print-html-silent] Auto paper width → ${paperMm}mm for ${deviceNameFromMain}`,
+        );
+      }
+    }
+
     return await new Promise((resolve) => {
       // Narrow off-screen window (~80mm @ 96dpi) so portrait layouts to paper width,
       // not a wide Letter-like canvas that recenters the ticket.
@@ -480,7 +499,7 @@ function registerPrintHtmlSilentIpc() {
         }, 300);
       });
 
-      const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+      const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(htmlForPrint)}`;
       printWin.loadURL(dataUrl).catch((err) => {
         done(false, String(err?.message ?? err));
       });
@@ -501,6 +520,7 @@ function registerGetSystemPrintersIpc() {
           displayName: String(p.displayName ?? p.name ?? ""),
           isDefault: Boolean(p.isDefault),
           isOffline: isPrinterOffline(p),
+          paperWidthMm: resolvePrinterPaperWidthMm(p),
         })),
       };
     } catch (err) {

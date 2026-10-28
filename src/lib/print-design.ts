@@ -1,7 +1,14 @@
 /** Shared thermal-paper Design from Template Manager (`styles._design`). */
 
+import {
+  PRINT_PAPER_MM_DEFAULT,
+  PRINT_PAPER_MM_MAX,
+  PRINT_PAPER_MM_MIN,
+} from "@/lib/print-paper-width.ts";
+
 export type PrintDesign = {
-  paperWidth: "58" | "80" | "custom";
+  /** `auto` = use assigned / OS printer media width at print time */
+  paperWidth: "auto" | "58" | "80" | "custom";
   customWidth: string;
   orientation: "portrait" | "landscape";
   font: "default" | "mono" | "sans";
@@ -16,7 +23,7 @@ export type PrintDesign = {
 };
 
 export const DEFAULT_PRINT_DESIGN: PrintDesign = {
-  paperWidth: "80",
+  paperWidth: "auto",
   customWidth: "80",
   orientation: "portrait",
   font: "default",
@@ -32,8 +39,8 @@ export const DEFAULT_PRINT_DESIGN: PrintDesign = {
 
 const FONT_MIN = 8;
 const FONT_MAX = 24;
-const MM_MIN = 48;
-const MM_MAX = 110;
+const MM_MIN = PRINT_PAPER_MM_MIN;
+const MM_MAX = PRINT_PAPER_MM_MAX;
 
 function pick<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
   return typeof value === "string" && (allowed as readonly string[]).includes(value)
@@ -59,7 +66,7 @@ export function readPrintDesign(source?: unknown): PrintDesign {
   const fontSize = num(o.fontSize, DEFAULT_PRINT_DESIGN.fontSize);
   const lineHeight = num(o.lineHeight, DEFAULT_PRINT_DESIGN.lineHeight);
   return {
-    paperWidth: pick(o.paperWidth, ["58", "80", "custom"] as const, "80"),
+    paperWidth: pick(o.paperWidth, ["auto", "58", "80", "custom"] as const, "auto"),
     customWidth: typeof o.customWidth === "string" ? o.customWidth : "80",
     orientation: pick(o.orientation, ["portrait", "landscape"] as const, "portrait"),
     font: pick(o.font, ["default", "mono", "sans"] as const, "default"),
@@ -74,12 +81,25 @@ export function readPrintDesign(source?: unknown): PrintDesign {
   };
 }
 
-export function paperWidthMm(design: PrintDesign): number {
+/**
+ * Design paper width in mm. `auto` uses `resolvedMm` (from printer) or 80mm for preview.
+ */
+export function paperWidthMm(design: PrintDesign, resolvedMm?: number): number {
+  if (design.paperWidth === "auto") {
+    if (typeof resolvedMm === "number" && Number.isFinite(resolvedMm)) {
+      return Math.min(MM_MAX, Math.max(MM_MIN, Math.round(resolvedMm)));
+    }
+    return PRINT_PAPER_MM_DEFAULT;
+  }
   if (design.paperWidth === "58") return 58;
   if (design.paperWidth === "80") return 80;
   const n = Number(design.customWidth);
-  if (!Number.isFinite(n)) return 80;
+  if (!Number.isFinite(n)) return PRINT_PAPER_MM_DEFAULT;
   return Math.min(MM_MAX, Math.max(MM_MIN, Math.round(n)));
+}
+
+export function isAutoPaperWidth(design: PrintDesign | { paperWidth?: string }): boolean {
+  return design.paperWidth === "auto" || design.paperWidth == null || design.paperWidth === "";
 }
 
 export function printFontFamily(design: PrintDesign): string {
@@ -123,9 +143,12 @@ function logoMargin(align: PrintDesign["align"]): string {
 }
 
 /** CSS appended at the end of each ticket stylesheet so Design wins over hardcoded 80mm/center. */
-export function printDesignCss(source?: unknown): string {
+export function printDesignCss(
+  source?: unknown,
+  opts?: { paperWidthMm?: number },
+): string {
   const d = readPrintDesign(source);
-  const mm = paperWidthMm(d);
+  const mm = paperWidthMm(d, opts?.paperWidthMm);
   // Portrait = exact roll width. Landscape may widen slightly for wide layouts.
   const widthMm =
     d.orientation === "landscape" ? Math.round(mm * 1.18) : mm;
@@ -150,6 +173,7 @@ export function printDesignCss(source?: unknown): string {
       --print-lh: ${d.lineHeight};
       --print-width: ${width};
       --print-width-mm: ${widthMm};
+      --print-paper-mode: ${d.paperWidth === "auto" ? "auto" : "fixed"};
       --print-orientation: ${d.orientation};
       --print-dash-style: ${dashStyle};
       --print-dash-width: ${d.dividerStyle === "none" ? "0" : dashWidth(d)};
@@ -229,9 +253,12 @@ export function printDesignCss(source?: unknown): string {
 }
 
 /** Inline body CSS for builders that do not use a shared stylesheet (fiscal). */
-export function printDesignInlineBody(source?: unknown): string {
+export function printDesignInlineBody(
+  source?: unknown,
+  opts?: { paperWidthMm?: number },
+): string {
   const d = readPrintDesign(source);
-  const mm = paperWidthMm(d);
+  const mm = paperWidthMm(d, opts?.paperWidthMm);
   const width = d.orientation === "landscape" ? Math.round(mm * 1.18) : mm;
   // Portrait: flush to paper left edge so thermal print starts at the roll width.
   const margin = d.orientation === "portrait" ? "0" : "0 auto";
