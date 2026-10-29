@@ -155,6 +155,14 @@
     "productName": "Vyntex POS",
     "asar": true,
     "compression": "maximum",
+    "electronLanguages": [
+      "en-US",
+      "en-GB",
+      "de",
+      "it",
+      "fr",
+      "tr"
+    ],
     "asarUnpack": [
       "electron/icon.ico"
     ],
