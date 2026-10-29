@@ -3,7 +3,6 @@
 export type PrintDesign = {
   paperWidth: "58" | "80" | "custom";
   customWidth: string;
-  orientation: "portrait" | "landscape";
   font: "default" | "mono" | "sans";
   fontSize: number;
   align: "left" | "center" | "right";
@@ -18,7 +17,6 @@ export type PrintDesign = {
 export const DEFAULT_PRINT_DESIGN: PrintDesign = {
   paperWidth: "80",
   customWidth: "80",
-  orientation: "portrait",
   font: "default",
   fontSize: 12,
   align: "center",
@@ -61,7 +59,6 @@ export function readPrintDesign(source?: unknown): PrintDesign {
   return {
     paperWidth: pick(o.paperWidth, ["58", "80", "custom"] as const, "80"),
     customWidth: typeof o.customWidth === "string" ? o.customWidth : "80",
-    orientation: pick(o.orientation, ["portrait", "landscape"] as const, "portrait"),
     font: pick(o.font, ["default", "mono", "sans"] as const, "default"),
     fontSize: Math.min(FONT_MAX, Math.max(FONT_MIN, Math.round(fontSize))),
     align: pick(o.align, ["left", "center", "right"] as const, "center"),
@@ -122,13 +119,20 @@ function logoMargin(align: PrintDesign["align"]): string {
   return "0 auto 8px";
 }
 
+/** Page height used until the print pipeline measures the real receipt (see `print-page.ts`). */
+export const FALLBACK_PAGE_HEIGHT_MM = 297;
+
+/** Physical page width in mm for the selected paper (receipts are always portrait). */
+export function printPageWidthMm(design: PrintDesign): number {
+  return paperWidthMm(design);
+}
+
 /** CSS appended at the end of each ticket stylesheet so Design wins over hardcoded 80mm/center. */
 export function printDesignCss(source?: unknown): string {
   const d = readPrintDesign(source);
-  const mm = paperWidthMm(d);
-  const width = d.orientation === "landscape" ? `${Math.round(mm * 1.18)}mm` : `${mm}mm`;
+  const pageMm = printPageWidthMm(d);
+  const width = `${pageMm}mm`;
   const dashStyle = d.dividerStyle === "none" ? "none" : d.dividerStyle;
-  const page = d.orientation === "landscape" ? "landscape" : `${mm}mm auto`;
   return `
     :root {
       --print-align: ${d.align};
@@ -142,18 +146,27 @@ export function printDesignCss(source?: unknown): string {
       --print-section: ${sectionPx(d)};
       --print-margin: ${marginPx(d)};
     }
-    @page { size: ${page}; margin: 0; }
+    @page { size: ${pageMm}mm ${FALLBACK_PAGE_HEIGHT_MM}mm; margin: 0; }
+    html { margin: 0 !important; padding: 0 !important; background: #fff; }
     body {
+      box-sizing: border-box !important;
+      width: auto !important;
+      max-width: none !important;
+      margin: 0 !important;
       font-family: var(--print-font) !important;
       font-size: var(--print-size) !important;
       line-height: var(--print-lh) !important;
       text-align: var(--print-align);
       padding: var(--print-margin) !important;
+      overflow-wrap: break-word;
     }
+    body:has(> .sheet), body:has(> .wrap) { padding: 0 !important; }
     .sheet, .wrap {
-      max-width: var(--print-width) !important;
-      margin-left: auto !important;
-      margin-right: auto !important;
+      box-sizing: border-box !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
       padding: var(--print-margin) !important;
     }
     .dash, hr.dash {
@@ -180,22 +193,36 @@ export function printDesignCss(source?: unknown): string {
       margin: ${logoMargin(d.align)} !important;
     }
     .badge { margin-left: ${d.align === "left" ? "0" : "auto"}; margin-right: ${d.align === "right" ? "0" : "auto"}; }
+    ${pageMm <= 60 ? NARROW_TABLE_CSS : ""}
   `;
 }
+
+/**
+ * 58 mm heads print ~48 mm and the head's dead zones already act as margins: tighten side
+ * padding and table gutters (not font sizes) so 4 columns and the totals block fit.
+ * Also applied by printer calibration when a narrow printer receives a wider template.
+ */
+export const NARROW_TABLE_CSS = `
+    body, .sheet, .wrap { padding-left: 4px !important; padding-right: 4px !important; }
+    body:has(> .sheet), body:has(> .wrap) { padding-left: 0 !important; padding-right: 0 !important; }
+    table th { letter-spacing: 0.04em !important; }
+    table th, table td { padding-left: 2px !important; padding-right: 2px !important; }
+    table th:first-child, table td:first-child { padding-left: 0 !important; }
+    table th:last-child, table td:last-child { padding-right: 0 !important; }
+    .totals { width: 100% !important; margin-left: 0 !important; }
+    .t-row { gap: 8px !important; }
+`;
 
 /** Inline body CSS for builders that do not use a shared stylesheet (fiscal). */
 export function printDesignInlineBody(source?: unknown): string {
   const d = readPrintDesign(source);
-  const mm = paperWidthMm(d);
-  const width = d.orientation === "landscape" ? Math.round(mm * 1.18) : mm;
   return [
     `font-family:${printFontFamily(d)}`,
     `font-size:${d.fontSize}px`,
     `line-height:${d.lineHeight}`,
     `text-align:${d.align}`,
     `color:#111`,
-    `max-width:${width}mm`,
-    `margin:0 auto`,
+    `margin:0`,
     `padding:${marginPx(d)}`,
     `background:#fff`,
   ].join(";");

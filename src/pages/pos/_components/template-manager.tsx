@@ -45,8 +45,10 @@ import {
 } from "@/lib/print-debt-voucher.ts";
 import {
   PRINT_POWERED_BY,
+  exportReceiptPdf,
   hasElectronSilentPrintIpc,
   tryPrintHtmlDocumentAsync,
+  type ReceiptPdfMode,
 } from "@/lib/print-html.ts";
 import {
   KITCHEN_TICKET_TITLE,
@@ -95,6 +97,7 @@ import {
   Wallet,
   CreditCard,
   Eye,
+  FileDown,
   ChevronRight,
   Printer,
   Save,
@@ -1251,7 +1254,7 @@ function readDesign(styles: TemplateRecord["styles"]): DesignSettings {
   return {
     paperWidth: pick(o.paperWidth, ["58", "80", "custom"] as const, "80"),
     customWidth: typeof o.customWidth === "string" ? o.customWidth : "80",
-    orientation: pick(o.orientation, ["portrait", "landscape"] as const, "portrait"),
+    orientation: "portrait",
     font: pick(o.font, ["default", "mono", "sans"] as const, "default"),
     fontSize: readFontSize(o.fontSize),
     align: pick(o.align, ["left", "center", "right"] as const, "center"),
@@ -1550,7 +1553,7 @@ function DesignPanel({
         title={t("templates.design.layout_title")}
         sub={t("templates.design.layout_sub")}
       >
-        <div className="grid grid-cols-2 gap-2">
+        <div>
           <div>
             <p className="mb-1 text-[11px] font-medium text-slate-500">
               {t("templates.design.paper_width")}
@@ -1621,19 +1624,6 @@ function DesignPanel({
                 </PopoverContent>
               </Popover>
             </div>
-          </div>
-          <div>
-            <p className="mb-1 text-[11px] font-medium text-slate-500">
-              {t("templates.design.orientation")}
-            </p>
-            <DesignSeg
-              value={design.orientation}
-              onChange={(id) => set("orientation", id as DesignSettings["orientation"])}
-              options={[
-                { id: "portrait", label: t("templates.design.portrait") },
-                { id: "landscape", label: t("templates.design.landscape") },
-              ]}
-            />
           </div>
         </div>
       </DesignBlock>
@@ -4717,6 +4707,7 @@ function TemplateEditor({
   const saveTemplate = useMutation("pos.templates.saveTemplate");
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState<ReceiptPdfMode | null>(null);
   const [editorTab, setEditorTab] = useState<EditorTab>("design");
   const [design, setDesign] = useState<DesignSettings>(() => readDesign(data?.styles));
   const [elements, setElements] = useState<ReceiptElements>(() =>
@@ -4795,10 +4786,7 @@ function TemplateEditor({
     setSaving(false);
   };
 
-  const handleTestPrint = async () => {
-    if (!data) return;
-    setTesting(true);
-    try {
+  const buildEditorHtml = (doc: NonNullable<typeof data>): string => {
       const preBill = meta.id === "non_fiscal_receipt";
       const complimentary = meta.id === "complimentary_slip";
       const debt = meta.id === "debt_voucher";
@@ -4979,7 +4967,7 @@ function TemplateEditor({
                 footerText: customLabels.footerText,
               },
               styles: {
-                ...(data.styles ?? {}),
+                ...(doc.styles ?? {}),
                 _design: design,
               },
             },
@@ -5106,7 +5094,7 @@ function TemplateEditor({
               headerText: customLabels.headerText,
               footerText: customLabels.footerText,
             },
-            styles: data.styles ?? {},
+            styles: doc.styles ?? {},
             lines,
             subtotal: total - tax,
             tax,
@@ -5133,6 +5121,14 @@ function TemplateEditor({
             website: customLabels.website.trim(),
             design,
           });
+      return html;
+  };
+
+  const handleTestPrint = async () => {
+    if (!data) return;
+    setTesting(true);
+    try {
+      const html = buildEditorHtml(data);
       const deviceName = resolvePaperPrinterDeviceName(
         printers,
         licenseKey,
@@ -5153,6 +5149,39 @@ function TemplateEditor({
       toast.error(errorMessageFromUnknown(error, t("order.print_ticket_silent_failed")));
     } finally {
       setTesting(false);
+    }
+  };
+
+  const handlePdf = async (mode: ReceiptPdfMode) => {
+    if (!data) return;
+    setPdfBusy(mode);
+    try {
+      const deviceName = resolvePaperPrinterDeviceName(printers, licenseKey, printerId, meta.id);
+      const outcome = await exportReceiptPdf(buildEditorHtml(data), {
+        mode,
+        fileName: typeName,
+        deviceName: deviceName || undefined,
+      });
+      if (outcome.cancelled) return;
+      if (!outcome.ok) {
+        toast.error(t("templates.pdf_failed"), { description: outcome.error });
+        return;
+      }
+      const size = t("templates.pdf_size", {
+        width: Math.round(outcome.widthMm ?? 0),
+        height: Math.round(outcome.heightMm ?? 0),
+      });
+      if (outcome.viaDialog) {
+        toast.info(t("templates.pdf_browser_dialog"), { description: size });
+      } else if (mode === "save") {
+        toast.success(t("templates.pdf_saved"), { description: `${size} · ${outcome.path ?? ""}` });
+      } else {
+        toast.success(t("templates.pdf_preview_opened"), { description: size });
+      }
+    } catch (error) {
+      toast.error(errorMessageFromUnknown(error, t("templates.pdf_failed")));
+    } finally {
+      setPdfBusy(null);
     }
   };
 
@@ -5199,7 +5228,25 @@ function TemplateEditor({
             ) : null}
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void handlePdf("preview")}
+            disabled={pdfBusy !== null || !data}
+            className="inline-flex h-10 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-[13px] font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50"
+          >
+            <Eye className="size-4" />
+            {pdfBusy === "preview" ? t("templates.pdf_working") : t("templates.pdf_preview")}
+          </button>
+          <button
+            type="button"
+            onClick={() => void handlePdf("save")}
+            disabled={pdfBusy !== null || !data}
+            className="inline-flex h-10 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-[13px] font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50"
+          >
+            <FileDown className="size-4" />
+            {pdfBusy === "save" ? t("templates.pdf_working") : t("templates.pdf_export")}
+          </button>
           <button
             type="button"
             onClick={() => void handleTestPrint()}

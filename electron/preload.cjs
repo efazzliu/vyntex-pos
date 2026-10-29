@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld("desktop", {
   platform: process.platform,
   isElectron: true,
   printHtmlSilent: (payload) => ipcRenderer.invoke("print-html-silent", payload),
+  printHtmlToPdf: (payload) => ipcRenderer.invoke("print-html-to-pdf", payload),
   getSystemPrinters: () => ipcRenderer.invoke("get-system-printers"),
   checkForAppUpdate: () => ipcRenderer.invoke("app-update-check"),
   downloadAppUpdate: () => ipcRenderer.invoke("app-update-download"),

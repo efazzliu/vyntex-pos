@@ -1,6 +1,7 @@
-const { app, BrowserWindow, shell, ipcMain, screen } = require("electron");
+const { app, BrowserWindow, dialog, shell, ipcMain, screen } = require("electron");
 const { registerAppUpdateIpc } = require("./app-update.cjs");
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 
@@ -190,6 +191,30 @@ async function resolvePrintDeviceName(event, requestedDeviceName) {
   return pickPrinterDeviceName(printers);
 }
 
+const CSS_PX_PER_MM = 96 / 25.4;
+
+/** Receipt page size from the renderer (`print-page.ts`), clamped to sane thermal-roll bounds. */
+function readPageSizeMm(payload) {
+  const size = payload && typeof payload === "object" ? payload.pageSize ?? payload : null;
+  const w = Number(size?.widthMm);
+  const h = Number(size?.heightMm);
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return null;
+  return {
+    widthMm: Math.min(300, Math.max(40, w)),
+    heightMm: Math.min(3000, Math.max(40, h)),
+  };
+}
+
+function paperWindowWidthPx(pageSize) {
+  return pageSize ? Math.max(160, Math.ceil(pageSize.widthMm * CSS_PX_PER_MM)) : 420;
+}
+
+/** Same rule as `printableWidthMm` in `src/lib/print-page.ts`: 58 mm → 48 mm, 80 mm → 72 mm. */
+function printableWidthMm(paperWidthMm) {
+  const unprintable = paperWidthMm <= 60 ? 10 : 8;
+  return Math.max(40, paperWidthMm - unprintable);
+}
+
 function registerPrintHtmlSilentIpc() {
   ipcMain.removeHandler("print-html-silent");
   ipcMain.handle("print-html-silent", async (event, payload) => {
@@ -205,6 +230,9 @@ function registerPrintHtmlSilentIpc() {
       typeof payload.deviceName === "string"
         ? payload.deviceName
         : undefined;
+    const pageSize = readPageSizeMm(payload);
+    // `none`: the HTML already carries calibrated side padding (or is the ruler page).
+    const marginType = payload && payload.marginType === "none" ? "none" : "printableArea";
 
     if (typeof html !== "string" || html.length === 0) {
       return { ok: false, error: "invalid-html" };
@@ -235,7 +263,7 @@ function registerPrintHtmlSilentIpc() {
     return await new Promise((resolve) => {
       const printWin = new BrowserWindow({
         show: false,
-        width: 420,
+        width: paperWindowWidthPx(pageSize),
         height: 720,
         webPreferences: {
           sandbox: true,
@@ -319,10 +347,22 @@ function registerPrintHtmlSilentIpc() {
               return;
             }
             const { ex, printBackground } = normalized[i];
+            // Without an explicit paper size Windows uses the driver default (often A4/Letter)
+            // and the narrow receipt lands off-centre on the roll. `printableArea` starts the
+            // layout at the head's first printable dot instead of the physical paper edge.
             const opts = {
               silent: true,
               printBackground: Boolean(printBackground),
               deviceName: name,
+              ...(pageSize
+                ? {
+                    pageSize: {
+                      width: Math.round(pageSize.widthMm * 1000),
+                      height: Math.round(pageSize.heightMm * 1000),
+                    },
+                    margins: { marginType },
+                  }
+                : {}),
               ...ex,
             };
             runPrint(opts, (success, failureReason) => {
@@ -348,6 +388,119 @@ function registerPrintHtmlSilentIpc() {
         done(false, String(err?.message ?? err));
       });
     });
+  });
+}
+
+const PDF_RENDER_MAX_MS = 15000;
+
+/** Renders receipt HTML in a hidden window and returns a PDF buffer at the exact paper size. */
+function renderReceiptPdf(html, pageSize, edgeToEdge) {
+  return new Promise((resolve, reject) => {
+    const pdfWin = new BrowserWindow({
+      show: false,
+      width: paperWindowWidthPx(pageSize),
+      height: 900,
+      webPreferences: { sandbox: true, nodeIntegration: false, contextIsolation: true },
+    });
+    let settled = false;
+    const finish = (err, data) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try {
+        if (!pdfWin.isDestroyed()) pdfWin.destroy();
+      } catch {
+        /* ignore */
+      }
+      if (err) reject(err);
+      else resolve(data);
+    };
+    const timer = setTimeout(() => finish(new Error("pdf-timeout")), PDF_RENDER_MAX_MS);
+    pdfWin.webContents.on("did-fail-load", (_e, _code, desc) => finish(new Error(desc || "load-failed")));
+    pdfWin.webContents.once("did-finish-load", () => {
+      setTimeout(() => {
+        if (settled || pdfWin.isDestroyed()) return;
+        // Side margins = the head's dead zones, so the PDF shows exactly what reaches the paper.
+        // Calibrated receipts and the ruler page already carry their own side padding.
+        const sideIn = edgeToEdge
+          ? 0
+          : (pageSize.widthMm - printableWidthMm(pageSize.widthMm)) / 2 / 25.4;
+        pdfWin.webContents
+          .printToPDF({
+            printBackground: true,
+            preferCSSPageSize: false,
+            pageSize: {
+              width: pageSize.widthMm / 25.4,
+              height: pageSize.heightMm / 25.4,
+            },
+            margins: { top: 0, bottom: 0, left: sideIn, right: sideIn },
+          })
+          .then((data) => finish(null, data))
+          .catch((err) => finish(err instanceof Error ? err : new Error(String(err))));
+      }, 200);
+    });
+    pdfWin
+      .loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
+      .catch((err) => finish(err instanceof Error ? err : new Error(String(err))));
+  });
+}
+
+function openPdfPreviewWindow(filePath, title, parent) {
+  const preview = new BrowserWindow({
+    width: 560,
+    height: 860,
+    title,
+    autoHideMenuBar: true,
+    parent: parent && !parent.isDestroyed() ? parent : undefined,
+    webPreferences: { sandbox: true, nodeIntegration: false, contextIsolation: true, plugins: true },
+  });
+  preview.setTitle(title);
+  preview.on("page-title-updated", (e) => e.preventDefault());
+  preview.webContents.on("did-fail-load", () => {
+    if (!preview.isDestroyed()) preview.destroy();
+    void shell.openPath(filePath);
+  });
+  preview.loadURL(pathToFileURL(filePath).toString()).catch(() => {
+    void shell.openPath(filePath);
+  });
+}
+
+function registerPrintHtmlToPdfIpc() {
+  ipcMain.removeHandler("print-html-to-pdf");
+  ipcMain.handle("print-html-to-pdf", async (event, payload) => {
+    const html = payload && typeof payload.html === "string" ? payload.html : "";
+    if (!html) return { ok: false, error: "invalid-html" };
+    if (html.length > MAX_SILENT_PRINT_HTML) return { ok: false, error: "html-too-large" };
+    const pageSize = readPageSizeMm(payload);
+    if (!pageSize) return { ok: false, error: "invalid-page-size" };
+    const mode = payload.mode === "save" ? "save" : "preview";
+    const baseName = String(payload.fileName || "receipt").replace(/[\\/:*?"<>|]+/g, "-").slice(0, 80) || "receipt";
+    const sizeLabel = `${Math.round(pageSize.widthMm)}mm`;
+    const parent = BrowserWindow.fromWebContents(event.sender);
+    try {
+      const data = await renderReceiptPdf(html, pageSize, payload.marginType === "none");
+      if (mode === "save") {
+        const saveOptions = {
+          title: "Export PDF",
+          defaultPath: path.join(app.getPath("downloads"), `${baseName} (${sizeLabel}).pdf`),
+          filters: [{ name: "PDF", extensions: ["pdf"] }],
+        };
+        const result = parent
+          ? await dialog.showSaveDialog(parent, saveOptions)
+          : await dialog.showSaveDialog(saveOptions);
+        if (result.canceled || !result.filePath) return { ok: false, cancelled: true };
+        fs.writeFileSync(result.filePath, data);
+        return { ok: true, path: result.filePath };
+      }
+      const dir = path.join(os.tmpdir(), "vyntex-pdf-preview");
+      fs.mkdirSync(dir, { recursive: true });
+      const filePath = path.join(dir, `${baseName} (${sizeLabel}) ${Date.now()}.pdf`);
+      fs.writeFileSync(filePath, data);
+      openPdfPreviewWindow(filePath, `${baseName} — ${sizeLabel} × ${Math.round(pageSize.heightMm)}mm`, parent);
+      return { ok: true, path: filePath };
+    } catch (err) {
+      return { ok: false, error: String(err?.message ?? err) };
+    }
   });
 }
 
@@ -541,6 +694,7 @@ function registerCustomerDisplayIpc() {
 
 app.whenReady().then(() => {
   registerPrintHtmlSilentIpc();
+  registerPrintHtmlToPdfIpc();
   registerGetSystemPrintersIpc();
   registerAppUpdateIpc();
   registerCustomerDisplayIpc();

@@ -2,6 +2,12 @@
  * Opens the system print dialog for a full HTML document without window.open.
  * Avoids popup blockers and Windows/Electron trying to resolve about:blank as an OS protocol.
  */
+import { prepareReceiptPaper, type ReceiptPaper } from "./print-page.ts";
+import {
+  buildCalibrationPageHtml,
+  getPrinterCalibration,
+  type PrinterCalibration,
+} from "./print-calibration.ts";
 
 export const PRINT_POWERED_BY = "Powered by: www.vyntexpos.net";
 
@@ -19,9 +25,48 @@ export function ensurePrintPoweredByFooter(html: string): string {
 
 export type PrintHtmlSilentResult = { ok: boolean; error?: string };
 
+export type PrintPageSizeMm = { widthMm: number; heightMm: number };
+
+/** `none`: the HTML already places content (calibration / ruler); default: driver printable area. */
+export type PrintMarginType = "none" | "printableArea";
+
 export type PrintHtmlSilentPayload =
   | string
-  | { html: string; deviceName?: string };
+  | {
+      html: string;
+      deviceName?: string;
+      pageSize?: PrintPageSizeMm;
+      marginType?: PrintMarginType;
+    };
+
+async function preparePaperSafely(
+  html: string,
+  calibration?: PrinterCalibration | null,
+): Promise<ReceiptPaper | null> {
+  try {
+    return await prepareReceiptPaper(html, calibration);
+  } catch {
+    return null;
+  }
+}
+
+/** OS queue the main process will pick when no device name is given (default physical printer). */
+async function defaultPhysicalPrinterName(): Promise<string | undefined> {
+  const inv = getDesktopSystemPrintersInvoker();
+  if (!inv) return undefined;
+  try {
+    const r = await inv();
+    if (!r.ok || r.printers.length === 0) return undefined;
+    return (r.printers.find((p) => p.isDefault) ?? r.printers[0]).deviceName;
+  } catch {
+    return undefined;
+  }
+}
+
+async function calibrationForDevice(deviceName?: string): Promise<PrinterCalibration | null> {
+  const name = deviceName?.trim() || (await defaultPhysicalPrinterName());
+  return getPrinterCalibration(name);
+}
 
 function getDesktopPrintSilent():
   | ((payload: PrintHtmlSilentPayload) => Promise<PrintHtmlSilentResult>)
@@ -142,16 +187,23 @@ export async function tryPrintHtmlDocumentAsync(
     typeof options?.silentTimeoutMs === "number"
       ? options.silentTimeoutMs
       : DEFAULT_SILENT_PRINT_IPC_TIMEOUT_MS;
+  const sourceHtml = htmlFullDocument;
+  const dialogPaper = await preparePaperSafely(sourceHtml);
+  htmlFullDocument = dialogPaper?.html ?? sourceHtml;
 
   if (wantSilent && silentApi) {
     if (!(await canAttemptSilentPrint())) {
       return { ok: false, error: "no-physical-printer" };
     }
     try {
-      const payload: PrintHtmlSilentPayload =
-        deviceName && deviceName.length > 0
-          ? { html: htmlFullDocument, deviceName }
-          : htmlFullDocument;
+      const calibration = dialogPaper ? await calibrationForDevice(deviceName) : null;
+      const paper = calibration ? await preparePaperSafely(sourceHtml, calibration) : dialogPaper;
+      const payload: PrintHtmlSilentPayload = {
+        html: paper?.html ?? htmlFullDocument,
+        ...(deviceName && deviceName.length > 0 ? { deviceName } : {}),
+        ...(paper ? { pageSize: { widthMm: paper.widthMm, heightMm: paper.heightMm } } : {}),
+        ...(paper?.calibrated ? { marginType: "none" as const } : {}),
+      };
       const r = await Promise.race([
         silentApi(payload),
         new Promise<PrintHtmlSilentResult>((resolve) =>
@@ -201,6 +253,153 @@ export async function printHtmlDocumentAsync(
 ): Promise<boolean> {
   const r = await tryPrintHtmlDocumentAsync(htmlFullDocument, options);
   return r.ok;
+}
+
+export type ReceiptPdfMode = "preview" | "save";
+
+export type ReceiptPdfOutcome = {
+  ok: boolean;
+  /** Saved/preview file path (desktop app). */
+  path?: string;
+  /** Browser fallback: the print dialog opened so the user can pick "Save as PDF". */
+  viaDialog?: boolean;
+  cancelled?: boolean;
+  widthMm?: number;
+  heightMm?: number;
+  error?: string;
+};
+
+type DesktopPdfPayload = {
+  html: string;
+  widthMm: number;
+  heightMm: number;
+  mode: ReceiptPdfMode;
+  fileName: string;
+  marginType?: PrintMarginType;
+};
+
+function getDesktopPrintToPdf():
+  | ((payload: DesktopPdfPayload) => Promise<{ ok: boolean; path?: string; cancelled?: boolean; error?: string }>)
+  | undefined {
+  if (typeof window === "undefined") return undefined;
+  const w = window as Window & {
+    desktop?: {
+      printHtmlToPdf?: (
+        payload: DesktopPdfPayload,
+      ) => Promise<{ ok: boolean; path?: string; cancelled?: boolean; error?: string }>;
+    };
+  };
+  return w.desktop?.printHtmlToPdf;
+}
+
+function safePdfFileName(name: string): string {
+  const base = name.trim().replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").slice(0, 80);
+  return base || "receipt";
+}
+
+/**
+ * Renders the exact receipt HTML used for printing to a PDF sized to the paper
+ * (width from the Design, height from the content). Desktop: real PDF file; browser:
+ * print dialog with the same page size so the user can choose "Save as PDF".
+ */
+export async function exportReceiptPdf(
+  htmlFullDocument: string,
+  options: {
+    mode: ReceiptPdfMode;
+    fileName: string;
+    /** Assigned OS printer: its calibration (paper width, printable band) shapes the PDF. */
+    deviceName?: string;
+  },
+): Promise<ReceiptPdfOutcome> {
+  const html = ensurePrintPoweredByFooter(htmlFullDocument);
+  const toPdf = getDesktopPrintToPdf();
+  const calibration = toPdf ? await calibrationForDevice(options.deviceName) : null;
+  const paper = await preparePaperSafely(html, calibration);
+  if (!paper) return { ok: false, error: "not-a-receipt" };
+  if (!toPdf) {
+    const opened = printHtmlDocument(paper.html);
+    return {
+      ok: opened,
+      viaDialog: true,
+      widthMm: paper.widthMm,
+      heightMm: paper.heightMm,
+      error: opened ? undefined : "dialog-failed",
+    };
+  }
+  try {
+    const r = await toPdf({
+      html: paper.html,
+      widthMm: paper.widthMm,
+      heightMm: paper.heightMm,
+      mode: options.mode,
+      fileName: safePdfFileName(options.fileName),
+      ...(paper.calibrated ? { marginType: "none" as const } : {}),
+    });
+    return { ...r, widthMm: paper.widthMm, heightMm: paper.heightMm };
+  } catch (e) {
+    return { ok: false, error: String((e as Error)?.message ?? e) };
+  }
+}
+
+const CALIBRATION_PAGE_HEIGHT_MM = 46;
+
+/** Prints the edge-to-edge ruler on one printer (no margins, no calibration applied). */
+export async function printCalibrationPage(args: {
+  deviceName?: string;
+  paperWidthMm: number;
+  title: string;
+  hint: string;
+}): Promise<PrintHtmlAsyncOutcome> {
+  const html = buildCalibrationPageHtml(args.paperWidthMm, args.title, args.hint);
+  const silentApi = getDesktopPrintSilent();
+  if (!silentApi) {
+    const opened = printHtmlDocument(html);
+    return { ok: opened, error: opened ? undefined : "dialog-failed" };
+  }
+  if (!(await canAttemptSilentPrint())) return { ok: false, error: "no-physical-printer" };
+  try {
+    const r = await Promise.race([
+      silentApi({
+        html,
+        ...(args.deviceName?.trim() ? { deviceName: args.deviceName.trim() } : {}),
+        pageSize: { widthMm: args.paperWidthMm, heightMm: CALIBRATION_PAGE_HEIGHT_MM },
+        marginType: "none",
+      }),
+      new Promise<PrintHtmlSilentResult>((resolve) =>
+        window.setTimeout(() => resolve({ ok: false, error: "silent-timeout" }), DEFAULT_SILENT_PRINT_IPC_TIMEOUT_MS),
+      ),
+    ]);
+    return r.ok ? { ok: true } : { ok: false, error: r.error ?? "silent-failed" };
+  } catch (e) {
+    return { ok: false, error: String((e as Error)?.message ?? e) };
+  }
+}
+
+/** Opens the ruler page as a PDF (desktop) so the layout can be checked without a printer. */
+export async function previewCalibrationPdf(args: {
+  paperWidthMm: number;
+  title: string;
+  hint: string;
+}): Promise<ReceiptPdfOutcome> {
+  const html = buildCalibrationPageHtml(args.paperWidthMm, args.title, args.hint);
+  const toPdf = getDesktopPrintToPdf();
+  if (!toPdf) {
+    const opened = printHtmlDocument(html);
+    return { ok: opened, viaDialog: true, error: opened ? undefined : "dialog-failed" };
+  }
+  try {
+    const r = await toPdf({
+      html,
+      widthMm: args.paperWidthMm,
+      heightMm: CALIBRATION_PAGE_HEIGHT_MM,
+      mode: "preview",
+      fileName: `calibration-${Math.round(args.paperWidthMm)}mm`,
+      marginType: "none",
+    });
+    return { ...r, widthMm: args.paperWidthMm, heightMm: CALIBRATION_PAGE_HEIGHT_MM };
+  } catch (e) {
+    return { ok: false, error: String((e as Error)?.message ?? e) };
+  }
 }
 
 export type DesktopSystemPrinterInfo = {

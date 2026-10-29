@@ -8,7 +8,12 @@ declare const __INSTALLER_UPDATED_AT__: string | undefined;
 
 type PrintHtmlSilentPayload =
   | string
-  | { html: string; deviceName?: string };
+  | {
+      html: string;
+      deviceName?: string;
+      pageSize?: { widthMm: number; heightMm: number };
+      marginType?: "none" | "printableArea";
+    };
 
 type GetSystemPrintersIpcResult =
   | {
@@ -28,6 +33,14 @@ interface VyntexDesktopApi {
   printHtmlSilent?: (
     payload: PrintHtmlSilentPayload,
   ) => Promise<{ ok: boolean; error?: string }>;
+  printHtmlToPdf?: (payload: {
+    html: string;
+    widthMm: number;
+    heightMm: number;
+    mode: "preview" | "save";
+    fileName: string;
+    marginType?: "none" | "printableArea";
+  }) => Promise<{ ok: boolean; path?: string; cancelled?: boolean; error?: string }>;
   getSystemPrinters?: () => Promise<GetSystemPrintersIpcResult>;
   checkForAppUpdate?: () => Promise<{
     ok: boolean;
