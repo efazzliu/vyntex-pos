@@ -132,11 +132,22 @@ export async function prepareReceiptPaper(
       calibrated: true,
     };
   }
-  const heightMm = await measureReceiptHeightMm(html, printableWidthMm(templateWidthMm));
+  // Auto width may resolve to 58 mm only at print time, after the template CSS was built.
+  const sized = templateWidthMm <= 60 ? applyNarrowRules(html) : html;
+  const heightMm = await measureReceiptHeightMm(sized, printableWidthMm(templateWidthMm));
   return {
-    html: applyReceiptPageSize(html, templateWidthMm, heightMm),
+    html: applyReceiptPageSize(sized, templateWidthMm, heightMm),
     widthMm: templateWidthMm,
     heightMm,
     calibrated: false,
   };
+}
+
+const NARROW_STYLE_ID = "vyntex-narrow";
+
+function applyNarrowRules(html: string): string {
+  if (html.includes(`id="${NARROW_STYLE_ID}"`)) return html;
+  const rule = `<style id="${NARROW_STYLE_ID}">${NARROW_TABLE_CSS}</style>`;
+  if (/<\/head>/i.test(html)) return html.replace(/<\/head>/i, `${rule}</head>`);
+  return `${rule}${html}`;
 }

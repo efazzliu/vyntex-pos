@@ -89,7 +89,7 @@ export function buildCalibrationPageHtml(paperWidthMm: number, title: string, hi
     if (mid) labels.push(`<b style="left:${mm}mm">${mm}</b>`);
   }
   const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>${esc(title)}</title><style>
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>${esc(title)}</title><style id="vyntex-page-size">@page{size:${w}mm 46mm;margin:0}</style><style>
     @page { size: ${w}mm 46mm; margin: 0; }
     html, body { margin: 0; padding: 0; width: ${w}mm; background: #fff; color: #000; font-family: Arial, Helvetica, sans-serif; }
     .ruler { position: relative; width: ${w}mm; height: 16mm; }

@@ -1,7 +1,14 @@
 /** Shared thermal-paper Design from Template Manager (`styles._design`). */
 
+import {
+  PRINT_PAPER_MM_DEFAULT,
+  PRINT_PAPER_MM_MAX,
+  PRINT_PAPER_MM_MIN,
+} from "@/lib/print-paper-width.ts";
+
 export type PrintDesign = {
-  paperWidth: "58" | "80" | "custom";
+  /** `auto` = use assigned / OS printer media width at print time */
+  paperWidth: "auto" | "58" | "80" | "custom";
   customWidth: string;
   font: "default" | "mono" | "sans";
   fontSize: number;
@@ -15,7 +22,7 @@ export type PrintDesign = {
 };
 
 export const DEFAULT_PRINT_DESIGN: PrintDesign = {
-  paperWidth: "80",
+  paperWidth: "auto",
   customWidth: "80",
   font: "default",
   fontSize: 12,
@@ -30,8 +37,8 @@ export const DEFAULT_PRINT_DESIGN: PrintDesign = {
 
 const FONT_MIN = 8;
 const FONT_MAX = 24;
-const MM_MIN = 48;
-const MM_MAX = 110;
+const MM_MIN = PRINT_PAPER_MM_MIN;
+const MM_MAX = PRINT_PAPER_MM_MAX;
 
 function pick<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
   return typeof value === "string" && (allowed as readonly string[]).includes(value)
@@ -57,7 +64,7 @@ export function readPrintDesign(source?: unknown): PrintDesign {
   const fontSize = num(o.fontSize, DEFAULT_PRINT_DESIGN.fontSize);
   const lineHeight = num(o.lineHeight, DEFAULT_PRINT_DESIGN.lineHeight);
   return {
-    paperWidth: pick(o.paperWidth, ["58", "80", "custom"] as const, "80"),
+    paperWidth: pick(o.paperWidth, ["auto", "58", "80", "custom"] as const, "auto"),
     customWidth: typeof o.customWidth === "string" ? o.customWidth : "80",
     font: pick(o.font, ["default", "mono", "sans"] as const, "default"),
     fontSize: Math.min(FONT_MAX, Math.max(FONT_MIN, Math.round(fontSize))),
@@ -71,12 +78,25 @@ export function readPrintDesign(source?: unknown): PrintDesign {
   };
 }
 
-export function paperWidthMm(design: PrintDesign): number {
+/**
+ * Design paper width in mm. `auto` uses `resolvedMm` (from printer) or 80mm for preview.
+ */
+export function paperWidthMm(design: PrintDesign, resolvedMm?: number): number {
+  if (design.paperWidth === "auto") {
+    if (typeof resolvedMm === "number" && Number.isFinite(resolvedMm)) {
+      return Math.min(MM_MAX, Math.max(MM_MIN, Math.round(resolvedMm)));
+    }
+    return PRINT_PAPER_MM_DEFAULT;
+  }
   if (design.paperWidth === "58") return 58;
   if (design.paperWidth === "80") return 80;
   const n = Number(design.customWidth);
-  if (!Number.isFinite(n)) return 80;
+  if (!Number.isFinite(n)) return PRINT_PAPER_MM_DEFAULT;
   return Math.min(MM_MAX, Math.max(MM_MIN, Math.round(n)));
+}
+
+export function isAutoPaperWidth(design: PrintDesign | { paperWidth?: string }): boolean {
+  return design.paperWidth === "auto" || design.paperWidth == null || design.paperWidth === "";
 }
 
 export function printFontFamily(design: PrintDesign): string {
@@ -122,15 +142,17 @@ function logoMargin(align: PrintDesign["align"]): string {
 /** Page height used until the print pipeline measures the real receipt (see `print-page.ts`). */
 export const FALLBACK_PAGE_HEIGHT_MM = 297;
 
-/** Physical page width in mm for the selected paper (receipts are always portrait). */
-export function printPageWidthMm(design: PrintDesign): number {
-  return paperWidthMm(design);
-}
-
-/** CSS appended at the end of each ticket stylesheet so Design wins over hardcoded 80mm/center. */
-export function printDesignCss(source?: unknown): string {
+/**
+ * CSS appended at the end of each ticket stylesheet so Design wins over hardcoded 80mm/center.
+ * The page is exactly the roll width; content fills whatever area the page gives it (driver
+ * printable area on paper, matching side margins in PDF) instead of a fixed mm width.
+ */
+export function printDesignCss(
+  source?: unknown,
+  opts?: { paperWidthMm?: number },
+): string {
   const d = readPrintDesign(source);
-  const pageMm = printPageWidthMm(d);
+  const pageMm = paperWidthMm(d, opts?.paperWidthMm);
   const width = `${pageMm}mm`;
   const dashStyle = d.dividerStyle === "none" ? "none" : d.dividerStyle;
   return `
@@ -141,13 +163,21 @@ export function printDesignCss(source?: unknown): string {
       --print-size: ${d.fontSize}px;
       --print-lh: ${d.lineHeight};
       --print-width: ${width};
+      --print-width-mm: ${pageMm};
+      --print-paper-mode: ${d.paperWidth === "auto" ? "auto" : "fixed"};
       --print-dash-style: ${dashStyle};
       --print-dash-width: ${d.dividerStyle === "none" ? "0" : dashWidth(d)};
       --print-section: ${sectionPx(d)};
       --print-margin: ${marginPx(d)};
     }
     @page { size: ${pageMm}mm ${FALLBACK_PAGE_HEIGHT_MM}mm; margin: 0; }
-    html { margin: 0 !important; padding: 0 !important; background: #fff; }
+    html {
+      margin: 0 !important;
+      padding: 0 !important;
+      background: #fff;
+      height: auto !important;
+      overflow: visible !important;
+    }
     body {
       box-sizing: border-box !important;
       width: auto !important;
@@ -159,6 +189,8 @@ export function printDesignCss(source?: unknown): string {
       text-align: var(--print-align);
       padding: var(--print-margin) !important;
       overflow-wrap: break-word;
+      height: auto !important;
+      overflow: visible !important;
     }
     body:has(> .sheet), body:has(> .wrap) { padding: 0 !important; }
     .sheet, .wrap {
@@ -168,6 +200,15 @@ export function printDesignCss(source?: unknown): string {
       margin-left: 0 !important;
       margin-right: 0 !important;
       padding: var(--print-margin) !important;
+      overflow: visible !important;
+      page-break-inside: auto;
+      break-inside: auto;
+    }
+    @media print {
+      html, body {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
     }
     .dash, hr.dash {
       border: none !important;
@@ -214,7 +255,10 @@ export const NARROW_TABLE_CSS = `
 `;
 
 /** Inline body CSS for builders that do not use a shared stylesheet (fiscal). */
-export function printDesignInlineBody(source?: unknown): string {
+export function printDesignInlineBody(
+  source?: unknown,
+  _opts?: { paperWidthMm?: number },
+): string {
   const d = readPrintDesign(source);
   return [
     `font-family:${printFontFamily(d)}`,
@@ -224,6 +268,7 @@ export function printDesignInlineBody(source?: unknown): string {
     `color:#111`,
     `margin:0`,
     `padding:${marginPx(d)}`,
+    `box-sizing:border-box`,
     `background:#fff`,
   ].join(";");
 }

@@ -104,10 +104,10 @@ function AppPosSoftwareClass() {
   return null;
 }
 
-/** POS shell: no on-screen toasts (Sonner). Web dashboard / auth keep toasts. */
+/** Customer display must stay silent; all other POS / dashboard routes show toasts. */
 function AppToaster() {
   const { pathname } = useLocation();
-  if (isPosPath(pathname)) return null;
+  if (pathname.includes("customer-display")) return null;
   return <Toaster richColors position="top-right" />;
 }
 
