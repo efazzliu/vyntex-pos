@@ -921,23 +921,38 @@ html[data-dashboard-reduced-motion] *::after {
   padding: 0.5rem 0.5rem 0.6rem;
   transform: rotateY(-18deg) rotateX(7deg) rotateZ(2deg) scale(0.86);
 }
+/* Full preview: flat PDF-style page (no tilt, texture, torn edges or fold). */
 .pos-receipt-stage--preview {
   height: auto;
   min-height: 100%;
-  perspective: 980px;
-  padding: 1.1rem 0.9rem 1.25rem;
+  perspective: none;
+  padding: 1.5rem 1rem;
   align-items: flex-start;
+  background: #eef1f5;
 }
 .pos-receipt-stage--preview .pos-receipt-sheet {
   width: 22.5rem;
-  padding: 1.45rem 1.25rem 1.6rem;
-  transform: rotateY(-10deg) rotateX(3.5deg) rotateZ(1.2deg);
-  transition: width 200ms ease, transform 200ms ease;
+  padding: 1.75rem 1.5rem 1.85rem;
+  transform: none;
+  transform-style: flat;
+  background: #ffffff;
+  border: 1px solid #e3e7ee;
+  border-radius: 2px;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.06),
+    0 8px 24px -12px rgba(15, 23, 42, 0.18);
+  transition: width 200ms ease;
   /* Full ticket height — do not clip long print layouts in the preview pane */
   max-height: none;
   overflow: visible;
 }
-.pos-receipt-stage--landscape .pos-receipt-sheet {
+.pos-receipt-stage--preview .pos-receipt-sheet::before,
+.pos-receipt-stage--preview .pos-receipt-sheet::after,
+.pos-receipt-stage--preview .pos-receipt-sheet__fold,
+.pos-receipt-stage--preview .pos-receipt-sheet__dogear {
+  display: none;
+}
+.pos-receipt-stage--landscape:not(.pos-receipt-stage--preview) .pos-receipt-sheet {
   transform: rotateY(-10deg) rotateX(3deg) rotateZ(0.8deg);
 }
 .pos-receipt-sheet {
