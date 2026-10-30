@@ -49,7 +49,7 @@ function dropRevokedWaiterPhone() {
   clearWaiterPhonePair();
 }
 
-/** Mutations that cannot be replayed offline (need live URL or immediate network). */
+/** Mutations that cannot be usefully queued offline (legacy Convex upload URL). */
 const OFFLINE_POS_MUTATION_DENYLIST = new Set<string>(["pos.menu.generateUploadUrl"]);
 
 export function ConvexProvider({ children }: { client?: unknown; children: ReactNode }) {

@@ -429,5 +429,18 @@ export async function runQueuedMutation(
   const id = functionPath.includes(".")
     ? functionPath
     : `pos.${functionPath.replace(/\//g, ".").replace(/^pos\./, "")}`;
-  await runPosMutation(id, args);
+
+  let mutationArgs = args;
+  if (
+    (id === "pos.menu.createItem" || id === "pos.menu.updateItem") &&
+    typeof args.imageUrl === "string" &&
+    args.imageUrl.startsWith("data:image/")
+  ) {
+    const { materializeMenuItemImageUrlArg } = await import(
+      "@/lib/supabase-pos/menu-photo-storage.ts"
+    );
+    mutationArgs = await materializeMenuItemImageUrlArg(args);
+  }
+
+  await runPosMutation(id, mutationArgs);
 }

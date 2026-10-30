@@ -416,6 +416,10 @@ function parseImageUrlArg(args: Record<string, unknown>): string | null | undefi
 
 export async function createItem(args: Record<string, unknown>) {
   const licenseKey = args.licenseKey as string;
+  const { materializeMenuItemImageUrlArg } = await import(
+    "@/lib/supabase-pos/menu-photo-storage.ts"
+  );
+  args = await materializeMenuItemImageUrlArg(args);
   const r = await getRestaurantByLicense(licenseKey);
   assertMenuItemStation(args.station);
   assertVenueVatRate(r, args.vatRate);
@@ -531,6 +535,10 @@ export async function createItem(args: Record<string, unknown>) {
 }
 
 export async function updateItem(args: Record<string, unknown>) {
+  const { materializeMenuItemImageUrlArg } = await import(
+    "@/lib/supabase-pos/menu-photo-storage.ts"
+  );
+  args = await materializeMenuItemImageUrlArg(args);
   const r = await getRestaurantByLicense(args.licenseKey as string);
   assertMenuItemStation(args.station);
   assertVenueVatRate(r, args.vatRate);

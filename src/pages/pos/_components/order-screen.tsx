@@ -85,7 +85,11 @@ import {
   type PrintPosBillOptions,
 } from "@/lib/pos-print-sent-order.ts";
 import { isSilentPrintQueueableError } from "@/lib/print-html.ts";
-import { runPosQuery } from "@/lib/supabase-pos/pos-router.ts";
+import {
+  cacheOrderWithItems,
+  resolveOrderWithItemsForPrint,
+  type OrderWithItemsForPrint,
+} from "@/lib/supabase-pos/order-print-cache.ts";
 import {
   STAFF_PIN_MAX_LEN,
   STAFF_PIN_MIN_LEN,
@@ -526,12 +530,30 @@ export default function OrderScreen({
 
   const currentTable = tablesList.find((t) => t._id === tableId);
   const existingOrder = activeOrders[0];
-  const orderWithItemsQuery = useQuery(
+  const orderWithItemsLive = useQuery(
     existingOrder ? "pos.orders.getOrderWithItems" : "skip",
     existingOrder
       ? { licenseKey, orderId: existingOrder._id }
       : "skip",
   );
+  const { data: orderWithItemsCached } = useOfflineData<OrderWithItemsForPrint>(
+    existingOrder
+      ? `orderWithItems:${licenseKey}:${existingOrder._id}`
+      : `orderWithItems:${licenseKey}:none`,
+    orderWithItemsLive as OrderWithItemsForPrint | undefined,
+    isOnline,
+  );
+  const orderWithItemsQuery = (orderWithItemsLive ??
+    orderWithItemsCached) as OrderWithItemsForPrint | undefined;
+
+  useEffect(() => {
+    if (!existingOrder || !orderWithItemsLive) return;
+    void cacheOrderWithItems(
+      licenseKey,
+      String(existingOrder._id),
+      orderWithItemsLive,
+    );
+  }, [existingOrder, licenseKey, orderWithItemsLive]);
   const paymentSettings = parsePosPaymentSettings(
     (companyQuery as { paymentSettings?: unknown } | undefined)?.paymentSettings,
   );
@@ -1331,31 +1353,14 @@ export default function OrderScreen({
 
   const handlePrintBill = async () => {
     if (!existingOrder) return;
-    if (!isOnline) {
-      toast.error(t("order.bill_offline"));
-      return;
-    }
     try {
-      const raw = (await runPosQuery("pos.orders.getOrderWithItems", {
-        licenseKey,
-        orderId: existingOrder._id,
-      })) as {
-        items: Array<{
-          name: string;
-          price: number;
-          quantity: number;
-          notes?: string;
-          station?: string;
-          status: string;
-        }>;
-        tableName?: string;
-        staffName?: string;
-        orderNumber?: number;
-        subtotal: number;
-        tax: number;
-        total: number;
-        _id: string;
-      };
+      const raw: OrderWithItemsForPrint =
+        orderWithItemsQuery && Array.isArray(orderWithItemsQuery.items)
+          ? orderWithItemsQuery
+          : await resolveOrderWithItemsForPrint(
+              licenseKey,
+              String(existingOrder._id),
+            );
 
       const mergeKey = (item: (typeof raw.items)[number]) => {
         const notes = (item.notes ?? "").trim().toLowerCase();
@@ -1494,7 +1499,11 @@ export default function OrderScreen({
         /* table status is best-effort after a successful print */
       }
     } catch (e) {
-      toast.error(errorMessageFromUnknown(e, t("order.bill_load_failed")));
+      toast.error(
+        !isOnline
+          ? t("order.bill_offline")
+          : errorMessageFromUnknown(e, t("order.bill_load_failed")),
+      );
     }
   };
 
@@ -1693,7 +1702,6 @@ export default function OrderScreen({
     ) {
       return;
     }
-    if (!isOnline) return;
     void (async () => {
       try {
         const pr =
