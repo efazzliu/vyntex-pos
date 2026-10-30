@@ -45,8 +45,10 @@ import {
 } from "@/lib/print-debt-voucher.ts";
 import {
   PRINT_POWERED_BY,
+  exportReceiptPdf,
   hasElectronSilentPrintIpc,
   tryPrintHtmlDocumentAsync,
+  type ReceiptPdfMode,
 } from "@/lib/print-html.ts";
 import {
   KITCHEN_TICKET_TITLE,
@@ -95,6 +97,7 @@ import {
   Wallet,
   CreditCard,
   Eye,
+  FileDown,
   ChevronRight,
   Printer,
   Save,
@@ -204,7 +207,8 @@ const EDITOR_TABS = ["design", "content"] as const;
 type EditorTab = (typeof EDITOR_TABS)[number];
 
 type DesignSettings = {
-  paperWidth: "58" | "80" | "custom";
+  /** auto = use assigned OS printer media width at print time */
+  paperWidth: "auto" | "58" | "80" | "custom";
   customWidth: string;
   orientation: "portrait" | "landscape";
   font: "default" | "mono" | "sans";
@@ -486,7 +490,7 @@ function readFontSize(value: unknown) {
 }
 
 const DEFAULT_DESIGN: DesignSettings = {
-  paperWidth: "80",
+  paperWidth: "auto",
   customWidth: "80",
   orientation: "portrait",
   font: "default",
@@ -1249,9 +1253,9 @@ function readDesign(styles: TemplateRecord["styles"]): DesignSettings {
       ? (value as T)
       : fallback;
   return {
-    paperWidth: pick(o.paperWidth, ["58", "80", "custom"] as const, "80"),
+    paperWidth: pick(o.paperWidth, ["auto", "58", "80", "custom"] as const, "auto"),
     customWidth: typeof o.customWidth === "string" ? o.customWidth : "80",
-    orientation: pick(o.orientation, ["portrait", "landscape"] as const, "portrait"),
+    orientation: "portrait",
     font: pick(o.font, ["default", "mono", "sans"] as const, "default"),
     fontSize: readFontSize(o.fontSize),
     align: pick(o.align, ["left", "center", "right"] as const, "center"),
@@ -1277,6 +1281,7 @@ const PAPER_MM_VALUES = Array.from(
 const PAPER_WHEEL_ITEM = 36;
 
 function paperMmValue(design: DesignSettings) {
+  if (design.paperWidth === "auto") return 80; // preview placeholder until printer is known
   if (design.paperWidth === "58") return 58;
   if (design.paperWidth === "80") return 80;
   const n = Number(design.customWidth);
@@ -1550,7 +1555,7 @@ function DesignPanel({
         title={t("templates.design.layout_title")}
         sub={t("templates.design.layout_sub")}
       >
-        <div className="grid grid-cols-2 gap-2">
+        <div>
           <div>
             <p className="mb-1 text-[11px] font-medium text-slate-500">
               {t("templates.design.paper_width")}
@@ -1559,6 +1564,22 @@ function DesignPanel({
               {t("templates.design.paper_width_hint")}
             </p>
             <div className="flex overflow-hidden rounded-xl border border-slate-200 bg-white">
+              <button
+                type="button"
+                onClick={() => {
+                  setWidthOpen(false);
+                  onChange({ ...design, paperWidth: "auto" });
+                }}
+                className={cn(
+                  "flex-[1.2] py-1.5 text-[12px] font-semibold transition",
+                  !widthOpen && design.paperWidth === "auto"
+                    ? "bg-brand text-[#f8fafc]"
+                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-800",
+                )}
+                title={t("templates.design.paper_width_auto_hint")}
+              >
+                {t("templates.design.paper_width_auto")}
+              </button>
               {(["58", "80"] as const).map((id) => (
                 <button
                   key={id}
@@ -1574,7 +1595,7 @@ function DesignPanel({
                       : "text-slate-500 hover:bg-slate-50 hover:text-slate-800",
                   )}
                 >
-                  {id} mm
+                  {id}
                 </button>
               ))}
               <Popover
@@ -1602,7 +1623,7 @@ function DesignPanel({
                     )}
                   >
                     {design.paperWidth === "custom"
-                      ? `${currentMm} mm`
+                      ? `${currentMm}`
                       : t("templates.design.custom")}
                   </button>
                 </PopoverTrigger>
@@ -1621,19 +1642,6 @@ function DesignPanel({
                 </PopoverContent>
               </Popover>
             </div>
-          </div>
-          <div>
-            <p className="mb-1 text-[11px] font-medium text-slate-500">
-              {t("templates.design.orientation")}
-            </p>
-            <DesignSeg
-              value={design.orientation}
-              onChange={(id) => set("orientation", id as DesignSettings["orientation"])}
-              options={[
-                { id: "portrait", label: t("templates.design.portrait") },
-                { id: "landscape", label: t("templates.design.landscape") },
-              ]}
-            />
           </div>
         </div>
       </DesignBlock>
@@ -2328,6 +2336,7 @@ function LedgerMark({ className }: { className?: string }) {
 }
 
 function paperWidthRem(design: DesignSettings) {
+  if (design.paperWidth === "auto") return 22.5;
   if (design.paperWidth === "58") return design.orientation === "landscape" ? 21 : 17;
   if (design.paperWidth === "80") return design.orientation === "landscape" ? 26.5 : 22.5;
   const mm = Number(design.customWidth);
@@ -4717,6 +4726,7 @@ function TemplateEditor({
   const saveTemplate = useMutation("pos.templates.saveTemplate");
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState<ReceiptPdfMode | null>(null);
   const [editorTab, setEditorTab] = useState<EditorTab>("design");
   const [design, setDesign] = useState<DesignSettings>(() => readDesign(data?.styles));
   const [elements, setElements] = useState<ReceiptElements>(() =>
@@ -4795,10 +4805,7 @@ function TemplateEditor({
     setSaving(false);
   };
 
-  const handleTestPrint = async () => {
-    if (!data) return;
-    setTesting(true);
-    try {
+  const buildEditorHtml = (doc: NonNullable<typeof data>): string => {
       const preBill = meta.id === "non_fiscal_receipt";
       const complimentary = meta.id === "complimentary_slip";
       const debt = meta.id === "debt_voucher";
@@ -4979,7 +4986,7 @@ function TemplateEditor({
                 footerText: customLabels.footerText,
               },
               styles: {
-                ...(data.styles ?? {}),
+                ...(doc.styles ?? {}),
                 _design: design,
               },
             },
@@ -5106,7 +5113,7 @@ function TemplateEditor({
               headerText: customLabels.headerText,
               footerText: customLabels.footerText,
             },
-            styles: data.styles ?? {},
+            styles: doc.styles ?? {},
             lines,
             subtotal: total - tax,
             tax,
@@ -5133,6 +5140,14 @@ function TemplateEditor({
             website: customLabels.website.trim(),
             design,
           });
+      return html;
+  };
+
+  const handleTestPrint = async () => {
+    if (!data) return;
+    setTesting(true);
+    try {
+      const html = buildEditorHtml(data);
       const deviceName = resolvePaperPrinterDeviceName(
         printers,
         licenseKey,
@@ -5153,6 +5168,39 @@ function TemplateEditor({
       toast.error(errorMessageFromUnknown(error, t("order.print_ticket_silent_failed")));
     } finally {
       setTesting(false);
+    }
+  };
+
+  const handlePdf = async (mode: ReceiptPdfMode) => {
+    if (!data) return;
+    setPdfBusy(mode);
+    try {
+      const deviceName = resolvePaperPrinterDeviceName(printers, licenseKey, printerId, meta.id);
+      const outcome = await exportReceiptPdf(buildEditorHtml(data), {
+        mode,
+        fileName: typeName,
+        deviceName: deviceName || undefined,
+      });
+      if (outcome.cancelled) return;
+      if (!outcome.ok) {
+        toast.error(t("templates.pdf_failed"), { description: outcome.error });
+        return;
+      }
+      const size = t("templates.pdf_size", {
+        width: Math.round(outcome.widthMm ?? 0),
+        height: Math.round(outcome.heightMm ?? 0),
+      });
+      if (outcome.viaDialog) {
+        toast.info(t("templates.pdf_browser_dialog"), { description: size });
+      } else if (mode === "save") {
+        toast.success(t("templates.pdf_saved"), { description: `${size} · ${outcome.path ?? ""}` });
+      } else {
+        toast.success(t("templates.pdf_preview_opened"), { description: size });
+      }
+    } catch (error) {
+      toast.error(errorMessageFromUnknown(error, t("templates.pdf_failed")));
+    } finally {
+      setPdfBusy(null);
     }
   };
 
@@ -5199,7 +5247,25 @@ function TemplateEditor({
             ) : null}
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void handlePdf("preview")}
+            disabled={pdfBusy !== null || !data}
+            className="inline-flex h-10 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-[13px] font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50"
+          >
+            <Eye className="size-4" />
+            {pdfBusy === "preview" ? t("templates.pdf_working") : t("templates.pdf_preview")}
+          </button>
+          <button
+            type="button"
+            onClick={() => void handlePdf("save")}
+            disabled={pdfBusy !== null || !data}
+            className="inline-flex h-10 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-[13px] font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50"
+          >
+            <FileDown className="size-4" />
+            {pdfBusy === "save" ? t("templates.pdf_working") : t("templates.pdf_export")}
+          </button>
           <button
             type="button"
             onClick={() => void handleTestPrint()}
@@ -5282,7 +5348,7 @@ function TemplateEditor({
           )}
         </section>
         <section className={cn(
-          "flex min-h-0 min-w-0 items-center justify-center overflow-hidden rounded-[1.75rem] border border-slate-200/80 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.35)]",
+          "flex min-h-0 min-w-0 items-start justify-center overflow-y-auto overscroll-contain rounded-[1.75rem] border border-slate-200/80 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.35)]",
           meta.id === "complimentary_slip"
             ? "bg-[linear-gradient(180deg,#fff4e8_0%,#fffaf4_100%)]"
             : meta.id === "debt_voucher"

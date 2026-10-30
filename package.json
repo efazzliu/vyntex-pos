@@ -1,7 +1,7 @@
 {
   "name": "vyntex-pos",
   "private": true,
-  "version": "1.0.89",
+  "version": "1.0.95",
   "description": "Vyntex POS — restaurant point of sale (web, desktop, companion apps). Windows installer targets laptops, touch PCs, Intel x64 and ARM64.",
   "author": "Vyntex",
   "type": "module",
@@ -50,6 +50,7 @@
     "deploy:site": "node scripts/deploy-site.mjs",
     "deploy:vercel": "node scripts/deploy-vercel.mjs",
     "deploy:vercel:git": "cross-env VERCEL_DEPLOY=git node scripts/deploy-vercel.mjs",
+    "apply:supabase-missing": "node scripts/apply-missing-supabase.mjs",
     "dist:win:skip-clean": "npm run dist:win",
     "postdist:win": "node scripts/copy-windows-installers-to-public.mjs && node scripts/sync-public-build-meta.mjs",
     "copy-installers": "node scripts/copy-windows-installers-to-public.mjs && node scripts/sync-public-build-meta.mjs",
@@ -114,7 +115,7 @@
     "convex": "^1.34.1",
     "cross-env": "^10.1.0",
     "date-fns": "^4.1.0",
-    "electron": "^41.2.0",
+    "electron": "^41.10.7",
     "electron-builder": "^26.8.1",
     "embla-carousel-react": "^8.6.0",
     "eslint": "^9.39.4",
@@ -155,6 +156,14 @@
     "productName": "Vyntex POS",
     "asar": true,
     "compression": "maximum",
+    "electronLanguages": [
+      "en-US",
+      "en-GB",
+      "de",
+      "it",
+      "fr",
+      "tr"
+    ],
     "asarUnpack": [
       "electron/icon.ico"
     ],

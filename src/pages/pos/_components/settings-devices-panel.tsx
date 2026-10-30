@@ -37,6 +37,7 @@ import {
   Printer,
   Receipt,
   RefreshCw,
+  Ruler,
   Trash2,
   Usb,
   Wifi,
@@ -46,9 +47,19 @@ import {
 import {
   getDesktopSystemPrintersInvoker,
   hasElectronSilentPrintIpc,
+  previewCalibrationPdf,
+  printCalibrationPage,
   tryPrintHtmlDocumentAsync,
   type DesktopSystemPrinterInfo,
 } from "@/lib/print-html.ts";
+import {
+  defaultPrinterCalibration,
+  getPrinterCalibration,
+  normalizePrinterCalibration,
+  savePrinterCalibration,
+  PAPER_MAX_MM,
+  PAPER_MIN_MM,
+} from "@/lib/print-calibration.ts";
 import {
   getQueuedPrintJobs,
   removeQueuedPrintJob,
@@ -276,6 +287,8 @@ export default function SettingsDevicesPanel({
   const [systemOpen, setSystemOpen] = useState(false);
   const [testingId, setTestingId] = useState<string | null>(null);
   const [editing, setEditing] = useState<PosPrinter | null>(null);
+  const [calibrating, setCalibrating] = useState<PosPrinter | null>(null);
+  const [calibrationTick, setCalibrationTick] = useState(0);
   const [routingTick, setRoutingTick] = useState(0);
   const [queue, setQueue] = useState<QueuedPrintJob[]>([]);
   const [queueBusy, setQueueBusy] = useState(false);
@@ -511,6 +524,11 @@ export default function SettingsDevicesPanel({
                               <p className="truncate text-[11px] text-[#8b93a7]">
                                 {TYPE_LABELS[printer.type]}
                               </p>
+                              <CalibrationSummary
+                                deviceName={printerDeviceName(printer)}
+                                tick={calibrationTick}
+                                t={t}
+                              />
                             </div>
                           </div>
                         </td>
@@ -572,6 +590,16 @@ export default function SettingsDevicesPanel({
                             >
                               <Play className="size-3.5 fill-current" />
                               {testingId === printer._id ? "…" : t("settings.test_print")}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setCalibrating(printer)}
+                              className="size-8 text-[#8b93a7] hover:bg-[#0D1326] hover:text-white"
+                              aria-label={t("settings.calibrate_printer")}
+                              title={t("settings.calibrate_printer")}
+                            >
+                              <Ruler className="size-3.5" />
                             </Button>
                             <Button
                               size="sm"
@@ -793,6 +821,14 @@ export default function SettingsDevicesPanel({
         }}
         licenseKey={licenseKey}
         updatePrinter={updatePrinter}
+        t={t}
+      />
+      <CalibratePrinterDialog
+        printer={calibrating}
+        onOpenChange={(open) => {
+          if (!open) setCalibrating(null);
+        }}
+        onSaved={() => setCalibrationTick((n) => n + 1)}
         t={t}
       />
     </div>
@@ -1088,6 +1124,251 @@ function AddPrinterDialog({
           >
             {saving ? t("common.loading") : t("settings.add_printer")}
           </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** OS print queue used for silent print and as the calibration key (same rule as Test print). */
+function printerDeviceName(printer: PosPrinter): string {
+  return printer.address?.trim() || printer.name?.trim() || "";
+}
+
+function formatMm(n: number): string {
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
+}
+
+function CalibrationSummary({
+  deviceName,
+  tick,
+  t,
+}: {
+  deviceName: string;
+  tick: number;
+  t: Translate;
+}) {
+  const cal = useMemo(() => getPrinterCalibration(deviceName), [deviceName, tick]);
+  if (!cal) return null;
+  return (
+    <p className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-medium text-brand">
+      <Ruler className="size-3" />
+      {t("settings.calibration_summary", {
+        paper: cal.paperWidthMm,
+        start: formatMm(cal.startMm),
+        end: formatMm(cal.endMm),
+      })}
+    </p>
+  );
+}
+
+function parseMm(raw: string): number {
+  return Number.parseFloat(raw.replace(",", ".").trim());
+}
+
+function CalibratePrinterDialog({
+  printer,
+  onOpenChange,
+  onSaved,
+  t,
+}: {
+  printer: PosPrinter | null;
+  onOpenChange: (open: boolean) => void;
+  onSaved: () => void;
+  t: Translate;
+}) {
+  const deviceName = printer ? printerDeviceName(printer) : "";
+  const [paper, setPaper] = useState("80");
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
+  const [busy, setBusy] = useState<"print" | "preview" | null>(null);
+
+  useEffect(() => {
+    if (!printer) return;
+    const cal = getPrinterCalibration(printerDeviceName(printer)) ?? defaultPrinterCalibration(80);
+    setPaper(String(cal.paperWidthMm));
+    setStart(formatMm(cal.startMm));
+    setEnd(formatMm(cal.endMm));
+  }, [printer]);
+
+  const paperMm = parseMm(paper);
+  const paperValid = Number.isFinite(paperMm) && paperMm >= PAPER_MIN_MM && paperMm <= PAPER_MAX_MM;
+
+  const choosePaper = (mm: number) => {
+    const def = defaultPrinterCalibration(mm);
+    setPaper(String(def.paperWidthMm));
+    setStart(formatMm(def.startMm));
+    setEnd(formatMm(def.endMm));
+  };
+
+  const rulerCopy = () => ({
+    title: t("settings.calibration_page_title", { paper: Math.round(paperMm), name: printer?.name ?? "" }),
+    hint: t("settings.calibration_page_hint"),
+  });
+
+  const handlePrintRuler = async () => {
+    if (!paperValid) {
+      toast.error(t("settings.calibration_invalid"));
+      return;
+    }
+    setBusy("print");
+    try {
+      const outcome = await printCalibrationPage({ deviceName, paperWidthMm: paperMm, ...rulerCopy() });
+      if (outcome.ok) toast.success(t("settings.calibration_page_sent"));
+      else toast.error(printErrorText(outcome.error, t));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handlePreviewRuler = async () => {
+    if (!paperValid) {
+      toast.error(t("settings.calibration_invalid"));
+      return;
+    }
+    setBusy("preview");
+    try {
+      const outcome = await previewCalibrationPdf({ paperWidthMm: paperMm, ...rulerCopy() });
+      if (!outcome.ok) toast.error(t("templates.pdf_failed"), { description: outcome.error });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleSave = () => {
+    if (!printer) return;
+    const cal = normalizePrinterCalibration({
+      paperWidthMm: paperMm,
+      startMm: parseMm(start),
+      endMm: parseMm(end),
+    });
+    if (!cal) {
+      toast.error(t("settings.calibration_invalid"));
+      return;
+    }
+    savePrinterCalibration(deviceName, cal);
+    onSaved();
+    toast.success(t("settings.calibration_saved"));
+    onOpenChange(false);
+  };
+
+  const handleReset = () => {
+    if (!printer) return;
+    savePrinterCalibration(deviceName, null);
+    onSaved();
+    toast.success(t("settings.calibration_reset_done"));
+    onOpenChange(false);
+  };
+
+  const isPreset = paper === "58" || paper === "80";
+
+  return (
+    <Dialog open={printer !== null} onOpenChange={onOpenChange}>
+      <DialogContent className="bg-[#0D1326] border-[#1e2a45] text-white max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Ruler className="size-5 text-brand" />
+            {t("settings.calibrate_printer")}
+          </DialogTitle>
+          <DialogDescription className="text-[#8b93a7]">
+            {printer?.name} · {t("settings.calibration_lead")}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 pt-1">
+          <div className="space-y-2">
+            <Label className="text-[#8b93a7]">{t("settings.calibration_step_paper")}</Label>
+            <div className="flex gap-2">
+              {[58, 80].map((mm) => (
+                <button
+                  key={mm}
+                  type="button"
+                  onClick={() => choosePaper(mm)}
+                  className={cn(
+                    "h-9 flex-1 rounded-xl border text-sm font-semibold transition",
+                    paper === String(mm)
+                      ? "border-brand bg-brand/12 text-brand"
+                      : "border-[#1e2a45] bg-[#131A2E] text-[#8b93a7] hover:text-white",
+                  )}
+                >
+                  {mm} mm
+                </button>
+              ))}
+              <Input
+                inputMode="decimal"
+                value={isPreset ? "" : paper}
+                placeholder={t("templates.design.custom")}
+                onChange={(e) => setPaper(e.target.value)}
+                onBlur={() => {
+                  const mm = parseMm(paper);
+                  if (Number.isFinite(mm) && !isPreset) choosePaper(mm);
+                }}
+                className="h-9 w-24 bg-[#131A2E] border-[#1e2a45] text-center text-white"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-[#8b93a7]">{t("settings.calibration_step_ruler")}</Label>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                onClick={() => void handlePrintRuler()}
+                disabled={busy !== null}
+                className="h-9 flex-1"
+              >
+                <Printer className="size-4" />
+                {busy === "print" ? "…" : t("settings.calibration_print_ruler")}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => void handlePreviewRuler()}
+                disabled={busy !== null}
+                className="h-9 flex-1 border border-[#1e2a45] text-[#8b93a7] hover:text-white"
+              >
+                {busy === "preview" ? "…" : t("settings.calibration_preview_ruler")}
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-[#8b93a7]">{t("settings.calibration_step_read")}</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <span className="text-[11px] text-[#8b93a7]">{t("settings.calibration_start")}</span>
+                <Input
+                  inputMode="decimal"
+                  value={start}
+                  onChange={(e) => setStart(e.target.value)}
+                  className="h-9 bg-[#131A2E] border-[#1e2a45] text-white"
+                />
+              </div>
+              <div className="space-y-1">
+                <span className="text-[11px] text-[#8b93a7]">{t("settings.calibration_end")}</span>
+                <Input
+                  inputMode="decimal"
+                  value={end}
+                  onChange={(e) => setEnd(e.target.value)}
+                  className="h-9 bg-[#131A2E] border-[#1e2a45] text-white"
+                />
+              </div>
+            </div>
+            <p className="text-[11px] leading-snug text-[#8b93a7]">{t("settings.calibration_read_hint")}</p>
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={handleReset}
+              className="h-10 border border-[#1e2a45] text-[#8b93a7] hover:text-white"
+            >
+              {t("settings.calibration_reset")}
+            </Button>
+            <Button type="button" className="h-10 flex-1" onClick={handleSave}>
+              {t("settings.save_changes")}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

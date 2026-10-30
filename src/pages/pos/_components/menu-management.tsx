@@ -662,7 +662,7 @@ export default function MenuManagement({
             </Empty>
           </div>
         ) : (
-          <div className="flex gap-2.5 overflow-x-auto pb-2 pt-1 px-1 -mx-1 scrollbar-thin">
+          <div className="flex flex-wrap gap-2.5 pb-2 pt-1 px-1 -mx-1">
             {/* "All" card */}
             <CategoryCard
               icon={<LayoutGrid className="size-4" style={{ color: ACCENT_BLUE }} />}

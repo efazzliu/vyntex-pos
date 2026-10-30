@@ -1,4 +1,4 @@
-import { nextFloorTableSlot } from "@/lib/pos-floor-layout.ts";
+import { firstFreeFloorSlot } from "@/lib/pos-floor-layout.ts";
 import { supabase } from "@/lib/supabase.ts";
 import { isMissingPgColumnError } from "./db-errors.ts";
 import { getRestaurantByLicense } from "./restaurant.ts";
@@ -39,7 +39,7 @@ export async function loadOpenSalesForTable(
   restaurantId: string,
   tableId: string,
 ): Promise<
-  { staff_id?: string | null; total?: number | string | null }[]
+  { staff_id?: string | null; total?: number | string | null; created_at?: string | null }[]
 > {
   const tid = String(tableId).trim();
   if (!tid) return [];
@@ -79,7 +79,7 @@ export async function getTableOrderSummaries(licenseKey: string) {
   const tables = await getTables(licenseKey);
   const summaries: Record<
     string,
-    { staffId: string; staffName: string; total: number }
+    { staffId: string; staffName: string; total: number; openedAt: string | null }
   > = {};
 
   const pairs = await Promise.all(
@@ -115,8 +115,14 @@ export async function getTableOrderSummaries(licenseKey: string) {
     const primary =
       rows.find((o) => o.staff_id) ?? rows[rows.length - 1];
     const sid = primary.staff_id as string | null;
+    const openedAt =
+      rows
+        .map((o) => (o.created_at ? String(o.created_at) : ""))
+        .filter(Boolean)
+        .sort()[0] ?? null;
 
     summaries[table._id] = {
+      openedAt,
       staffId: sid ?? "",
       staffName: sid
         ? (staffMap[sid] ??
@@ -146,7 +152,7 @@ export async function createTable(args: {
     args.name?.trim() ||
     `T${zoneTables.length + 1}`;
 
-  const slot = nextFloorTableSlot(zoneTables.length);
+  const slot = firstFreeFloorSlot(zoneTables, args.shape ?? "square");
   const full = {
     restaurant_id: r.id,
     name: tableName,
@@ -199,11 +205,49 @@ export async function createTable(args: {
   return data!.id as string;
 }
 
+export class TableHasOpenOrderError extends Error {
+  constructor(public readonly tableName: string) {
+    super(`TABLE_HAS_OPEN_ORDER:${tableName}`);
+    this.name = "TableHasOpenOrderError";
+  }
+}
+
+/**
+ * `sales.table_id` references `pos_floor_tables` without ON DELETE, so paid history
+ * blocks the delete. Open orders must be finished first; closed ones are unlinked
+ * (their `table_ref` text stays for history).
+ */
+async function detachTablesFromSales(
+  restaurantId: string,
+  tables: { id: string; name: string }[],
+) {
+  for (const table of tables) {
+    const open = await loadOpenSalesForTable(restaurantId, table.id);
+    if (open.length > 0) throw new TableHasOpenOrderError(table.name);
+  }
+  const ids = tables.map((x) => x.id);
+  if (ids.length === 0) return;
+  const { error } = await supabase
+    .from("sales")
+    .update({ table_id: null })
+    .eq("restaurant_id", restaurantId)
+    .in("table_id", ids);
+  if (error) throw error;
+}
+
 export async function deleteTable(args: {
   licenseKey: string;
   tableId: string;
 }) {
-  await getRestaurantByLicense(args.licenseKey);
+  const r = await getRestaurantByLicense(args.licenseKey);
+  const { data: row } = await supabase
+    .from("pos_floor_tables")
+    .select("id, name")
+    .eq("id", args.tableId)
+    .maybeSingle();
+  await detachTablesFromSales(r.id, [
+    { id: args.tableId, name: String(row?.name ?? "") },
+  ]);
   const { error } = await supabase
     .from("pos_floor_tables")
     .delete()
@@ -282,6 +326,16 @@ export async function deleteZone(args: {
   zone: string;
 }) {
   const r = await getRestaurantByLicense(args.licenseKey);
+  const { data: rows, error: listError } = await supabase
+    .from("pos_floor_tables")
+    .select("id, name")
+    .eq("restaurant_id", r.id)
+    .eq("zone", args.zone);
+  if (listError) throw listError;
+  await detachTablesFromSales(
+    r.id,
+    (rows ?? []).map((x) => ({ id: String(x.id), name: String(x.name ?? "") })),
+  );
   const { error } = await supabase
     .from("pos_floor_tables")
     .delete()

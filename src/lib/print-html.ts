@@ -2,8 +2,25 @@
  * Opens the system print dialog for a full HTML document without window.open.
  * Avoids popup blockers and Windows/Electron trying to resolve about:blank as an OS protocol.
  */
+import { prepareReceiptPaper, type ReceiptPaper } from "./print-page.ts";
+import {
+  buildCalibrationPageHtml,
+  getPrinterCalibration,
+  type PrinterCalibration,
+} from "./print-calibration.ts";
+
+import {
+  applyPaperWidthMmToPrintHtml,
+  resolvePrinterPaperWidthMm,
+} from "@/lib/print-paper-width.ts";
 
 export const PRINT_POWERED_BY = "Powered by: www.vyntexpos.net";
+
+function htmlWantsAutoPaperWidth(html: string): boolean {
+  if (/--print-paper-mode\s*:\s*auto/i.test(html)) return true;
+  if (!/--print-paper-mode\s*:/i.test(html)) return true;
+  return false;
+}
 
 export function ensurePrintPoweredByFooter(html: string): string {
   if (/www\.vyntexpos\.net/i.test(html) && /powered by/i.test(html)) {
@@ -19,9 +36,76 @@ export function ensurePrintPoweredByFooter(html: string): string {
 
 export type PrintHtmlSilentResult = { ok: boolean; error?: string };
 
+export type PrintPageSizeMm = { widthMm: number; heightMm: number };
+
+/** `none`: the HTML already places content (calibration / ruler); default: driver printable area. */
+export type PrintMarginType = "none" | "printableArea";
+
 export type PrintHtmlSilentPayload =
   | string
-  | { html: string; deviceName?: string };
+  | {
+      html: string;
+      deviceName?: string;
+      pageSize?: PrintPageSizeMm;
+      marginType?: PrintMarginType;
+    };
+
+async function preparePaperSafely(
+  html: string,
+  calibration?: PrinterCalibration | null,
+): Promise<ReceiptPaper | null> {
+  try {
+    return await prepareReceiptPaper(html, calibration);
+  } catch {
+    return null;
+  }
+}
+
+/** OS queue the main process will pick when no device name is given (default physical printer). */
+async function defaultPhysicalPrinterName(): Promise<string | undefined> {
+  const inv = getDesktopSystemPrintersInvoker();
+  if (!inv) return undefined;
+  try {
+    const r = await inv();
+    if (!r.ok || r.printers.length === 0) return undefined;
+    return (r.printers.find((p) => p.isDefault) ?? r.printers[0]).deviceName;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Design Auto: size the ticket to the assigned (or default) OS printer's media width. */
+async function resolveAutoPaperWidth(html: string, deviceName?: string): Promise<string> {
+  if (!htmlWantsAutoPaperWidth(html)) return html;
+  const inv = getDesktopSystemPrintersInvoker();
+  if (!inv) return html;
+  try {
+    const listed = await inv();
+    if (!listed.ok || listed.printers.length === 0) return html;
+    const want = (deviceName ?? "").toLowerCase();
+    const match =
+      (want
+        ? listed.printers.find(
+            (p) => p.deviceName.toLowerCase() === want || p.displayName.toLowerCase() === want,
+          )
+        : null) ??
+      listed.printers.find((p) => p.isDefault) ??
+      listed.printers[0];
+    const mm = resolvePrinterPaperWidthMm({
+      deviceName: match.deviceName,
+      displayName: match.displayName,
+      paperWidthMm: match.paperWidthMm,
+    });
+    return applyPaperWidthMmToPrintHtml(html, mm);
+  } catch {
+    return html;
+  }
+}
+
+async function calibrationForDevice(deviceName?: string): Promise<PrinterCalibration | null> {
+  const name = deviceName?.trim() || (await defaultPhysicalPrinterName());
+  return getPrinterCalibration(name);
+}
 
 function getDesktopPrintSilent():
   | ((payload: PrintHtmlSilentPayload) => Promise<PrintHtmlSilentResult>)
@@ -58,13 +142,111 @@ export async function canAttemptSilentPrint(): Promise<boolean> {
   return count === null ? true : count > 0;
 }
 
+/** Wait until document + images are ready so long layouts print completely. */
+function whenPrintDocumentReady(doc: Document, win: Window): Promise<void> {
+  const images = Array.from(doc.images ?? []);
+  const imageWait = Promise.all(
+    images.map(
+      (img) =>
+        img.complete
+          ? Promise.resolve()
+          : new Promise<void>((resolve) => {
+              img.addEventListener("load", () => resolve(), { once: true });
+              img.addEventListener("error", () => resolve(), { once: true });
+            }),
+    ),
+  );
+  const fontsWait =
+    "fonts" in doc && doc.fonts?.ready
+      ? doc.fonts.ready.then(() => undefined).catch(() => undefined)
+      : Promise.resolve();
+  return Promise.all([imageWait, fontsWait]).then(() => {
+    // Two frames: let layout settle at the real iframe size (not 0×0).
+    return new Promise<void>((resolve) => {
+      win.requestAnimationFrame(() => {
+        win.requestAnimationFrame(() => resolve());
+      });
+    });
+  });
+}
+
+/** Grow iframe to paper width + inject exact @page so portrait fills the roll edge-to-edge. */
+function fitPrintIframeToContent(iframe: HTMLIFrameElement, doc: Document): void {
+  const body = doc.body;
+  const html = doc.documentElement;
+  if (!body || !html) return;
+
+  // Already sized by `print-page.ts` (exact @page + printable layout): only fit the frame.
+  const prepared = /@page\{size:([\d.]+)mm\s+([\d.]+)mm/i.exec(
+    doc.getElementById("vyntex-page-size")?.textContent ?? "",
+  );
+  if (prepared) {
+    iframe.style.width = `${Math.ceil((Number(prepared[1]) * 96) / 25.4) + 2}px`;
+    iframe.style.height = `${Math.ceil((Number(prepared[2]) * 96) / 25.4) + 48}px`;
+    return;
+  }
+
+  const root = doc.defaultView?.getComputedStyle(html);
+  const varMm = (root?.getPropertyValue("--print-width-mm") || "").trim();
+  const varW = (root?.getPropertyValue("--print-width") || "").trim();
+  const mmFromVar = Number(varMm);
+  const mmMatch = varW.match(/([\d.]+)\s*mm/i);
+  const widthMm = Math.min(
+    120,
+    Math.max(
+      48,
+      Number.isFinite(mmFromVar) && mmFromVar > 0
+        ? mmFromVar
+        : mmMatch
+          ? Number(mmMatch[1]) || 80
+          : 80,
+    ),
+  );
+  // ~96dpi: mm → CSS px so the iframe matches the thermal paper width.
+  const widthPx = Math.ceil((widthMm * 96) / 25.4) + 2;
+
+  let pinEl = doc.getElementById("vyntex-print-paper-pin");
+  if (!pinEl) {
+    pinEl = doc.createElement("style");
+    pinEl.id = "vyntex-print-paper-pin";
+    doc.head.appendChild(pinEl);
+  }
+  pinEl.textContent =
+    `html,body{width:${widthMm}mm!important;max-width:${widthMm}mm!important;` +
+    `margin:0!important;box-sizing:border-box!important;overflow:visible!important}` +
+    `.sheet,.wrap{width:100%!important;max-width:100%!important;margin:0!important;padding:0!important}`;
+
+  const heightPx = Math.max(
+    body.scrollHeight || 0,
+    html.scrollHeight || 0,
+    body.offsetHeight || 0,
+    600,
+  );
+  iframe.style.width = `${widthPx}px`;
+  iframe.style.height = `${Math.ceil(heightPx + 48)}px`;
+
+  const heightMm = Math.max(40, (heightPx * 25.4) / 96 + 8);
+
+  let styleEl = doc.getElementById("vyntex-print-page-size");
+  if (!styleEl) {
+    styleEl = doc.createElement("style");
+    styleEl.id = "vyntex-print-page-size";
+    doc.head.appendChild(styleEl);
+  }
+  styleEl.textContent =
+    `@page{size:${widthMm}mm ${heightMm.toFixed(2)}mm;margin:0}` +
+    `html,body{width:${widthMm}mm!important;max-width:${widthMm}mm!important;` +
+    `margin:0!important;height:auto!important;overflow:visible!important}`;
+}
+
 /** Interactive print (browser/Electron print dialog). */
 export function printHtmlDocument(htmlFullDocument: string): boolean {
   htmlFullDocument = ensurePrintPoweredByFooter(htmlFullDocument);
   const iframe = document.createElement("iframe");
   iframe.setAttribute("aria-hidden", "true");
+  // Off-screen at ~80mm paper width so portrait lays out to the roll, not a wide page.
   iframe.style.cssText =
-    "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;";
+    "position:fixed;left:-10000px;top:0;width:302px;height:3200px;border:0;opacity:0;pointer-events:none;";
   document.body.appendChild(iframe);
   const win = iframe.contentWindow;
   const doc = iframe.contentDocument;
@@ -86,16 +268,20 @@ export function printHtmlDocument(htmlFullDocument: string): boolean {
 
   const runPrint = () => {
     try {
+      fitPrintIframeToContent(iframe, doc);
       win.focus();
       win.print();
     } catch {
       cleanup();
       return;
     }
-    setTimeout(cleanup, 1000);
+    // Keep iframe alive briefly so the print pipeline can snapshot full HTML.
+    setTimeout(cleanup, 4000);
   };
 
-  setTimeout(runPrint, 0);
+  void whenPrintDocumentReady(doc, win)
+    .then(runPrint)
+    .catch(runPrint);
   return true;
 }
 
@@ -103,11 +289,11 @@ export type PrintHtmlAsyncOutcome = { ok: boolean; error?: string };
 
 /**
  * Max wait for Electron silent-print IPC before treating as timeout.
- * Must be ≥ main-process print cap (`SILENT_PRINT_JOB_MAX_MS` in `electron/main.cjs`) so the
- * renderer does not abandon the invoke while a hidden print window is still open (Windows
- * can show a blocking "Waiting for printer connection…" dialog until that job ends).
+ * Must cover main-process start + spool windows (`SILENT_PRINT_START_MAX_MS` +
+ * `SILENT_PRINT_SPOOL_MAX_MS` in `electron/main.cjs`) so long thermal layouts can
+ * finish spooling instead of being cut off when the renderer gives up early.
  */
-export const DEFAULT_SILENT_PRINT_IPC_TIMEOUT_MS = 2200;
+export const DEFAULT_SILENT_PRINT_IPC_TIMEOUT_MS = 30_000;
 
 /** Errors after which we keep HTML in the local print queue for retry (Electron / offline printer). */
 export function isSilentPrintQueueableError(error: string | undefined): boolean {
@@ -142,16 +328,23 @@ export async function tryPrintHtmlDocumentAsync(
     typeof options?.silentTimeoutMs === "number"
       ? options.silentTimeoutMs
       : DEFAULT_SILENT_PRINT_IPC_TIMEOUT_MS;
+  const sourceHtml = await resolveAutoPaperWidth(htmlFullDocument, deviceName);
+  const dialogPaper = await preparePaperSafely(sourceHtml);
+  htmlFullDocument = dialogPaper?.html ?? sourceHtml;
 
   if (wantSilent && silentApi) {
     if (!(await canAttemptSilentPrint())) {
       return { ok: false, error: "no-physical-printer" };
     }
     try {
-      const payload: PrintHtmlSilentPayload =
-        deviceName && deviceName.length > 0
-          ? { html: htmlFullDocument, deviceName }
-          : htmlFullDocument;
+      const calibration = dialogPaper ? await calibrationForDevice(deviceName) : null;
+      const paper = calibration ? await preparePaperSafely(sourceHtml, calibration) : dialogPaper;
+      const payload: PrintHtmlSilentPayload = {
+        html: paper?.html ?? htmlFullDocument,
+        ...(deviceName && deviceName.length > 0 ? { deviceName } : {}),
+        ...(paper ? { pageSize: { widthMm: paper.widthMm, heightMm: paper.heightMm } } : {}),
+        ...(paper?.calibrated ? { marginType: "none" as const } : {}),
+      };
       const r = await Promise.race([
         silentApi(payload),
         new Promise<PrintHtmlSilentResult>((resolve) =>
@@ -203,11 +396,163 @@ export async function printHtmlDocumentAsync(
   return r.ok;
 }
 
+export type ReceiptPdfMode = "preview" | "save";
+
+export type ReceiptPdfOutcome = {
+  ok: boolean;
+  /** Saved/preview file path (desktop app). */
+  path?: string;
+  /** Browser fallback: the print dialog opened so the user can pick "Save as PDF". */
+  viaDialog?: boolean;
+  cancelled?: boolean;
+  widthMm?: number;
+  heightMm?: number;
+  error?: string;
+};
+
+type DesktopPdfPayload = {
+  html: string;
+  widthMm: number;
+  heightMm: number;
+  mode: ReceiptPdfMode;
+  fileName: string;
+  marginType?: PrintMarginType;
+};
+
+function getDesktopPrintToPdf():
+  | ((payload: DesktopPdfPayload) => Promise<{ ok: boolean; path?: string; cancelled?: boolean; error?: string }>)
+  | undefined {
+  if (typeof window === "undefined") return undefined;
+  const w = window as Window & {
+    desktop?: {
+      printHtmlToPdf?: (
+        payload: DesktopPdfPayload,
+      ) => Promise<{ ok: boolean; path?: string; cancelled?: boolean; error?: string }>;
+    };
+  };
+  return w.desktop?.printHtmlToPdf;
+}
+
+function safePdfFileName(name: string): string {
+  const base = name.trim().replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").slice(0, 80);
+  return base || "receipt";
+}
+
+/**
+ * Renders the exact receipt HTML used for printing to a PDF sized to the paper
+ * (width from the Design, height from the content). Desktop: real PDF file; browser:
+ * print dialog with the same page size so the user can choose "Save as PDF".
+ */
+export async function exportReceiptPdf(
+  htmlFullDocument: string,
+  options: {
+    mode: ReceiptPdfMode;
+    fileName: string;
+    /** Assigned OS printer: its calibration (paper width, printable band) shapes the PDF. */
+    deviceName?: string;
+  },
+): Promise<ReceiptPdfOutcome> {
+  const html = await resolveAutoPaperWidth(
+    ensurePrintPoweredByFooter(htmlFullDocument),
+    options.deviceName,
+  );
+  const toPdf = getDesktopPrintToPdf();
+  const calibration = toPdf ? await calibrationForDevice(options.deviceName) : null;
+  const paper = await preparePaperSafely(html, calibration);
+  if (!paper) return { ok: false, error: "not-a-receipt" };
+  if (!toPdf) {
+    const opened = printHtmlDocument(paper.html);
+    return {
+      ok: opened,
+      viaDialog: true,
+      widthMm: paper.widthMm,
+      heightMm: paper.heightMm,
+      error: opened ? undefined : "dialog-failed",
+    };
+  }
+  try {
+    const r = await toPdf({
+      html: paper.html,
+      widthMm: paper.widthMm,
+      heightMm: paper.heightMm,
+      mode: options.mode,
+      fileName: safePdfFileName(options.fileName),
+      ...(paper.calibrated ? { marginType: "none" as const } : {}),
+    });
+    return { ...r, widthMm: paper.widthMm, heightMm: paper.heightMm };
+  } catch (e) {
+    return { ok: false, error: String((e as Error)?.message ?? e) };
+  }
+}
+
+const CALIBRATION_PAGE_HEIGHT_MM = 46;
+
+/** Prints the edge-to-edge ruler on one printer (no margins, no calibration applied). */
+export async function printCalibrationPage(args: {
+  deviceName?: string;
+  paperWidthMm: number;
+  title: string;
+  hint: string;
+}): Promise<PrintHtmlAsyncOutcome> {
+  const html = buildCalibrationPageHtml(args.paperWidthMm, args.title, args.hint);
+  const silentApi = getDesktopPrintSilent();
+  if (!silentApi) {
+    const opened = printHtmlDocument(html);
+    return { ok: opened, error: opened ? undefined : "dialog-failed" };
+  }
+  if (!(await canAttemptSilentPrint())) return { ok: false, error: "no-physical-printer" };
+  try {
+    const r = await Promise.race([
+      silentApi({
+        html,
+        ...(args.deviceName?.trim() ? { deviceName: args.deviceName.trim() } : {}),
+        pageSize: { widthMm: args.paperWidthMm, heightMm: CALIBRATION_PAGE_HEIGHT_MM },
+        marginType: "none",
+      }),
+      new Promise<PrintHtmlSilentResult>((resolve) =>
+        window.setTimeout(() => resolve({ ok: false, error: "silent-timeout" }), DEFAULT_SILENT_PRINT_IPC_TIMEOUT_MS),
+      ),
+    ]);
+    return r.ok ? { ok: true } : { ok: false, error: r.error ?? "silent-failed" };
+  } catch (e) {
+    return { ok: false, error: String((e as Error)?.message ?? e) };
+  }
+}
+
+/** Opens the ruler page as a PDF (desktop) so the layout can be checked without a printer. */
+export async function previewCalibrationPdf(args: {
+  paperWidthMm: number;
+  title: string;
+  hint: string;
+}): Promise<ReceiptPdfOutcome> {
+  const html = buildCalibrationPageHtml(args.paperWidthMm, args.title, args.hint);
+  const toPdf = getDesktopPrintToPdf();
+  if (!toPdf) {
+    const opened = printHtmlDocument(html);
+    return { ok: opened, viaDialog: true, error: opened ? undefined : "dialog-failed" };
+  }
+  try {
+    const r = await toPdf({
+      html,
+      widthMm: args.paperWidthMm,
+      heightMm: CALIBRATION_PAGE_HEIGHT_MM,
+      mode: "preview",
+      fileName: `calibration-${Math.round(args.paperWidthMm)}mm`,
+      marginType: "none",
+    });
+    return { ...r, widthMm: args.paperWidthMm, heightMm: CALIBRATION_PAGE_HEIGHT_MM };
+  } catch (e) {
+    return { ok: false, error: String((e as Error)?.message ?? e) };
+  }
+}
+
 export type DesktopSystemPrinterInfo = {
   deviceName: string;
   displayName: string;
   isDefault: boolean;
   isOffline?: boolean;
+  /** Detected thermal paper width in mm (58/80/…) when known */
+  paperWidthMm?: number;
 };
 
 export type GetSystemPrintersResult =
