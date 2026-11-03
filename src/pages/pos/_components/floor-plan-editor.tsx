@@ -156,6 +156,30 @@ function fmtDuration(minutes: number): string {
   return `${Math.floor(hours / 24)}d ${hours % 24}h`;
 }
 
+/**
+ * Seats a table of this size holds (~0.55 m of edge per chair). Matches SIZE_PRESETS:
+ * 0.8 sq → 2, 1.0 sq → 4, 1.2×0.8 → 6, 1.6×0.8 → 8, Ø1.0 → 4, Ø1.2 → 6.
+ */
+function seatsForSize(shape: TableShape, widthM: number, heightM: number): number {
+  const clampSeats = (n: number) => Math.max(2, Math.min(16, n));
+  const long = Math.max(widthM, heightM);
+  const short = Math.min(widthM, heightM);
+  if (shape === "circle") return clampSeats(Math.round(10 * long - 6));
+  if (long < 0.9) return 2;
+  if (shape === "square") return clampSeats(Math.max(1, Math.floor(long / 0.55 + 0.05)) * 4);
+  const perLongSide = Math.max(1, Math.round(long / 0.55));
+  const ends = short >= 0.7 ? 1 : 0;
+  return clampSeats(perLongSide * 2 + ends * 2);
+}
+
+/** Draft with seats refitted to its size; a half-typed size ("1.") keeps the current seats. */
+function withSizeSeats(d: Draft): Draft {
+  const w = parseM(d.widthM);
+  const h = parseM(d.heightM);
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return d;
+  return { ...d, seats: seatsForSize(d.shape, w, h) };
+}
+
 /** Chair rectangles around a table (relative to its top-left). */
 function chairLayout(shape: TableShape, seats: number, w: number, h: number) {
   const chairs: { x: number; y: number; w: number; h: number }[] = [];
@@ -552,7 +576,16 @@ export default function FloorPlanEditor({ licenseKey }: { licenseKey: string }) 
       e.preventDefault();
       const next = resizeTarget(resize, e.clientX, e.clientY);
       setResizeLive(next);
-      setDraft((d) => (d ? { ...d, widthM: fmtM(next.widthM), heightM: fmtM(next.heightM) } : d));
+      setDraft((d) =>
+        d
+          ? {
+              ...d,
+              widthM: fmtM(next.widthM),
+              heightM: fmtM(next.heightM),
+              seats: seatsForSize(d.shape, next.widthM, next.heightM),
+            }
+          : d,
+      );
       return;
     }
     if (!drag) return;
@@ -623,10 +656,10 @@ export default function FloorPlanEditor({ licenseKey }: { licenseKey: string }) 
         const nextW = clampDim(w + delta, base.w);
         const nextH = clampDim(h + delta, base.h);
         if (d.shape === "circle") {
-          const side = fmtM(Math.max(nextW, nextH));
-          return { ...d, widthM: side, heightM: side };
+          const side = Math.max(nextW, nextH);
+          return { ...d, widthM: fmtM(side), heightM: fmtM(side), seats: seatsForSize(d.shape, side, side) };
         }
-        return { ...d, widthM: fmtM(nextW), heightM: fmtM(nextH) };
+        return { ...d, widthM: fmtM(nextW), heightM: fmtM(nextH), seats: seatsForSize(d.shape, nextW, nextH) };
       });
     };
     el.addEventListener("wheel", onWheel, { passive: false });
@@ -1221,13 +1254,21 @@ export default function FloorPlanEditor({ licenseKey }: { licenseKey: string }) 
                     <MetreInput
                       value={draft.widthM}
                       onChange={(v) =>
-                        setDraft(draft.shape === "circle" ? { ...draft, widthM: v, heightM: v } : { ...draft, widthM: v })
+                        setDraft(
+                          withSizeSeats(
+                            draft.shape === "circle" ? { ...draft, widthM: v, heightM: v } : { ...draft, widthM: v },
+                          ),
+                        )
                       }
                     />
                     <MetreInput
                       value={draft.heightM}
                       onChange={(v) =>
-                        setDraft(draft.shape === "circle" ? { ...draft, widthM: v, heightM: v } : { ...draft, heightM: v })
+                        setDraft(
+                          withSizeSeats(
+                            draft.shape === "circle" ? { ...draft, widthM: v, heightM: v } : { ...draft, heightM: v },
+                          ),
+                        )
                       }
                     />
                   </div>

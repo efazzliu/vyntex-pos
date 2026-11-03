@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/popover.tsx";
 import { cn } from "@/lib/utils.ts";
 import { errorMessageFromUnknown } from "@/lib/supabase-pos/db-errors.ts";
+import { defaultTemplateParts } from "@/lib/supabase-pos/templates-ops.ts";
 import { buildFiscalReceiptHtml } from "@/lib/print-fiscal-receipt.ts";
 import {
   buildPreBillHtml,
@@ -133,6 +134,7 @@ import {
   StickyNote,
   Coins,
   Contact,
+  RotateCcw,
 } from "lucide-react";
 import { usePosLocale } from "./pos-locale-provider.tsx";
 import { resolvePaperPrinterDeviceName } from "@/lib/pos-printer-routing.ts";
@@ -4724,7 +4726,9 @@ function TemplateEditor({
   onOpenDevices?: () => void;
 }) {
   const saveTemplate = useMutation("pos.templates.saveTemplate");
+  const resetTemplate = useMutation("pos.templates.resetTemplate");
   const [saving, setSaving] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [testing, setTesting] = useState(false);
   const [pdfBusy, setPdfBusy] = useState<ReceiptPdfMode | null>(null);
   const [editorTab, setEditorTab] = useState<EditorTab>("design");
@@ -4803,6 +4807,38 @@ function TemplateEditor({
       toast.error(errorMessageFromUnknown(error, t("templates.save_failed")));
     }
     setSaving(false);
+  };
+
+  /** Back to the factory layout. The printer assignment is not layout, so it is kept. */
+  const handleReset = async () => {
+    if (!window.confirm(t("templates.reset_confirm", { name: typeName }))) return;
+    setResetting(true);
+    try {
+      if (printerId) {
+        await saveTemplate({
+          licenseKey,
+          templateType: meta.id,
+          toggles: {},
+          labels: {},
+          styles: {},
+          printerId,
+        });
+      } else {
+        await resetTemplate({ licenseKey, templateType: meta.id });
+      }
+      const defaults = defaultTemplateParts(meta.id);
+      const toggles = defaults?.toggles as TemplateRecord["toggles"] | undefined;
+      const labels = defaults?.labels as TemplateRecord["labels"] | undefined;
+      setDesign(readDesign({}));
+      setElements(readElements(toggles, {}, meta.id));
+      setCustomLabels(readCustomLabels(labels, {}, meta.id));
+      setContent(readContent({}, toggles, meta.id));
+      setLogoDataUrl(null);
+      toast.success(t("templates.reset_success"));
+    } catch (error) {
+      toast.error(errorMessageFromUnknown(error, t("templates.reset_failed")));
+    }
+    setResetting(false);
   };
 
   const buildEditorHtml = (doc: NonNullable<typeof data>): string => {
@@ -5250,6 +5286,15 @@ function TemplateEditor({
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <button
             type="button"
+            onClick={() => void handleReset()}
+            disabled={resetting || saving || !data}
+            className="inline-flex h-10 items-center gap-2 rounded-full border border-[#fecaca] bg-white px-4 text-[13px] font-semibold text-[#dc2626] transition hover:bg-[#fef2f2] disabled:opacity-50"
+          >
+            <RotateCcw className="size-4" />
+            {resetting ? t("templates.resetting") : t("templates.reset_settings")}
+          </button>
+          <button
+            type="button"
             onClick={() => void handlePdf("preview")}
             disabled={pdfBusy !== null || !data}
             className="inline-flex h-10 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-[13px] font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50"
@@ -5377,12 +5422,12 @@ function TemplateEditor({
             logoDataUrl={logoDataUrl}
           />
         </section>
-        <div className="flex min-h-0 min-w-0 flex-col gap-4">
-          <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white p-4 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.35)]">
+        <div className="flex min-h-0 min-w-0 flex-col gap-4 overflow-y-auto overscroll-contain">
+          <section className="shrink-0 overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white p-4 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.35)]">
             <p className="text-[13px] font-semibold text-slate-950">
               {t("templates.design.show_hide")}
             </p>
-            <div className="mt-2 flex min-h-0 flex-1 flex-col justify-start overflow-y-auto">
+            <div className="mt-2 grid grid-cols-2 gap-x-3">
               {(meta.id === "non_fiscal_receipt"
                 ? RECEIPT_ELEMENT_ITEMS.filter((item) => PRE_BILL_ELEMENT_IDS.includes(item.id))
                 : meta.id === "complimentary_slip"
@@ -5440,18 +5485,18 @@ function TemplateEditor({
                 return (
                   <label
                     key={item.id}
-                    className="flex shrink-0 cursor-pointer items-center gap-2.5 border-b border-slate-100 py-2.5 last:border-b-0"
+                    className="flex min-w-0 cursor-pointer items-center gap-2 border-b border-slate-100 py-2"
                   >
                     <Icon
                       className={cn(
-                        "size-4 shrink-0",
+                        "size-3.5 shrink-0",
                         on ? "text-brand" : "text-slate-300",
                       )}
                       strokeWidth={1.75}
                     />
                     <span
                       className={cn(
-                        "min-w-0 flex-1 text-[12px] font-medium leading-snug",
+                        "min-w-0 flex-1 text-[11.5px] font-medium leading-tight",
                         on ? "text-slate-800" : "text-slate-400",
                       )}
                     >

@@ -231,6 +231,12 @@ function mergeLabels(
   };
 }
 
+/** Toggles/labels a never-saved template starts with (same as `listTemplates` for a missing row). */
+export function defaultTemplateParts(type: string) {
+  if (!isTemplateType(type)) return null;
+  return { toggles: mergeToggles(type, null), labels: mergeLabels(type, null) };
+}
+
 function mergeStyles(raw: unknown): Record<string, unknown> {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
   return raw as Record<string, unknown>;

@@ -358,15 +358,16 @@ function WaiterFloorView({
                     {summary ? (
                       <>
                         <span
-                          className={cn(
-                            "text-xs font-semibold tabular-nums",
-                            showMine && "text-brand-soft",
-                            showOtherWaiter &&
-                              (isAdminOrManager
-                                ? "text-amber-400"
-                                : "text-red-500"),
-                            showOpenUnassigned && "text-amber-400",
-                          )}
+                          className="rounded-full px-1.5 py-px text-xs font-bold tabular-nums leading-tight shadow-sm"
+                          style={{
+                            backgroundColor: "#ffffff",
+                            color:
+                              showOtherWaiter && !isAdminOrManager
+                                ? "#dc2626"
+                                : showOtherWaiter || showOpenUnassigned
+                                  ? "#b45309"
+                                  : "#0047b3",
+                          }}
                         >
                           {formatPrice(summary.total)}
                         </span>

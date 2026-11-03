@@ -228,6 +228,9 @@ export function printDesignCss(
     .legal, .thanks, .tag, .head, .foot, .ho, .ho-lab, .brand, .contact, .items-h, .table {
       text-align: var(--print-align) !important;
     }
+    /* Design alignment is for header/footer blocks; item lines always read from the left. */
+    table th, table td, .items, .items .name { text-align: left; }
+    table th.r, table td.r { text-align: right; }
     .brand-row { justify-content: var(--print-justify) !important; }
     img.logo, .logo {
       display: block;
