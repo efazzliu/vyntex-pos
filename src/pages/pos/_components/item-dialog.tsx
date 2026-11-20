@@ -1,30 +1,32 @@
-import { useState, useEffect, useRef, useMemo, type ComponentType } from "react";
+import { useState, useEffect, useRef, useMemo, type ComponentType, type ReactNode } from "react";
 import { useQuery, useMutation } from "convex/react";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
-  SheetFooter,
 } from "@/components/ui/sheet.tsx";
-import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
-import { Textarea } from "@/components/ui/textarea.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
 import { cn } from "@/lib/utils.ts";
 import { toast } from "sonner";
 import { errorMessageFromUnknown } from "@/lib/supabase-pos/db-errors.ts";
 import { resolveMenuItemPhotoForSave } from "@/lib/supabase-pos/menu-photo-storage.ts";
 import {
+  MENU_BARCODE_TAKEN,
+  MENU_ID_FIELDS_NEED_COLUMN,
+  MENU_SKU_TAKEN,
+} from "@/lib/supabase-pos/menu-ops.ts";
+import { isStockPhotoUrl } from "@/lib/menu-item-photo-urls.ts";
+import {
   ChefHat,
   Wine,
   ImageIcon,
   X,
-  Upload,
   Star,
-  UtensilsCrossed,
   Package,
   Truck,
   Hash,
@@ -64,20 +66,47 @@ import {
   Citrus,
   Coffee,
   Trash2,
+  Check,
+  ChevronDown,
+  Eye,
+  Layers,
+  LayoutGrid,
+  Lock,
+  Pencil,
+  Box,
+  Bookmark,
+  Settings,
+  Users,
+  UtensilsCrossed,
+  GripVertical,
+  Archive,
+  Bell,
+  Barcode,
+  ChevronRight,
+  Printer,
+  ScanLine,
+  ShoppingCart,
+  SlidersHorizontal,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu.tsx";
+import { emojiForCategoryName } from "@/lib/pos-category-icons.ts";
+import { compatibleUnits, ingredientEmoji, type StockUnit } from "@/lib/stock-units.ts";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { getDataCache, saveDataCache } from "@/lib/local-db.ts";
 import { usePosLocale } from "./pos-locale-provider.tsx";
+import { FormSection, NumberStepper, Segmented, ToggleSwitch, variantGroupIcon } from "./drawer-form-kit.tsx";
 import { MenuItemCustomizationEditor } from "@/components/menu-item-customization-picker.tsx";
 import {
   normalizeCustomizationConfig,
+  normalizeModifierGroupIds,
+  selectionLimits,
   type MenuCustomizationGroup,
 } from "@/lib/menu-customizations.ts";
-import { MenuItemPrepEditor } from "@/components/menu-item-prep-editor.tsx";
-import {
-  emptyPrepConfig,
-  normalizePrepConfig,
-  type PrepConfig,
-} from "@/lib/menu-prep-config.ts";
 import {
   defaultVatFraction,
   enabledCatalogRates,
@@ -91,15 +120,26 @@ import {
   DEFAULT_LOW_STOCK_THRESHOLD,
   parsePosStockRules,
 } from "@/lib/pos-order-availability.ts";
+import {
+  parseDecimal,
+  staffMealPayload,
+  stockEditMode,
+  validateProductForm,
+  vatFractionFromPercent,
+  vatPercentFromFraction,
+  type ProductField,
+} from "@/lib/product-form.ts";
+import { isMenuVariantsEnabled } from "../_lib/plan-features.ts";
 
 type StationValue = "kitchen" | "bar" | undefined;
-type StockUnit = "pc" | "lt" | "kg" | "g" | "ml" | "bottle" | "box";
 type SupplyStorage = "fridge" | "freezer" | "dry" | "ambient";
 
 type RecipeUiLine = {
   key: string;
   supplyMenuItemId: Id<"menuItems"> | "";
   qty: string;
+  /** Unit the quantity is written in; "" = the ingredient's own stock unit. */
+  unit: StockUnit | "";
 };
 
 function newRecipeLineKey(): string {
@@ -109,14 +149,15 @@ function newRecipeLineKey(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-function parseRecipeForApi(
-  lines: RecipeUiLine[],
-): { supplyMenuItemId: Id<"menuItems">; qtyPerUnit: number }[] {
+type RecipeApiLine = { supplyMenuItemId: Id<"menuItems">; qtyPerUnit: number; unit?: StockUnit };
+
+function parseRecipeForApi(lines: RecipeUiLine[]): RecipeApiLine[] {
   return lines
     .filter((l) => String(l.supplyMenuItemId).trim())
     .map((l) => ({
       supplyMenuItemId: l.supplyMenuItemId as Id<"menuItems">,
-      qtyPerUnit: Math.max(0, parseFloat(l.qty.replace(",", ".")) || 0),
+      qtyPerUnit: Math.max(0, parseDecimal(l.qty) || 0),
+      ...(l.unit ? { unit: l.unit } : {}),
     }))
     .filter((l) => l.qtyPerUnit > 0);
 }
@@ -163,6 +204,42 @@ const BAR_SUPPLY_PRESETS: ReadonlyArray<SupplyPresetDef> = [
   { id: "straws", labelKey: "menu.supply_preset_straws", unit: "box", Icon: Cylinder },
 ];
 
+/** Order the drawer checks fields in, top to bottom, when Save finds errors. */
+type ProductTab = "general" | "variants" | "stock" | "advanced";
+
+/** Tab that holds each validated field (name sits above the tabs). */
+const FIELD_TAB: Partial<Record<ProductField, ProductTab>> = {
+  price: "general",
+  category: "general",
+  station: "general",
+  staffPrice: "advanced",
+  staffFreeQty: "advanced",
+  staffDailyLimit: "advanced",
+  stock: "stock",
+  lowStock: "stock",
+  recipe: "stock",
+  sku: "advanced",
+  barcode: "advanced",
+};
+
+const FIELD_ORDER: ProductField[] = [
+  "name",
+  "price",
+  "category",
+  "station",
+  "staffPrice",
+  "staffFreeQty",
+  "staffDailyLimit",
+  "stock",
+  "lowStock",
+  "recipe",
+  "sku",
+  "barcode",
+];
+
+const BRAND = "#1d5ff0";
+const DESCRIPTION_MAX = 250;
+
 // Exported so menu-management can reference it for state typing
 export type EditingItem = {
   _id: Id<"menuItems">;
@@ -193,11 +270,15 @@ export type EditingItem = {
   supplyLot?: string;
   supplyExpiryDate?: string;
   supplyStorage?: SupplyStorage;
-  /** Per 1 sold unit: deduct `qtyPerUnit` from each supply row (same unit as that row’s stock). */
-  supplyRecipe?: { supplyMenuItemId: Id<"menuItems">; qtyPerUnit: number }[];
+  /** Per 1 sold unit: deduct `qtyPerUnit` (in `unit`, default the supply's stock unit) from each supply row. */
+  supplyRecipe?: RecipeApiLine[];
   vatRate?: number;
   customizationConfig?: MenuCustomizationGroup[];
-  prepConfig?: PrepConfig;
+  /** Assigned Settings → Modifiers group IDs (order Customize Order). */
+  modifierGroupIds?: string[];
+  sku?: string;
+  barcode?: string;
+  internalNotes?: string;
 };
 
 /** DB / mappers sometimes emit "" for null category_id; `??` does not treat "" as missing. */
@@ -240,7 +321,152 @@ type ItemDialogProps = {
   enterpriseSupplyRecipe?: boolean;
   canEditVat?: boolean;
   canEditRecipe?: boolean;
+  /** Logged as the author of stock changes made from this drawer. */
+  stockActorName?: string;
 };
+
+const inputCls = (invalid?: boolean) =>
+  cn(
+    "h-11 rounded-xl bg-white text-[14px] text-[#0b1220] placeholder:text-[#94a3b8]",
+    invalid ? "border-red-400 focus-visible:ring-red-200" : "border-[#e3ebf7]",
+  );
+
+function FieldLabel({
+  children,
+  required,
+  optionalLabel,
+}: {
+  children: ReactNode;
+  required?: boolean;
+  optionalLabel?: string;
+}) {
+  return (
+    <span className="mb-1.5 block text-[13px] font-semibold text-[#0b1220]">
+      {children}
+      {required ? <span className="text-red-500"> *</span> : null}
+      {optionalLabel ? <span className="font-medium text-[#2563eb]"> ({optionalLabel})</span> : null}
+    </span>
+  );
+}
+
+function FieldMessage({ error, help }: { error?: string; help?: string }) {
+  if (!error && !help) return null;
+  return (
+    <p
+      className="mt-1.5 text-[12px]"
+      style={{ color: error ? "#dc2626" : "#64748b" }}
+      role={error ? "alert" : undefined}
+    >
+      {error ?? help}
+    </p>
+  );
+}
+
+/** Pill-style choice; `solid` fills with the given colour (category chips), otherwise a soft tint. */
+function Chip({
+  active,
+  onClick,
+  children,
+  color = BRAND,
+  solid = false,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+  color?: string;
+  solid?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={cn(
+        "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-xl border px-3 text-[13px] font-semibold transition",
+        !active && "border-[#e3ebf7] bg-white text-[#334155] hover:border-[#c7d6f5]",
+      )}
+      style={
+        active
+          ? solid
+            ? { backgroundColor: color, borderColor: color, color: "#ffffff" }
+            : { backgroundColor: "#eef4ff", borderColor: color, color: "#1d4ed8" }
+          : undefined
+      }
+    >
+      {children}
+    </button>
+  );
+}
+
+function ToggleRow({
+  icon,
+  title,
+  help,
+  checked,
+  onChange,
+  flat = false,
+}: {
+  icon: ReactNode;
+  title: string;
+  help: string;
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  /** Row inside a grouped list (no own border). */
+  flat?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-3 bg-white",
+        flat ? "px-4 py-3.5" : "rounded-xl border border-[#eef2f8] px-3.5 py-3",
+      )}
+    >
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#f1f5ff] text-[#2563eb]">
+        {icon}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[14px] font-semibold text-[#0b1220]">{title}</p>
+        <p className="text-[12px] text-[#64748b]">{help}</p>
+      </div>
+      <ToggleSwitch checked={checked} label={title} onChange={() => onChange(!checked)} />
+    </div>
+  );
+}
+
+function Disclosure({
+  title,
+  meta,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string;
+  meta?: string;
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-[#eef2f8] bg-white">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={onToggle}
+        className="flex w-full items-center gap-2 px-3.5 py-3 text-left hover:bg-[#f9fbff]"
+      >
+        <span className="min-w-0 flex-1 text-[14px] font-semibold text-[#0b1220]">{title}</span>
+        {meta ? <span className="text-[12px] font-medium text-[#64748b]">{meta}</span> : null}
+        <ChevronDown
+          className={cn("size-4 text-[#64748b] transition-transform", open && "rotate-180")}
+        />
+      </button>
+      {open ? <div className="border-t border-[#eef2f8] p-3">{children}</div> : null}
+    </div>
+  );
+}
+
+const formatQty = (n: number) =>
+  Number(n).toLocaleString(undefined, { maximumFractionDigits: 3 });
 
 export default function ItemDialog({
   open,
@@ -259,8 +485,9 @@ export default function ItemDialog({
   enterpriseSupplyRecipe = false,
   canEditVat = true,
   canEditRecipe = true,
+  stockActorName = "",
 }: ItemDialogProps) {
-  const { currency, t } = usePosLocale();
+  const { currency, formatPrice, t } = usePosLocale();
   const stockUnitOptions = useMemo(
     () =>
       (["pc", "kg", "g", "lt", "ml", "bottle", "box"] as const).map((value) => ({
@@ -285,6 +512,10 @@ export default function ItemDialog({
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [sku, setSku] = useState("");
+  const [barcode, setBarcode] = useState("");
+  const [internalNotes, setInternalNotes] = useState("");
+  const barcodeInputRef = useRef<HTMLInputElement>(null);
   const [price, setPrice] = useState("");
   const [available, setAvailable] = useState(true);
   const [station, setStation] = useState<StationValue>(undefined);
@@ -307,18 +538,35 @@ export default function ItemDialog({
   );
   const [supplyDetailsOpen, setSupplyDetailsOpen] = useState(false);
   const [recipeLines, setRecipeLines] = useState<RecipeUiLine[]>([]);
+  /** Off = this product deducts no ingredients (the recipe is saved empty). */
+  const [recipeEnabled, setRecipeEnabled] = useState(false);
+  const [dragRecipeKey, setDragRecipeKey] = useState<string | null>(null);
   const [vatPct, setVatPct] = useState("20");
   const [selectedCategoryId, setSelectedCategoryId] = useState<
     Id<"menuCategories"> | undefined
   >(undefined);
   const [saving, setSaving] = useState(false);
-
+  /** Defaults that may load after the drawer opened only fill in while untouched. */
+  const [vatTouched, setVatTouched] = useState(false);
+  const [lowStockTouched, setLowStockTouched] = useState(false);
+  const [stockQtyTouched, setStockQtyTouched] = useState(false);
+  const [touched, setTouched] = useState<ReadonlySet<ProductField>>(new Set());
+  const [submitted, setSubmitted] = useState(false);
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const [tab, setTab] = useState<ProductTab>("general");
+  const [collapsedGroups, setCollapsedGroups] = useState<ReadonlySet<string>>(new Set());
+  const [dragGroupId, setDragGroupId] = useState<string | null>(null);
   const furnizimCategoryId = useMemo(
     () => categories.find((c) => c.name.trim() === "Furnizim")?._id,
     [categories],
   );
 
   const menus = useQuery("pos.menu.getMenus", { licenseKey });
+  /** Groups made in Settings → Variants; ticking one copies it onto this product. */
+  const variantLibrary = (useQuery(
+    "pos.menu.getVariantLibrary",
+    open ? { licenseKey } : "skip",
+  ) ?? []) as MenuCustomizationGroup[];
   const companyQuery = useQuery(
     "pos.settings.getCompanyDetails",
     open ? { licenseKey } : "skip",
@@ -363,13 +611,25 @@ export default function ItemDialog({
   }, [companyQuery]);
   const allMenuForRecipe = useQuery(
     "pos.menu.getAllItems",
-    open && enterpriseSupplyRecipe && !supplyMallContext
-      ? { licenseKey }
-      : "skip",
+    open && !supplyMallContext ? { licenseKey } : "skip",
   );
+  /** Codes already used by the venue's other products, for the duplicate check. */
+  const takenCodes = useMemo(() => {
+    const skus = new Set<string>();
+    const barcodes = new Set<string>();
+    if (Array.isArray(allMenuForRecipe)) {
+      for (const row of allMenuForRecipe as { _id: string; sku?: string; barcode?: string }[]) {
+        if (editing && row._id === editing._id) continue;
+        if (row.sku?.trim()) skus.add(row.sku.trim().toLowerCase());
+        if (row.barcode?.trim()) barcodes.add(row.barcode.trim().toLowerCase());
+      }
+    }
+    return { skus, barcodes };
+  }, [allMenuForRecipe, editing]);
   const createItem = useMutation("pos.menu.createItem");
   const updateItem = useMutation("pos.menu.updateItem");
   const ensureSupplyCategory = useMutation("pos.menu.ensureSupplyCategory");
+  const setStockMut = useMutation("pos.stock.setStock");
 
   const recipeIngredientOptions = useMemo(() => {
     if (!allMenuForRecipe || !Array.isArray(allMenuForRecipe)) return [];
@@ -391,134 +651,152 @@ export default function ItemDialog({
   >(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [customizationGroups, setCustomizationGroups] = useState<MenuCustomizationGroup[]>([]);
-  const [prepConfig, setPrepConfig] = useState<PrepConfig>(emptyPrepConfig());
-
+  const [assignedModifierIds, setAssignedModifierIds] = useState<string[]>([]);
+  const [modifiersAssignOpen, setModifiersAssignOpen] = useState(false);
+  const modifierLibraryQuery = useQuery(
+    "pos.menu.getModifierLibrary",
+    open && !supplyMallContext ? { licenseKey } : "skip",
+  ) as MenuCustomizationGroup[] | undefined;
+  const modifierLibrary = useMemo(
+    () => (modifierLibraryQuery ?? []).filter((g) => g.active !== false),
+    [modifierLibraryQuery],
+  );
+  /**
+   * The form loads once per opening (or when a different product is opened). Re-running on every
+   * parent render would wipe what the user is typing whenever the product list refreshes.
+   */
+  const loadedForRef = useRef<string | null>(null);
   useEffect(() => {
-    if (open) {
-      if (editing) {
-        setName(editing.name);
-        setDescription(editing.description ?? "");
-        setPrice(editing.price.toString());
-        const vatRounded = Math.round(Number(editing.vatRate ?? 0.2) * 100);
-        setVatPct(String(Number.isFinite(vatRounded) ? vatRounded : 20));
-        setAvailable(editing.available);
-        setStation(editing.station ?? undefined);
-        setMenuId(editing.menuId ?? undefined);
-        setIsFavorite(editing.isFavorite ?? false);
-        const allowed = editing.staffMealAllowed === true;
-        const mealPrice =
-          typeof editing.staffMealPrice === "number"
-            ? editing.staffMealPrice
-            : undefined;
-        setStaffMealAllowed(allowed);
-        if (mealPrice !== undefined && mealPrice > 0) {
-          setStaffMealPricingMode("custom");
-          setStaffMealCustomPrice(String(mealPrice));
-        } else {
-          setStaffMealPricingMode("free");
-          setStaffMealCustomPrice("");
-        }
-        setStaffMealDailyLimit(
-          typeof editing.staffMealDailyLimit === "number" &&
-            editing.staffMealDailyLimit > 0
-            ? String(editing.staffMealDailyLimit)
-            : "",
-        );
-        setStaffMealFreeQty(
-          typeof editing.staffMealFreeQty === "number" &&
-            editing.staffMealFreeQty > 0
-            ? String(editing.staffMealFreeQty)
-            : "",
-        );
-        setTrackStock(editing.trackStock ?? false);
-        setStockUnit(editing.stockUnit ?? "pc");
-        const mallCtx =
-          dialogNewTitleOverride === "supply_kitchen" ||
-          dialogNewTitleOverride === "supply_bar";
-        if (mallCtx && editing.trackStock) {
-          setInitialStock(
-            String(editing.currentStock ?? editing.initialStock ?? 0),
-          );
-        } else {
-          setInitialStock(editing.initialStock?.toString() ?? "");
-        }
-        setLowStockThreshold(editing.lowStockThreshold?.toString() ?? "");
-        setImagePreview(editing.imageUrl ?? null);
-        setCurrentImageStorageId(editing.imageStorageId);
-        setImageFile(null);
-        setImageRemoved(false);
-        setCustomizationGroups(
-          normalizeCustomizationConfig(editing.customizationConfig),
-        );
-        setPrepConfig(normalizePrepConfig(editing.prepConfig));
-        setSelectedCategoryId(nonEmptyCategoryId(editing.categoryId));
-        setSupplyVendor(editing.supplyVendor ?? "");
-        setSupplyLot(editing.supplyLot ?? "");
-        setSupplyExpiryDate(editing.supplyExpiryDate ?? "");
-        setSupplyStorage(editing.supplyStorage);
-        if (mallCtx) {
-          setSupplyDetailsOpen(
-            Boolean(
-              (editing.supplyVendor ?? "").trim() ||
-                (editing.supplyLot ?? "").trim() ||
-                (editing.supplyExpiryDate ?? "").trim() ||
-                editing.supplyStorage,
-            ),
-          );
-        } else {
-          setSupplyDetailsOpen(false);
-        }
-        if (enterpriseSupplyRecipe && !mallCtx) {
-          const r = editing.supplyRecipe;
-          if (r?.length) {
-            setRecipeLines(
-              r.map((row) => ({
-                key: newRecipeLineKey(),
-                supplyMenuItemId: row.supplyMenuItemId,
-                qty: String(row.qtyPerUnit),
-              })),
-            );
-          } else {
-            setRecipeLines([]);
-          }
-        } else {
-          setRecipeLines([]);
-        }
+    if (!open) {
+      loadedForRef.current = null;
+      return;
+    }
+    const loadKey = editing ? `edit:${editing._id}` : `new:${dialogNewTitleOverride ?? ""}`;
+    if (loadedForRef.current === loadKey) return;
+    loadedForRef.current = loadKey;
+
+    setTab("general");
+    setCollapsedGroups(new Set());
+    setTouched(new Set());
+    setSubmitted(false);
+    setVatTouched(false);
+    setLowStockTouched(false);
+    setStockQtyTouched(false);
+    setImageFile(null);
+    setImageRemoved(false);
+    const mallCtx =
+      dialogNewTitleOverride === "supply_kitchen" ||
+      dialogNewTitleOverride === "supply_bar";
+
+    if (editing) {
+      setName(editing.name);
+      setDescription(editing.description ?? "");
+      setSku(editing.sku ?? "");
+      setBarcode(editing.barcode ?? "");
+      setInternalNotes(editing.internalNotes ?? "");
+      setPrice(editing.price.toFixed(currency.decimals));
+      setVatPct(vatPercentFromFraction(editing.vatRate));
+      setAvailable(editing.available);
+      setStation(editing.station ?? undefined);
+      setMenuId(editing.menuId ?? undefined);
+      setIsFavorite(editing.isFavorite ?? false);
+      const mealPrice =
+        typeof editing.staffMealPrice === "number" ? editing.staffMealPrice : undefined;
+      setStaffMealAllowed(editing.staffMealAllowed === true);
+      if (mealPrice !== undefined && mealPrice > 0) {
+        setStaffMealPricingMode("custom");
+        setStaffMealCustomPrice(String(mealPrice));
       } else {
-        setName(initialName ?? "");
-        setDescription("");
-        setPrice("");
-        setVatPct(vatChoices.defaultPercent);
-        setAvailable(initialAvailable ?? true);
-        setStation(initialStation);
-        setMenuId(undefined);
-        setIsFavorite(false);
-        setStaffMealAllowed(false);
         setStaffMealPricingMode("free");
         setStaffMealCustomPrice("");
-        setStaffMealDailyLimit("1");
-        setStaffMealFreeQty("");
-        setTrackStock(initialTrackStock ?? false);
-        setStockUnit(initialStockUnit ?? "pc");
-        setInitialStock("");
-        setLowStockThreshold(String(venueLowStock || DEFAULT_LOW_STOCK_THRESHOLD));
-        setImagePreview(null);
-        setCurrentImageStorageId(undefined);
-        setImageFile(null);
-        setImageRemoved(false);
-        setCustomizationGroups([]);
-        setPrepConfig(emptyPrepConfig());
-        setSelectedCategoryId(
-          nonEmptyCategoryId(categoryId) ??
-            nonEmptyCategoryId(categories[0]?._id),
-        );
-        setSupplyVendor("");
-        setSupplyLot("");
-        setSupplyExpiryDate("");
-        setSupplyStorage(undefined);
-        setSupplyDetailsOpen(false);
-        setRecipeLines([]);
       }
+      setStaffMealDailyLimit(
+        typeof editing.staffMealDailyLimit === "number" && editing.staffMealDailyLimit > 0
+          ? String(editing.staffMealDailyLimit)
+          : "",
+      );
+      setStaffMealFreeQty(
+        typeof editing.staffMealFreeQty === "number" && editing.staffMealFreeQty > 0
+          ? String(editing.staffMealFreeQty)
+          : "",
+      );
+      setTrackStock(editing.trackStock ?? false);
+      setStockUnit(editing.stockUnit ?? "pc");
+      setInitialStock(
+        editing.trackStock
+          ? String(editing.currentStock ?? editing.initialStock ?? (mallCtx ? 0 : ""))
+          : "",
+      );
+      setLowStockThreshold(editing.lowStockThreshold?.toString() ?? "");
+      setImagePreview(editing.imageUrl ?? null);
+      setCurrentImageStorageId(editing.imageStorageId);
+      const groups = normalizeCustomizationConfig(editing.customizationConfig);
+      setCustomizationGroups(groups);
+      setAssignedModifierIds(normalizeModifierGroupIds(editing.modifierGroupIds));
+      setModifiersAssignOpen(normalizeModifierGroupIds(editing.modifierGroupIds).length > 0);
+      setOptionsOpen(false);
+      setSelectedCategoryId(nonEmptyCategoryId(editing.categoryId));
+      setSupplyVendor(editing.supplyVendor ?? "");
+      setSupplyLot(editing.supplyLot ?? "");
+      setSupplyExpiryDate(editing.supplyExpiryDate ?? "");
+      setSupplyStorage(editing.supplyStorage);
+      setSupplyDetailsOpen(
+        mallCtx &&
+          Boolean(
+            (editing.supplyVendor ?? "").trim() ||
+              (editing.supplyLot ?? "").trim() ||
+              (editing.supplyExpiryDate ?? "").trim() ||
+              editing.supplyStorage,
+          ),
+      );
+      const savedRecipe =
+        enterpriseSupplyRecipe && !mallCtx && editing.supplyRecipe?.length
+          ? editing.supplyRecipe.map((row) => ({
+              key: newRecipeLineKey(),
+              supplyMenuItemId: row.supplyMenuItemId,
+              qty: String(row.qtyPerUnit),
+              unit: row.unit ?? ("" as const),
+            }))
+          : [];
+      setRecipeLines(savedRecipe);
+      setRecipeEnabled(savedRecipe.length > 0);
+    } else {
+      setName(initialName ?? "");
+      setDescription("");
+      setSku("");
+      setBarcode("");
+      setInternalNotes("");
+      setPrice("");
+      setVatPct(vatChoices.defaultPercent);
+      setAvailable(initialAvailable ?? true);
+      setStation(initialStation);
+      setMenuId(undefined);
+      setIsFavorite(false);
+      setStaffMealAllowed(false);
+      setStaffMealPricingMode("free");
+      setStaffMealCustomPrice("");
+      setStaffMealDailyLimit("1");
+      setStaffMealFreeQty("");
+      setTrackStock(initialTrackStock ?? false);
+      setStockUnit(initialStockUnit ?? "pc");
+      setInitialStock("");
+      setLowStockThreshold(String(venueLowStock || DEFAULT_LOW_STOCK_THRESHOLD));
+      setImagePreview(null);
+      setCurrentImageStorageId(undefined);
+      setCustomizationGroups([]);
+      setAssignedModifierIds([]);
+      setModifiersAssignOpen(false);
+      setOptionsOpen(false);
+      setSelectedCategoryId(
+        nonEmptyCategoryId(categoryId) ?? nonEmptyCategoryId(categories[0]?._id),
+      );
+      setSupplyVendor("");
+      setSupplyLot("");
+      setSupplyExpiryDate("");
+      setSupplyStorage(undefined);
+      setSupplyDetailsOpen(false);
+      setRecipeLines([]);
+      setRecipeEnabled(false);
     }
   }, [
     editing,
@@ -533,7 +811,31 @@ export default function ItemDialog({
     dialogNewTitleOverride,
     enterpriseSupplyRecipe,
     venueLowStock,
+    vatChoices.defaultPercent,
+    currency.decimals,
   ]);
+
+  // Venue defaults arrive after the drawer opens; apply them to a new product until edited.
+  useEffect(() => {
+    if (open && !editing && !vatTouched) setVatPct(vatChoices.defaultPercent);
+  }, [open, editing, vatTouched, vatChoices.defaultPercent]);
+  useEffect(() => {
+    if (open && !editing && !lowStockTouched) {
+      setLowStockThreshold(String(venueLowStock || DEFAULT_LOW_STOCK_THRESHOLD));
+    }
+  }, [open, editing, lowStockTouched, venueLowStock]);
+  useEffect(() => {
+    if (open && !editing && !selectedCategoryId && categories.length > 0) {
+      setSelectedCategoryId(nonEmptyCategoryId(categoryId) ?? categories[0]._id);
+    }
+  }, [open, editing, selectedCategoryId, categories, categoryId]);
+
+  useEffect(
+    () => () => {
+      if (imagePreview?.startsWith("blob:")) URL.revokeObjectURL(imagePreview);
+    },
+    [imagePreview],
+  );
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -552,83 +854,115 @@ export default function ItemDialog({
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const touch = (field: ProductField) =>
+    setTouched((prev) => (prev.has(field) ? prev : new Set(prev).add(field)));
+
+  const supplyCreate = !editing && supplyMallContext;
+  const resolvedStation: StationValue =
+    supplyCreate && dialogNewTitleOverride === "supply_kitchen"
+      ? "kitchen"
+      : supplyCreate && dialogNewTitleOverride === "supply_bar"
+        ? "bar"
+        : station;
+  const stockMode = supplyMallContext ? "opening" : stockEditMode(editing);
+  const trackStockOn = supplyCreate || trackStock;
+
+  const errors = useMemo(
+    () =>
+      validateProductForm({
+        name,
+        price,
+        categoryId: selectedCategoryId ?? (editing ? nonEmptyCategoryId(editing.categoryId) : undefined),
+        needsCategory: !supplyMallContext,
+        station: resolvedStation,
+        needsStation: true,
+        staffMealAllowed,
+        staffMealPricingMode,
+        staffMealCustomPrice,
+        staffMealFreeQty,
+        staffMealDailyLimit,
+        trackStock: trackStockOn,
+        stockMode,
+        initialStock,
+        lowStockThreshold,
+        recipeLines:
+          canEditRecipe && enterpriseSupplyRecipe && !supplyMallContext && recipeEnabled
+            ? recipeLines.map((l) => ({ supplyMenuItemId: String(l.supplyMenuItemId), qty: l.qty }))
+            : [],
+        sku: supplyMallContext ? "" : sku,
+        barcode: supplyMallContext ? "" : barcode,
+        takenSkus: takenCodes.skus,
+        takenBarcodes: takenCodes.barcodes,
+      }),
+    [
+      name,
+      price,
+      selectedCategoryId,
+      editing,
+      supplyMallContext,
+      resolvedStation,
+      staffMealAllowed,
+      staffMealPricingMode,
+      staffMealCustomPrice,
+      staffMealFreeQty,
+      staffMealDailyLimit,
+      trackStockOn,
+      stockMode,
+      initialStock,
+      lowStockThreshold,
+      canEditRecipe,
+      enterpriseSupplyRecipe,
+      recipeEnabled,
+      recipeLines,
+      sku,
+      barcode,
+      takenCodes,
+    ],
+  );
+  /** Errors show once the field was used, or after Save was pressed. */
+  const errorFor = (field: ProductField): string | undefined => {
+    const key = errors[field];
+    return key && (submitted || touched.has(field)) ? t(key) : undefined;
+  };
+
   const handleSubmit = async () => {
-    if (!name.trim()) {
-      toast.error(t("menu.err_name"));
+    setSubmitted(true);
+    const firstError = FIELD_ORDER.find((f) => errors[f]);
+    if (firstError) {
+      toast.error(t(errors[firstError]!));
+      const errorTab = FIELD_TAB[firstError];
+      if (errorTab && !supplyMallContext) setTab(errorTab);
+      window.setTimeout(() => {
+        document
+          .querySelector(`[data-product-field="${firstError}"]`)
+          ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 60);
       return;
     }
-    const supplyCreateEarly =
-      !editing &&
-      (dialogNewTitleOverride === "supply_kitchen" ||
-        dialogNewTitleOverride === "supply_bar");
+
     let categoryForSubmit =
       editing != null
-        ? (nonEmptyCategoryId(selectedCategoryId) ??
-            nonEmptyCategoryId(editing.categoryId))
+        ? (nonEmptyCategoryId(selectedCategoryId) ?? nonEmptyCategoryId(editing.categoryId))
         : nonEmptyCategoryId(selectedCategoryId);
-    if (!supplyCreateEarly && !categoryForSubmit && supplyMallContext && editing) {
+    if (!supplyCreate && !categoryForSubmit && supplyMallContext && editing) {
       try {
         categoryForSubmit = await ensureSupplyCategory({ licenseKey });
       } catch {
         /* leave undefined; error below */
       }
     }
-    if (!supplyCreateEarly && !categoryForSubmit) {
+    if (!supplyCreate && !categoryForSubmit) {
       toast.error(t("menu.err_category"));
       return;
     }
-    const priceNum = parseFloat(price);
-    if (isNaN(priceNum) || priceNum < 0) {
-      toast.error(t("menu.err_price"));
-      return;
-    }
-    const resolvedStation =
-      !editing && dialogNewTitleOverride === "supply_kitchen"
-        ? ("kitchen" as const)
-        : !editing && dialogNewTitleOverride === "supply_bar"
-          ? ("bar" as const)
-          : station;
-    if (resolvedStation !== "kitchen" && resolvedStation !== "bar") {
-      toast.error(t("menu.item_station_required"));
-      return;
-    }
-    let parsedStaffMealPrice: number | undefined = undefined;
-    let parsedStaffMealFreeQty: number | undefined = undefined;
-    let parsedStaffMealDailyLimit: number | undefined = undefined;
-    if (staffMealAllowed) {
-      const parsedLimit = parseInt(staffMealDailyLimit, 10);
-      if (staffMealDailyLimit.trim() && (!Number.isFinite(parsedLimit) || parsedLimit < 1)) {
-        toast.error(t("menu.err_staff_meal_daily_limit"));
-        return;
-      }
-      parsedStaffMealDailyLimit =
-        Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 0;
-      if (staffMealPricingMode === "free") {
-        parsedStaffMealPrice = 0;
-        parsedStaffMealFreeQty = parsedStaffMealDailyLimit;
-      } else {
-        const p = parseFloat(staffMealCustomPrice);
-        if (isNaN(p) || p < 0) {
-          toast.error(t("menu.err_staff_meal_price"));
-          return;
-        }
-        parsedStaffMealPrice = p;
-        const parsedFree = parseInt(staffMealFreeQty, 10);
-        if (staffMealFreeQty.trim() && (!Number.isFinite(parsedFree) || parsedFree < 0)) {
-          toast.error(t("menu.err_staff_meal_free_qty"));
-          return;
-        }
-        parsedStaffMealFreeQty =
-          Number.isFinite(parsedFree) && parsedFree > 0 ? parsedFree : 0;
-        if (
-          parsedStaffMealDailyLimit > 0 &&
-          parsedStaffMealFreeQty > parsedStaffMealDailyLimit
-        ) {
-          toast.error(t("menu.err_staff_meal_free_qty"));
-          return;
-        }
-      }
-    }
+    const priceNum = parseDecimal(price);
+    const staffMeal = staffMealPayload({
+      staffMealAllowed,
+      staffMealPricingMode,
+      staffMealCustomPrice,
+      staffMealFreeQty,
+      staffMealDailyLimit,
+    });
 
     setSaving(true);
     try {
@@ -647,45 +981,27 @@ export default function ItemDialog({
         }
       } else if (imageRemoved) {
         finalImageUrl = null;
-      } else if (
-        imagePreview &&
-        !imagePreview.startsWith("blob:")
-      ) {
-        finalImageUrl = imagePreview;
       }
       const finalImageStorageId = currentImageStorageId;
 
-      const supplyCreate =
-        !editing &&
-        (dialogNewTitleOverride === "supply_kitchen" ||
-          dialogNewTitleOverride === "supply_bar");
-      const isSupplyMallEdit = Boolean(
-        editing &&
-          supplyMallContext &&
-          (dialogNewTitleOverride === "supply_kitchen" ||
-            dialogNewTitleOverride === "supply_bar"),
-      );
-      const qtyFromStockField = Math.max(0, parseFloat(initialStock) || 0);
+      const isSupplyMallEdit = Boolean(editing && supplyMallContext);
+      const qtyFromStockField = Math.max(0, parseDecimal(initialStock) || 0);
+      const lowParsed = parseDecimal(lowStockThreshold);
 
-      const stockArgs =
-        supplyCreate || trackStock
-          ? {
-              trackStock: true as const,
-              stockUnit,
-              initialStock: isSupplyMallEdit
-                ? (editing?.initialStock ?? qtyFromStockField)
-                : parseFloat(initialStock) || 0,
-              lowStockThreshold: (() => {
-                const n = parseFloat(lowStockThreshold);
-                return Number.isFinite(n) && n >= 0 ? n : venueLowStock;
-              })(),
-            }
-          : {
-              trackStock: false as const,
-              stockUnit: undefined,
-              initialStock: undefined,
-              lowStockThreshold: undefined,
-            };
+      const stockArgs = trackStockOn
+        ? {
+            trackStock: true as const,
+            stockUnit,
+            initialStock: qtyFromStockField,
+            lowStockThreshold:
+              Number.isFinite(lowParsed) && lowParsed >= 0 ? lowParsed : venueLowStock,
+          }
+        : {
+            trackStock: false as const,
+            stockUnit: undefined,
+            initialStock: undefined,
+            lowStockThreshold: undefined,
+          };
 
       const supplyMutationPayload = {
         supplyVendor: supplyVendor.trim() || undefined,
@@ -696,106 +1012,137 @@ export default function ItemDialog({
 
       const recipeSavePayload =
         canEditRecipe && enterpriseSupplyRecipe && !supplyMallContext
-          ? parseRecipeForApi(recipeLines)
+          ? recipeEnabled
+            ? parseRecipeForApi(recipeLines)
+            : []
           : undefined;
-      const vatRatePayload = canEditVat
-        ? Number(vatPct) / 100
-        : undefined;
-      const customizationSavePayload = !supplyMallContext
-        ? customizationGroups
-            .map((group) => ({
-              ...group,
-              name: group.name.trim(),
-              options: group.options
-                .map((option) => ({
-                  ...option,
-                  name: option.name.trim(),
-                }))
-                .filter((option) => option.name),
-            }))
-            .filter((group) => group.name && group.options.length > 0)
-        : [];
-      const prepSavePayload = !supplyMallContext
-        ? normalizePrepConfig(prepConfig)
-        : emptyPrepConfig();
-
+      // An unchanged rate is not re-sent, so a rate the venue later disabled never blocks saving.
+      const vatRatePayload =
+        canEditVat && (!editing || vatTouched) ? vatFractionFromPercent(vatPct) : undefined;
+      // When Variants are off, omit customizationConfig so existing product data is not overwritten.
+      const customizationSavePayload =
+        !supplyMallContext && isMenuVariantsEnabled()
+          ? customizationGroups
+              .map((group) => ({
+                ...group,
+                name: group.name.trim(),
+                options: group.options
+                  .map((option) => ({
+                    ...option,
+                    name: option.name.trim(),
+                  }))
+                  .filter((option) => option.name),
+              }))
+              .filter((group) => group.name && group.options.length > 0)
+          : undefined;
       if (editing) {
+        // Existing stock is never re-sent with the product (sales may have moved it since the
+        // drawer opened); a quantity the user changed is applied below as a logged stock set.
+        const stockAdjustTo =
+          !isSupplyMallEdit &&
+          trackStockOn &&
+          stockMode === "adjust" &&
+          stockQtyTouched &&
+          qtyFromStockField !== Number(editing.currentStock ?? 0)
+            ? qtyFromStockField
+            : undefined;
+        const currentStockPayload = !trackStockOn
+          ? undefined
+          : isSupplyMallEdit
+            ? stockQtyTouched || editing.currentStock == null
+              ? qtyFromStockField
+              : undefined
+            : stockMode === "opening"
+              ? qtyFromStockField
+              : undefined;
         await updateItem({
           licenseKey,
           itemId: editing._id,
           name: name.trim(),
-          description: description.trim() || undefined,
+          description: description.trim() || null,
+          ...(!supplyMallContext
+            ? {
+                sku: sku.trim() || null,
+                barcode: barcode.trim() || null,
+                internalNotes: internalNotes.trim() || null,
+              }
+            : {}),
           price: priceNum,
           available,
           categoryId: categoryForSubmit!,
-          menuId,
-          station,
+          menuId: menuId ?? null,
+          station: resolvedStation,
           imageStorageId: finalImageStorageId,
           ...(finalImageUrl !== undefined ? { imageUrl: finalImageUrl } : {}),
           isFavorite,
           staffMealAllowed,
-          staffMealPrice: parsedStaffMealPrice,
-          staffMealFreeQty: parsedStaffMealFreeQty,
-          staffMealDailyLimit: parsedStaffMealDailyLimit,
+          ...staffMeal,
           ...stockArgs,
-          currentStock: trackStock
-            ? isSupplyMallEdit
-              ? qtyFromStockField
-              : (editing.currentStock ?? (parseFloat(initialStock) || 0))
-            : undefined,
+          ...(currentStockPayload !== undefined ? { currentStock: currentStockPayload } : {}),
           ...supplyMutationPayload,
           ...(vatRatePayload !== undefined ? { vatRate: vatRatePayload } : {}),
           ...(recipeSavePayload !== undefined
             ? { supplyRecipe: recipeSavePayload }
             : {}),
-          customizationConfig: customizationSavePayload,
-          prepConfig: prepSavePayload,
+          ...(customizationSavePayload !== undefined
+            ? { customizationConfig: customizationSavePayload }
+            : {}),
+          ...(!supplyMallContext
+            ? { modifierGroupIds: assignedModifierIds }
+            : {}),
         });
-        const nextCurrentStock = trackStock
-          ? isSupplyMallEdit
-            ? qtyFromStockField
-            : (editing.currentStock ?? (parseFloat(initialStock) || 0))
-          : undefined;
+        if (stockAdjustTo !== undefined) {
+          await setStockMut({
+            licenseKey,
+            itemId: editing._id,
+            newStock: stockAdjustTo,
+            staffName: stockActorName.trim() || "Menu",
+            note: t("menu.stock_set_note"),
+          });
+        }
         const updatedItem: EditingItem = {
           ...editing,
           name: name.trim(),
           description: description.trim() || undefined,
+          ...(!supplyMallContext
+            ? {
+                sku: sku.trim() || undefined,
+                barcode: barcode.trim() || undefined,
+                internalNotes: internalNotes.trim() || undefined,
+              }
+            : {}),
           price: priceNum,
           vatRate: vatRatePayload ?? editing.vatRate,
           available,
           categoryId: categoryForSubmit!,
           menuId,
-          station,
+          station: resolvedStation,
           imageStorageId: finalImageStorageId,
-          imageUrl:
-            finalImageUrl === null
-              ? null
-              : finalImageUrl ?? imagePreview,
+          imageUrl: finalImageUrl === undefined ? editing.imageUrl : finalImageUrl,
           isFavorite,
           staffMealAllowed,
-          staffMealPrice: parsedStaffMealPrice,
-          staffMealFreeQty: parsedStaffMealFreeQty,
-          staffMealDailyLimit: parsedStaffMealDailyLimit,
+          staffMealPrice: staffMeal.staffMealPrice,
+          staffMealFreeQty: staffMeal.staffMealFreeQty,
+          staffMealDailyLimit: staffMeal.staffMealDailyLimit,
           trackStock: stockArgs.trackStock,
           stockUnit: stockArgs.stockUnit,
           initialStock: stockArgs.initialStock,
           lowStockThreshold: stockArgs.lowStockThreshold,
-          currentStock: nextCurrentStock,
+          currentStock: stockAdjustTo ?? currentStockPayload ?? editing.currentStock,
           ...supplyMutationPayload,
           ...(recipeSavePayload !== undefined
             ? { supplyRecipe: recipeSavePayload }
             : {}),
-          customizationConfig: customizationSavePayload,
-          prepConfig: prepSavePayload,
+          customizationConfig:
+            customizationSavePayload !== undefined
+              ? customizationSavePayload
+              : editing.customizationConfig,
+          ...(!supplyMallContext ? { modifierGroupIds: assignedModifierIds } : {}),
         };
         const cached = (await getDataCache<EditingItem[]>(`menuItems:${licenseKey}`)) ?? [];
         await saveDataCache(
           `menuItems:${licenseKey}`,
-          cached.map((item) =>
-            item._id === editing._id
-              ? updatedItem
-              : item,
-          ),
+          cached.map((item) => (item._id === editing._id ? updatedItem : item)),
         );
         onSaved?.(updatedItem, "update");
         toast.success(t("menu.toast_updated"));
@@ -803,38 +1150,47 @@ export default function ItemDialog({
         const categoryIdForCreate = supplyCreate
           ? await ensureSupplyCategory({ licenseKey })
           : selectedCategoryId!;
+        const openingStock = trackStockOn ? qtyFromStockField : undefined;
         const createdId = await createItem({
           licenseKey,
           categoryId: categoryIdForCreate,
           menuId,
           name: name.trim(),
           description: description.trim() || undefined,
+          sku: sku.trim() || undefined,
+          barcode: barcode.trim() || undefined,
+          internalNotes: internalNotes.trim() || undefined,
           price: priceNum,
+          available,
           station: resolvedStation,
           imageStorageId: finalImageStorageId,
           ...(finalImageUrl !== undefined ? { imageUrl: finalImageUrl } : {}),
           isFavorite,
           staffMealAllowed,
-          staffMealPrice: parsedStaffMealPrice,
-          staffMealFreeQty: parsedStaffMealFreeQty,
-          staffMealDailyLimit: parsedStaffMealDailyLimit,
+          ...staffMeal,
           ...stockArgs,
+          ...(openingStock !== undefined ? { currentStock: openingStock } : {}),
           ...(supplyCreate ? supplyMutationPayload : {}),
           ...(vatRatePayload !== undefined ? { vatRate: vatRatePayload } : {}),
           ...(recipeSavePayload !== undefined
             ? { supplyRecipe: recipeSavePayload }
             : {}),
-          customizationConfig: customizationSavePayload,
-          prepConfig: prepSavePayload,
+          ...(customizationSavePayload !== undefined
+            ? { customizationConfig: customizationSavePayload }
+            : {}),
+          ...(!supplyMallContext ? { modifierGroupIds: assignedModifierIds } : {}),
         });
         const cached = (await getDataCache<EditingItem[]>(`menuItems:${licenseKey}`)) ?? [];
         const newItem: EditingItem = {
           _id: createdId as Id<"menuItems">,
           name: name.trim(),
           description: description.trim() || undefined,
+          sku: sku.trim() || undefined,
+          barcode: barcode.trim() || undefined,
+          internalNotes: internalNotes.trim() || undefined,
           price: priceNum,
           vatRate: vatRatePayload,
-          available: true,
+          available,
           categoryId: categoryIdForCreate,
           menuId,
           station: resolvedStation,
@@ -842,20 +1198,22 @@ export default function ItemDialog({
           imageUrl: finalImageUrl ?? null,
           isFavorite,
           staffMealAllowed,
-          staffMealPrice: parsedStaffMealPrice,
-          staffMealFreeQty: parsedStaffMealFreeQty,
-          staffMealDailyLimit: parsedStaffMealDailyLimit,
+          staffMealPrice: staffMeal.staffMealPrice,
+          staffMealFreeQty: staffMeal.staffMealFreeQty,
+          staffMealDailyLimit: staffMeal.staffMealDailyLimit,
           trackStock: stockArgs.trackStock,
           stockUnit: stockArgs.stockUnit,
           initialStock: stockArgs.initialStock,
           lowStockThreshold: stockArgs.lowStockThreshold,
-          currentStock: stockArgs.initialStock,
+          currentStock: openingStock,
           ...(supplyCreate ? supplyMutationPayload : {}),
           ...(recipeSavePayload !== undefined
             ? { supplyRecipe: recipeSavePayload }
             : {}),
-          customizationConfig: customizationSavePayload,
-          prepConfig: prepSavePayload,
+          ...(customizationSavePayload !== undefined
+            ? { customizationConfig: customizationSavePayload }
+            : {}),
+          ...(!supplyMallContext ? { modifierGroupIds: assignedModifierIds } : {}),
         };
         await saveDataCache(`menuItems:${licenseKey}`, [...cached, newItem]);
         onSaved?.(newItem, "create");
@@ -865,1054 +1223,1711 @@ export default function ItemDialog({
       }
       onOpenChange(false);
     } catch (err) {
-      toast.error(errorMessageFromUnknown(err, t("menu.err_save")));
+      const message = err instanceof Error ? err.message : String(err ?? "");
+      if (message.includes(MENU_ID_FIELDS_NEED_COLUMN)) {
+        toast.error(t("menu.id_fields_need_db"), { duration: 8000 });
+      } else if (message.includes(MENU_SKU_TAKEN)) {
+        setTab("advanced");
+        toast.error(t("menu.err_sku_taken"));
+      } else if (message.includes(MENU_BARCODE_TAKEN)) {
+        setTab("advanced");
+        toast.error(t("menu.err_barcode_taken"));
+      } else {
+        toast.error(errorMessageFromUnknown(err, t("menu.err_save")));
+      }
     } finally {
       setSaving(false);
     }
   };
 
-  const categoryPicker = useMemo(
-    () => (
-      <div className="space-y-2">
-        <Label className="text-slate-600">{t("menu.label_category")}</Label>
-        <div className="flex flex-wrap gap-2">
-          {categories.map((cat) => (
-            <button
-              key={cat._id}
-              type="button"
-              onClick={() => setSelectedCategoryId(cat._id)}
-              className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all cursor-pointer border",
-                selectedCategoryId === cat._id
-                  ? "text-white border-transparent"
-                  : "bg-white text-slate-600 border-slate-200 hover:border-slate-300",
-              )}
-              style={
-                selectedCategoryId === cat._id ? { backgroundColor: cat.color } : undefined
-              }
-            >
-              {cat.icon && <span className="text-sm">{cat.icon}</span>}
-              {cat.name}
-            </button>
-          ))}
-        </div>
-        {categories.length === 0 && (
-          <p className="text-xs text-slate-500">{t("menu.no_categories_hint")}</p>
-        )}
-      </div>
-    ),
-    [categories, selectedCategoryId, t],
-  );
-
   const supplyAccentKitchen =
     supplyMallContext && dialogNewTitleOverride === "supply_kitchen";
   const supplyAccentBar = supplyMallContext && dialogNewTitleOverride === "supply_bar";
+  const saveColor = supplyAccentKitchen ? "#059669" : supplyAccentBar ? "#7c3aed" : BRAND;
 
-  return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="right"
-        className={cn(
-          "flex h-full w-full flex-col gap-0 bg-white p-0 text-slate-900 sm:max-w-xl [&>button]:text-slate-500",
-          supplyAccentKitchen && "border-slate-200 border-t-[6px] border-t-emerald-500",
-          supplyAccentBar && "border-slate-200 border-t-[6px] border-t-violet-500",
-          !supplyMallContext && "border-slate-200",
-        )}
-      >
-        <SheetHeader
-          className={cn(
-            "shrink-0 border-b px-6 py-5",
-            supplyAccentKitchen && "border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-white",
-            supplyAccentBar && "border-violet-100 bg-gradient-to-br from-violet-50 via-white to-white",
-            !supplyMallContext && "border-slate-200 bg-white",
-          )}
+  const libraryKeys = useMemo(
+    () => ({
+      ids: new Set(variantLibrary.map((g) => g.id)),
+      names: new Set(variantLibrary.map((g) => g.name.trim().toLowerCase())),
+    }),
+    [variantLibrary],
+  );
+  const productOnlyGroupCount = customizationGroups.filter(
+    (g) => !libraryKeys.ids.has(g.id) && !libraryKeys.names.has(g.name.trim().toLowerCase()),
+  ).length;
+  const autoPhoto = !imageFile && isStockPhotoUrl(imagePreview);
+  const showRecipe = canEditRecipe && enterpriseSupplyRecipe && !supplyMallContext;
+  const unitLabel = t(`menu.stock_unit_${stockUnit}`);
+
+  const vatOptions = vatChoices.options.some((o) => formatTaxPercent(o.percent) === vatPct)
+    ? vatChoices.options
+    : [
+        { id: "current", percent: parseDecimal(vatPct) || 0, label: `${vatPct}%`, nameKey: "" },
+        ...vatChoices.options,
+      ];
+
+  const selectTrigger = (invalid?: boolean) =>
+    cn(
+      "h-11 w-full rounded-xl bg-white text-[14px] font-medium text-[#0b1220]",
+      invalid ? "border-red-400" : "border-[#e3ebf7]",
+    );
+  const selectContent = "max-h-72 rounded-xl border-[#e3ebf7] bg-white text-[#0b1220]";
+  const selectItem = "text-[14px] text-[#0b1220] focus:bg-[#f1f5ff] focus:text-[#0b1220]";
+  const card = "rounded-[18px] border border-[#e3ebf7] bg-white/80 shadow-[0_1px_2px_rgba(15,23,42,0.04)]";
+
+  const tabs: { id: ProductTab; label: string; icon: ReactNode }[] = [
+    { id: "general", label: t("menu.tab_general"), icon: <Box className="size-5" strokeWidth={1.9} /> },
+    ...(isMenuVariantsEnabled()
+      ? ([
+          {
+            id: "variants" as const,
+            label: t("menu.tab_variants"),
+            icon: <Layers className="size-5" strokeWidth={1.9} />,
+          },
+        ] as const)
+      : []),
+    { id: "stock", label: t("menu.tab_stock"), icon: <Soup className="size-5" strokeWidth={1.9} /> },
+    { id: "advanced", label: t("menu.tab_advanced"), icon: <Settings className="size-5" strokeWidth={1.9} /> },
+  ];
+
+  const photoCard = (
+    <div className={cn(card, "p-4")}>
+      <div className="grid gap-5 sm:grid-cols-[168px_minmax(0,1fr)]">
+        <div
+          className="group relative size-[168px] shrink-0 overflow-hidden rounded-[18px] border border-[#e3ebf7] bg-[#f7f9fd] shadow-[0_6px_18px_-12px_rgba(15,23,42,0.45)]"
+          title={autoPhoto ? t("menu.image_auto") : t("menu.image_hint")}
         >
-          {supplyMallContext ? (
-            <div className="flex items-start gap-3">
-              <div
-                className={cn(
-                  "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border shadow-sm",
-                  supplyAccentKitchen &&
-                    "border-emerald-200 bg-white text-emerald-700",
-                  supplyAccentBar && "border-violet-200 bg-white text-violet-700",
-                )}
-              >
-                {supplyAccentKitchen ? (
-                  <ChefHat className="size-6" strokeWidth={2} />
-                ) : (
-                  <Wine className="size-6" strokeWidth={2} />
-                )}
-              </div>
-              <div className="min-w-0 flex-1 space-y-1.5">
-                <SheetTitle className="text-left text-2xl font-bold tracking-tight text-slate-900">
-                  {editing
-                    ? dialogNewTitleOverride === "supply_kitchen"
-                      ? t("menu.dialog_edit_supply_kitchen_title")
-                      : t("menu.dialog_edit_supply_bar_title")
-                    : dialogNewTitleOverride === "supply_kitchen"
-                      ? t("menu.dialog_new_supply_kitchen_title")
-                      : t("menu.dialog_new_supply_bar_title")}
-                </SheetTitle>
-                <p className="text-sm leading-snug text-slate-600">
-                  {dialogNewTitleOverride === "supply_kitchen"
-                    ? t("menu.supply_subtitle_kitchen")
-                    : t("menu.supply_subtitle_bar")}
-                </p>
-              </div>
-            </div>
+          {imagePreview ? (
+            <img src={imagePreview} alt={t("menu.image_preview_alt")} className="size-full object-cover" />
           ) : (
-            <SheetTitle className="text-2xl font-bold tracking-tight text-slate-900">
-              {editing
-                ? t("menu.dialog_edit_title")
-                : t("menu.dialog_new_title")}
-            </SheetTitle>
-          )}
-        </SheetHeader>
-
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-          {supplyMallContext && (
-            <div
-              className={cn(
-                "flex items-center gap-3 rounded-xl border px-4 py-3",
-                supplyAccentKitchen &&
-                  "border-emerald-200/80 bg-emerald-50/60",
-                supplyAccentBar && "border-violet-200/80 bg-violet-50/60",
-              )}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex size-full flex-col items-center justify-center gap-2 text-[#64748b] hover:bg-[#f1f5ff]"
             >
-              {supplyAccentKitchen ? (
-                <ChefHat className="size-5 shrink-0 text-emerald-700" />
-              ) : (
-                <Wine className="size-5 shrink-0 text-violet-700" />
-              )}
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-900">
-                  {dialogNewTitleOverride === "supply_kitchen"
-                    ? t("menu.station_kitchen")
-                    : t("menu.station_bar")}
-                </p>
-                <p className="text-xs text-slate-600">
-                  {dialogNewTitleOverride === "supply_kitchen"
-                    ? t("menu.supply_station_hint_kitchen")
-                    : t("menu.supply_station_hint_bar")}
-                </p>
-              </div>
-            </div>
+              <ImageIcon className="size-7 text-[#94a3b8]" />
+              <span className="text-[12px] font-semibold">{t("menu.image_upload")}</span>
+            </button>
           )}
-
-          {supplyQuickPresets.length > 0 && (
-            <div
-              className={cn(
-                "space-y-2 rounded-2xl border p-3 shadow-sm",
-                supplyAccentKitchen &&
-                  "border-amber-200/70 bg-gradient-to-br from-amber-50/90 to-white",
-                supplyAccentBar &&
-                  "border-violet-200/70 bg-gradient-to-br from-violet-50/50 to-white",
-              )}
+          <button
+            type="button"
+            aria-label={imagePreview ? t("menu.image_change") : t("menu.image_upload")}
+            title={imagePreview ? t("menu.image_change") : t("menu.image_upload")}
+            onClick={() => fileInputRef.current?.click()}
+            className="absolute right-2.5 top-2.5 flex size-9 items-center justify-center rounded-xl backdrop-blur-sm transition hover:scale-105"
+            style={{ backgroundColor: "rgba(11,18,32,0.72)", color: "#ffffff" }}
+          >
+            <Pencil className="size-[17px]" strokeWidth={2} />
+          </button>
+          {imagePreview && !autoPhoto ? (
+            <button
+              type="button"
+              aria-label={t("menu.image_remove")}
+              title={t("menu.image_remove")}
+              onClick={removeImage}
+              className="absolute bottom-2.5 right-2.5 flex size-9 items-center justify-center rounded-xl backdrop-blur-sm transition hover:scale-105"
+              style={{ backgroundColor: "rgba(11,18,32,0.72)", color: "#ffffff" }}
             >
-              <Label className="flex items-center gap-2 text-xs font-semibold text-slate-800">
-                <Sparkles className="size-3.5 shrink-0 text-amber-500" />
-                {t("menu.supply_quick_pick_title")}
-              </Label>
-              <p className="text-[11px] leading-snug text-slate-600">
-                {t("menu.supply_quick_pick_hint")}
-              </p>
-              <div className="flex max-h-[9.5rem] flex-wrap gap-1.5 overflow-y-auto overscroll-contain pr-0.5">
-                {supplyQuickPresets.map((p) => {
-                  const PresetIcon = p.Icon;
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => {
-                        setName(t(p.labelKey));
-                        setStockUnit(p.unit);
-                      }}
-                      className={cn(
-                        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-left text-[11px] font-semibold transition-colors cursor-pointer",
-                        supplyAccentKitchen &&
-                          "border-emerald-200/80 bg-white text-emerald-900 hover:border-emerald-400 hover:bg-emerald-50",
-                        supplyAccentBar &&
-                          "border-violet-200/80 bg-white text-violet-900 hover:border-violet-400 hover:bg-violet-50",
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "flex size-6 shrink-0 items-center justify-center rounded-full",
-                          supplyAccentKitchen && "bg-emerald-500/15 text-emerald-800",
-                          supplyAccentBar && "bg-violet-500/15 text-violet-900",
-                        )}
-                      >
-                        <PresetIcon className="size-3.5" strokeWidth={2} />
-                      </span>
-                      <span className="leading-tight">{t(p.labelKey)}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {!supplyMallContext ? (
-            <>
-            <MenuItemCustomizationEditor
-              groups={customizationGroups}
-              onChange={setCustomizationGroups}
-              labels={{
-                title: t("menu.customization_title"),
-                addGroup: t("menu.customization_add_group"),
-                groupName: t("menu.customization_group_name"),
-                required: t("menu.customization_required"),
-                multi: t("menu.customization_multi"),
-                addOption: t("menu.customization_add_option"),
-                optionName: t("menu.customization_option_name"),
-                priceDelta: t("menu.customization_price_delta"),
-                defaultOption: t("menu.customization_default"),
-              }}
-            />
-            <MenuItemPrepEditor
-              config={prepConfig}
-              onChange={setPrepConfig}
-              labels={{
-                title: t("menu.prep_title"),
-                hint: t("menu.prep_hint"),
-                choiceTitle: t("menu.prep_choice_title"),
-                choiceHint: t("menu.prep_choice_hint"),
-                addChoiceGroup: t("menu.prep_add_choice_group"),
-                groupName: t("menu.prep_group_name"),
-                addOption: t("menu.prep_add_option"),
-                optionName: t("menu.prep_option_name"),
-                togglesTitle: t("menu.prep_toggles_title"),
-                togglesHint: t("menu.prep_toggles_hint"),
-                toggleGroupName: t("menu.prep_toggle_group_name"),
-                addToggle: t("menu.prep_add_toggle"),
-                paidExtrasTitle: t("menu.prep_paid_extras_title"),
-                paidExtrasHint: t("menu.prep_paid_extras_hint"),
-                addPaidExtra: t("menu.prep_add_paid_extra"),
-                priceDelta: t("menu.customization_price_delta"),
-                allowCustomInstructions: t("menu.prep_allow_custom_instructions"),
-                allowCustomInstructionsHint: t("menu.prep_allow_custom_instructions_hint"),
-                quickTitle: t("menu.prep_quick_title"),
-                quickHint: t("menu.prep_quick_hint"),
-                addQuick: t("menu.prep_add_quick"),
-              }}
-            />
-            </>
+              <Trash2 className="size-[17px]" strokeWidth={2} />
+            </button>
           ) : null}
-
-          {/* Image upload */}
-          {!supplyMallContext && (
-          <div className="space-y-2">
-            <Label className="text-slate-600">{t("menu.label_product_image")}</Label>
-            <div className="flex items-center gap-4">
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-dashed border-slate-300 bg-slate-50">
-                {imagePreview ? (
-                  <img
-                    src={imagePreview}
-                    alt={t("menu.image_preview_alt")}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <ImageIcon className="size-5 text-slate-400" />
-                )}
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-brand-hover">
-                  <Upload className="size-3" />
-                  {imagePreview ? t("menu.image_change") : t("menu.image_upload")}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleImageChange}
-                  />
-                </label>
-                {imagePreview && (
-                  <button
-                    type="button"
-                    onClick={removeImage}
-                    className="inline-flex w-fit cursor-pointer items-center gap-1 text-xs text-red-500 hover:text-red-600"
-                  >
-                    <X className="size-3" /> {t("menu.image_remove")}
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-          )}
-
-          <div className="space-y-2">
-            <Label
-              className={cn(
-                "flex items-center gap-2 text-slate-600",
-                supplyMallContext && "font-medium",
-              )}
+          {autoPhoto ? (
+            <span
+              className="absolute bottom-2.5 left-2.5 rounded-lg px-2 py-0.5 text-[11px] font-semibold backdrop-blur-sm"
+              style={{ backgroundColor: "rgba(11,18,32,0.72)", color: "#ffffff" }}
             >
-              {supplyMallContext ? (
-                <ClipboardList className="size-4 shrink-0 text-emerald-600" />
-              ) : null}
-              {t("menu.label_name")}
-            </Label>
+              {t("menu.image_auto_badge")}
+            </span>
+          ) : null}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleImageChange}
+          />
+        </div>
+
+        <div className="min-w-0 space-y-4">
+          <div data-product-field="name">
+            <FieldLabel required>{t("menu.label_product_name")}</FieldLabel>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder={
-                supplyMallContext
-                  ? t("menu.placeholder_supply_name")
-                  : t("menu.placeholder_name_example")
-              }
-              className={cn(
-                "border-slate-200 bg-slate-50 text-slate-900",
-                supplyMallContext && "h-11 text-base font-medium",
-              )}
+              onBlur={() => touch("name")}
+              placeholder={t("menu.placeholder_name_example")}
+              className={cn(inputCls(Boolean(errorFor("name"))), "text-[15px] font-medium")}
             />
+            <FieldMessage error={errorFor("name")} />
           </div>
-
-          {!supplyMallContext && (
-            <div className="space-y-2">
-              <Label className="text-slate-600">{t("menu.label_description")}</Label>
-              <Textarea
+          <div>
+            <FieldLabel>{t("menu.label_description_short")}</FieldLabel>
+            <div className="relative">
+              <textarea
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                maxLength={DESCRIPTION_MAX}
+                onChange={(e) => setDescription(e.target.value.slice(0, DESCRIPTION_MAX))}
                 placeholder={t("menu.placeholder_description")}
-                rows={2}
-                className="resize-none border-slate-200 bg-slate-50 text-slate-900"
+                rows={3}
+                className="block w-full resize-none rounded-xl border border-[#e3ebf7] bg-white px-3.5 pb-7 pt-2.5 text-[14px] leading-relaxed text-[#0b1220] outline-none placeholder:text-[#94a3b8] focus:border-[#1d5ff0] focus:ring-2 focus:ring-[#1d5ff0]/15"
               />
+              <span className="pointer-events-none absolute bottom-2 right-3 text-[12px] tabular-nums text-[#64748b]">
+                {description.length} / {DESCRIPTION_MAX}
+              </span>
             </div>
-          )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
-          <div className="space-y-2">
-            <Label
+  const generalPanel = (
+    <div className="space-y-4">
+      <div className={cn(card, "p-4")}>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div data-product-field="price">
+            <FieldLabel required>{t("menu.label_price", { symbol: currency.symbol })}</FieldLabel>
+            <div
               className={cn(
-                "flex items-center gap-2 text-slate-600",
-                supplyMallContext && "font-medium",
+                "flex h-11 items-center overflow-hidden rounded-xl border bg-white focus-within:ring-2",
+                errorFor("price")
+                  ? "border-red-400 focus-within:ring-red-200"
+                  : "border-[#e3ebf7] focus-within:border-[#1d5ff0] focus-within:ring-[#1d5ff0]/15",
               )}
             >
-              {supplyMallContext ? (
-                <CircleDollarSign className="size-4 shrink-0 text-emerald-600" />
-              ) : null}
-              {supplyMallContext
-                ? t("menu.supply_label_price", { symbol: currency.symbol })
-                : t("menu.label_price", { symbol: currency.symbol })}
-            </Label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              placeholder="0.00"
-              className="border-slate-200 bg-slate-50 text-slate-900"
+              <span className="flex h-full items-center bg-[#f7f9fd] px-3.5 text-[15px] font-semibold text-[#0b1220]">
+                {currency.symbol}
+              </span>
+              <input
+                value={price}
+                inputMode="decimal"
+                onChange={(e) => setPrice(e.target.value)}
+                onBlur={() => {
+                  touch("price");
+                  const n = parseDecimal(price);
+                  if (Number.isFinite(n) && n >= 0) setPrice(n.toFixed(currency.decimals));
+                }}
+                placeholder="0.00"
+                className="h-full min-w-0 flex-1 bg-white px-3 text-[15px] font-medium tabular-nums text-[#0b1220] outline-none placeholder:text-[#94a3b8]"
+              />
+            </div>
+            <FieldMessage error={errorFor("price")} />
+          </div>
+
+          <div>
+            <FieldLabel required>{t("menu.label_vat_rate")}</FieldLabel>
+            <Select
+              value={vatPct}
+              disabled={!canEditVat}
+              onValueChange={(v) => {
+                setVatPct(v);
+                setVatTouched(true);
+              }}
+            >
+              <SelectTrigger className={selectTrigger()}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className={selectContent}>
+                {vatOptions.map((opt) => {
+                  const n = formatTaxPercent(opt.percent);
+                  return (
+                    <SelectItem key={opt.id} value={n} className={selectItem}>
+                      {opt.nameKey ? `${t(opt.nameKey)} ${n}%` : `${n}%`}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+            {vatChoices.options.length === 0 ? <FieldMessage help={t("settings.tax_need_country")} /> : null}
+          </div>
+
+          <div data-product-field="category">
+            <FieldLabel required>{t("menu.label_category")}</FieldLabel>
+            <Select
+              value={selectedCategoryId ?? ""}
+              onValueChange={(v) => {
+                setSelectedCategoryId(v as Id<"menuCategories">);
+                touch("category");
+              }}
+            >
+              <SelectTrigger className={selectTrigger(Boolean(errorFor("category")))}>
+                <SelectValue placeholder={t("menu.select_category")} />
+              </SelectTrigger>
+              <SelectContent className={selectContent}>
+                {categories.map((cat) => {
+                  const glyph = (cat.icon && String(cat.icon).trim()) || emojiForCategoryName(cat.name ?? "");
+                  return (
+                    <SelectItem key={cat._id} value={cat._id} className={selectItem}>
+                      <span className="flex items-center gap-2.5">
+                        <span className="flex size-6 items-center justify-center">
+                          {glyph ? (
+                            <span className="text-[18px] leading-none">{glyph}</span>
+                          ) : (
+                            <UtensilsCrossed className="size-4 text-[#2563eb]" />
+                          )}
+                        </span>
+                        {cat.name}
+                      </span>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+            <FieldMessage
+              error={errorFor("category")}
+              help={categories.length === 0 ? t("menu.no_categories_hint") : undefined}
             />
           </div>
 
-          {canEditVat && !supplyMallContext ? (
-            <div className="space-y-2">
-              <Label className="text-slate-600">{t("menu.label_vat")}</Label>
-              <div className="flex flex-wrap gap-1.5">
-                {(
-                  vatChoices.options.some((o) => formatTaxPercent(o.percent) === vatPct)
-                    ? vatChoices.options
-                    : vatChoices.options.length > 0
-                      ? [
-                          {
-                            id: "current",
-                            percent: Number(vatPct) || 0,
-                            label: `${vatPct}%`,
-                            nameKey: "",
-                          },
-                          ...vatChoices.options,
-                        ]
-                      : [{ id: "fallback", percent: Number(vatPct) || 0, label: `${vatPct}%`, nameKey: "" }]
-                ).map((opt) => {
-                  const n = formatTaxPercent(opt.percent);
-                  const selected = vatPct === n || Number(vatPct) === opt.percent;
+          <div data-product-field="station">
+            <FieldLabel required>{t("menu.label_station_short")}</FieldLabel>
+            <Select
+              value={station ?? ""}
+              onValueChange={(v) => {
+                setStation(v as "kitchen" | "bar");
+                touch("station");
+              }}
+            >
+              <SelectTrigger className={selectTrigger(Boolean(errorFor("station")))}>
+                <SelectValue placeholder={t("menu.select_station")} />
+              </SelectTrigger>
+              <SelectContent className={selectContent}>
+                <SelectItem value="kitchen" className={selectItem}>
+                  <span className="flex items-center gap-2.5">
+                    <ChefHat className="size-[18px]" strokeWidth={1.9} />
+                    {t("menu.station_kitchen")}
+                  </span>
+                </SelectItem>
+                <SelectItem value="bar" className={selectItem}>
+                  <span className="flex items-center gap-2.5">
+                    <Wine className="size-[18px]" strokeWidth={1.9} />
+                    {t("menu.station_bar")}
+                  </span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <FieldMessage error={errorFor("station")} />
+          </div>
+        </div>
+      </div>
+
+      <div className={cn(card, "divide-y divide-[#eef2f8] overflow-hidden")}>
+        <ToggleRow
+          flat
+          icon={<Bookmark className="size-5" strokeWidth={1.9} />}
+          title={t("menu.label_favorites")}
+          help={t("menu.favorites_help")}
+          checked={isFavorite}
+          onChange={setIsFavorite}
+        />
+        <ToggleRow
+          flat
+          icon={<Users className="size-5" strokeWidth={1.9} />}
+          title={t("menu.label_staff_meal_allow")}
+          help={t("menu.staff_meal_help")}
+          checked={staffMealAllowed}
+          onChange={(next) => {
+            setStaffMealAllowed(next);
+            if (next && !staffMealDailyLimit.trim()) setStaffMealDailyLimit("1");
+          }}
+        />
+        {staffMealAllowed ? (
+          <button
+            type="button"
+            onClick={() => setTab("advanced")}
+            className="flex w-full items-center justify-between gap-2 bg-[#f9fbff] px-4 py-2.5 text-left text-[13px] font-semibold text-[#1d4ed8] hover:bg-[#f1f5ff]"
+          >
+            {t("menu.staff_meal_settings_link")}
+            <ChevronRight className="size-4" />
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+
+  const attachedKeys = {
+    ids: new Set(customizationGroups.map((g) => g.id)),
+    names: new Set(customizationGroups.map((g) => g.name.trim().toLowerCase())),
+  };
+  const addableLibrary = variantLibrary.filter(
+    (lib) => !attachedKeys.ids.has(lib.id) && !attachedKeys.names.has(lib.name.trim().toLowerCase()),
+  );
+  const signedPrice = (delta: number) =>
+    delta < 0 ? `− ${formatPrice(Math.abs(delta))}` : `+ ${formatPrice(delta)}`;
+  const moveGroup = (fromId: string, toId: string) =>
+    setCustomizationGroups((groups) => {
+      const list = [...groups];
+      const from = list.findIndex((g) => g.id === fromId);
+      const to = list.findIndex((g) => g.id === toId);
+      if (from < 0 || to < 0 || from === to) return groups;
+      const [moved] = list.splice(from, 1);
+      list.splice(to, 0, moved);
+      return list;
+    });
+
+  const variantsPanel = (
+    <div className="space-y-4">
+      <div className="flex items-start gap-3">
+        <span className="mt-0.5 text-[#2563eb]">
+          <Layers className="size-6" strokeWidth={1.9} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[17px] font-bold text-[#0b1220]">{t("menu.vg_title")}</p>
+          <p className="text-[13px] text-[#64748b]">{t("menu.vg_subtitle")}</p>
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl px-4 text-[14px] font-semibold shadow-[0_8px_18px_-10px_rgba(37,99,235,0.9)]"
+              style={{ backgroundColor: BRAND, color: "#ffffff" }}
+            >
+              <Plus className="size-4" strokeWidth={2.2} />
+              {t("menu.vg_add")}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="end"
+            className="w-72 rounded-xl border-[#e3ebf7] bg-white p-1.5 text-[#0b1220]"
+          >
+            {addableLibrary.length > 0 ? (
+              addableLibrary.map((lib) => {
+                const Icon = variantGroupIcon(lib.name);
+                return (
+                  <DropdownMenuItem
+                    key={lib.id}
+                    onSelect={() => setCustomizationGroups((groups) => [...groups, { ...lib }])}
+                    className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-[14px] focus:bg-[#f1f5ff] focus:text-[#0b1220]"
+                  >
+                    <Icon className="size-4 text-[#2563eb]" />
+                    <span className={cn("min-w-0 flex-1 truncate font-medium", lib.active === false && "opacity-60")}>
+                      {lib.name}
+                    </span>
+                    <span className="text-[12px] text-[#64748b]">
+                      {t(lib.options.length === 1 ? "menu.vg_option_count_one" : "menu.vg_option_count", {
+                        count: lib.options.length,
+                      })}
+                    </span>
+                  </DropdownMenuItem>
+                );
+              })
+            ) : (
+              <p className="px-2.5 py-2 text-[13px] text-[#64748b]">
+                {variantLibrary.length === 0 ? t("menu.variant_library_empty") : t("menu.vg_all_added")}
+              </p>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {customizationGroups.length === 0 ? (
+        <div className="rounded-[18px] border border-dashed border-[#c7d6f5] bg-white/70 px-4 py-6 text-center text-[13px] text-[#64748b]">
+          {t("menu.vg_none_attached")}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {customizationGroups.map((group) => {
+            const Icon = variantGroupIcon(group.name);
+            const multi = group.selectionType === "multi";
+            const { min, max } = selectionLimits(group);
+            const collapsed = collapsedGroups.has(group.id);
+            const fromLibrary =
+              libraryKeys.ids.has(group.id) || libraryKeys.names.has(group.name.trim().toLowerCase());
+            return (
+              <div
+                key={group.id}
+                onDragOver={(e) => {
+                  if (dragGroupId && dragGroupId !== group.id) e.preventDefault();
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (dragGroupId) moveGroup(dragGroupId, group.id);
+                  setDragGroupId(null);
+                }}
+                className={cn(
+                  "overflow-hidden rounded-[18px] border border-[#e3ebf7] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]",
+                  dragGroupId === group.id && "opacity-50",
+                )}
+              >
+                <div className="flex items-center gap-3 px-3.5 py-3">
+                  <span
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.effectAllowed = "move";
+                      setDragGroupId(group.id);
+                    }}
+                    onDragEnd={() => setDragGroupId(null)}
+                    title={t("menu.vg_drag")}
+                    className="cursor-grab text-[#94a3b8]"
+                  >
+                    <GripVertical className="size-5" />
+                  </span>
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#f1f5ff] text-[#2563eb]">
+                    <Icon className="size-5" strokeWidth={1.9} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[15px] font-bold text-[#0b1220]">
+                      {group.name}
+                      {!fromLibrary ? (
+                        <span className="ml-2 align-middle text-[11px] font-semibold text-[#64748b]">
+                          {t("menu.vg_product_only")}
+                        </span>
+                      ) : null}
+                    </p>
+                    <p className="text-[12px] text-[#64748b]">
+                      {group.required ? t("menu.vg_required") : t("menu.vg_optional")}
+                      {" • "}
+                      {multi ? t("menu.vg_multi", { min, max }) : t("menu.vg_single")}
+                    </p>
+                  </div>
+                  <span
+                    className="rounded-full px-3 py-1 text-[12px] font-semibold"
+                    style={
+                      group.required
+                        ? { backgroundColor: "#f1edff", color: "#6d28d9" }
+                        : { backgroundColor: "#eaf2ff", color: "#1d4ed8" }
+                    }
+                  >
+                    {group.required ? t("menu.vg_required") : t("menu.vg_optional")}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label={collapsed ? t("menu.vg_expand") : t("menu.vg_collapse")}
+                    aria-expanded={!collapsed}
+                    onClick={() =>
+                      setCollapsedGroups((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(group.id)) next.delete(group.id);
+                        else next.add(group.id);
+                        return next;
+                      })
+                    }
+                    className="flex size-8 items-center justify-center rounded-lg text-[#0b1220] hover:bg-[#f1f5fb]"
+                  >
+                    <ChevronDown className={cn("size-4 transition-transform", !collapsed && "rotate-180")} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={t("menu.vg_remove")}
+                    title={t("menu.vg_remove")}
+                    onClick={() => setCustomizationGroups((groups) => groups.filter((g) => g.id !== group.id))}
+                    className="flex size-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50"
+                  >
+                    <Trash2 className="size-[18px]" />
+                  </button>
+                </div>
+
+                {!collapsed ? (
+                  <div className="border-t border-[#eef2f8]">
+                    <div className="grid grid-cols-[1fr_140px] gap-2 bg-[#f7f9fd] px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-[#334155]">
+                      <span className="pl-7">{t("menu.vg_col_option")}</span>
+                      <span>{t("menu.vg_col_price")}</span>
+                    </div>
+                    {group.options.map((o) => {
+                      const isDefault = !multi && o.isDefault === true;
+                      return (
+                        <div
+                          key={o.id}
+                          className={cn(
+                            "grid grid-cols-[1fr_140px] items-center gap-2 border-t border-[#f1f4f9] px-4 py-2",
+                            isDefault && "bg-[#f5f8ff]",
+                          )}
+                        >
+                          <span className="flex min-w-0 items-center gap-3">
+                            {multi ? (
+                              <span className="size-[18px] shrink-0 rounded-[5px] border-2 border-[#cbd5e1] bg-white" />
+                            ) : (
+                              <span
+                                className="flex size-[18px] shrink-0 items-center justify-center rounded-full border-2"
+                                style={{ borderColor: isDefault ? BRAND : "#cbd5e1" }}
+                              >
+                                {isDefault ? (
+                                  <span className="size-2 rounded-full" style={{ backgroundColor: BRAND }} />
+                                ) : null}
+                              </span>
+                            )}
+                            <span className="truncate text-[14px] text-[#0b1220]">{o.name}</span>
+                            {isDefault ? (
+                              <span
+                                className="shrink-0 rounded-md px-2 py-0.5 text-[11px] font-semibold"
+                                style={{ backgroundColor: "#e8f0ff", color: "#1d4ed8" }}
+                              >
+                                {t("menu.vg_default")}
+                              </span>
+                            ) : null}
+                          </span>
+                          <span className="w-fit rounded-lg border border-[#e3ebf7] bg-white px-2.5 py-1 text-[13px] font-semibold tabular-nums text-[#0b1220]">
+                            {signedPrice(Number(o.priceDelta ?? 0))}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <p className="text-[12px] text-[#64748b]">{t("menu.vg_edit_hint")}</p>
+
+      <div>
+        <Disclosure
+          title={t("menu.product_options_title")}
+          meta={productOnlyGroupCount > 0 ? String(productOnlyGroupCount) : undefined}
+          open={optionsOpen}
+          onToggle={() => setOptionsOpen((v) => !v)}
+        >
+          <MenuItemCustomizationEditor
+            groups={customizationGroups}
+            onChange={setCustomizationGroups}
+            labels={{
+              title: t("menu.customization_title"),
+              addGroup: t("menu.customization_add_group"),
+              groupName: t("menu.customization_group_name"),
+              required: t("menu.customization_required"),
+              multi: t("menu.customization_multi"),
+              addOption: t("menu.customization_add_option"),
+              optionName: t("menu.customization_option_name"),
+              priceDelta: t("menu.customization_price_delta"),
+              defaultOption: t("menu.customization_default"),
+              emptyHint: t("menu.customization_empty_hint"),
+            }}
+          />
+        </Disclosure>
+      </div>
+    </div>
+  );
+
+  const unitSelect = (
+    value: string,
+    onChange: (unit: StockUnit) => void,
+    units: readonly StockUnit[],
+    className?: string,
+  ) => (
+    <Select value={value} onValueChange={(v) => onChange(v as StockUnit)}>
+      <SelectTrigger className={cn(selectTrigger(), className)}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent className={selectContent}>
+        {units.map((u) => (
+          <SelectItem key={u} value={u} className={selectItem}>
+            {t(`menu.stock_unit_${u}`)}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+
+  /** Field with a leading icon tile, as in the stock row of the design. */
+  const iconInput = (icon: ReactNode, input: ReactNode, invalid?: boolean) => (
+    <div
+      className={cn(
+        "flex h-11 items-center overflow-hidden rounded-xl border bg-white focus-within:ring-2",
+        invalid
+          ? "border-red-400 focus-within:ring-red-200"
+          : "border-[#e3ebf7] focus-within:border-[#1d5ff0] focus-within:ring-[#1d5ff0]/15",
+      )}
+    >
+      <span className="flex h-full w-11 shrink-0 items-center justify-center border-r border-[#e3ebf7] bg-[#f7f9fd] text-[#334155]">
+        {icon}
+      </span>
+      {input}
+    </div>
+  );
+
+  const ingredientById = new Map(recipeIngredientOptions.map((i) => [String(i._id), i]));
+  const moveRecipeLine = (fromKey: string, toKey: string) =>
+    setRecipeLines((prev) => {
+      const list = [...prev];
+      const from = list.findIndex((l) => l.key === fromKey);
+      const to = list.findIndex((l) => l.key === toKey);
+      if (from < 0 || to < 0 || from === to) return prev;
+      const [moved] = list.splice(from, 1);
+      list.splice(to, 0, moved);
+      return list;
+    });
+  const addRecipeLine = () =>
+    setRecipeLines((prev) => [...prev, { key: newRecipeLineKey(), supplyMenuItemId: "", qty: "", unit: "" }]);
+
+  const stockPanel = (
+    <div className="space-y-4">
+      <div className={cn(card, "p-4")}>
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 text-[#2563eb]">
+            <Package className="size-6" strokeWidth={1.9} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[16px] font-bold text-[#0b1220]">{t("menu.stock_title")}</p>
+            <p className="text-[13px] text-[#64748b]">{t("menu.stock_subtitle")}</p>
+          </div>
+          <ToggleSwitch checked={trackStock} label={t("menu.label_track_stock")} onChange={() => setTrackStock(!trackStock)} />
+        </div>
+
+        {trackStock ? (
+          <>
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <div>
+                <FieldLabel>{t("menu.label_unit")}</FieldLabel>
+                {unitSelect(stockUnit, setStockUnit, stockUnitOptions.map((u) => u.value))}
+              </div>
+              <div data-product-field="stock">
+                <FieldLabel>{t("menu.label_initial_stock")}</FieldLabel>
+                {iconInput(
+                  <Archive className="size-[18px]" strokeWidth={1.9} />,
+                  <input
+                    value={initialStock}
+                    inputMode="decimal"
+                    onChange={(e) => {
+                      setInitialStock(e.target.value);
+                      setStockQtyTouched(true);
+                    }}
+                    onBlur={() => touch("stock")}
+                    placeholder={t("menu.placeholder_qty_example")}
+                    className="h-full min-w-0 flex-1 bg-white px-3 text-[15px] font-medium tabular-nums text-[#0b1220] outline-none placeholder:text-[#94a3b8]"
+                  />,
+                  Boolean(errorFor("stock")),
+                )}
+                <FieldMessage error={errorFor("stock")} />
+              </div>
+              <div data-product-field="lowStock">
+                <FieldLabel>{t("menu.low_stock_alert")}</FieldLabel>
+                {iconInput(
+                  <Bell className="size-[18px]" strokeWidth={1.9} />,
+                  <input
+                    value={lowStockThreshold}
+                    inputMode="decimal"
+                    onChange={(e) => {
+                      setLowStockThreshold(e.target.value);
+                      setLowStockTouched(true);
+                    }}
+                    onBlur={() => touch("lowStock")}
+                    placeholder={String(venueLowStock)}
+                    className="h-full min-w-0 flex-1 bg-white px-3 text-[15px] font-medium tabular-nums text-[#0b1220] outline-none placeholder:text-[#94a3b8]"
+                  />,
+                  Boolean(errorFor("lowStock")),
+                )}
+                <FieldMessage error={errorFor("lowStock")} />
+              </div>
+            </div>
+            <p className="mt-2 text-[12px] text-[#64748b]">
+              {stockMode === "adjust" ? t("menu.stock_adjust_help") : t("menu.stock_opening_help")}
+            </p>
+          </>
+        ) : null}
+      </div>
+
+      {showRecipe ? (
+        <div className={cn(card, "p-4")} data-product-field="recipe">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 text-[#2563eb]">
+              <Soup className="size-6" strokeWidth={1.9} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[16px] font-bold text-[#0b1220]">
+                {t("menu.recipe_title")}{" "}
+                <span className="text-[13px] font-medium text-[#64748b]">({t("variants_page.optional_label")})</span>
+              </p>
+              <p className="text-[13px] text-[#64748b]">{t("menu.recipe_subtitle")}</p>
+            </div>
+            <ToggleSwitch
+              checked={recipeEnabled}
+              label={t("menu.recipe_title")}
+              onChange={() => {
+                const next = !recipeEnabled;
+                setRecipeEnabled(next);
+                if (next && recipeLines.length === 0) addRecipeLine();
+              }}
+            />
+          </div>
+
+          {recipeEnabled ? (
+            <div className="mt-3">
+              <div className="mb-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={addRecipeLine}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-[#dbe7ff] bg-white px-3.5 text-[13px] font-semibold text-[#1d4ed8] shadow-sm hover:bg-[#f5f8ff]"
+                >
+                  <Plus className="size-4" strokeWidth={2.2} />
+                  {t("menu.recipe_add_ingredient")}
+                </button>
+              </div>
+
+              {recipeIngredientOptions.length === 0 ? (
+                <p className="mb-2 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
+                  {t("menu.recipe_no_supply_items")}
+                </p>
+              ) : null}
+
+              <div className="overflow-hidden rounded-xl border border-[#e3ebf7] bg-white">
+                <div className="grid grid-cols-[52px_minmax(0,1fr)_112px_140px_32px] items-center gap-2 bg-[#f7f9fd] px-3 py-2 text-[12px] font-semibold text-[#334155]">
+                  <span className="text-center">#</span>
+                  <span>{t("menu.recipe_ingredient")}</span>
+                  <span>{t("menu.label_unit")}</span>
+                  <span>
+                    {t("menu.recipe_qty_short")}{" "}
+                    <span className="font-medium text-[#64748b]">({t("menu.recipe_per_portion")})</span>
+                  </span>
+                  <span />
+                </div>
+                {recipeLines.map((line, idx) => {
+                  const picked = ingredientById.get(String(line.supplyMenuItemId));
+                  const stockUnitOfPick = (picked?.stockUnit as StockUnit | undefined) ?? undefined;
+                  const units = compatibleUnits(stockUnitOfPick);
+                  const lineUnit = line.unit || stockUnitOfPick || "pc";
+                  const lineInvalid =
+                    Boolean(errorFor("recipe")) &&
+                    (!String(line.supplyMenuItemId) || !(parseDecimal(line.qty) > 0));
                   return (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => setVatPct(n)}
+                    <div
+                      key={line.key}
+                      onDragOver={(e) => {
+                        if (dragRecipeKey && dragRecipeKey !== line.key) e.preventDefault();
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (dragRecipeKey) moveRecipeLine(dragRecipeKey, line.key);
+                        setDragRecipeKey(null);
+                      }}
                       className={cn(
-                        "px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer border",
-                        selected
-                          ? "bg-brand/20 border-brand/50 text-brand"
-                          : "bg-white border-slate-200 text-slate-600 hover:border-slate-300",
+                        "grid grid-cols-[52px_minmax(0,1fr)_112px_140px_32px] items-center gap-2 border-t border-[#eef2f8] px-3 py-2",
+                        dragRecipeKey === line.key && "opacity-50",
                       )}
                     >
-                      {opt.nameKey ? `${t(opt.nameKey)} ${n}%` : `${n}%`}
+                      <span className="flex items-center gap-1">
+                        <span
+                          draggable
+                          onDragStart={(e) => {
+                            e.dataTransfer.effectAllowed = "move";
+                            setDragRecipeKey(line.key);
+                          }}
+                          onDragEnd={() => setDragRecipeKey(null)}
+                          title={t("menu.recipe_drag")}
+                          className="cursor-grab text-[#94a3b8]"
+                        >
+                          <GripVertical className="size-4" />
+                        </span>
+                        <span className="flex size-7 items-center justify-center rounded-full border border-[#e3ebf7] bg-[#f7f9fd] text-[13px] font-bold text-[#0b1220]">
+                          {idx + 1}
+                        </span>
+                      </span>
+
+                      <Select
+                        value={String(line.supplyMenuItemId)}
+                        onValueChange={(v) => {
+                          const next = ingredientById.get(v);
+                          setRecipeLines((prev) =>
+                            prev.map((row) =>
+                              row.key === line.key
+                                ? {
+                                    ...row,
+                                    supplyMenuItemId: v as Id<"menuItems">,
+                                    unit: (next?.stockUnit as StockUnit | undefined) ?? "",
+                                  }
+                                : row,
+                            ),
+                          );
+                        }}
+                      >
+                        <SelectTrigger
+                          className={cn(selectTrigger(lineInvalid && !line.supplyMenuItemId), "h-10")}
+                          aria-label={t("menu.recipe_ingredient")}
+                        >
+                          <SelectValue placeholder={t("menu.recipe_pick_ingredient")} />
+                        </SelectTrigger>
+                        <SelectContent className={selectContent}>
+                          {recipeIngredientOptions.map((opt) => {
+                            const g = ingredientEmoji(opt.name) ?? emojiForCategoryName(opt.name);
+                            return (
+                              <SelectItem key={opt._id} value={String(opt._id)} className={selectItem}>
+                                <span className="flex items-center gap-2.5">
+                                  <span className="flex size-6 items-center justify-center">
+                                    {g ? (
+                                      <span className="text-[18px] leading-none">{g}</span>
+                                    ) : (
+                                      <Package className="size-4 text-[#2563eb]" />
+                                    )}
+                                  </span>
+                                  {opt.name}
+                                </span>
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+
+                      {unitSelect(
+                        lineUnit,
+                        (unit) =>
+                          setRecipeLines((prev) =>
+                            prev.map((row) => (row.key === line.key ? { ...row, unit } : row)),
+                          ),
+                        units,
+                        "h-10",
+                      )}
+
+                      <Input
+                        value={line.qty}
+                        inputMode="decimal"
+                        aria-label={t("menu.recipe_qty_label")}
+                        onChange={(e) =>
+                          setRecipeLines((prev) =>
+                            prev.map((row) => (row.key === line.key ? { ...row, qty: e.target.value } : row)),
+                          )
+                        }
+                        onBlur={() => touch("recipe")}
+                        placeholder={t("menu.recipe_qty_placeholder")}
+                        className={cn(
+                          inputCls(lineInvalid && !(parseDecimal(line.qty) > 0)),
+                          "h-10 tabular-nums",
+                        )}
+                      />
+
+                      <button
+                        type="button"
+                        aria-label={t("menu.recipe_remove_line")}
+                        onClick={() => setRecipeLines((prev) => prev.filter((row) => row.key !== line.key))}
+                        className="flex size-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50"
+                      >
+                        <Trash2 className="size-[18px]" />
+                      </button>
+                    </div>
+                  );
+                })}
+                {recipeLines.length === 0 ? (
+                  <p className="border-t border-[#eef2f8] px-3 py-4 text-center text-[13px] text-[#64748b]">
+                    {t("menu.recipe_empty")}
+                  </p>
+                ) : null}
+              </div>
+              <FieldMessage error={errorFor("recipe")} help={t("menu.recipe_timing_help")} />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+
+  const cardHeader = (icon: ReactNode, title: ReactNode, subtitle: string, action?: ReactNode) => (
+    <div className="flex items-start gap-3">
+      <span className="mt-0.5 text-[#2563eb]">{icon}</span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[16px] font-bold text-[#0b1220]">{title}</p>
+        <p className="text-[13px] text-[#64748b]">{subtitle}</p>
+      </div>
+      {action}
+    </div>
+  );
+  const settingRow = (icon: ReactNode, label: string, control: ReactNode) => (
+    <div className="flex items-center gap-3 py-2.5">
+      <span className="text-[#334155]">{icon}</span>
+      <span className="min-w-0 flex-1 text-[14px] font-semibold text-[#0b1220]">{label}</span>
+      {control}
+    </div>
+  );
+  const comingSoon = (
+    <span className="rounded-full bg-[#f1f5f9] px-2.5 py-0.5 text-[11px] font-semibold text-[#64748b]">
+      {t("menu.coming_soon")}
+    </span>
+  );
+
+  const limitN = /^\d+$/.test(staffMealDailyLimit.trim()) ? Number(staffMealDailyLimit) : 0;
+  const freeN = /^\d+$/.test(staffMealFreeQty.trim()) ? Number(staffMealFreeQty) : 0;
+  const freeCap = limitN > 0 ? limitN : 999;
+  const setDailyLimit = (next: number) => {
+    const n = Math.min(999, Math.max(0, next));
+    setStaffMealDailyLimit(n > 0 ? String(n) : "");
+    if (n > 0 && freeN > n) setStaffMealFreeQty(String(n));
+  };
+
+  const advancedPanel = (
+    <div className="space-y-4">
+      <div className={cn(card, "p-4")}>
+        {cardHeader(
+          <Barcode className="size-6" strokeWidth={1.9} />,
+          t("menu.id_title"),
+          t("menu.id_subtitle"),
+        )}
+        <div className="mt-4 space-y-3">
+          <div className="grid items-start gap-2 sm:grid-cols-[150px_minmax(0,1fr)]" data-product-field="sku">
+            <span className="pt-3 text-[13px] font-semibold text-[#0b1220]">{t("menu.label_sku")}</span>
+            <div>
+              <Input
+                value={sku}
+                maxLength={32}
+                onChange={(e) => setSku(e.target.value)}
+                onBlur={() => touch("sku")}
+                placeholder={t("menu.placeholder_sku")}
+                className={inputCls(Boolean(errorFor("sku")))}
+              />
+              <FieldMessage error={errorFor("sku")} />
+            </div>
+          </div>
+          <div className="grid items-start gap-2 sm:grid-cols-[150px_minmax(0,1fr)]" data-product-field="barcode">
+            <span className="pt-3 text-[13px] font-semibold text-[#0b1220]">{t("menu.label_barcode")}</span>
+            <div>
+              <div
+                className={cn(
+                  "flex h-11 items-center overflow-hidden rounded-xl border bg-white focus-within:ring-2",
+                  errorFor("barcode")
+                    ? "border-red-400 focus-within:ring-red-200"
+                    : "border-[#e3ebf7] focus-within:border-[#1d5ff0] focus-within:ring-[#1d5ff0]/15",
+                )}
+              >
+                <input
+                  ref={barcodeInputRef}
+                  value={barcode}
+                  maxLength={32}
+                  onChange={(e) => setBarcode(e.target.value.trim())}
+                  onBlur={() => touch("barcode")}
+                  onKeyDown={(e) => {
+                    // Scanners finish with Enter; keep it from reaching other controls.
+                    if (e.key === "Enter") e.preventDefault();
+                  }}
+                  placeholder={t("menu.placeholder_barcode")}
+                  className="h-full min-w-0 flex-1 bg-white px-3 text-[14px] tabular-nums text-[#0b1220] outline-none placeholder:text-[#94a3b8]"
+                />
+                <button
+                  type="button"
+                  title={t("menu.barcode_scan_hint")}
+                  aria-label={t("menu.barcode_scan_hint")}
+                  onClick={() => {
+                    barcodeInputRef.current?.focus();
+                    barcodeInputRef.current?.select();
+                  }}
+                  className="mr-1.5 flex size-8 items-center justify-center rounded-lg bg-[#eef4ff] text-[#1d4ed8] hover:bg-[#e2ebff]"
+                >
+                  <ScanLine className="size-[18px]" strokeWidth={1.9} />
+                </button>
+              </div>
+              <FieldMessage error={errorFor("barcode")} help={t("menu.barcode_help")} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className={cn(card, "p-4")}>
+        {cardHeader(
+          <Layers className="size-6" strokeWidth={1.9} />,
+          t("menu.status_display_title"),
+          t("menu.status_display_subtitle"),
+        )}
+        <div className="mt-2 divide-y divide-[#eef2f8]">
+          {settingRow(
+            <ShoppingCart className="size-5" strokeWidth={1.9} />,
+            t("menu.available_for_sale"),
+            <ToggleSwitch checked={available} label={t("menu.available_for_sale")} onChange={() => setAvailable(!available)} />,
+          )}
+          {settingRow(
+            <Bookmark className="size-5" strokeWidth={1.9} />,
+            t("menu.label_favorites"),
+            <ToggleSwitch checked={isFavorite} label={t("menu.label_favorites")} onChange={() => setIsFavorite(!isFavorite)} />,
+          )}
+        </div>
+      </div>
+
+      <div className={cn(card, "p-4")}>
+        {cardHeader(
+          <Users className="size-6" strokeWidth={1.9} />,
+          t("menu.section_staff"),
+          t("menu.staff_meal_help"),
+          <ToggleSwitch
+            checked={staffMealAllowed}
+            label={t("menu.label_staff_meal_allow")}
+            onChange={() => {
+              const next = !staffMealAllowed;
+              setStaffMealAllowed(next);
+              if (next && !staffMealDailyLimit.trim()) setStaffMealDailyLimit("1");
+            }}
+          />,
+        )}
+        {staffMealAllowed ? (
+          <div className="mt-4 space-y-4">
+            <div className="grid items-start gap-2 sm:grid-cols-[minmax(0,1fr)_150px]">
+              <Segmented
+                value={staffMealPricingMode}
+                onChange={(v) => setStaffMealPricingMode(v as "free" | "custom")}
+                options={[
+                  { value: "free", label: t("menu.staff_meal_free") },
+                  { value: "custom", label: t("menu.staff_meal_special_price") },
+                ]}
+              />
+              <div data-product-field="staffPrice">
+                <div
+                  className={cn(
+                    "flex h-11 items-center overflow-hidden rounded-xl border bg-white",
+                    staffMealPricingMode !== "custom" && "bg-[#f7f9fd] opacity-60",
+                    errorFor("staffPrice") && staffMealPricingMode === "custom" ? "border-red-400" : "border-[#e3ebf7]",
+                  )}
+                >
+                  <span className="flex h-full items-center px-3 text-[14px] font-semibold text-[#64748b]">
+                    {currency.symbol}
+                  </span>
+                  <input
+                    value={staffMealPricingMode === "custom" ? staffMealCustomPrice : ""}
+                    disabled={staffMealPricingMode !== "custom"}
+                    inputMode="decimal"
+                    aria-label={t("menu.label_staff_price")}
+                    onChange={(e) => setStaffMealCustomPrice(e.target.value)}
+                    onBlur={() => touch("staffPrice")}
+                    placeholder="0.00"
+                    className="h-full min-w-0 flex-1 bg-transparent pr-3 text-[14px] tabular-nums text-[#0b1220] outline-none placeholder:text-[#94a3b8] disabled:cursor-not-allowed"
+                  />
+                </div>
+                {staffMealPricingMode === "custom" ? <FieldMessage error={errorFor("staffPrice")} /> : null}
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div data-product-field="staffFreeQty">
+                <FieldLabel>{t("menu.label_free_quantity")}</FieldLabel>
+                <NumberStepper
+                  value={staffMealPricingMode === "free" ? staffMealDailyLimit : staffMealFreeQty}
+                  placeholder={staffMealPricingMode === "free" ? "∞" : "0"}
+                  disabled={staffMealPricingMode === "free"}
+                  invalid={Boolean(errorFor("staffFreeQty"))}
+                  canDecrease={staffMealPricingMode === "custom" && freeN > 0}
+                  canIncrease={staffMealPricingMode === "custom" && freeN < freeCap}
+                  decreaseLabel={t("variants_page.decrease")}
+                  increaseLabel={t("variants_page.increase")}
+                  onStep={(d) => setStaffMealFreeQty(String(Math.min(freeCap, Math.max(0, freeN + d))))}
+                  onType={(v) => setStaffMealFreeQty(v === "" ? "" : String(Math.min(freeCap, Number(v))))}
+                  onBlur={() => touch("staffFreeQty")}
+                />
+                <FieldMessage
+                  error={errorFor("staffFreeQty")}
+                  help={
+                    staffMealPricingMode === "free"
+                      ? t("menu.staff_free_all_help")
+                      : t("menu.hint_staff_meal_first_free")
+                  }
+                />
+              </div>
+              <div data-product-field="staffDailyLimit">
+                <FieldLabel>{t("menu.label_daily_limit")}</FieldLabel>
+                <NumberStepper
+                  value={staffMealDailyLimit}
+                  placeholder="∞"
+                  invalid={Boolean(errorFor("staffDailyLimit"))}
+                  canDecrease={limitN > 0}
+                  canIncrease={limitN < 999}
+                  decreaseLabel={t("variants_page.decrease")}
+                  increaseLabel={t("variants_page.increase")}
+                  onStep={(d) => setDailyLimit(limitN + d)}
+                  onType={(v) => (v === "" ? setStaffMealDailyLimit("") : setDailyLimit(Number(v)))}
+                  onBlur={() => touch("staffDailyLimit")}
+                />
+                <FieldMessage error={errorFor("staffDailyLimit")} help={t("menu.daily_limit_help")} />
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <div className={cn(card, "p-4")}>
+        {cardHeader(
+          <SlidersHorizontal className="size-6" strokeWidth={1.9} />,
+          t("menu.additional_title"),
+          t("menu.additional_subtitle"),
+        )}
+        <div className="mt-2 divide-y divide-[#eef2f8]">
+          {settingRow(
+            <Printer className="size-5" strokeWidth={1.9} />,
+            t("menu.print_station_only"),
+            comingSoon,
+          )}
+          {settingRow(
+            <Layers className="size-5" strokeWidth={1.9} />,
+            t("menu.allow_modifiers"),
+            <ToggleSwitch
+              checked={modifiersAssignOpen || assignedModifierIds.length > 0}
+              label={t("menu.allow_modifiers")}
+              onChange={() => {
+                const next = !(modifiersAssignOpen || assignedModifierIds.length > 0);
+                setModifiersAssignOpen(next);
+                if (!next) setAssignedModifierIds([]);
+              }}
+            />,
+          )}
+        </div>
+        {(modifiersAssignOpen || assignedModifierIds.length > 0) && !supplyMallContext ? (
+          <div className="mt-3 space-y-2 rounded-xl border border-[#e3ebf7] bg-[#f7f9fd] p-3">
+            <p className="text-[12px] text-[#64748b]">{t("menu.assign_modifiers_help")}</p>
+            {modifierLibrary.length === 0 ? (
+              <p className="text-[13px] font-medium text-[#94a3b8]">
+                {t("menu.assign_modifiers_empty")}
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {modifierLibrary.map((g) => {
+                  const on = assignedModifierIds.includes(g.id);
+                  return (
+                    <button
+                      key={g.id}
+                      type="button"
+                      onClick={() =>
+                        setAssignedModifierIds((prev) =>
+                          on ? prev.filter((id) => id !== g.id) : [...prev, g.id],
+                        )
+                      }
+                      className={cn(
+                        "rounded-full border px-3 py-1.5 text-[12px] font-semibold transition",
+                        on
+                          ? "border-[#1d5ff0] bg-[#e8f0ff] text-[#1d5ff0]"
+                          : "border-[#e3ebf7] bg-white text-[#334155] hover:border-[#c7d6f5]",
+                      )}
+                    >
+                      {g.name}
+                      <span className="ml-1 tabular-nums text-[#94a3b8]">
+                        ({g.options.length})
+                      </span>
                     </button>
                   );
                 })}
               </div>
-              {vatChoices.options.length === 0 ? (
-                <p className="text-[11px] text-slate-500">{t("settings.tax_need_country")}</p>
+            )}
+          </div>
+        ) : null}
+      </div>
+
+      <div className={cn(card, "p-4")}>
+        {cardHeader(
+          <ClipboardList className="size-6" strokeWidth={1.9} />,
+          <>
+            {t("menu.internal_notes")}{" "}
+            <span className="text-[13px] font-medium text-[#64748b]">({t("variants_page.optional_label")})</span>
+          </>,
+          t("menu.internal_notes_help"),
+        )}
+        <div className="relative mt-3">
+          <textarea
+            value={internalNotes}
+            maxLength={DESCRIPTION_MAX}
+            onChange={(e) => setInternalNotes(e.target.value.slice(0, DESCRIPTION_MAX))}
+            placeholder={t("menu.internal_notes_placeholder")}
+            rows={3}
+            className="block w-full resize-none rounded-xl border border-[#e3ebf7] bg-white px-3.5 pb-7 pt-2.5 text-[14px] leading-relaxed text-[#0b1220] outline-none placeholder:text-[#94a3b8] focus:border-[#1d5ff0] focus:ring-2 focus:ring-[#1d5ff0]/15"
+          />
+          <span className="pointer-events-none absolute bottom-2 right-3 text-[12px] tabular-nums text-[#64748b]">
+            {internalNotes.length} / {DESCRIPTION_MAX}
+          </span>
+        </div>
+      </div>
+
+      {menus && menus.length > 0 ? (
+        <FormSection icon={<LayoutGrid className="size-[18px]" strokeWidth={2} />} title={t("menu.label_menu")}>
+          <div className="flex flex-wrap gap-1.5">
+            <Chip active={menuId === undefined} onClick={() => setMenuId(undefined)}>
+              {t("common.none")}
+            </Chip>
+            {menus.map((m) => (
+              <Chip key={m._id} active={menuId === m._id} onClick={() => setMenuId(m._id)}>
+                {m.name}
+              </Chip>
+            ))}
+          </div>
+        </FormSection>
+      ) : null}
+    </div>
+  );
+
+  const productBody = (
+    <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
+      {photoCard}
+
+      <div role="tablist" aria-label={t("menu.dialog_edit_title")} className="grid grid-cols-4 gap-2">
+        {tabs.map((tb) => {
+          const active = tab === tb.id;
+          const hasError =
+            submitted && FIELD_ORDER.some((f) => FIELD_TAB[f] === tb.id && errors[f]);
+          return (
+            <button
+              key={tb.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setTab(tb.id)}
+              className={cn(
+                "relative flex h-12 items-center justify-center gap-2 whitespace-nowrap rounded-2xl px-2 text-[14px] font-semibold transition",
+                active
+                  ? "shadow-[0_10px_22px_-12px_rgba(37,99,235,0.9)]"
+                  : "border border-[#e3ebf7] bg-white text-[#0b1220] shadow-[0_1px_2px_rgba(15,23,42,0.05)] hover:bg-[#f7f9fd]",
+              )}
+              style={active ? { backgroundColor: BRAND, color: "#ffffff" } : undefined}
+            >
+              {tb.icon}
+              <span className="truncate">{tb.label}</span>
+              {hasError ? (
+                <span className="absolute right-2 top-2 size-2 rounded-full" style={{ backgroundColor: "#ef4444" }} />
               ) : null}
-            </div>
-          ) : null}
+            </button>
+          );
+        })}
+      </div>
 
-          {!supplyMallContext && categoryPicker}
+      {tab === "general" ? generalPanel : null}
+      {tab === "variants" ? variantsPanel : null}
+      {tab === "stock" ? stockPanel : null}
+      {tab === "advanced" ? advancedPanel : null}
+    </div>
+  );
 
-          {/* Menu assignment */}
-          {menus && menus.length > 0 && !supplyMallContext && (
-            <div className="space-y-2">
-              <Label className="text-slate-600">{t("menu.label_menu_optional")}</Label>
-              <div className="flex flex-wrap gap-2">
+  const supplyBody = (
+    <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+      <div
+        className={cn(
+          "flex items-center gap-3 rounded-xl border px-4 py-3",
+          supplyAccentKitchen && "border-emerald-200/80 bg-emerald-50/60",
+          supplyAccentBar && "border-violet-200/80 bg-violet-50/60",
+        )}
+      >
+        {supplyAccentKitchen ? (
+          <ChefHat className="size-5 shrink-0 text-emerald-700" />
+        ) : (
+          <Wine className="size-5 shrink-0 text-violet-700" />
+        )}
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-slate-900">
+            {supplyAccentKitchen ? t("menu.station_kitchen") : t("menu.station_bar")}
+          </p>
+          <p className="text-xs text-slate-600">
+            {supplyAccentKitchen ? t("menu.supply_station_hint_kitchen") : t("menu.supply_station_hint_bar")}
+          </p>
+        </div>
+      </div>
+
+      {supplyQuickPresets.length > 0 && (
+        <div
+          className={cn(
+            "space-y-2 rounded-2xl border p-3 shadow-sm",
+            supplyAccentKitchen && "border-amber-200/70 bg-gradient-to-br from-amber-50/90 to-white",
+            supplyAccentBar && "border-violet-200/70 bg-gradient-to-br from-violet-50/50 to-white",
+          )}
+        >
+          <Label className="flex items-center gap-2 text-xs font-semibold text-slate-800">
+            <Sparkles className="size-3.5 shrink-0 text-amber-500" />
+            {t("menu.supply_quick_pick_title")}
+          </Label>
+          <p className="text-[11px] leading-snug text-slate-600">{t("menu.supply_quick_pick_hint")}</p>
+          <div className="flex max-h-[9.5rem] flex-wrap gap-1.5 overflow-y-auto overscroll-contain pr-0.5">
+            {supplyQuickPresets.map((p) => {
+              const PresetIcon = p.Icon;
+              return (
                 <button
+                  key={p.id}
                   type="button"
-                  onClick={() => setMenuId(undefined)}
+                  onClick={() => {
+                    setName(t(p.labelKey));
+                    setStockUnit(p.unit);
+                  }}
                   className={cn(
-                    "px-3 py-1.5 rounded-lg text-sm font-medium transition-all cursor-pointer",
-                    menuId === undefined
-                      ? "bg-brand text-white"
-                      : "bg-white text-slate-600 border border-slate-200 hover:border-slate-300"
+                    "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-left text-[11px] font-semibold transition-colors cursor-pointer",
+                    supplyAccentKitchen &&
+                      "border-emerald-200/80 bg-white text-emerald-900 hover:border-emerald-400 hover:bg-emerald-50",
+                    supplyAccentBar &&
+                      "border-violet-200/80 bg-white text-violet-950 hover:border-violet-400 hover:bg-violet-50",
                   )}
                 >
-                  {t("common.none")}
-                </button>
-                {menus.map((m) => (
-                  <button
-                    key={m._id}
-                    type="button"
-                    onClick={() => setMenuId(m._id)}
+                  <span
                     className={cn(
-                      "px-3 py-1.5 rounded-lg text-sm font-medium transition-all cursor-pointer",
-                      menuId === m._id
-                        ? "bg-brand text-white"
-                        : "bg-white text-slate-600 border border-slate-200 hover:border-slate-300"
+                      "flex size-6 shrink-0 items-center justify-center rounded-full",
+                      supplyAccentKitchen && "bg-emerald-500/15 text-emerald-800",
+                      supplyAccentBar && "bg-violet-500/15 text-violet-900",
                     )}
                   >
-                    {m.name}
+                    <PresetIcon className="size-3.5" strokeWidth={2} />
+                  </span>
+                  <span className="leading-tight">{t(p.labelKey)}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-2" data-product-field="name">
+        <Label className="flex items-center gap-2 font-medium text-slate-600">
+          <ClipboardList className="size-4 shrink-0 text-emerald-600" />
+          {t("menu.label_name")}
+        </Label>
+        <Input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={() => touch("name")}
+          placeholder={t("menu.placeholder_supply_name")}
+          className={cn(
+            "h-11 border-slate-200 bg-slate-50 text-base font-medium text-slate-900",
+            errorFor("name") && "border-red-400",
+          )}
+        />
+        <FieldMessage error={errorFor("name")} />
+      </div>
+
+      <div className="space-y-2" data-product-field="price">
+        <Label className="flex items-center gap-2 font-medium text-slate-600">
+          <CircleDollarSign className="size-4 shrink-0 text-emerald-600" />
+          {t("menu.supply_label_price", { symbol: currency.symbol })}
+        </Label>
+        <Input
+          value={price}
+          inputMode="decimal"
+          onChange={(e) => setPrice(e.target.value)}
+          onBlur={() => touch("price")}
+          placeholder="0.00"
+          className={cn("border-slate-200 bg-slate-50 text-slate-900", errorFor("price") && "border-red-400")}
+        />
+        <FieldMessage error={errorFor("price")} />
+      </div>
+
+      <div
+        className={cn(
+          "space-y-4 rounded-2xl border p-4 shadow-sm",
+          supplyAccentKitchen && "border-emerald-200/90 bg-gradient-to-b from-emerald-50/80 to-white",
+          supplyAccentBar && "border-violet-200/90 bg-gradient-to-b from-violet-50/80 to-white",
+        )}
+      >
+        <div className="flex items-center gap-2">
+          <Package className="size-4 shrink-0 text-slate-500" />
+          <p className="text-sm font-semibold text-slate-900">{t("menu.supply_section_inventory")}</p>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs font-medium text-slate-600">{t("menu.label_unit")}</Label>
+          <div className="flex flex-wrap gap-1.5">
+            {stockUnitOptions.map((u) => (
+              <button
+                key={u.value}
+                type="button"
+                onClick={() => setStockUnit(u.value)}
+                className={cn(
+                  "px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer border",
+                  stockUnit === u.value
+                    ? supplyAccentKitchen
+                      ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-800"
+                      : "border-violet-500/60 bg-violet-500/15 text-violet-900"
+                    : "bg-white border-slate-200 text-slate-600 hover:border-slate-300",
+                )}
+              >
+                {u.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1" data-product-field="stock">
+            <Label className="text-xs font-medium text-slate-600">
+              {editing ? t("menu.supply_qty_on_hand") : t("menu.initial_stock")}
+            </Label>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                aria-label={t("menu.supply_qty_minus")}
+                disabled={(parseDecimal(initialStock) || 0) <= 0}
+                onClick={() => {
+                  setStockQtyTouched(true);
+                  setInitialStock((prev) => String(Math.max(0, (parseDecimal(prev) || 0) - 1)));
+                }}
+                className={cn(
+                  "flex size-9 shrink-0 items-center justify-center rounded-lg border transition-colors cursor-pointer",
+                  (parseDecimal(initialStock) || 0) <= 0
+                    ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-300"
+                    : supplyAccentKitchen
+                      ? "border-emerald-200 bg-white text-emerald-800 hover:bg-emerald-50"
+                      : "border-violet-200 bg-white text-violet-900 hover:bg-violet-50",
+                )}
+              >
+                <Minus className="size-4" strokeWidth={2.5} />
+              </button>
+              <Input
+                value={initialStock}
+                inputMode="decimal"
+                onChange={(e) => {
+                  setStockQtyTouched(true);
+                  setInitialStock(e.target.value);
+                }}
+                onBlur={() => touch("stock")}
+                placeholder={t("menu.placeholder_qty_example")}
+                className={cn(
+                  "min-w-0 flex-1 border-slate-200 bg-white text-center text-slate-900 tabular-nums",
+                  errorFor("stock") && "border-red-400",
+                )}
+              />
+              <button
+                type="button"
+                aria-label={t("menu.supply_qty_plus")}
+                onClick={() => {
+                  setStockQtyTouched(true);
+                  setInitialStock((prev) => String((parseDecimal(prev) || 0) + 1));
+                }}
+                className={cn(
+                  "flex size-9 shrink-0 items-center justify-center rounded-lg border transition-colors cursor-pointer",
+                  supplyAccentKitchen
+                    ? "border-emerald-200 bg-white text-emerald-800 hover:bg-emerald-50"
+                    : "border-violet-200 bg-white text-violet-900 hover:bg-violet-50",
+                )}
+              >
+                <Plus className="size-4" strokeWidth={2.5} />
+              </button>
+            </div>
+            <FieldMessage error={errorFor("stock")} />
+          </div>
+          <div className="space-y-1" data-product-field="lowStock">
+            <Label className="text-xs font-medium text-slate-600">{t("menu.low_stock_alert")}</Label>
+            <Input
+              value={lowStockThreshold}
+              inputMode="decimal"
+              onChange={(e) => {
+                setLowStockThreshold(e.target.value);
+                setLowStockTouched(true);
+              }}
+              onBlur={() => touch("lowStock")}
+              placeholder={t("menu.placeholder_low_stock_example")}
+              className={cn("border-slate-200 bg-white text-slate-900", errorFor("lowStock") && "border-red-400")}
+            />
+            <FieldMessage error={errorFor("lowStock")} />
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <div
+          className={cn(
+            "flex items-center justify-between gap-3 rounded-xl border px-4 py-3",
+            supplyAccentKitchen && "border-emerald-200/80 bg-emerald-50/40",
+            supplyAccentBar && "border-violet-200/80 bg-violet-50/40",
+          )}
+        >
+          <div className="min-w-0 space-y-0.5">
+            <Label htmlFor="supply-details-toggle" className="text-sm font-medium text-slate-900">
+              {t("menu.supply_details_toggle")}
+            </Label>
+            <p className="text-xs text-slate-600">{t("menu.supply_details_toggle_hint")}</p>
+          </div>
+          <Switch
+            id="supply-details-toggle"
+            checked={supplyDetailsOpen}
+            onCheckedChange={setSupplyDetailsOpen}
+          />
+        </div>
+        {supplyDetailsOpen ? (
+          <div
+            className={cn(
+              "space-y-4 rounded-2xl border p-4 shadow-sm",
+              supplyAccentKitchen && "border-emerald-200/80 bg-gradient-to-br from-emerald-50/70 to-white",
+              supplyAccentBar && "border-violet-200/80 bg-gradient-to-br from-violet-50/70 to-white",
+            )}
+          >
+            <div className="flex items-center gap-2">
+              <Truck className="size-4 shrink-0 text-slate-600" />
+              <p className="text-sm font-semibold text-slate-900">{t("menu.supply_section_details")}</p>
+            </div>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-xs font-medium text-slate-600">
+                <Truck className="size-3.5 text-slate-500" />
+                {t("menu.supply_label_vendor")}
+              </Label>
+              <Input
+                value={supplyVendor}
+                onChange={(e) => setSupplyVendor(e.target.value)}
+                placeholder={t("menu.supply_placeholder_vendor")}
+                className="border-slate-200 bg-white text-slate-900"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-xs font-medium text-slate-600">
+                <Hash className="size-3.5 text-slate-500" />
+                {t("menu.supply_label_lot")}
+              </Label>
+              <Input
+                value={supplyLot}
+                onChange={(e) => setSupplyLot(e.target.value)}
+                placeholder={t("menu.supply_placeholder_lot")}
+                className="border-slate-200 bg-white text-slate-900"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-xs font-medium text-slate-600">
+                <CalendarDays className="size-3.5 text-slate-500" />
+                {t("menu.supply_label_expiry")}
+              </Label>
+              <Input
+                type="date"
+                value={supplyExpiryDate}
+                onChange={(e) => setSupplyExpiryDate(e.target.value)}
+                className="border-slate-200 bg-white text-slate-900"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-xs font-medium text-slate-600">
+                <Warehouse className="size-3.5 text-slate-500" />
+                {t("menu.supply_storage_label")}
+              </Label>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {(
+                  [
+                    { value: "fridge" as const, Icon: Thermometer, label: t("menu.supply_storage_fridge") },
+                    { value: "freezer" as const, Icon: Snowflake, label: t("menu.supply_storage_freezer") },
+                    { value: "dry" as const, Icon: Warehouse, label: t("menu.supply_storage_dry") },
+                    { value: "ambient" as const, Icon: Sun, label: t("menu.supply_storage_ambient") },
+                  ] as const
+                ).map(({ value, Icon, label }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setSupplyStorage((s) => (s === value ? undefined : value))}
+                    className={cn(
+                      "flex flex-col items-center gap-1 rounded-xl border px-2 py-2.5 text-center text-[11px] font-semibold transition-all cursor-pointer",
+                      supplyStorage === value
+                        ? supplyAccentKitchen
+                          ? "border-emerald-500/70 bg-emerald-500/15 text-emerald-900"
+                          : "border-violet-500/70 bg-violet-500/15 text-violet-900"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
+                    )}
+                  >
+                    <Icon className="size-4 shrink-0 opacity-90" />
+                    {label}
                   </button>
                 ))}
               </div>
             </div>
-          )}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
 
-          {!supplyMallContext && (
-            <div className="space-y-2">
-              <Label className="text-slate-600">
-                {t("menu.item_station_label")}
-                <span className="text-red-500"> *</span>
-              </Label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setStation("kitchen")}
-                  className={cn(
-                    "flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all cursor-pointer",
-                    station === "kitchen"
-                      ? "bg-orange-500/20 border-orange-500/50 text-orange-400"
-                      : "bg-white border-slate-200 text-slate-600 hover:border-slate-300",
-                  )}
-                >
-                  <ChefHat className="size-4" />
-                  {t("menu.station_kitchen")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStation("bar")}
-                  className={cn(
-                    "flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all cursor-pointer",
-                    station === "bar"
-                      ? "bg-purple-500/20 border-purple-500/50 text-purple-400"
-                      : "bg-white border-slate-200 text-slate-600 hover:border-slate-300",
-                  )}
-                >
-                  <Wine className="size-4" />
-                  {t("menu.station_bar")}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {!supplyMallContext && (
-            <>
-              <div className="flex items-center justify-between py-1">
-                <div className="flex items-center gap-2">
-                  <Star className="size-4 text-amber-400" />
-                  <Label className="text-slate-600">{t("menu.label_favorites")}</Label>
-                </div>
-                <Switch checked={isFavorite} onCheckedChange={setIsFavorite} />
-              </div>
-
-              <div className="flex items-center justify-between py-1">
-                <div className="flex items-center gap-2 min-w-0">
-                  <UtensilsCrossed className="size-4 shrink-0 text-amber-400" />
-                  <Label className="text-slate-600">
-                    {t("menu.label_staff_meal_allow")}
-                  </Label>
-                </div>
-                <Switch
-                  checked={staffMealAllowed}
-                  onCheckedChange={(next) => {
-                    setStaffMealAllowed(next);
-                    if (next && !staffMealDailyLimit.trim()) {
-                      setStaffMealDailyLimit("1");
-                    }
-                  }}
-                />
-              </div>
-
-              {staffMealAllowed && (
-                <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                  <Label className="text-slate-600">{t("menu.label_staff_meal_pricing")}</Label>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setStaffMealPricingMode("free")}
-                      className={cn(
-                        "px-3 py-1.5 rounded-lg text-xs font-medium border transition-all cursor-pointer",
-                        staffMealPricingMode === "free"
-                          ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-700"
-                          : "bg-white border-slate-200 text-slate-600 hover:border-slate-300",
-                      )}
-                    >
-                      {t("menu.staff_meal_free")}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setStaffMealPricingMode("custom")}
-                      className={cn(
-                        "px-3 py-1.5 rounded-lg text-xs font-medium border transition-all cursor-pointer",
-                        staffMealPricingMode === "custom"
-                          ? "bg-brand/15 border-brand/40 text-brand"
-                          : "bg-white border-slate-200 text-slate-600 hover:border-slate-300",
-                      )}
-                    >
-                      {t("menu.staff_meal_custom_price")}
-                    </button>
-                  </div>
-                  {staffMealPricingMode === "custom" && (
-                    <div className="space-y-1">
-                      <Label className="text-xs text-slate-500">{t("menu.label_staff_price")}</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={staffMealCustomPrice}
-                        onChange={(e) => setStaffMealCustomPrice(e.target.value)}
-                        placeholder="0.00"
-                        className="border-slate-200 bg-white text-slate-900"
-                      />
-                    </div>
-                  )}
-                  {staffMealPricingMode === "custom" && (
-                    <div className="space-y-1">
-                      <Label className="text-xs text-slate-500">
-                        {t("menu.label_staff_meal_free_qty")}
-                      </Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={staffMealFreeQty}
-                        onChange={(e) => setStaffMealFreeQty(e.target.value)}
-                        placeholder="0"
-                        className="border-slate-200 bg-white text-slate-900"
-                      />
-                      <p className="text-[11px] text-slate-500">
-                        {t("menu.hint_staff_meal_first_free")}
-                      </p>
-                    </div>
-                  )}
-                  <div className="space-y-1">
-                    <Label className="text-xs text-slate-500">
-                      {t("menu.label_staff_meal_daily_limit")}
-                    </Label>
-                    <Input
-                      type="number"
-                      min="1"
-                      step="1"
-                      value={staffMealDailyLimit}
-                      onChange={(e) => setStaffMealDailyLimit(e.target.value)}
-                      placeholder={t("menu.hint_staff_meal_daily_unlimited")}
-                      className="border-slate-200 bg-white text-slate-900"
-                    />
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-
-          {supplyMallContext ? (
-            <>
-            <div
-              className={cn(
-                "space-y-4 rounded-2xl border p-4 shadow-sm",
-                supplyAccentKitchen &&
-                  "border-emerald-200/90 bg-gradient-to-b from-emerald-50/80 to-white",
-                supplyAccentBar && "border-violet-200/90 bg-gradient-to-b from-violet-50/80 to-white",
-              )}
-            >
-              <div className="flex items-center gap-2">
-                <Package className="size-4 shrink-0 text-slate-500" />
-                <p className="text-sm font-semibold text-slate-900">
-                  {t("menu.supply_section_inventory")}
-                </p>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs font-medium text-slate-600">{t("menu.label_unit")}</Label>
-                <div className="flex flex-wrap gap-1.5">
-                  {stockUnitOptions.map((u) => (
-                    <button
-                      key={u.value}
-                      type="button"
-                      onClick={() => setStockUnit(u.value)}
-                      className={cn(
-                        "px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer border",
-                        stockUnit === u.value
-                          ? supplyAccentKitchen
-                            ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-800"
-                            : supplyAccentBar
-                              ? "border-violet-500/60 bg-violet-500/15 text-violet-900"
-                              : "bg-brand/20 border-brand/50 text-brand"
-                          : "bg-white border-slate-200 text-slate-600 hover:border-slate-300",
-                      )}
-                    >
-                      {u.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-xs font-medium text-slate-600">
-                    {editing
-                      ? t("menu.supply_qty_on_hand")
-                      : t("menu.initial_stock")}
-                  </Label>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      aria-label={t("menu.supply_qty_minus")}
-                      disabled={(parseFloat(initialStock) || 0) <= 0}
-                      onClick={() =>
-                        setInitialStock((prev) =>
-                          String(
-                            Math.max(0, (parseFloat(prev) || 0) - 1),
-                          ),
-                        )
-                      }
-                      className={cn(
-                        "flex size-9 shrink-0 items-center justify-center rounded-lg border transition-colors cursor-pointer",
-                        (parseFloat(initialStock) || 0) <= 0
-                          ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-300"
-                          : supplyAccentKitchen
-                            ? "border-emerald-200 bg-white text-emerald-800 hover:bg-emerald-50"
-                            : supplyAccentBar
-                              ? "border-violet-200 bg-white text-violet-900 hover:bg-violet-50"
-                              : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
-                      )}
-                    >
-                      <Minus className="size-4" strokeWidth={2.5} />
-                    </button>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="any"
-                      value={initialStock}
-                      onChange={(e) => setInitialStock(e.target.value)}
-                      placeholder={t("menu.placeholder_qty_example")}
-                      className="min-w-0 flex-1 border-slate-200 bg-white text-center text-slate-900 tabular-nums"
-                    />
-                    <button
-                      type="button"
-                      aria-label={t("menu.supply_qty_plus")}
-                      onClick={() =>
-                        setInitialStock((prev) =>
-                          String((parseFloat(prev) || 0) + 1),
-                        )
-                      }
-                      className={cn(
-                        "flex size-9 shrink-0 items-center justify-center rounded-lg border transition-colors cursor-pointer",
-                        supplyAccentKitchen
-                          ? "border-emerald-200 bg-white text-emerald-800 hover:bg-emerald-50"
-                          : supplyAccentBar
-                            ? "border-violet-200 bg-white text-violet-900 hover:bg-violet-50"
-                            : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
-                      )}
-                    >
-                      <Plus className="size-4" strokeWidth={2.5} />
-                    </button>
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs font-medium text-slate-600">
-                    {t("menu.low_stock_alert")}
-                  </Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="any"
-                    value={lowStockThreshold}
-                    onChange={(e) => setLowStockThreshold(e.target.value)}
-                    placeholder={t("menu.placeholder_low_stock_example")}
-                    className="border-slate-200 bg-white text-slate-900"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div
-                className={cn(
-                  "flex items-center justify-between gap-3 rounded-xl border px-4 py-3",
-                  supplyAccentKitchen &&
-                    "border-emerald-200/80 bg-emerald-50/40",
-                  supplyAccentBar && "border-violet-200/80 bg-violet-50/40",
-                )}
-              >
-                <div className="min-w-0 space-y-0.5">
-                  <Label
-                    htmlFor="supply-details-toggle"
-                    className="text-sm font-medium text-slate-900"
-                  >
-                    {t("menu.supply_details_toggle")}
-                  </Label>
-                  <p className="text-xs text-slate-600">
-                    {t("menu.supply_details_toggle_hint")}
-                  </p>
-                </div>
-                <Switch
-                  id="supply-details-toggle"
-                  checked={supplyDetailsOpen}
-                  onCheckedChange={setSupplyDetailsOpen}
-                />
-              </div>
-              {supplyDetailsOpen ? (
-                <div
-                  className={cn(
-                    "space-y-4 rounded-2xl border p-4 shadow-sm",
-                    supplyAccentKitchen &&
-                      "border-emerald-200/80 bg-gradient-to-br from-emerald-50/70 to-white",
-                    supplyAccentBar &&
-                      "border-violet-200/80 bg-gradient-to-br from-violet-50/70 to-white",
-                  )}
-                >
-                  <div className="flex items-center gap-2">
-                    <Truck className="size-4 shrink-0 text-slate-600" />
-                    <p className="text-sm font-semibold text-slate-900">
-                      {t("menu.supply_section_details")}
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2 text-xs font-medium text-slate-600">
-                      <Truck className="size-3.5 text-slate-500" />
-                      {t("menu.supply_label_vendor")}
-                    </Label>
-                    <Input
-                      value={supplyVendor}
-                      onChange={(e) => setSupplyVendor(e.target.value)}
-                      placeholder={t("menu.supply_placeholder_vendor")}
-                      className="border-slate-200 bg-white text-slate-900"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2 text-xs font-medium text-slate-600">
-                      <Hash className="size-3.5 text-slate-500" />
-                      {t("menu.supply_label_lot")}
-                    </Label>
-                    <Input
-                      value={supplyLot}
-                      onChange={(e) => setSupplyLot(e.target.value)}
-                      placeholder={t("menu.supply_placeholder_lot")}
-                      className="border-slate-200 bg-white text-slate-900"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2 text-xs font-medium text-slate-600">
-                      <CalendarDays className="size-3.5 text-slate-500" />
-                      {t("menu.supply_label_expiry")}
-                    </Label>
-                    <Input
-                      type="date"
-                      value={supplyExpiryDate}
-                      onChange={(e) => setSupplyExpiryDate(e.target.value)}
-                      className="border-slate-200 bg-white text-slate-900"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2 text-xs font-medium text-slate-600">
-                      <Warehouse className="size-3.5 text-slate-500" />
-                      {t("menu.supply_storage_label")}
-                    </Label>
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                      {(
-                        [
-                          {
-                            value: "fridge" as const,
-                            Icon: Thermometer,
-                            label: t("menu.supply_storage_fridge"),
-                          },
-                          {
-                            value: "freezer" as const,
-                            Icon: Snowflake,
-                            label: t("menu.supply_storage_freezer"),
-                          },
-                          {
-                            value: "dry" as const,
-                            Icon: Warehouse,
-                            label: t("menu.supply_storage_dry"),
-                          },
-                          {
-                            value: "ambient" as const,
-                            Icon: Sun,
-                            label: t("menu.supply_storage_ambient"),
-                          },
-                        ] as const
-                      ).map(({ value, Icon, label }) => (
-                        <button
-                          key={value}
-                          type="button"
-                          onClick={() =>
-                            setSupplyStorage((s) => (s === value ? undefined : value))
-                          }
-                          className={cn(
-                            "flex flex-col items-center gap-1 rounded-xl border px-2 py-2.5 text-center text-[11px] font-semibold transition-all cursor-pointer",
-                            supplyStorage === value
-                              ? supplyAccentKitchen
-                                ? "border-emerald-500/70 bg-emerald-500/15 text-emerald-900"
-                                : supplyAccentBar
-                                  ? "border-violet-500/70 bg-violet-500/15 text-violet-900"
-                                  : "border-slate-400 bg-slate-100"
-                              : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
-                          )}
-                        >
-                          <Icon className="size-4 shrink-0 opacity-90" />
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-            </>
-          ) : (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-slate-600">{t("menu.label_track_stock")}</Label>
-                <Switch checked={trackStock} onCheckedChange={setTrackStock} />
-              </div>
-              {trackStock && (
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs text-slate-500">{t("menu.label_unit")}</Label>
-                    <div className="flex flex-wrap gap-1.5">
-                      {stockUnitOptions.map((u) => (
-                        <button
-                          key={u.value}
-                          type="button"
-                          onClick={() => setStockUnit(u.value)}
-                          className={cn(
-                            "px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer border",
-                            stockUnit === u.value
-                              ? "bg-brand/20 border-brand/50 text-brand"
-                              : "bg-white border-slate-200 text-slate-600 hover:border-slate-300",
-                          )}
-                        >
-                          {u.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <Label className="text-xs text-slate-500">
-                        {t("menu.initial_stock")}
-                      </Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={initialStock}
-                        onChange={(e) => setInitialStock(e.target.value)}
-                        placeholder={t("menu.placeholder_qty_example")}
-                        className="border-slate-200 bg-slate-50 text-slate-900"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs text-slate-500">
-                        {t("menu.low_stock_alert")}
-                      </Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={lowStockThreshold}
-                        onChange={(e) => setLowStockThreshold(e.target.value)}
-                        placeholder={t("menu.placeholder_low_stock_example")}
-                        className="border-slate-200 bg-slate-50 text-slate-900"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {canEditRecipe && enterpriseSupplyRecipe && !supplyMallContext && (
-            <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/90 p-4">
-              <div className="flex items-start gap-2">
-                <ClipboardList className="mt-0.5 size-4 shrink-0 text-slate-500" />
-                <div className="min-w-0 space-y-0.5">
-                  <p className="text-sm font-semibold text-slate-900">
-                    {t("menu.recipe_section_title")}
-                  </p>
-                  <p className="text-xs text-slate-500 leading-snug">
-                    {t("menu.recipe_section_hint")}
-                  </p>
-                </div>
-              </div>
-              {recipeIngredientOptions.length === 0 ? (
-                <p className="rounded-lg border border-amber-100 bg-amber-50 px-2 py-2 text-xs text-amber-900">
-                  {t("menu.recipe_no_supply_items")}
-                </p>
-              ) : null}
-              <div className="space-y-2">
-                {recipeLines.map((line) => {
-                  const picked = recipeIngredientOptions.find(
-                    (i) => i._id === line.supplyMenuItemId,
-                  );
-                  const unitLabel =
-                    picked?.stockUnit != null
-                      ? t(`menu.stock_unit_${picked.stockUnit}`)
-                      : null;
-                  return (
-                    <div
-                      key={line.key}
-                      className="flex flex-wrap items-end gap-2 rounded-lg border border-slate-200 bg-white p-2"
-                    >
-                      <div className="min-w-[160px] flex-1 space-y-1">
-                        <Label className="text-[11px] text-slate-500">
-                          {t("menu.recipe_ingredient")}
-                        </Label>
-                        <select
-                          value={line.supplyMenuItemId}
-                          onChange={(e) => {
-                            const v = e.target.value as Id<"menuItems"> | "";
-                            setRecipeLines((prev) =>
-                              prev.map((row) =>
-                                row.key === line.key
-                                  ? { ...row, supplyMenuItemId: v }
-                                  : row,
-                              ),
-                            );
-                          }}
-                          className="h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-900"
-                        >
-                          <option value="">{t("menu.recipe_pick_ingredient")}</option>
-                          {recipeIngredientOptions.map((opt) => (
-                            <option key={opt._id} value={opt._id}>
-                              {opt.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="w-[100px] space-y-1">
-                        <Label className="text-[11px] text-slate-500">
-                          {t("menu.recipe_qty_label")}
-                        </Label>
-                        <Input
-                          type="text"
-                          inputMode="decimal"
-                          value={line.qty}
-                          onChange={(e) =>
-                            setRecipeLines((prev) =>
-                              prev.map((row) =>
-                                row.key === line.key
-                                  ? { ...row, qty: e.target.value }
-                                  : row,
-                              ),
-                            )
-                          }
-                          placeholder={t("menu.recipe_qty_placeholder")}
-                          className="h-9 border-slate-200 bg-white text-slate-900"
-                        />
-                      </div>
-                      {unitLabel ? (
-                        <span className="pb-2 text-[11px] text-slate-400">
-                          {unitLabel}
-                        </span>
-                      ) : (
-                        <span className="pb-2 text-[11px] text-transparent">—</span>
-                      )}
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="shrink-0 text-slate-400 hover:text-red-600"
-                        aria-label={t("menu.recipe_remove_line")}
-                        onClick={() =>
-                          setRecipeLines((prev) =>
-                            prev.filter((row) => row.key !== line.key),
-                          )
-                        }
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </div>
-                  );
-                })}
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="border-slate-200"
-                onClick={() =>
-                  setRecipeLines((prev) => [
-                    ...prev,
-                    { key: newRecipeLineKey(), supplyMenuItemId: "", qty: "" },
-                  ])
-                }
-              >
-                <Plus className="mr-1.5 size-4" />
-                {t("menu.recipe_add_line")}
-              </Button>
-            </div>
-          )}
-
-          {editing && !supplyMallContext && (
-            <div className="flex items-center justify-between">
-              <Label className="text-slate-600">{t("menu.label_available")}</Label>
-              <Switch checked={available} onCheckedChange={setAvailable} />
-            </div>
-          )}
-        </div>
-
-        <SheetFooter
+  return (
+    <Sheet open={open} onOpenChange={(next) => (!next && saving ? undefined : onOpenChange(next))}>
+      <SheetContent
+        side="right"
+        className={cn(
+          "flex h-full w-full flex-col gap-0 overflow-hidden p-0 [&>button:last-child]:hidden",
+          supplyMallContext
+            ? "bg-white text-slate-900 sm:max-w-xl"
+            : "border-l border-[#e3ebf7] bg-[linear-gradient(180deg,#f7f9ff,#ffffff)] text-[#0b1220] sm:max-w-[640px]",
+          supplyAccentKitchen && "border-slate-200 border-t-[6px] border-t-emerald-500",
+          supplyAccentBar && "border-slate-200 border-t-[6px] border-t-violet-500",
+        )}
+      >
+        <SheetHeader
           className={cn(
-            "shrink-0 flex-row justify-end gap-2 border-t bg-white px-6 py-4",
-            supplyAccentKitchen && "border-emerald-100",
-            supplyAccentBar && "border-violet-100",
-            !supplyMallContext && "border-slate-200",
+            "flex-row items-center gap-3.5 space-y-0 border-b px-6 py-4 text-left",
+            supplyAccentKitchen && "border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-white",
+            supplyAccentBar && "border-violet-100 bg-gradient-to-br from-violet-50 via-white to-white",
+            !supplyMallContext && "border-[#eef2f8]",
           )}
         >
-          <Button
-            variant="ghost"
-            onClick={() => onOpenChange(false)}
-            className="text-slate-500"
-          >
-            {t("menu.btn_cancel")}
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={saving}
+          <span
             className={cn(
-              "text-white shadow-sm",
-              supplyAccentKitchen && "bg-emerald-600 hover:bg-emerald-700",
-              supplyAccentBar && "bg-violet-600 hover:bg-violet-700",
-              !supplyMallContext &&
-                "bg-gradient-to-r from-brand to-[#22c55e] hover:opacity-95",
+              "flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border",
+              supplyAccentKitchen && "border-emerald-200 bg-white text-emerald-700",
+              supplyAccentBar && "border-violet-200 bg-white text-violet-700",
+              !supplyMallContext && "border-[#dbe7ff] bg-[linear-gradient(145deg,#f5f9ff,#e4eeff)] text-[#2563eb]",
             )}
           >
-            {editing
-              ? t("menu.btn_save_changes")
-              : supplyMallContext
-                ? t("menu.btn_add_supply")
-                : t("menu.btn_add_item")}
-          </Button>
-        </SheetFooter>
+            {supplyMallContext ? (
+              supplyAccentKitchen ? (
+                <ChefHat className="size-6" strokeWidth={2} />
+              ) : (
+                <Wine className="size-6" strokeWidth={2} />
+              )
+            ) : imagePreview ? (
+              <img src={imagePreview} alt="" className="size-full object-cover" />
+            ) : (
+              <Package className="size-6" strokeWidth={1.9} />
+            )}
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-center gap-2">
+              <SheetTitle className="truncate text-[22px] font-bold tracking-tight text-[#0b1220]">
+                {supplyMallContext
+                  ? editing
+                    ? supplyAccentKitchen
+                      ? t("menu.dialog_edit_supply_kitchen_title")
+                      : t("menu.dialog_edit_supply_bar_title")
+                    : supplyAccentKitchen
+                      ? t("menu.dialog_new_supply_kitchen_title")
+                      : t("menu.dialog_new_supply_bar_title")
+                  : editing
+                    ? t("menu.dialog_edit_title")
+                    : t("menu.dialog_new_title")}
+              </SheetTitle>
+            </div>
+            <SheetDescription className="truncate text-[13px] text-[#475569]">
+              {supplyMallContext
+                ? supplyAccentKitchen
+                  ? t("menu.supply_subtitle_kitchen")
+                  : t("menu.supply_subtitle_bar")
+                : editing
+                  ? t("menu.dialog_edit_desc")
+                  : t("menu.dialog_new_desc")}
+            </SheetDescription>
+          </div>
+          {!supplyMallContext ? (
+            <Select value={available ? "on" : "off"} onValueChange={(v) => setAvailable(v === "on")}>
+              <SelectTrigger
+                aria-label={t("menu.label_available")}
+                title={available ? t("menu.available_help_on") : t("menu.available_help_off")}
+                className="h-10 w-auto shrink-0 gap-2 rounded-xl border-[#e3ebf7] bg-white px-3.5 text-[14px] font-semibold text-[#0b1220] shadow-sm"
+              >
+                <span className="flex items-center gap-2">
+                  <span
+                    className="size-2.5 rounded-full"
+                    style={{ backgroundColor: available ? "#16a34a" : "#ef4444" }}
+                  />
+                  <SelectValue />
+                </span>
+              </SelectTrigger>
+              <SelectContent align="end" className={selectContent}>
+                <SelectItem value="on" className={selectItem}>
+                  {t("menu.status_available")}
+                </SelectItem>
+                <SelectItem value="off" className={selectItem}>
+                  {t("menu.status_unavailable")}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          ) : null}
+          <button
+            type="button"
+            aria-label={t("menu.btn_cancel")}
+            disabled={saving}
+            onClick={() => onOpenChange(false)}
+            className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-[#e3ebf7] bg-white text-[#0b1220] shadow-sm hover:bg-[#f1f5fb]"
+          >
+            <X className="size-[18px]" strokeWidth={2.2} />
+          </button>
+        </SheetHeader>
+
+        {supplyMallContext ? supplyBody : productBody}
+
+        <div className="flex gap-3 border-t border-[#eef2f8] bg-white px-6 py-4">
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => onOpenChange(false)}
+            className="h-12 flex-1 rounded-2xl border border-[#e3ebf7] bg-white text-[15px] font-semibold text-[#0b1220] shadow-sm hover:bg-[#f7f9fd]"
+          >
+            {t("menu.btn_cancel")}
+          </button>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => void handleSubmit()}
+            className="inline-flex h-12 flex-[1.6] items-center justify-center gap-2 rounded-2xl text-[15px] font-semibold shadow-[0_10px_22px_-12px_rgba(37,99,235,0.9)] disabled:opacity-60"
+            style={{ backgroundColor: saveColor, color: "#ffffff" }}
+          >
+            <Check className="size-5" strokeWidth={2.4} />
+            {saving
+              ? t("common.loading")
+              : editing
+                ? t("menu.btn_save_changes")
+                : supplyMallContext
+                  ? t("menu.btn_add_supply")
+                  : t("menu.btn_add_item")}
+          </button>
+        </div>
       </SheetContent>
     </Sheet>
   );

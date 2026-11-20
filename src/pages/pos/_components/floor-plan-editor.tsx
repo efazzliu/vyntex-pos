@@ -46,12 +46,13 @@ import { useOfflineData } from "@/hooks/use-offline-data.ts";
 import { getDataCache, saveDataCache } from "@/lib/local-db.ts";
 import { posTablesIndexedDbKey } from "@/lib/supabase-pos/cache-keys.ts";
 import { errorMessageFromUnknown } from "@/lib/supabase-pos/db-errors.ts";
+import { FLOOR_ROOMS_NEED_COLUMN, type FloorRoomSize } from "@/lib/supabase-pos/floor-room-ops.ts";
 import {
-  TABLE_SCALE_MAX,
-  TABLE_SCALE_MIN,
   clampTableScale,
   firstFreeFloorSlot,
-  floorCanvasBox,
+  floorFitScale,
+  floorRoomBox,
+  floorRoomMinBox,
   nextFloorTableSlot,
   tableFootprint,
   tableScaleXY,
@@ -61,20 +62,15 @@ import { usePosLocale } from "./pos-locale-provider.tsx";
 /** Floor scale: a 1.0 m square table is 80 px at 100 % zoom. */
 const PX_PER_M = 80;
 const GRID_SIZE = 20;
-/** Extra room right/below the last table so it can be dragged outward (the room then grows and the view refits). */
-const EDITOR_GROW_PX = 160;
 /** Ruler band above/left of the room. */
 const RULER = 34;
-/** Wall line inset inside the canvas. */
-const WALL_INSET = 8;
+/** Wall line inset inside the canvas (0: the walls are the room box, so the rulers match the saved size). */
+const WALL_INSET = 0;
 /** Closest a table may get to the wall line. */
 const MIN_REL = 16;
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 1.6;
 const ZOOM_STEP = 0.1;
-/** Mouse-wheel resize: one notch (~100 px of delta) grows / shrinks the table by 0.1 m. */
-const WHEEL_PX_PER_STEP = 100;
-const WHEEL_STEP_M = 0.1;
 /** After this, a refetch wins even if it never echoed the local change (e.g. another device). */
 const PENDING_PATCH_MAX_MS = 15_000;
 
@@ -163,13 +159,51 @@ function fmtDuration(minutes: number): string {
 function seatsForSize(shape: TableShape, widthM: number, heightM: number): number {
   const clampSeats = (n: number) => Math.max(2, Math.min(16, n));
   const long = Math.max(widthM, heightM);
-  const short = Math.min(widthM, heightM);
   if (shape === "circle") return clampSeats(Math.round(10 * long - 6));
   if (long < 0.9) return 2;
-  if (shape === "square") return clampSeats(Math.max(1, Math.floor(long / 0.55 + 0.05)) * 4);
-  const perLongSide = Math.max(1, Math.round(long / 0.55));
-  const ends = short >= 0.7 ? 1 : 0;
-  return clampSeats(perLongSide * 2 + ends * 2);
+  return clampSeats(sideSeatCaps(widthM, heightM).reduce((sum, n) => sum + n, 0));
+}
+
+/** Chairs one edge of this length holds: 0.8–1.0 m → 1, 1.2 m → 2, 1.6 m → 3, under 0.65 m → 0. */
+function edgeSeatCap(lengthM: number): number {
+  return Math.max(0, Math.floor((lengthM - 0.2) / 0.45 + 1e-6));
+}
+
+/** Per-side capacity [top, right, bottom, left]; the long sides always take at least one chair. */
+function sideSeatCaps(widthM: number, heightM: number): [number, number, number, number] {
+  const across = edgeSeatCap(widthM);
+  const down = edgeSeatCap(heightM);
+  return widthM >= heightM
+    ? [Math.max(1, across), down, Math.max(1, across), down]
+    : [across, Math.max(1, down), across, Math.max(1, down)];
+}
+
+/**
+ * How many chairs go on each side [top, right, bottom, left]: the long sides fill first, the
+ * short ends only when the long sides are full (one end before the other). Seats beyond the
+ * table's capacity squeeze onto the long sides.
+ */
+function chairsPerSide(seats: number, widthM: number, heightM: number): [number, number, number, number] {
+  const caps = sideSeatCaps(widthM, heightM);
+  const longSides = widthM >= heightM ? [0, 2] : [1, 3];
+  const shortSides = widthM >= heightM ? [1, 3] : [0, 2];
+  const counts: [number, number, number, number] = [0, 0, 0, 0];
+  let left = seats;
+  for (const group of [longSides, shortSides]) {
+    let placed = true;
+    while (left > 0 && placed) {
+      placed = false;
+      for (const s of group) {
+        if (left > 0 && counts[s] < caps[s]) {
+          counts[s] += 1;
+          left -= 1;
+          placed = true;
+        }
+      }
+    }
+  }
+  for (let i = 0; left > 0; i++, left--) counts[longSides[i % 2]] += 1;
+  return counts;
 }
 
 /** Draft with seats refitted to its size; a half-typed size ("1.") keeps the current seats. */
@@ -200,19 +234,7 @@ function chairLayout(shape: TableShape, seats: number, w: number, h: number) {
     }
     return chairs;
   }
-  // [top, right, bottom, left]
-  const counts = [0, 0, 0, 0];
-  if (shape === "rectangle") {
-    const ends = n >= 6 ? 1 : 0;
-    counts[1] = ends;
-    counts[3] = ends;
-    const rest = n - ends * 2;
-    counts[0] = Math.ceil(rest / 2);
-    counts[2] = Math.floor(rest / 2);
-  } else {
-    const order = [3, 1, 0, 2];
-    for (let i = 0; i < n; i++) counts[order[i % 4]] += 1;
-  }
+  const counts = chairsPerSide(n, w / PX_PER_M, h / PX_PER_M);
   const place = (side: number, count: number) => {
     for (let i = 0; i < count; i++) {
       const horizontal = side === 0 || side === 2;
@@ -294,6 +316,7 @@ export default function FloorPlanEditor({ licenseKey }: { licenseKey: string }) 
   const moveTable = useMutation("pos.tables.moveTable");
   const renameZoneMut = useMutation("pos.tables.renameZone");
   const deleteZoneMut = useMutation("pos.tables.deleteZone");
+  const setFloorRoomMut = useMutation("pos.tables.setFloorRoom");
 
   const [localTables, setLocalTables] = useState<Doc<"tables">[]>([]);
   const [activeZone, setActiveZone] = useState<string | null>(null);
@@ -383,8 +406,52 @@ export default function FloorPlanEditor({ licenseKey }: { licenseKey: string }) 
     };
   };
 
+  // ── Room (walls) size: saved per zone, shared with the waiter floor ──
+  const roomsQuery = useQuery("pos.tables.getFloorRooms", { licenseKey }) as
+    | Record<string, FloorRoomSize>
+    | undefined;
+  const [roomOverride, setRoomOverride] = useState<Record<string, FloorRoomSize | null>>({});
+  const [roomDrag, setRoomDrag] = useState<{
+    axis: "x" | "y" | "both";
+    startX: number;
+    startY: number;
+    origW: number;
+    origH: number;
+    scale: number;
+  } | null>(null);
+  const [roomLive, setRoomLive] = useState<FloorRoomSize | null>(null);
+  // Optimistic sizes stay until the server returns the same value.
+  useEffect(() => {
+    if (!roomsQuery) return;
+    setRoomOverride((o) => {
+      let changed = false;
+      const next = { ...o };
+      for (const [zone, size] of Object.entries(o)) {
+        const server = roomsQuery[zone] ?? null;
+        const same =
+          size === null
+            ? server === null
+            : server !== null &&
+              Math.abs(server.widthM - size.widthM) < 0.01 &&
+              Math.abs(server.heightM - size.heightM) < 0.01;
+        if (same) {
+          delete next[zone];
+          changed = true;
+        }
+      }
+      return changed ? next : o;
+    });
+  }, [roomsQuery]);
+  const savedRoom = activeZone
+    ? activeZone in roomOverride
+      ? roomOverride[activeZone]
+      : (roomsQuery?.[activeZone] ?? null)
+    : null;
+
   // ── Canvas geometry ──
-  const box = floorCanvasBox(zoneTables.map(drawn), EDITOR_GROW_PX);
+  const drawnZoneTables = zoneTables.map(drawn);
+  const box = floorRoomBox(drawnZoneTables, roomLive ?? savedRoom);
+  const minRoom = floorRoomMinBox(drawnZoneTables);
   const [viewport, setViewport] = useState({ w: 0, h: 0 });
   const hasZone = Boolean(activeZone);
   useEffect(() => {
@@ -396,20 +463,36 @@ export default function FloorPlanEditor({ licenseKey }: { licenseKey: string }) 
     observer.observe(el);
     return () => observer.disconnect();
   }, [hasZone]);
-  // 100 % zoom = the whole room fits the viewport (never scrolls); only zooming in past fit scrolls.
-  const naturalW = RULER + box.width + 8;
-  const naturalH = RULER + box.height + 8;
-  const fitScale =
-    viewport.w > 0 && viewport.h > 0
-      ? Math.min(1, viewport.w / naturalW, viewport.h / naturalH)
-      : 1;
-  const scale = fitScale * zoom;
-  const canvasW = Math.max(box.width, viewport.w / scale - RULER - 8);
-  const canvasH = Math.max(box.height, viewport.h / scale - RULER - 8);
+  // The room is the same size as on the waiter floor (`floorRoomBox`); 100 % zoom fits it to the
+  // viewport. The view never scrolls: drag empty floor to pan. While the walls are dragged the
+  // scale is frozen so the corner stays under the mouse; it refits on release.
+  const canvasW = box.width;
+  const canvasH = box.height;
+  const scale =
+    roomDrag?.scale ??
+    floorFitScale({ width: RULER + canvasW + 8, height: RULER + canvasH + 8 }, viewport) * zoom;
   const totalW = RULER + canvasW + 8;
   const totalH = RULER + canvasH + 8;
   const roomW = canvasW - WALL_INSET * 2;
   const roomH = canvasH - WALL_INSET * 2;
+
+  // ── Pan (grab empty floor and move the view) ──
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const panRef = useRef<{ startX: number; startY: number; origX: number; origY: number; moved: boolean } | null>(null);
+  const suppressClickRef = useRef(false);
+  const [panning, setPanning] = useState(false);
+  useEffect(() => {
+    setPan({ x: 0, y: 0 });
+  }, [activeZone, zoom]);
+  const clampPan = (p: { x: number; y: number }) => {
+    const keep = 120;
+    const w = totalW * scale;
+    const h = totalH * scale;
+    return {
+      x: Math.min(Math.max(p.x, keep - w), Math.max(keep, viewport.w - keep)),
+      y: Math.min(Math.max(p.y, keep - h), Math.max(keep, viewport.h - keep)),
+    };
+  };
 
   // ── Pending / history helpers ──
   const writeCache = useCallback(
@@ -571,7 +654,65 @@ export default function FloorPlanEditor({ licenseKey }: { licenseKey: string }) 
     setResizeLive({ widthM: m.widthM, heightM: m.heightM });
   };
 
+  const onRoomHandlePointerDown = (e: React.PointerEvent, axis: "x" | "y" | "both") => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setRoomDrag({ axis, startX: e.clientX, startY: e.clientY, origW: canvasW, origH: canvasH, scale });
+    setRoomLive({ widthM: canvasW / PX_PER_M, heightM: canvasH / PX_PER_M });
+  };
+
+  const roomTarget = (r: NonNullable<typeof roomDrag>, clientX: number, clientY: number): FloorRoomSize => {
+    const w = r.axis === "y" ? r.origW : r.origW + (clientX - r.startX) / r.scale;
+    const h = r.axis === "x" ? r.origH : r.origH + (clientY - r.startY) / r.scale;
+    return {
+      widthM: Math.max(minRoom.width, snap(w)) / PX_PER_M,
+      heightM: Math.max(minRoom.height, snap(h)) / PX_PER_M,
+    };
+  };
+
+  const saveRoom = async (zone: string, size: FloorRoomSize | null) => {
+    const before = savedRoom;
+    setRoomOverride((o) => ({ ...o, [zone]: size }));
+    try {
+      await setFloorRoomMut({
+        licenseKey,
+        zone,
+        widthM: size?.widthM ?? null,
+        heightM: size?.heightM ?? null,
+      });
+    } catch (err) {
+      setRoomOverride((o) => ({ ...o, [zone]: before }));
+      const needsColumn = err instanceof Error && err.message === FLOOR_ROOMS_NEED_COLUMN;
+      toast.error(
+        needsColumn ? t("floor.room_needs_db") : errorMessageFromUnknown(err, t("floor.save_failed")),
+        needsColumn ? { duration: 12_000 } : undefined,
+      );
+    }
+  };
+
+  const onFloorPointerDown = (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    panRef.current = { startX: e.clientX, startY: e.clientY, origX: pan.x, origY: pan.y, moved: false };
+    setPanning(true);
+  };
+
   const onCanvasPointerMove = (e: React.PointerEvent) => {
+    if (roomDrag) {
+      e.preventDefault();
+      setRoomLive(roomTarget(roomDrag, e.clientX, e.clientY));
+      return;
+    }
+    const p = panRef.current;
+    if (p) {
+      const dx = e.clientX - p.startX;
+      const dy = e.clientY - p.startY;
+      if (!p.moved && Math.abs(dx) + Math.abs(dy) < 4) return;
+      p.moved = true;
+      setPan(clampPan({ x: p.origX + dx, y: p.origY + dy }));
+      return;
+    }
     if (resize) {
       e.preventDefault();
       const next = resizeTarget(resize, e.clientX, e.clientY);
@@ -594,6 +735,22 @@ export default function FloorPlanEditor({ licenseKey }: { licenseKey: string }) 
   };
 
   const endPointer = (e: React.PointerEvent) => {
+    if (roomDrag) {
+      const next = roomTarget(roomDrag, e.clientX, e.clientY);
+      const changed =
+        Math.abs(next.widthM * PX_PER_M - roomDrag.origW) > 0.5 ||
+        Math.abs(next.heightM * PX_PER_M - roomDrag.origH) > 0.5;
+      setRoomDrag(null);
+      setRoomLive(null);
+      if (changed && activeZone) void saveRoom(activeZone, next);
+      return;
+    }
+    if (panRef.current) {
+      suppressClickRef.current = panRef.current.moved;
+      panRef.current = null;
+      setPanning(false);
+      return;
+    }
     if (resize) {
       // Resize only edits the draft; Save writes it (with undo).
       setResize(null);
@@ -616,55 +773,11 @@ export default function FloorPlanEditor({ licenseKey }: { licenseKey: string }) 
     setDragPos(null);
     setResize(null);
     setResizeLive(null);
+    setRoomDrag(null);
+    setRoomLive(null);
+    panRef.current = null;
+    setPanning(false);
   };
-
-  // Wheel over a table: first selects it, then resizes the draft (like the corner handle; Save writes it).
-  // Native listener because React's onWheel is passive and cannot stop the canvas from scrolling.
-  const wheelAccRef = useRef(0);
-  useEffect(() => {
-    const el = floorRef.current;
-    if (!el) return;
-    const onWheel = (e: WheelEvent) => {
-      if (e.ctrlKey || drag || resize) return;
-      const tableEl = (e.target as HTMLElement | null)?.closest<HTMLElement>("[data-table-id]");
-      const id = tableEl?.dataset.tableId as Id<"tables"> | undefined;
-      if (!id) return;
-      e.preventDefault();
-      if (id !== selectedId) {
-        wheelAccRef.current = 0;
-        setTool("tables");
-        setSelectedId(id);
-        return;
-      }
-      const px = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
-      wheelAccRef.current += px;
-      const steps = Math.trunc(wheelAccRef.current / WHEEL_PX_PER_STEP);
-      if (steps === 0) return;
-      wheelAccRef.current -= steps * WHEEL_PX_PER_STEP;
-      const delta = -steps * WHEEL_STEP_M;
-      setDraft((d) => {
-        if (!d) return d;
-        const w = parseM(d.widthM);
-        const h = parseM(d.heightM);
-        if (!Number.isFinite(w) || !Number.isFinite(h)) return d;
-        const base = baseSize(d.shape);
-        const clampDim = (v: number, basePx: number) =>
-          Math.min(
-            (basePx * TABLE_SCALE_MAX) / PX_PER_M,
-            Math.max(Math.max(0.4, (basePx * TABLE_SCALE_MIN) / PX_PER_M), v),
-          );
-        const nextW = clampDim(w + delta, base.w);
-        const nextH = clampDim(h + delta, base.h);
-        if (d.shape === "circle") {
-          const side = Math.max(nextW, nextH);
-          return { ...d, widthM: fmtM(side), heightM: fmtM(side), seats: seatsForSize(d.shape, side, side) };
-        }
-        return { ...d, widthM: fmtM(nextW), heightM: fmtM(nextH), seats: seatsForSize(d.shape, nextW, nextH) };
-      });
-    };
-    el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
-  }, [hasZone, selectedId, drag, resize]);
 
   // ── Table actions ──
   const addTable = async (preset?: (typeof SIZE_PRESETS)[number]) => {
@@ -1031,22 +1144,38 @@ export default function FloorPlanEditor({ licenseKey }: { licenseKey: string }) 
             <div
               ref={floorRef}
               className={cn(
-                "relative min-h-0 flex-1 select-none overscroll-contain bg-[#fbfcfe]",
-                zoom > 1 ? "overflow-auto" : "overflow-hidden",
+                "relative min-h-0 flex-1 touch-none select-none overflow-hidden overscroll-contain bg-[#fbfcfe]",
+                panning ? "cursor-grabbing" : "cursor-grab",
               )}
+              onPointerDown={(e) => {
+                if ((e.target as HTMLElement).closest("button, a, input, [role='dialog']")) return;
+                onFloorPointerDown(e);
+              }}
               onPointerMove={onCanvasPointerMove}
               onPointerUp={endPointer}
               onPointerCancel={cancelPointer}
-              onClick={() => setSelectedId(null)}
+              onClick={() => {
+                if (suppressClickRef.current) {
+                  suppressClickRef.current = false;
+                  return;
+                }
+                setSelectedId(null);
+              }}
             >
-              <div style={{ width: Math.floor(totalW * scale), height: Math.floor(totalH * scale) }}>
+              <div
+                style={{
+                  width: Math.floor(totalW * scale),
+                  height: Math.floor(totalH * scale),
+                  transform: `translate(${pan.x}px, ${pan.y}px)`,
+                }}
+              >
                 <div
                   className="relative"
                   style={{ width: totalW, height: totalH, transform: `scale(${scale})`, transformOrigin: "0 0" }}
                 >
                   {/* Rulers */}
-                  <DimensionLine horizontal x={RULER + WALL_INSET} y={10} length={roomW} label={`${fmtM(roomW / PX_PER_M)} m`} />
-                  <DimensionLine x={10} y={RULER + WALL_INSET} length={roomH} label={`${fmtM(roomH / PX_PER_M)} m`} />
+                  <DimensionLine horizontal x={RULER + WALL_INSET} y={10} length={roomW} label={`${fmtM(canvasW / PX_PER_M)} m`} />
+                  <DimensionLine x={10} y={RULER + WALL_INSET} length={roomH} label={`${fmtM(canvasH / PX_PER_M)} m`} />
 
                   {/* Room: grid + walls */}
                   <div
@@ -1063,6 +1192,41 @@ export default function FloorPlanEditor({ licenseKey }: { licenseKey: string }) 
                       boxShadow: "inset 0 0 0 6px #8b95a5",
                     }}
                   />
+
+                  {/* Wall handles: right edge, bottom edge, corner. Double-click the corner for the automatic size. */}
+                  {(
+                    [
+                      { axis: "x", x: RULER + canvasW, y: RULER + canvasH / 2, cursor: "ew-resize" },
+                      { axis: "y", x: RULER + canvasW / 2, y: RULER + canvasH, cursor: "ns-resize" },
+                      { axis: "both", x: RULER + canvasW, y: RULER + canvasH, cursor: "nwse-resize" },
+                    ] as const
+                  ).map((hd) => {
+                    const size = (hd.axis === "both" ? 18 : 14) / scale;
+                    return (
+                      <button
+                        key={hd.axis}
+                        type="button"
+                        aria-label={t("floor.room_resize")}
+                        title={t(hd.axis === "both" ? "floor.room_resize_corner_hint" : "floor.room_resize")}
+                        className="absolute z-50 touch-none rounded-full border-white shadow"
+                        style={{
+                          left: hd.x - size / 2,
+                          top: hd.y - size / 2,
+                          width: size,
+                          height: size,
+                          borderWidth: 2 / scale,
+                          cursor: hd.cursor,
+                          backgroundColor: roomDrag?.axis === hd.axis ? "#005bd6" : "#475569",
+                        }}
+                        onPointerDown={(e) => onRoomHandlePointerDown(e, hd.axis)}
+                        onClick={(e) => e.stopPropagation()}
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          if (hd.axis === "both" && activeZone) void saveRoom(activeZone, null);
+                        }}
+                      />
+                    );
+                  })}
 
                   {zoneTables.length === 0 ? (
                     <div className="absolute inset-0 flex items-center justify-center">

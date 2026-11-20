@@ -255,6 +255,11 @@ async function applySettledLinePlan(
   await recalcSaleTotals(orderId);
 }
 
+/** Each payment raises the sale's paid amount, so (sale, amount paid before) names one payment step. */
+function recipePaymentKey(orderId: string, paidBefore: number): string {
+  return `recipe:${orderId}:${Math.round(paidBefore * 100)}`;
+}
+
 /** Stock + total_sold for lines being paid (before rows are deleted on split). */
 async function applyStockSoldForSaleItemRows(
   restaurantId: string,
@@ -263,6 +268,8 @@ async function applyStockSoldForSaleItemRows(
   orderLabel: string,
   menuIdBySnapshot: Map<string, string> | null,
   licenseKey: string,
+  /** One payment step of one sale, e.g. `recipe:<saleId>:<paid before>`. */
+  recipeKey: string,
 ) {
   const qtyByMenuId = new Map<string, number>();
   const qtyDeductByMenuId = new Map<string, number>();
@@ -340,12 +347,15 @@ async function applyStockSoldForSaleItemRows(
     assertNoPgError("Log stock sale (partial split)", batchLogErr);
   }
 
+  // Paid lines leave the order, so each unit reaches this point once; the key stops a retried
+  // payment step from deducting the recipe again.
   await applySupplyRecipeAfterSale({
     restaurantId,
-    qtyByMenuItemId: qtyDeductByMenuId,
+    qtyByMenuItemId: qtyByMenuId,
     staffName,
     contextNote: `Order ${orderLabel}`,
     licenseKey,
+    idempotencyKey: recipeKey,
   });
 }
 
@@ -501,14 +511,7 @@ async function commitTrackedStockOnSend(args: {
       .insert(stockLogRows);
     assertNoPgError("Log stock on send", logErr);
   }
-
-  await applySupplyRecipeAfterSale({
-    restaurantId: r.id,
-    qtyByMenuItemId: qtyByMenuId,
-    staffName: args.staffName,
-    contextNote: args.note,
-    licenseKey: args.licenseKey,
-  });
+  // Recipe ingredients are deducted once when the lines are paid, not on (re)send.
   return qtyByMenuId;
 }
 
@@ -2043,6 +2046,7 @@ export async function payOrder(args: Record<string, unknown>) {
         order.order_number != null ? `#${order.order_number}` : String(orderId).slice(0, 8),
         menuIdBySnapshot,
         licenseKey,
+        recipePaymentKey(orderId, prevPaid),
       );
 
       await applySettledLinePlan(plan, orderId);
@@ -2266,6 +2270,7 @@ export async function payOrder(args: Record<string, unknown>) {
         : String(orderId).slice(0, 8),
       menuIdBySnapshotF,
       licenseKey,
+      recipePaymentKey(orderId, prevPaid),
     );
     await applySettledLinePlan(planF, orderId);
   }
@@ -2403,6 +2408,7 @@ export async function payOrder(args: Record<string, unknown>) {
         orderLabel,
         menuIdBySnapshot,
         licenseKey,
+        recipePaymentKey(orderId, prevPaid),
       );
     } catch (err) {
       console.warn("[POS] payOrder stock:", err);
@@ -3099,6 +3105,96 @@ export async function removeItemFromOrder(_args: Record<string, unknown>) {
 }
 export async function updateItemStatus(_args: Record<string, unknown>) {
   return null;
+}
+
+/**
+ * Update modifiers on already-submitted sale lines.
+ * By default customizes **one unit** only: peels it off a multi-qty row so the
+ * rest of the group keeps the previous modifiers. Snapshots IDs/names/prices.
+ */
+export async function updateItemCustomizations(args: {
+  licenseKey: string;
+  orderId: string;
+  itemIds: string[];
+  staffId: string;
+  selectedCustomizations?: SelectedCustomization[];
+  notes?: string;
+  unitPrice: number;
+  /** How many units to customize (default 1). */
+  units?: number;
+}) {
+  await getRestaurantByLicense(args.licenseKey);
+  await assertSaleStaffCanEdit(args.orderId, args.staffId);
+
+  const ids = [...new Set(args.itemIds.map((id) => String(id).trim()).filter(Boolean))];
+  if (ids.length === 0) return { updated: 0 };
+
+  const selected = normalizeSelectedCustomizations(args.selectedCustomizations);
+  const unitPrice = Number(args.unitPrice);
+  if (!Number.isFinite(unitPrice)) {
+    throw new Error("Invalid unit price for customization update");
+  }
+  const notes =
+    mergeNotesWithCustomizations(selected, args.notes) ?? args.notes?.trim() ?? null;
+  const wanted = Math.max(1, Math.floor(Number(args.units) || 1));
+
+  const { data: rows, error: loadErr } = await supabase
+    .from("sale_items")
+    .select(
+      "id, quantity, status, sale_id, name, menu_item_id, station, vat_rate, notes, selected_customizations",
+    )
+    .eq("sale_id", args.orderId)
+    .in("id", ids);
+  assertNoPgError("Load lines to customize", loadErr);
+
+  let remaining = wanted;
+  let customizedUnits = 0;
+
+  for (const row of rows ?? []) {
+    if (remaining <= 0) break;
+    const st = String(row.status ?? "");
+    if (st === "voided" || st === "cancelled") continue;
+    const q = Number(row.quantity);
+    if (!Number.isFinite(q) || q <= 0) continue;
+    const take = Math.min(q, remaining);
+
+    const patch: Record<string, unknown> = {
+      price: unitPrice,
+      notes,
+      selected_customizations: selected,
+    };
+
+    if (take >= q) {
+      // Whole row becomes the customized line.
+      await patchSaleItemProductFields(String(row.id), patch);
+    } else {
+      // Keep remainder on the original row; insert a new row for the customized units.
+      const { error: keepErr } = await supabase
+        .from("sale_items")
+        .update({ quantity: q - take })
+        .eq("id", row.id);
+      assertNoPgError("Split line for customization", keepErr);
+
+      await insertSaleItemWithSchemaFallback({
+        sale_id: args.orderId,
+        name: String(row.name ?? ""),
+        price: unitPrice,
+        quantity: take,
+        notes,
+        menu_item_id: (row.menu_item_id as string | null) ?? null,
+        station: (row.station as string | null) ?? null,
+        vat_rate: row.vat_rate != null ? Number(row.vat_rate) : 0.2,
+        selected_customizations: selected,
+        status: st || "sent",
+      });
+    }
+
+    remaining -= take;
+    customizedUnits += take;
+  }
+
+  if (customizedUnits > 0) await recalcSaleTotals(args.orderId);
+  return { updated: customizedUnits };
 }
 export async function generateFiscalCoupon(_args: Record<string, unknown>) {
   return null;

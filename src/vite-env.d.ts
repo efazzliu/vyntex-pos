@@ -34,6 +34,10 @@ interface VyntexDesktopApi {
   printHtmlSilent?: (
     payload: PrintHtmlSilentPayload,
   ) => Promise<{ ok: boolean; error?: string }>;
+  writeElinkFiscalFile?: (payload: {
+    body: string;
+    orderRef: string;
+  }) => Promise<{ ok: boolean; error?: string; path?: string }>;
   printHtmlToPdf?: (payload: {
     html: string;
     widthMm: number;

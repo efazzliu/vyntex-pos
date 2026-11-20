@@ -67,13 +67,20 @@ import { verifyAdminPin } from "@/lib/supabase-pos.ts";
 import { errorMessageFromUnknown } from "@/lib/supabase-pos/db-errors.ts";
 import { emojiForCategoryName } from "@/lib/pos-category-icons.ts";
 import MenuItemCustomizationPicker from "@/components/menu-item-customization-picker.tsx";
+import OrderCustomizeDrawer from "./order-customize-drawer.tsx";
 import {
   cartLineKey,
+  customizationPriceDelta,
   defaultSelectionsForGroups,
+  diffCustomizations,
+  formatCustomizationDiffForTicket,
   formatCustomizationsForDisplay,
   getMenuItemCustomizationGroups,
   hasMenuItemCustomizations,
+  normalizeModifierGroupIds,
+  resolveAssignedModifierGroups,
   resolvedMenuItemUnitPrice,
+  type MenuCustomizationGroup,
   type SelectedCustomization,
 } from "@/lib/menu-customizations.ts";
 import { uuidOrNull, staffIdsEqual } from "@/lib/supabase-pos/uuid.ts";
@@ -82,6 +89,7 @@ import { displayOrderNumber } from "@/lib/supabase-pos/mappers.ts";
 import {
   printPosBill,
   printSentOrderTicket,
+  printModificationTicket,
   type PrintPosBillOptions,
 } from "@/lib/pos-print-sent-order.ts";
 import { isSilentPrintQueueableError } from "@/lib/print-html.ts";
@@ -367,6 +375,9 @@ export default function OrderScreen({
   const staffListQuery = useQuery('pos.staff.getStaff', { licenseKey });
   const printersQuery = useQuery("pos.settings.getPrinters", { licenseKey });
   const companyQuery = useQuery("pos.settings.getCompanyDetails", { licenseKey });
+  const modifierLibraryQuery = useQuery("pos.menu.getModifierLibrary", {
+    licenseKey,
+  }) as MenuCustomizationGroup[] | undefined;
   const { t, formatPrice, currency } = usePosLocale();
 
   const { data: categoriesRaw, isHydrated: categoriesHydrated } =
@@ -418,6 +429,9 @@ export default function OrderScreen({
   const printBill = useMutation("pos.orders.printBill");
   const transferOrders = useMutation("pos.orders.transferOrdersToTable");
   const mergeOrders = useMutation("pos.orders.mergeTableOrders");
+  const updateItemCustomizations = useMutation(
+    "pos.orders.updateItemCustomizations",
+  );
 
   const [activeCategory, setActiveCategory] =
     useState<Id<"menuCategories"> | "favorites" | null>(null);
@@ -508,9 +522,18 @@ export default function OrderScreen({
     useState<Id<"customers"> | null>(null);
   const [newCustomerName, setNewCustomerName] = useState("");
 
-  // Note editing state
-  const [noteCartKey, setNoteCartKey] = useState<string | null>(null);
-  const [noteText, setNoteText] = useState("");
+  // Customize Order drawer (pencil on cart / sent line)
+  const [customizeCartKey, setCustomizeCartKey] = useState<string | null>(null);
+  const [customizeSentTarget, setCustomizeSentTarget] = useState<{
+    itemIds: Id<"orderItems">[];
+    menuItemId: string;
+    name: string;
+    quantity: number;
+    price: number;
+    station?: "kitchen" | "bar";
+    selectedCustomizations?: SelectedCustomization[];
+    notes?: string;
+  } | null>(null);
   const [customizationPickerItem, setCustomizationPickerItem] =
     useState<MenuItemWithCustomizations | null>(null);
 
@@ -1000,6 +1023,8 @@ export default function OrderScreen({
       toastOrderBlocked(blocked, item.name);
       return;
     }
+    // Variants path (feature flag): still uses the add-to-cart picker.
+    // Assigned Modifiers stay optional — waiter opens Customize via pencil only.
     if (hasMenuItemCustomizations(item)) {
       setCustomizationPickerItem(item);
       return;
@@ -1124,22 +1149,208 @@ export default function OrderScreen({
     closeCartReplaceDialog();
   };
 
-  const openNoteDialog = (line: CartItem) => {
-    setNoteCartKey(cartLineKey(line));
-    setNoteText(line.notes ?? "");
+  const openCustomizeDrawer = (line: CartItem) => {
+    setCustomizeSentTarget(null);
+    setCustomizeCartKey(cartLineKey(line));
   };
 
-  const saveNote = () => {
-    if (!noteCartKey) return;
-    setCart((prev) =>
-      prev.map((c) =>
-        cartLineKey(c) === noteCartKey
-          ? { ...c, notes: noteText.trim() || undefined }
-          : c,
-      ),
+  const customizeCartItem = useMemo(
+    () =>
+      customizeCartKey
+        ? cart.find((c) => cartLineKey(c) === customizeCartKey) ?? null
+        : null,
+    [cart, customizeCartKey],
+  );
+
+  const customizeMenuItemId = customizeCartItem
+    ? String(customizeCartItem.menuItemId)
+    : customizeSentTarget
+      ? String(customizeSentTarget.menuItemId)
+      : null;
+
+  const customizeGroups = useMemo(() => {
+    if (!customizeMenuItemId) return [] as MenuCustomizationGroup[];
+    const menuItem = menuItems.find(
+      (i) => String(i._id) === customizeMenuItemId,
+    ) as (Doc<"menuItems"> & { modifierGroupIds?: string[] }) | undefined;
+    return resolveAssignedModifierGroups(
+      normalizeModifierGroupIds(menuItem?.modifierGroupIds),
+      modifierLibraryQuery ?? [],
     );
-    setNoteCartKey(null);
-    setNoteText("");
+  }, [customizeMenuItemId, menuItems, modifierLibraryQuery]);
+
+  const customizeLine = useMemo(() => {
+    if (customizeCartItem) {
+      const menuItem = menuItems.find(
+        (i) => String(i._id) === String(customizeCartItem.menuItemId),
+      );
+      const basePrice =
+        menuItem?.price ??
+        Math.max(
+          0,
+          customizeCartItem.price -
+            customizationPriceDelta(customizeCartItem.selectedCustomizations),
+        );
+      return {
+        name: customizeCartItem.name,
+        basePrice,
+        // Pencil always customizes one unit; multi-qty lines are split on save.
+        quantity: 1,
+        selectedCustomizations: customizeCartItem.selectedCustomizations,
+        notes: customizeCartItem.notes,
+      };
+    }
+    if (customizeSentTarget) {
+      const menuItem = menuItems.find(
+        (i) => String(i._id) === String(customizeSentTarget.menuItemId),
+      );
+      const basePrice =
+        menuItem?.price ??
+        Math.max(
+          0,
+          customizeSentTarget.price -
+            customizationPriceDelta(customizeSentTarget.selectedCustomizations),
+        );
+      return {
+        name: customizeSentTarget.name,
+        basePrice,
+        quantity: 1,
+        selectedCustomizations: customizeSentTarget.selectedCustomizations,
+        notes: customizeSentTarget.notes,
+      };
+    }
+    return null;
+  }, [customizeCartItem, customizeSentTarget, menuItems]);
+
+  const applyCustomizeToCart = (
+    selections: SelectedCustomization[],
+    notes?: string,
+  ) => {
+    if (!customizeCartKey || !customizeCartItem) return;
+    const menuItem = menuItems.find(
+      (i) => String(i._id) === String(customizeCartItem.menuItemId),
+    );
+    const basePrice =
+      menuItem?.price ??
+      Math.max(
+        0,
+        customizeCartItem.price -
+          customizationPriceDelta(customizeCartItem.selectedCustomizations),
+      );
+    const unitPrice = resolvedMenuItemUnitPrice(basePrice, selections);
+    setCart((prev) => {
+      const source = prev.find((c) => cartLineKey(c) === customizeCartKey);
+      if (!source) return prev;
+      const customized: CartItem = {
+        ...source,
+        quantity: 1,
+        selectedCustomizations: selections.length ? selections : undefined,
+        notes,
+        price: unitPrice,
+      };
+      const newKey = cartLineKey(customized);
+      const sameAsSource = newKey === customizeCartKey;
+
+      // No real change — leave the multi-qty line alone.
+      if (sameAsSource) return prev;
+
+      // Qty > 1: peel off one unit with the new modifiers; keep the rest unchanged.
+      if (source.quantity > 1) {
+        const remainder: CartItem = { ...source, quantity: source.quantity - 1 };
+        const without = prev.filter((c) => cartLineKey(c) !== customizeCartKey);
+        const withRemainder = [...without, remainder];
+        const existing = withRemainder.find((c) => cartLineKey(c) === newKey);
+        if (existing) {
+          return withRemainder.map((c) =>
+            cartLineKey(c) === newKey
+              ? { ...c, quantity: c.quantity + 1 }
+              : c,
+          );
+        }
+        return [...withRemainder, customized];
+      }
+
+      // Qty 1: replace the line (or merge into an identical key).
+      const without = prev.filter((c) => cartLineKey(c) !== customizeCartKey);
+      const existing = without.find((c) => cartLineKey(c) === newKey);
+      if (existing) {
+        return without.map((c) =>
+          cartLineKey(c) === newKey
+            ? { ...c, quantity: c.quantity + 1 }
+            : c,
+        );
+      }
+      return [...without, customized];
+    });
+    setCustomizeCartKey(null);
+  };
+
+  const applyCustomizeToSent = async (
+    selections: SelectedCustomization[],
+    notes?: string,
+  ) => {
+    if (!customizeSentTarget || !existingOrder) return;
+    const before = customizeSentTarget.selectedCustomizations ?? [];
+    const diff = diffCustomizations(before, selections);
+    if (diff.added.length === 0 && diff.removed.length === 0) {
+      // Notes-only update still persists
+      if ((notes ?? "") === (customizeSentTarget.notes ?? "")) {
+        setCustomizeSentTarget(null);
+        return;
+      }
+    }
+    const menuItem = menuItems.find(
+      (i) => String(i._id) === String(customizeSentTarget.menuItemId),
+    );
+    const basePrice =
+      menuItem?.price ??
+      Math.max(
+        0,
+        customizeSentTarget.price - customizationPriceDelta(before),
+      );
+    const unitPrice = resolvedMenuItemUnitPrice(basePrice, selections);
+    try {
+      await updateItemCustomizations({
+        licenseKey,
+        orderId: existingOrder._id,
+        itemIds: customizeSentTarget.itemIds.map(String),
+        staffId,
+        selectedCustomizations: selections,
+        notes,
+        unitPrice,
+        units: 1,
+      });
+      const changesText = formatCustomizationDiffForTicket(diff);
+      if (changesText.trim()) {
+        const station = customizeSentTarget.station ?? menuItem?.station;
+        const deviceName =
+          station === "bar" ? barTicketDeviceName : kitchenTicketDeviceName;
+        await printModificationTicket({
+          title: t("order.mod_ticket_title"),
+          tableLabel: t("order.ticket_table"),
+          tableName: currentTable?.name ?? "—",
+          orderLabel: t("order.ticket_order_ref"),
+          orderValue: displayOrderNumber(existingOrder) || String(existingOrder._id),
+          staffLabel: t("order.ticket_staff"),
+          staffName,
+          printedLabel: t("order.ticket_printed"),
+          itemLabel: t("order.mod_ticket_item"),
+          itemName: customizeSentTarget.name,
+          quantity: 1,
+          changesText,
+          station: station === "bar" || station === "kitchen" ? station : undefined,
+          stationKitchen: t("order.ticket_station_kitchen"),
+          stationBar: t("order.ticket_station_bar"),
+          formatPrice,
+          deviceName,
+          licenseKey,
+        });
+      }
+      toast.success(t("order.item_customized_toast"));
+      setCustomizeSentTarget(null);
+    } catch {
+      toast.error(t("order.item_customize_fail"));
+    }
   };
 
   // Send order
@@ -1692,7 +1903,12 @@ export default function OrderScreen({
   const printPaidReceipt = (
     type: PaymentType,
     paidOrderId: string,
-    extra?: { customerName?: string },
+    extra?: {
+      customerName?: string;
+      paymentMethod?: PaymentMethod;
+      settledSaleItems?: { id: string; quantity: number }[];
+      payAmount?: number;
+    },
   ) => {
     if (
       type !== "fiscal" &&
@@ -1712,6 +1928,9 @@ export default function OrderScreen({
                 formatPrice,
                 strings: receiptPrintStrings,
                 deviceName: receiptPrinterDeviceName,
+                paymentMethod: extra?.paymentMethod,
+                settledSaleItems: extra?.settledSaleItems,
+                payAmount: extra?.payAmount,
               })
             : type === "non_fiscal"
             ? await printNonFiscalReceiptForPay({
@@ -1737,6 +1956,14 @@ export default function OrderScreen({
                 customerName: extra?.customerName,
               });
         if (!pr.ok) {
+          if (pr.error === "elink-partial") {
+            toast.error(t("order.fiscal_elink_partial"));
+            return;
+          }
+          if (pr.error === "elink" || pr.error === "elink-desktop") {
+            toast.error(t("order.fiscal_elink_failed"));
+            return;
+          }
           const electronApp = Boolean(
             typeof window !== "undefined" &&
               (window as Window & { desktop?: { isElectron?: boolean } })
@@ -1818,8 +2045,15 @@ export default function OrderScreen({
         setSplitPickerEpoch((n) => n + 1);
       };
 
+      const receiptExtra = {
+        customerName: custName,
+        paymentMethod: method,
+        settledSaleItems: settledItems ?? undefined,
+        payAmount,
+      };
+
       if (options?.confirmCash) {
-        printPaidReceipt(type, paidOrderId, { customerName: custName });
+        printPaidReceipt(type, paidOrderId, receiptExtra);
       }
 
       if (payingPartial) {
@@ -1840,7 +2074,7 @@ export default function OrderScreen({
       onBack();
 
       if (!options?.confirmCash) {
-        printPaidReceipt(type, paidOrderId, { customerName: custName });
+        printPaidReceipt(type, paidOrderId, receiptExtra);
       }
     } catch (e) {
       toast.error(errorMessageFromUnknown(e, t("order.err_payment_process")));
@@ -2658,6 +2892,10 @@ export default function OrderScreen({
                 menuItems={menuItems}
                 panelHost={orderBodyEl}
                 headerActions={sentItemsHeaderActions}
+                onCustomizeSent={(group) => {
+                  setCustomizeCartKey(null);
+                  setCustomizeSentTarget(group);
+                }}
                 extraScrollContent={
                   <OrderNewCartLines
                     cart={cart}
@@ -2669,7 +2907,7 @@ export default function OrderScreen({
                       setCartReplaceQuery("");
                       setCartReplaceKey(lineKey);
                     }}
-                    onNote={openNoteDialog}
+                    onNote={openCustomizeDrawer}
                     onQty={updateCartQty}
                     onRemove={removeFromCart}
                   />
@@ -2687,7 +2925,7 @@ export default function OrderScreen({
                     setCartReplaceQuery("");
                     setCartReplaceKey(lineKey);
                   }}
-                  onNote={openNoteDialog}
+                  onNote={openCustomizeDrawer}
                   onQty={updateCartQty}
                   onRemove={removeFromCart}
                 />
@@ -2991,59 +3229,27 @@ export default function OrderScreen({
         t={t}
       />
 
-      {/* Note dialog */}
-      <Dialog
-        open={noteCartKey !== null}
+      {/* Customize Order — Split Layout (cart or sent line) */}
+      <OrderCustomizeDrawer
+        open={customizeCartKey !== null || customizeSentTarget !== null}
         onOpenChange={(open) => {
-          if (!open) setNoteCartKey(null);
+          if (!open) {
+            setCustomizeCartKey(null);
+            setCustomizeSentTarget(null);
+          }
         }}
-      >
-        <DialogContent className="bg-[#131A2E] border-[#1e2a45] max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="text-white">Special Request</DialogTitle>
-            <DialogDescription className="text-[#8b93a7]">
-              Add a note for the kitchen/bar staff
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            <Input
-              value={noteText}
-              onChange={(e) => setNoteText(e.target.value)}
-              placeholder="e.g., No sugar, Extra cold, Well done..."
-              className="bg-[#0A0F1E] border-[#1e2a45] text-white"
-              autoFocus
-            />
-            <div className="flex flex-wrap gap-2">
-              {[
-                "No sugar",
-                "Extra cold",
-                "Well done",
-                "No ice",
-                "Extra hot",
-                "Mild",
-              ].map((note) => (
-                <button
-                  key={note}
-                  onClick={() => setNoteText(note)}
-                  className="px-2.5 py-1 rounded-lg bg-[#0A0F1E] border border-[#1e2a45] text-xs text-[#8b93a7] hover:text-white hover:border-[#2a3a5a] transition-colors cursor-pointer"
-                >
-                  {note}
-                </button>
-              ))}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => setNoteCartKey(null)}
-              className="text-[#8b93a7]"
-            >
-              Cancel
-            </Button>
-            <Button onClick={saveNote}>Save Note</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        line={customizeLine}
+        groups={customizeGroups}
+        formatPrice={formatPrice}
+        t={t}
+        onConfirm={(selections, notes) => {
+          if (customizeSentTarget) {
+            void applyCustomizeToSent(selections, notes);
+          } else {
+            applyCustomizeToCart(selections, notes);
+          }
+        }}
+      />
     </div>
   );
 }
@@ -4169,6 +4375,7 @@ function ExistingOrderItems({
   panelHost,
   headerActions,
   extraScrollContent,
+  onCustomizeSent,
 }: {
   licenseKey: string;
   orderId: Id<"orders">;
@@ -4182,6 +4389,16 @@ function ExistingOrderItems({
   panelHost?: HTMLElement | null;
   headerActions?: ReactNode | null;
   extraScrollContent?: ReactNode;
+  onCustomizeSent?: (group: {
+    itemIds: Id<"orderItems">[];
+    menuItemId: string;
+    name: string;
+    quantity: number;
+    price: number;
+    station?: "kitchen" | "bar";
+    selectedCustomizations?: SelectedCustomization[];
+    notes?: string;
+  }) => void;
 }) {
   const { formatPrice, t, language } = usePosLocale();
   const [sendsOpen, setSendsOpen] = useState(false);
@@ -4322,6 +4539,7 @@ function ExistingOrderItems({
     menuItemId: string;
     station?: "kitchen" | "bar";
     notes?: string;
+    selectedCustomizations?: SelectedCustomization[];
     displayStatus: string;
     allUnsent: boolean;
     itemIds: Id<"orderItems">[];
@@ -4336,12 +4554,18 @@ function ExistingOrderItems({
     const name = item.name.trim().toLowerCase();
     const price = Math.round(Number(item.price) * 100) / 100;
     const station = item.station ?? "";
-    return `${name}|${price}|${notes}|${station}`;
+    const customs = formatCustomizationsForDisplay(
+      (item as { selectedCustomizations?: SelectedCustomization[] })
+        .selectedCustomizations,
+    );
+    return `${name}|${price}|${notes}|${station}|${customs}`;
   };
 
   const grouped: GroupedItem[] = [];
   for (const item of activeItems) {
     const key = mergeKey(item);
+    const itemCustoms = (item as { selectedCustomizations?: SelectedCustomization[] })
+      .selectedCustomizations;
     const existing = grouped.find((g) => g.key === key);
     if (existing) {
       existing.totalQuantity += item.quantity;
@@ -4362,6 +4586,7 @@ function ExistingOrderItems({
         menuItemId: item.menuItemId ? String(item.menuItemId) : "",
         station: item.station,
         notes: item.notes,
+        selectedCustomizations: itemCustoms,
         displayStatus: item.status,
         allUnsent: item.status === "pending" || !item.status,
         itemIds: [item._id],
@@ -4787,8 +5012,29 @@ function ExistingOrderItems({
             )}
           </div>
 
-          {(allowReplaceSent || allowRefund || group.allUnsent) && (
+          {(allowReplaceSent || allowRefund || group.allUnsent || onCustomizeSent) && (
             <div className="flex items-center shrink-0">
+              {onCustomizeSent && group.menuItemId ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    onCustomizeSent({
+                      itemIds: group.itemIds,
+                      menuItemId: group.menuItemId,
+                      name: group.name,
+                      quantity: group.totalQuantity,
+                      price: group.price,
+                      station: group.station,
+                      selectedCustomizations: group.selectedCustomizations,
+                      notes: group.notes,
+                    })
+                  }
+                  className="p-1 rounded hover:bg-brand/10 text-[#5a6580] hover:text-brand-sky cursor-pointer"
+                  title={t("order.customize_title")}
+                >
+                  <Pencil className="size-3" />
+                </button>
+              ) : null}
               {!group.allUnsent && (allowReplaceSent || allowRefund) && (
                 <button
                   type="button"

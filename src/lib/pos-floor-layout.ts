@@ -110,6 +110,46 @@ export function floorCanvasBox(
   };
 }
 
+/** Free floor kept right/below the furthest table (2 m at 80 px/m) so tables can be dragged outward. */
+export const FLOOR_ROOM_GROW_PX = 160;
+
+/** Floor scale shared by the editor and the waiter floor: a 1.0 m square table is 80 px. */
+export const FLOOR_PX_PER_M = 80;
+
+/**
+ * The room as one size everywhere: the editor and the waiter/dashboard floor both draw this box.
+ * `room` is the size set by dragging the walls (metres); without it the room is the tables + 2 m.
+ * A saved room never cuts off a table: it grows to keep every table inside.
+ */
+export function floorRoomBox(
+  tables: FloorTableRect[],
+  room?: { widthM: number; heightM: number } | null,
+) {
+  const auto = floorCanvasBox(tables, FLOOR_ROOM_GROW_PX);
+  if (!room) return auto;
+  const content = floorCanvasBox(tables, 0);
+  return {
+    minX: auto.minX,
+    minY: auto.minY,
+    width: Math.max(content.width, Math.round(room.widthM * FLOOR_PX_PER_M)),
+    height: Math.max(content.height, Math.round(room.heightM * FLOOR_PX_PER_M)),
+  };
+}
+
+/** Smallest room (px) that still holds every table — the wall handle cannot go inside this. */
+export function floorRoomMinBox(tables: FloorTableRect[]) {
+  return floorCanvasBox(tables, 0);
+}
+
+/** Scale that fits a room into a viewport without scrolling; never enlarges past 100 %. */
+export function floorFitScale(
+  room: { width: number; height: number },
+  viewport: { w: number; h: number },
+): number {
+  if (viewport.w <= 0 || viewport.h <= 0) return 1;
+  return Math.min(1, viewport.w / room.width, viewport.h / room.height);
+}
+
 /** Bounding box of one room’s tables, padded — floor canvas scrolls when this exceeds the viewport. */
 export function zoneContentBox(
   tables: {

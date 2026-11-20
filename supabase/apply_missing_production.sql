@@ -322,4 +322,8 @@ $$;
 grant execute on function public.vyntex_request_waiter_phone_by_license(text, text, text, text, text) to anon, authenticated;
 grant execute on function public.vyntex_waiter_license_request_status(text, text) to anon, authenticated;
 
+-- Product ↔ Modifiers library assignment (migration 051)
+alter table public.menu_items
+  add column if not exists modifier_group_ids jsonb not null default '[]'::jsonb;
+
 notify pgrst, 'reload schema';

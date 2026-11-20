@@ -32,7 +32,7 @@ import {
   POS_DEFAULT_CURRENCY_SYMBOL,
   POS_DEFAULT_LANGUAGE,
 } from "@/lib/pos-locale-defaults.ts";
-import { LogOut, Menu } from "lucide-react";
+import { ArrowLeft, ChevronRight, LogOut, Menu } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils.ts";
 import {
@@ -391,6 +391,21 @@ function PosAppInner({
     setActiveView("settings");
   }, []);
 
+  /** Products opened from Settings → Menu & Categories keep the Settings breadcrumb. */
+  const [menuFromSettings, setMenuFromSettings] = useState(false);
+  useEffect(() => {
+    if (activeView !== "menu") setMenuFromSettings(false);
+  }, [activeView]);
+  const openProductsFromSettings = useCallback(() => {
+    if (!canAccessView(activation.plan, "menu")) return;
+    setMenuFromSettings(true);
+    setActiveView("menu");
+  }, [activation.plan]);
+  const backToSettings = useCallback((category: SettingsCategoryId | null) => {
+    setSettingsJump(category ? { category, nonce: Date.now() } : null);
+    setActiveView("settings");
+  }, []);
+
   const handleTableSelect = (tableId: Id<"tables">) => {
     setSelectedTableId(tableId);
     setActiveView("order");
@@ -593,10 +608,46 @@ function PosAppInner({
                   enterpriseSupplyMall={hasEnterpriseSupplyMall(activation.plan)}
                   enterpriseSupplyRecipe={hasEnterpriseSupplyRecipe(activation.plan)}
                   staffRole={activeStaff.role}
+                  topBar={
+                    menuFromSettings ? (
+                      <div className="flex h-9 min-w-0 items-center gap-3">
+                        <button
+                          type="button"
+                          aria-label={t("settings.cat.menu")}
+                          onClick={() => backToSettings("menu")}
+                          className="inline-flex shrink-0 items-center text-[#8b93a7] transition-colors hover:text-white cursor-pointer"
+                        >
+                          <span className="flex size-9 items-center justify-center rounded-full border border-[#1e2a45] bg-[#131A2E] transition-colors hover:border-brand/40">
+                            <ArrowLeft className="size-4" />
+                          </span>
+                        </button>
+                        <nav className="flex min-w-0 items-center gap-1.5 text-sm">
+                          <button
+                            type="button"
+                            onClick={() => backToSettings(null)}
+                            className="shrink-0 font-medium text-[#8b93a7] transition-colors hover:text-white cursor-pointer"
+                          >
+                            {t("nav.settings")}
+                          </button>
+                          <ChevronRight className="size-3.5 shrink-0 text-[#8b93a7]" />
+                          <button
+                            type="button"
+                            onClick={() => backToSettings("menu")}
+                            className="min-w-0 truncate font-medium text-[#8b93a7] transition-colors hover:text-white cursor-pointer"
+                          >
+                            {t("settings.cat.menu")}
+                          </button>
+                          <ChevronRight className="size-3.5 shrink-0 text-[#8b93a7]" />
+                          <span className="min-w-0 truncate font-semibold text-white">
+                            {t("settings.menu_link_title")}
+                          </span>
+                        </nav>
+                      </div>
+                    ) : undefined
+                  }
                 />
               </div>
             ))}
-
             {/* Floor Plan editor (Tables) */}
             {gated("tables", (
               <div className="h-full overflow-hidden">
@@ -691,6 +742,7 @@ function PosAppInner({
                   staffName={activeStaff.name}
                   deviceId={activation.deviceId}
                   jumpToCategory={settingsJump}
+                  onOpenProducts={openProductsFromSettings}
                 />
               </div>
             ))}

@@ -4,6 +4,7 @@ import { isMissingPgColumnError } from "./db-errors.ts";
 import { getRestaurantByLicense } from "./restaurant.ts";
 import { floorTableFromRow } from "./mappers.ts";
 import { isPostgrestExposeOrCacheError } from "./floor-sync.ts";
+import { moveFloorRoom } from "./floor-room-ops.ts";
 export async function getTables(licenseKey: string) {
   const r = await getRestaurantByLicense(licenseKey);
   const { data, error } = await supabase
@@ -319,6 +320,7 @@ export async function renameZone(args: {
     .eq("restaurant_id", r.id)
     .eq("zone", args.oldName);
   if (error) throw error;
+  await moveFloorRoom(args.licenseKey, args.oldName, args.newName.trim()).catch(() => undefined);
 }
 
 export async function deleteZone(args: {
@@ -342,6 +344,7 @@ export async function deleteZone(args: {
     .eq("restaurant_id", r.id)
     .eq("zone", args.zone);
   if (error) throw error;
+  await moveFloorRoom(args.licenseKey, args.zone, null).catch(() => undefined);
 }
 
 export async function setTableStatus(args: {

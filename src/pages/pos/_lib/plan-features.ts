@@ -164,6 +164,18 @@ export function hasEnterpriseSupplyRecipe(plan: string): boolean {
   return normalizePlan(plan) === "enterprise";
 }
 
+/**
+ * Temporary kill-switch for Menu → Variants (Settings card, Edit Product tab, waiter/POS picker).
+ * Existing `variantGroups` prefs and `menu_items.customization_config` stay in the database.
+ * Flip to `true` to re-enable; Modifiers are independent.
+ */
+export const MENU_VARIANTS_FEATURE_ENABLED = false;
+
+/** Whether Variants UI and waiter picking are active. */
+export function isMenuVariantsEnabled(): boolean {
+  return MENU_VARIANTS_FEATURE_ENABLED;
+}
+
 /** Hard cap on simultaneous device activations per plan tier (used with `restaurants.max_terminals`). */
 export function maxTerminalsCapForPlan(plan: string): number {
   const tier = normalizePlan(plan);

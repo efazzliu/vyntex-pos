@@ -9,6 +9,7 @@ import {
   newCustomizationGroupId,
   newCustomizationOptionId,
   resolvedMenuItemUnitPrice,
+  selectionLimits,
   toggleCustomizationSelection,
   validateCustomizationSelections,
   type MenuCustomizationGroup,
@@ -88,7 +89,13 @@ export default function MenuItemCustomizationPicker({
               </span>
             ) : null}
             {group.selectionType === "multi" ? (
-              <span className="text-[10px] text-muted-foreground">multi</span>
+              <span className="text-[10px] tabular-nums text-muted-foreground">
+                {(() => {
+                  const { min, max } = selectionLimits(group);
+                  const picked = selections.filter((s) => s.groupId === group.id).length;
+                  return `${picked}/${max}${min > 0 ? ` · min ${min}` : ""}`;
+                })()}
+              </span>
             ) : null}
           </div>
           <div className="flex flex-wrap gap-2">
@@ -110,7 +117,9 @@ export default function MenuItemCustomizationPicker({
                   style={active ? accentStyle : undefined}
                 >
                   {option.name}
-                  {option.priceDelta ? ` (+${formatPrice(option.priceDelta)})` : ""}
+                  {option.priceDelta
+                    ? ` (${option.priceDelta > 0 ? "+" : "−"}${formatPrice(Math.abs(option.priceDelta))})`
+                    : ""}
                 </button>
               );
             })}
@@ -157,6 +166,7 @@ type EditorProps = {
     optionName: string;
     priceDelta: string;
     defaultOption: string;
+    emptyHint: string;
   };
 };
 
@@ -248,9 +258,7 @@ export function MenuItemCustomizationEditor({
       </div>
 
       {groups.length === 0 ? (
-        <p className="text-xs text-slate-500">
-          P.sh. Pjekja: Shumë / Mesatarisht / Pak · Sallatë: Me sallatë / Pa sallatë
-        </p>
+        <p className="text-xs text-slate-500">{labels.emptyHint}</p>
       ) : null}
 
       {groups.map((group) => (

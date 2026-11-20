@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/sheet.tsx";
 import { cn } from "@/lib/utils.ts";
 import { toast } from "sonner";
+import { sendOrderFiscalFileToElink } from "@/lib/elink-fiscal-file.ts";
 import { format, isSameDay } from "date-fns";
 import {
   ClipboardList,
@@ -487,6 +488,21 @@ function OrderDetailSheet({
     if (!orderId || !canManage) return;
     setFiscalizing(true);
     try {
+      const sent = await sendOrderFiscalFileToElink({
+        licenseKey,
+        orderId,
+        paymentMethod: String(
+          (orderDetail as { paymentMethod?: string } | undefined)?.paymentMethod ?? "cash",
+        ),
+      });
+      if (!sent.ok) {
+        toast.error(
+          sent.error === "elink-partial"
+            ? t("order.fiscal_elink_partial")
+            : t("order.fiscal_elink_failed"),
+        );
+        return;
+      }
       await generateFiscal({ licenseKey, orderId, staffId });
       toast.success(t("orders_hist.fiscal_toast_ok"));
     } catch (err) {

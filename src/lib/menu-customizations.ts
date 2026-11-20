@@ -1,18 +1,42 @@
+import { isMenuVariantsEnabled } from "@/pages/pos/_lib/plan-features.ts";
+
 export type MenuCustomizationOption = {
   id: string;
   name: string;
   priceDelta?: number;
   isDefault?: boolean;
+  /** `false`: hidden from waiters. Missing means active. */
+  active?: boolean;
 };
 
 export type MenuCustomizationGroup = {
   id: string;
   name: string;
+  /** Shown in Settings → Variants only. */
+  description?: string;
+  /** `false`: kept on the product but hidden from waiters. Missing means active. */
+  active?: boolean;
   required?: boolean;
   /** single = one choice; multi = pick many */
   selectionType?: "single" | "multi";
+  /** Multiple choice only: fewest / most options a waiter may pick. */
+  minSelect?: number;
+  maxSelect?: number;
   options: MenuCustomizationOption[];
 };
+
+/**
+ * How many options a waiter must / may pick. Single choice is always at most one (one when
+ * required). Multiple choice uses its saved limits, clamped to the option count; a required
+ * group needs at least one.
+ */
+export function selectionLimits(group: MenuCustomizationGroup): { min: number; max: number } {
+  const count = group.options.length;
+  if (group.selectionType !== "multi") return { min: group.required ? 1 : 0, max: 1 };
+  const max = Math.max(1, Math.min(count, group.maxSelect ?? count));
+  const min = Math.min(max, Math.max(group.required ? 1 : 0, group.minSelect ?? 0));
+  return { min, max };
+}
 
 export type SelectedCustomization = {
   groupId: string;
@@ -54,15 +78,31 @@ export function normalizeCustomizationConfig(raw: unknown): MenuCustomizationGro
         name: optionName,
         priceDelta: Number.isFinite(priceDelta) ? priceDelta : 0,
         isDefault: Boolean(opt.isDefault ?? opt.is_default),
+        ...(opt.active === false ? { active: false } : {}),
       });
     }
     if (options.length === 0) continue;
+    const description = typeof rec.description === "string" ? rec.description.trim() : "";
+    const multi = rec.selectionType === "multi" || rec.selection_type === "multi";
+    const readInt = (v: unknown) => {
+      const n = Number(v);
+      return Number.isInteger(n) && n >= 0 ? n : undefined;
+    };
+    const minSelect = multi ? readInt(rec.minSelect ?? rec.min_select) : undefined;
+    const maxSelect = multi ? readInt(rec.maxSelect ?? rec.max_select) : undefined;
     groups.push({
       id: groupId,
       name,
+      ...(description ? { description } : {}),
+      ...(rec.active === false ? { active: false } : {}),
       required: Boolean(rec.required),
-      selectionType: rec.selectionType === "multi" || rec.selection_type === "multi" ? "multi" : "single",
-      options,
+      selectionType: multi ? "multi" : "single",
+      ...(minSelect !== undefined ? { minSelect } : {}),
+      ...(maxSelect !== undefined && maxSelect > 0 ? { maxSelect } : {}),
+      // Single choice has exactly one default at most; multiple choice has none.
+      options: multi
+        ? options.map(({ isDefault: _d, ...o }) => o)
+        : options.map((o, i) => (o.isDefault && options.findIndex((x) => x.isDefault) !== i ? { ...o, isDefault: false } : o)),
     });
   }
   return groups;
@@ -98,10 +138,14 @@ export function customizationConfigForDb(
   return normalizeCustomizationConfig(groups);
 }
 
+/** Groups waiters can pick from (inactive groups stay on the product but are skipped). */
 export function getMenuItemCustomizationGroups(
   item: { customizationConfig?: unknown } | null | undefined,
 ): MenuCustomizationGroup[] {
-  return normalizeCustomizationConfig(item?.customizationConfig);
+  // When Variants are temporarily off, product customization groups are not offered at order time.
+  // Stored `customization_config` is left untouched for reactivation.
+  if (!isMenuVariantsEnabled()) return [];
+  return normalizeCustomizationConfig(item?.customizationConfig).filter((g) => g.active !== false);
 }
 
 export function hasMenuItemCustomizations(
@@ -169,13 +213,9 @@ export function validateCustomizationSelections(
   selections: SelectedCustomization[],
 ): string | null {
   for (const group of groups) {
-    const picked = selections.filter((s) => s.groupId === group.id);
-    if (group.required && picked.length === 0) {
-      return group.name;
-    }
-    if (group.selectionType !== "multi" && picked.length > 1) {
-      return group.name;
-    }
+    const picked = selections.filter((s) => s.groupId === group.id).length;
+    const { min, max } = selectionLimits(group);
+    if (picked < min || picked > max) return group.name;
   }
   return null;
 }
@@ -195,6 +235,10 @@ export function toggleCustomizationSelection(
       return current.filter(
         (s) => !(s.groupId === group.id && s.optionId === option.id),
       );
+    }
+    // Already at the maximum: ignore the tap instead of exceeding the limit.
+    if (current.filter((s) => s.groupId === group.id).length >= selectionLimits(group).max) {
+      return current;
     }
     return [
       ...current,
@@ -220,6 +264,48 @@ export function toggleCustomizationSelection(
   ];
 }
 
+export function normalizeModifierGroupIds(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const row of raw) {
+    const id = String(row ?? "").trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+}
+
+export function modifierGroupIdsForDb(ids: string[] | undefined): string[] | undefined {
+  if (ids === undefined) return undefined;
+  return normalizeModifierGroupIds(ids);
+}
+
+/** Active library groups assigned to a product (order-time source of truth for Modifiers). */
+export function resolveAssignedModifierGroups(
+  assignedIds: string[] | undefined,
+  library: MenuCustomizationGroup[] | undefined,
+): MenuCustomizationGroup[] {
+  if (!assignedIds?.length || !library?.length) return [];
+  const byId = new Map(library.map((g) => [g.id, g]));
+  const out: MenuCustomizationGroup[] = [];
+  for (const id of assignedIds) {
+    const group = byId.get(id);
+    if (!group || group.active === false) continue;
+    const options = group.options.filter((o) => o.active !== false);
+    if (options.length === 0) continue;
+    out.push({ ...group, options });
+  }
+  return out;
+}
+
+export function productHasAssignedModifiers(item: {
+  modifierGroupIds?: string[] | null;
+} | null | undefined): boolean {
+  return normalizeModifierGroupIds(item?.modifierGroupIds).length > 0;
+}
+
 export function formatCustomizationsForDisplay(
   selections: SelectedCustomization[] | undefined,
 ): string {
@@ -228,12 +314,59 @@ export function formatCustomizationsForDisplay(
   for (const s of selections) {
     const key = s.groupName || s.groupId;
     const list = byGroup.get(key) ?? [];
-    list.push(s.optionName);
+    const delta = s.priceDelta ?? 0;
+    list.push(
+      delta < 0
+        ? `− ${s.optionName}`
+        : delta > 0
+          ? `+ ${s.optionName}`
+          : s.optionName,
+    );
     byGroup.set(key, list);
   }
   return [...byGroup.entries()]
     .map(([group, opts]) => `${group}: ${opts.join(", ")}`)
     .join(" · ");
+}
+
+export type CustomizationDiff = {
+  added: SelectedCustomization[];
+  removed: SelectedCustomization[];
+};
+
+export function diffCustomizations(
+  before: SelectedCustomization[] | undefined,
+  after: SelectedCustomization[] | undefined,
+): CustomizationDiff {
+  const keyOf = (s: SelectedCustomization) => `${s.groupId}:${s.optionId}`;
+  const beforeMap = new Map((before ?? []).map((s) => [keyOf(s), s]));
+  const afterMap = new Map((after ?? []).map((s) => [keyOf(s), s]));
+  const added: SelectedCustomization[] = [];
+  const removed: SelectedCustomization[] = [];
+  for (const [k, s] of afterMap) {
+    if (!beforeMap.has(k)) added.push(s);
+  }
+  for (const [k, s] of beforeMap) {
+    if (!afterMap.has(k)) removed.push(s);
+  }
+  return { added, removed };
+}
+
+export function formatCustomizationDiffForTicket(diff: CustomizationDiff): string {
+  const lines: string[] = [];
+  for (const s of diff.added) {
+    const price =
+      s.priceDelta === 0
+        ? ""
+        : s.priceDelta > 0
+          ? ` (+${s.priceDelta})`
+          : ` (${s.priceDelta})`;
+    lines.push(`+ ${s.groupName}: ${s.optionName}${price}`);
+  }
+  for (const s of diff.removed) {
+    lines.push(`− ${s.groupName}: ${s.optionName}`);
+  }
+  return lines.join("\n");
 }
 
 export function mergeNotesWithCustomizations(

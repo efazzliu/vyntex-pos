@@ -1,8 +1,13 @@
 /** Map Supabase rows to Convex Doc-shaped objects the UI expects. */
 
 import { resolveMenuItemImageUrl } from "@/lib/menu-item-photo-urls.ts";
-import { normalizeCustomizationConfig, normalizeSelectedCustomizations } from "@/lib/menu-customizations.ts";
+import {
+  normalizeCustomizationConfig,
+  normalizeModifierGroupIds,
+  normalizeSelectedCustomizations,
+} from "@/lib/menu-customizations.ts";
 import { hasPrepConfig, normalizePrepConfig } from "@/lib/menu-prep-config.ts";
+import { normalizeSupplyRecipeForDb } from "@/lib/supply-recipe.ts";
 
 export function staffFromRow(r: {
   id: string;
@@ -104,26 +109,17 @@ export function menuItemFromRow(r: {
   low_stock_threshold: number | string | null;
   supply_recipe?: unknown;
   customization_config?: unknown;
+  modifier_group_ids?: unknown;
   prep_config?: unknown;
+  sku?: string | null;
+  barcode?: string | null;
+  internal_notes?: string | null;
 }) {
-  const rawRecipe = r.supply_recipe;
-  let supplyRecipe:
-    | { supplyMenuItemId: string; qtyPerUnit: number }[]
-    | undefined;
-  if (Array.isArray(rawRecipe) && rawRecipe.length > 0) {
-    const lines: { supplyMenuItemId: string; qtyPerUnit: number }[] = [];
-    for (const row of rawRecipe as Record<string, unknown>[]) {
-      const sid = String(
-        row.supplyMenuItemId ?? row.supply_menu_item_id ?? "",
-      ).trim();
-      const q = Number(row.qtyPerUnit ?? row.qty_per_unit);
-      if (!sid || !Number.isFinite(q) || q <= 0) continue;
-      lines.push({ supplyMenuItemId: sid, qtyPerUnit: q });
-    }
-    if (lines.length > 0) supplyRecipe = lines;
-  }
+  const recipeLines = normalizeSupplyRecipeForDb(r.supply_recipe) ?? [];
+  const supplyRecipe = recipeLines.length > 0 ? recipeLines : undefined;
 
   const customizationConfig = normalizeCustomizationConfig(r.customization_config);
+  const modifierGroupIds = normalizeModifierGroupIds(r.modifier_group_ids);
   const prepConfig = normalizePrepConfig(r.prep_config);
 
   return {
@@ -162,7 +158,11 @@ export function menuItemFromRow(r: {
         ? Number(r.low_stock_threshold)
         : undefined,
     supplyRecipe,
+    sku: r.sku ?? undefined,
+    barcode: r.barcode ?? undefined,
+    internalNotes: r.internal_notes ?? undefined,
     ...(customizationConfig.length > 0 ? { customizationConfig } : {}),
+    ...(modifierGroupIds.length > 0 ? { modifierGroupIds } : {}),
     ...(hasPrepConfig(prepConfig) ? { prepConfig } : {}),
   };
 }

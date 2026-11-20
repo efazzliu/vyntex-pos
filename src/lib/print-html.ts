@@ -77,6 +77,9 @@ async function defaultPhysicalPrinterName(): Promise<string | undefined> {
 /** Design Auto: size the ticket to the assigned (or default) OS printer's media width. */
 async function resolveAutoPaperWidth(html: string, deviceName?: string): Promise<string> {
   if (!htmlWantsAutoPaperWidth(html)) return html;
+  if (isNetworkPrinterAddress(deviceName)) {
+    return applyPaperWidthMmToPrintHtml(html, resolvePrinterPaperWidthMm({ deviceName: deviceName! }));
+  }
   const inv = getDesktopSystemPrintersInvoker();
   if (!inv) return html;
   try {
@@ -133,6 +136,11 @@ export async function getPhysicalPrinterCount(): Promise<number | null> {
   const r = await inv();
   if (!r.ok) return 0;
   return r.printers.length;
+}
+
+/** Printers added by IP (`192.168.1.50:9100`) print over the network, not through Windows. */
+export function isNetworkPrinterAddress(deviceName?: string | null): boolean {
+  return /^\d{1,3}(\.\d{1,3}){3}(:\d{1,5})?$/.test(String(deviceName ?? "").trim());
 }
 
 /** Skip silent IPC when there is no real printer — avoids Windows blocking dialogs. */
@@ -299,6 +307,7 @@ export const DEFAULT_SILENT_PRINT_IPC_TIMEOUT_MS = 30_000;
 export function isSilentPrintQueueableError(error: string | undefined): boolean {
   return (
     error === "no-physical-printer" ||
+    error === "printer-not-found" ||
     error === "printer-offline" ||
     error === "silent-timeout" ||
     error === "timeout"
@@ -333,7 +342,7 @@ export async function tryPrintHtmlDocumentAsync(
   htmlFullDocument = dialogPaper?.html ?? sourceHtml;
 
   if (wantSilent && silentApi) {
-    if (!(await canAttemptSilentPrint())) {
+    if (!isNetworkPrinterAddress(deviceName) && !(await canAttemptSilentPrint())) {
       return { ok: false, error: "no-physical-printer" };
     }
     try {

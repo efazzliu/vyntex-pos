@@ -438,6 +438,59 @@ export async function printPosBill(
   return outcome;
 }
 
+/**
+ * Separate modification ticket for an already-submitted item.
+ * Prints only the diff (+ added / − removed), never the full order.
+ */
+export async function printModificationTicket(opts: {
+  title: string;
+  tableLabel: string;
+  tableName: string;
+  orderLabel: string;
+  orderValue: string;
+  staffLabel: string;
+  staffName: string;
+  printedLabel: string;
+  itemLabel: string;
+  itemName: string;
+  quantity: number;
+  changesText: string;
+  station?: "kitchen" | "bar";
+  stationKitchen: string;
+  stationBar: string;
+  formatPrice: (amount: number) => string;
+  deviceName?: string;
+  licenseKey?: string;
+}): Promise<PrintHtmlAsyncOutcome> {
+  const changes = opts.changesText.trim();
+  if (!changes) {
+    return { ok: true };
+  }
+  return printSentOrderTicket({
+    title: opts.title,
+    tableLabel: opts.tableLabel,
+    tableName: opts.tableName,
+    orderLabel: opts.orderLabel,
+    orderValue: opts.orderValue,
+    staffLabel: opts.staffLabel,
+    staffName: opts.staffName,
+    printedLabel: opts.printedLabel,
+    stationKitchen: opts.stationKitchen,
+    stationBar: opts.stationBar,
+    lines: [
+      {
+        name: `${opts.itemLabel}: ${opts.itemName}`,
+        quantity: opts.quantity,
+        modifiers: changes,
+        station: opts.station,
+      },
+    ],
+    formatPrice: opts.formatPrice,
+    deviceName: opts.deviceName,
+    licenseKey: opts.licenseKey,
+  });
+}
+
 /** Kitchen/bar tickets for staff meals (badge title e.g. STAFF). */
 export async function printStaffMealTickets(opts: {
   title: string;

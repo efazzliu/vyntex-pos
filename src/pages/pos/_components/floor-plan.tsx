@@ -50,7 +50,7 @@ import { uuidOrNull, staffIdsEqual } from "@/lib/supabase-pos/uuid.ts";
 import { posQueryKey } from "@/lib/supabase-pos/pos-router.ts";
 import { posTablesIndexedDbKey } from "@/lib/supabase-pos/cache-keys.ts";
 import { errorMessageFromUnknown } from "@/lib/supabase-pos/db-errors.ts";
-import { floorCanvasBox, tableFootprint, tableScaleXY } from "@/lib/pos-floor-layout.ts";
+import { floorFitScale, floorRoomBox, tableFootprint, tableScaleXY } from "@/lib/pos-floor-layout.ts";
 import FloorPlanEditor from "./floor-plan-editor.tsx";
 import ExpenseDialog from "./expense-dialog.tsx";
 import StaffConsumptionDialog from "./staff-consumption-dialog.tsx";
@@ -148,7 +148,24 @@ function WaiterFloorView({
       : resolvedTables
     : [];
 
-  const zoneBox = floorCanvasBox(displayTables);
+  const floorRooms = useQuery("pos.tables.getFloorRooms", { licenseKey }) as
+    | Record<string, { widthM: number; heightM: number }>
+    | undefined;
+  const shownZones = [...new Set(displayTables.map((t) => t.zone))];
+  const roomZone = shownZones.length === 1 ? shownZones[0] : null;
+  const zoneBox = floorRoomBox(displayTables, roomZone ? floorRooms?.[roomZone] : null);
+  const floorRef = useRef<HTMLDivElement>(null);
+  const [viewport, setViewport] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const el = floorRef.current;
+    if (!el) return;
+    const measure = () => setViewport({ w: el.clientWidth, h: el.clientHeight });
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [resolvedTables.length > 0]);
+  const floorScale = floorFitScale(zoneBox, viewport);
 
   const currentStaffId = waiter?.staffId;
   const isAdminOrManager = waiter?.role === "admin" || waiter?.role === "manager";
@@ -281,10 +298,24 @@ function WaiterFloorView({
             </div>
       ) : null}
 
-      <div className="min-h-0 flex-1 overflow-auto overscroll-contain rounded-xl border border-[#1e2a45] bg-[#0D1326]">
+      <div
+        ref={floorRef}
+        className="min-h-0 flex-1 overflow-hidden rounded-xl border border-[#1e2a45] bg-[#0D1326]"
+      >
+        <div
+          style={{
+            width: Math.floor(zoneBox.width * floorScale),
+            height: Math.floor(zoneBox.height * floorScale),
+          }}
+        >
         <div
           className="relative select-none"
-          style={{ width: zoneBox.width, height: zoneBox.height }}
+          style={{
+            width: zoneBox.width,
+            height: zoneBox.height,
+            transform: `scale(${floorScale})`,
+            transformOrigin: "0 0",
+          }}
         >
             {displayTables.map((table) => {
               const colors = getTableColors(table);
@@ -413,6 +444,7 @@ function WaiterFloorView({
                 </div>
               );
             })}
+        </div>
         </div>
       </div>
       </div>

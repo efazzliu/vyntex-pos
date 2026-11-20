@@ -109,4 +109,8 @@ create policy "pos_dev_pos_stock_logs" on public.pos_stock_logs
 -- Category emoji for POS order tabs (see migration 013)
 alter table public.menu_categories add column if not exists icon text;
 
+-- Product ↔ Modifiers library assignment (see migration 051)
+alter table public.menu_items
+  add column if not exists modifier_group_ids jsonb not null default '[]'::jsonb;
+
 notify pgrst, 'reload schema';
