@@ -1188,6 +1188,7 @@ export default function StockManagement({
             icon: c.icon,
           }))}
           editing={itemDialog.mode === "edit" ? (itemDialog.item as unknown as EditingItem) : null}
+          stockActorName={staffName}
           initialStation={
             itemDialog.mode === "create"
               ? tab === "supply_kitchen"

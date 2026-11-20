@@ -80,6 +80,17 @@ export function photoUrlForMenuItem(name: string, categoryName = ""): string {
   return GENERIC_FOOD;
 }
 
+const STOCK_PHOTO_URLS = new Set<string>([
+  ...PHOTO_RULES.map((r) => r.url),
+  ...Object.values(CATEGORY_DEFAULTS),
+  GENERIC_FOOD,
+]);
+
+/** True for the automatic stock photos above (not a photo the venue uploaded). */
+export function isStockPhotoUrl(url: string | null | undefined): boolean {
+  return Boolean(url && STOCK_PHOTO_URLS.has(url.trim()));
+}
+
 /** Use stored image_url when set; otherwise fall back to a stock photo. */
 export function resolveMenuItemImageUrl(
   item: { name: string; imageUrl?: string | null },

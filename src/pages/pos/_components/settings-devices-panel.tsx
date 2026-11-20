@@ -804,7 +804,7 @@ export default function SettingsDevicesPanel({
         onOpenChange={setSystemOpen}
         licenseKey={licenseKey}
         addPrinter={addPrinter}
-        existingDeviceNames={printers.map((p) => (p.address ?? "").trim().toLowerCase())}
+        existingDeviceNames={printers.map((p) => `${(p.address ?? "").trim().toLowerCase()}|${p.role}`)}
         t={t}
       />
       <AddPrinterDialog
@@ -898,9 +898,11 @@ function AddSystemPrinterDialog({
     };
   }, [open]);
 
+  // One Windows printer may serve several roles (e.g. receipts and bar tickets); only the same
+  // printer in the same role is a duplicate.
   const isDuplicate =
     deviceName.trim().length > 0 &&
-    existingDeviceNames.includes(deviceName.trim().toLowerCase());
+    existingDeviceNames.includes(`${deviceName.trim().toLowerCase()}|${role}`);
 
   const handleSubmit = async () => {
     if (!deviceName.trim()) {

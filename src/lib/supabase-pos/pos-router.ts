@@ -3,6 +3,8 @@
  */
 import * as staff from "./staff-ops.ts";
 import * as tables from "./tables-ops.ts";
+import * as floorRooms from "./floor-room-ops.ts";
+import * as variantLibrary from "./variant-library-ops.ts";
 import * as menu from "./menu-ops.ts";
 import * as orders from "./orders-ops.ts";
 import * as settings from "./settings-ops.ts";
@@ -34,6 +36,12 @@ export async function runPosQuery(
       return tables.getTables(args.licenseKey as string);
     case "pos.tables.getTableOrderSummaries":
       return tables.getTableOrderSummaries(args.licenseKey as string);
+    case "pos.tables.getFloorRooms":
+      return floorRooms.getFloorRooms(args.licenseKey as string);
+    case "pos.menu.getVariantLibrary":
+      return variantLibrary.getVariantLibrary(args.licenseKey as string);
+    case "pos.menu.getAllCategories":
+      return menu.getAllCategories(args.licenseKey as string);
     case "pos.menu.getCategories":
       return menu.getCategories(args.licenseKey as string);
     case "pos.menu.getAllItems":
@@ -196,10 +204,20 @@ export async function runPosMutation(
       );
     case "pos.tables.deleteZone":
       return tables.deleteZone(args as Parameters<typeof tables.deleteZone>[0]);
+    case "pos.tables.setFloorRoom":
+      return floorRooms.setFloorRoom(args as Parameters<typeof floorRooms.setFloorRoom>[0]);
     case "pos.tables.setTableStatus":
       return tables.setTableStatus(
         args as Parameters<typeof tables.setTableStatus>[0],
       );
+    case "pos.menu.saveVariantGroup":
+      return variantLibrary.saveVariantGroup(args as Parameters<typeof variantLibrary.saveVariantGroup>[0]);
+    case "pos.menu.deleteVariantGroup":
+      return variantLibrary.deleteVariantGroup(args as Parameters<typeof variantLibrary.deleteVariantGroup>[0]);
+    case "pos.menu.setItemCustomizations":
+      return menu.setItemCustomizations(args as Parameters<typeof menu.setItemCustomizations>[0]);
+    case "pos.menu.setCategoryOrder":
+      return menu.setCategoryOrder(args as Parameters<typeof menu.setCategoryOrder>[0]);
     case "pos.menu.createCategory":
       return menu.createCategory(
         args as Parameters<typeof menu.createCategory>[0],

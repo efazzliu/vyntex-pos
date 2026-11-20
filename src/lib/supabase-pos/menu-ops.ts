@@ -178,6 +178,57 @@ export async function getCategories(licenseKey: string) {
   );
 }
 
+/** Replaces only a product's variant groups (Settings → Variants); other product fields stay as they are. */
+export async function setItemCustomizations(args: {
+  licenseKey: string;
+  itemId: string;
+  customizationConfig: unknown;
+}) {
+  const r = await getRestaurantByLicense(args.licenseKey);
+  const groups = customizationConfigForDb(args.customizationConfig as never) ?? [];
+  const { error } = await supabase
+    .from("menu_items")
+    .update({ customization_config: groups })
+    .eq("restaurant_id", r.id)
+    .eq("id", args.itemId);
+  if (error) throw error;
+}
+
+/** Every category, including inactive ones (Settings → Categories). The POS screens use `getCategories`. */
+export async function getAllCategories(licenseKey: string) {
+  const r = await getRestaurantByLicense(licenseKey);
+  const { data, error } = await supabase
+    .from("menu_categories")
+    .select("*")
+    .eq("restaurant_id", r.id)
+    .order("display_order", { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []).map((row) =>
+    menuCategoryFromRow(row as Parameters<typeof menuCategoryFromRow>[0]),
+  );
+}
+
+/** Writes display_order 1..n in the given order (only rows whose position changed). */
+export async function setCategoryOrder(args: {
+  licenseKey: string;
+  orderedIds: string[];
+  previousIds?: string[];
+}) {
+  const r = await getRestaurantByLicense(args.licenseKey);
+  const before = args.previousIds ?? [];
+  for (let i = 0; i < args.orderedIds.length; i++) {
+    const id = args.orderedIds[i];
+    if (before[i] === id) continue;
+    const { error } = await supabase
+      .from("menu_categories")
+      .update({ display_order: i + 1 })
+      .eq("restaurant_id", r.id)
+      .eq("id", id);
+    if (error) throw error;
+  }
+}
+
 export async function getAllItems(licenseKey: string) {
   const r = await getRestaurantByLicense(licenseKey);
   const { data: cats } = await supabase
@@ -414,6 +465,62 @@ function parseImageUrlArg(args: Record<string, unknown>): string | null | undefi
   return undefined;
 }
 
+/** Thrown when SKU / barcode / notes are entered but `supabase/menu_items_identification.sql` has not run. */
+export const MENU_ID_FIELDS_NEED_COLUMN = "MENU_ID_FIELDS_NEED_COLUMN";
+export const MENU_SKU_TAKEN = "MENU_SKU_TAKEN";
+export const MENU_BARCODE_TAKEN = "MENU_BARCODE_TAKEN";
+
+const ID_COLUMNS = ["sku", "barcode", "internal_notes"] as const;
+
+function cleanText(value: unknown): string | null {
+  if (value == null) return null;
+  const s = String(value).trim();
+  return s || null;
+}
+
+function idFieldsPayload(args: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (args.sku !== undefined) out.sku = cleanText(args.sku);
+  if (args.barcode !== undefined) out.barcode = cleanText(args.barcode);
+  if (args.internalNotes !== undefined) out.internal_notes = cleanText(args.internalNotes);
+  return out;
+}
+
+/**
+ * Older databases lack the identification columns: empty values are simply left out, but
+ * entered values must not be dropped silently.
+ */
+function withoutMissingIdColumns(
+  payload: Record<string, unknown>,
+  error: { message?: string } | null,
+): Record<string, unknown> | null {
+  if (!error) return null;
+  const missing = ID_COLUMNS.filter(
+    (c) => c in payload && (pgMissingColumnMessage(error, c) || isMissingPgColumnError(error.message ?? "", c)),
+  );
+  if (missing.length === 0) return null;
+  if (ID_COLUMNS.some((c) => payload[c] != null)) throw new Error(MENU_ID_FIELDS_NEED_COLUMN);
+  const next = { ...payload };
+  for (const c of ID_COLUMNS) delete next[c];
+  return next;
+}
+
+function assertIdFieldsUnique(error: { message?: string; code?: string } | null) {
+  if (!error || String(error.code ?? "") !== "23505") return;
+  const m = String(error.message ?? "").toLowerCase();
+  if (m.includes("sku")) throw new Error(MENU_SKU_TAKEN);
+  if (m.includes("barcode")) throw new Error(MENU_BARCODE_TAKEN);
+}
+
+/** A new tracked item starts at its initial stock; null stock reads as 0 and blocks ordering. */
+function openingStock(args: Record<string, unknown>): number | null {
+  const explicit = Number(args.currentStock);
+  if (args.currentStock != null && Number.isFinite(explicit)) return explicit;
+  if (args.trackStock !== true) return null;
+  const initial = Number(args.initialStock);
+  return Number.isFinite(initial) && initial > 0 ? initial : 0;
+}
+
 export async function createItem(args: Record<string, unknown>) {
   const licenseKey = args.licenseKey as string;
   const { materializeMenuItemImageUrlArg } = await import(
@@ -451,8 +558,9 @@ export async function createItem(args: Record<string, unknown>) {
     ...staffMealDbFields(args),
     track_stock: (args.trackStock as boolean) ?? false,
     stock_unit: (args.stockUnit as string) ?? null,
-    current_stock: (args.currentStock as number) ?? null,
+    current_stock: openingStock(args),
     low_stock_threshold: (args.lowStockThreshold as number) ?? null,
+    ...idFieldsPayload(args),
   };
 
   const imageUrl = parseImageUrlArg(args);
@@ -523,6 +631,16 @@ export async function createItem(args: Record<string, unknown>) {
       .single());
   }
 
+  const withoutIdColumns = withoutMissingIdColumns(withoutStaffMeal ?? payload, error);
+  if (withoutIdColumns) {
+    ({ data, error } = await supabase
+      .from("menu_items")
+      .insert(withoutIdColumns)
+      .select("id")
+      .single());
+  }
+  assertIdFieldsUnique(error);
+
   if (error) {
     if (isRlsViolation(error)) {
       throw new Error(
@@ -558,6 +676,7 @@ export async function updateItem(args: Record<string, unknown>) {
     stock_unit: args.stockUnit,
     current_stock: args.currentStock,
     low_stock_threshold: args.lowStockThreshold,
+    ...idFieldsPayload(args),
   };
   if (args.vatRate !== undefined) {
     patch.vat_rate = args.vatRate;
@@ -626,6 +745,15 @@ export async function updateItem(args: Record<string, unknown>) {
       .update(withoutStaffMealPatch)
       .eq("id", args.itemId as string));
   }
+
+  const withoutIdPatch = withoutMissingIdColumns(withoutStaffMealPatch ?? patch, error);
+  if (withoutIdPatch) {
+    ({ error } = await supabase
+      .from("menu_items")
+      .update(withoutIdPatch)
+      .eq("id", args.itemId as string));
+  }
+  assertIdFieldsUnique(error);
 
   if (error) {
     if (isRlsViolation(error)) {

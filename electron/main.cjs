@@ -5,6 +5,7 @@ const {
   applyPaperWidthMmToPrintHtml,
   htmlWantsAutoPaperWidth,
 } = require("./print-paper-width.cjs");
+const { parseNetworkPrinterAddress, printHtmlToNetworkPrinter } = require("./network-print.cjs");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
@@ -272,17 +273,20 @@ function matchPhysicalPrinterName(printers, requested) {
   return undefined;
 }
 
+/** Returned when a named printer is not installed in Windows (never print it elsewhere). */
+const PRINTER_NOT_FOUND = Symbol("printer-not-found");
+
 /**
- * If `requestedDeviceName` is set, use that OS printer when it exists and is physical.
- * Otherwise fall back to the default physical printer.
+ * If `requestedDeviceName` is set, use that OS printer; when it is missing return
+ * PRINTER_NOT_FOUND instead of the default printer, so kitchen/bar tickets never land on
+ * another station's printer. Without a requested name, use the default physical printer.
  */
 async function resolvePrintDeviceName(event, requestedDeviceName) {
   const printers = await getPrintersForSilentPrint(event);
   const req =
     typeof requestedDeviceName === "string" ? requestedDeviceName.trim() : "";
   if (req) {
-    const matched = matchPhysicalPrinterName(printers, req);
-    if (matched) return matched;
+    return matchPhysicalPrinterName(printers, req) ?? PRINTER_NOT_FOUND;
   }
   return pickPrinterDeviceName(printers);
 }
@@ -337,10 +341,18 @@ function registerPrintHtmlSilentIpc() {
       return { ok: false, error: "html-too-large" };
     }
 
+    const networkAddress = parseNetworkPrinterAddress(deviceNameOpt);
+    if (networkAddress) {
+      return printHtmlToNetworkPrinter(html, networkAddress, pageSize?.widthMm ?? 80);
+    }
+
     const deviceNameFromMain = await resolvePrintDeviceName(
       event,
       deviceNameOpt,
     );
+    if (deviceNameFromMain === PRINTER_NOT_FOUND) {
+      return { ok: false, error: "printer-not-found" };
+    }
     if (!deviceNameFromMain) {
       if (isDev) {
         console.warn(

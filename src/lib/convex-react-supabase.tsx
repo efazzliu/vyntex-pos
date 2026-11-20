@@ -346,6 +346,15 @@ function invalidatePosQueriesAfterMutation(
     void qc.invalidateQueries({
       queryKey: posQueryKey("pos.tables.getTables", { licenseKey }),
     });
+    if (
+      mutationId === "pos.tables.setFloorRoom" ||
+      mutationId === "pos.tables.renameZone" ||
+      mutationId === "pos.tables.deleteZone"
+    ) {
+      void qc.invalidateQueries({
+        queryKey: posQueryKey("pos.tables.getFloorRooms", { licenseKey }),
+      });
+    }
     void qc.invalidateQueries({
       queryKey: posQueryKey("pos.tables.getTableOrderSummaries", { licenseKey }),
     });
@@ -452,7 +461,9 @@ export function useQuery(
   const refetchSummaries = id === "pos.tables.getTableOrderSummaries";
   const refetchTables = id === "pos.tables.getTables";
   const refetchMenuItems = id === "pos.menu.getAllItems";
-  const refetchCompanyDetails = id === "pos.settings.getCompanyDetails";
+  // Room sizes poll like company details so waiter devices follow the Floor Plan editor.
+  const refetchCompanyDetails =
+    id === "pos.settings.getCompanyDetails" || id === "pos.tables.getFloorRooms";
   const refetchKitchenQueue =
     id === "pos.orders.getKitchenQueue" ||
     id === "pos.orders.getWaiterKitchenNotifications";

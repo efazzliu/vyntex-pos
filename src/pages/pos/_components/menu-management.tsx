@@ -46,8 +46,19 @@ import {
   Star,
   ChefHat,
   Wine,
+  Layers,
+  CircleDot,
+  List,
 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select.tsx";
 import CategoryDialog from "./category-dialog.tsx";
+import MenuBackdrop from "./menu-backdrop.tsx";
 import ItemDialog, { type EditingItem } from "./item-dialog.tsx";
 import { useOnlineStatus } from "@/hooks/use-online-status.ts";
 import { useOfflineData } from "@/hooks/use-offline-data.ts";
@@ -60,7 +71,8 @@ const ACCENT_BLUE = BRAND.primary;
 
 /** Below 1280px the category column folds under the product name so names never collapse. */
 const MENU_TABLE_GRID =
-  "grid items-center gap-2 grid-cols-[32px_minmax(120px,1fr)_76px_80px_96px_100px] xl:gap-3 xl:grid-cols-[44px_1fr_140px_120px_90px_110px_118px]";
+  "grid items-center gap-3 grid-cols-[32px_minmax(170px,1fr)_84px_118px_158px_96px] xl:gap-4 xl:grid-cols-[36px_minmax(220px,1fr)_160px_96px_140px_170px_104px]";
+const TH = "text-[13px] font-semibold text-[#0b1220]";
 const ACCENT_GREEN = "#22c55e";
 
 /** Same names as supply auto-category (`ensureSupplyCategory`); hidden from product category strip. */
@@ -113,6 +125,8 @@ type MenuManagementProps = {
   enterpriseSupplyRecipe?: boolean;
   /** Admin vs manager: managers cannot delete, change VAT, or edit recipes/cost. */
   staffRole?: string;
+  /** Rendered above the page header on the same background (e.g. Settings breadcrumb). */
+  topBar?: ReactNode;
 };
 
 export default function MenuManagement({
@@ -121,6 +135,7 @@ export default function MenuManagement({
   enterpriseSupplyMall = false,
   enterpriseSupplyRecipe = false,
   staffRole,
+  topBar,
 }: MenuManagementProps) {
   const { t, formatPrice } = usePosLocale();
   const isAdminStaff = staffRole === "admin";
@@ -159,6 +174,8 @@ export default function MenuManagement({
   const [selectedMenuId, setSelectedMenuId] =
     useState<Id<"menus"> | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [mallView, setMallView] = useState<"none" | "kitchen" | "bar">("none");
 
   // Selection for bulk actions
@@ -267,6 +284,8 @@ export default function MenuManagement({
         const q = searchQuery.trim().toLowerCase();
         if (!item.name?.toLowerCase().includes(q)) return false;
       }
+      if (statusFilter === "active" && !item.available) return false;
+      if (statusFilter === "inactive" && item.available) return false;
       return true;
     })
     .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
@@ -627,18 +646,33 @@ export default function MenuManagement({
   // ── Main View ─────────────────────────────────────
 
   return (
-    <div className="min-h-full space-y-6 bg-gradient-to-b from-slate-50 to-white p-6 lg:p-8">
+    <div className="relative isolate min-h-full overflow-hidden">
+      <MenuBackdrop />
+      <div className="space-y-6 p-6 lg:p-8">
+      {topBar}
       {!isAdminStaff ? (
         <p className="text-xs text-amber-700/90 -mb-3">
           {t("menu_page.manager_hint")}
         </p>
       ) : null}
-      {/* ─── 1. Category Cards ─────────────────────── */}
-      <section className="space-y-3">
-        <h2 className="text-lg font-bold text-slate-900">{t("menu_page.categories")}</h2>
+      {/* ─── 0. Page header ────────────────────────── */}
+      <header className="flex min-w-0 items-center gap-4">
+        <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl border border-[#dbe7ff] bg-[linear-gradient(145deg,#f4f8ff,#e3edff)] text-[#2563eb] shadow-[0_8px_20px_-12px_rgba(37,99,235,0.55)]">
+          <Package className="size-6" strokeWidth={1.9} />
+        </span>
+        <div className="min-w-0">
+          <h1 className="text-[26px] font-bold leading-tight tracking-tight text-[#0b1220]">
+            {t("settings.menu_link_title")}
+          </h1>
+          <p className="mt-1 text-[14px] text-[#475569]">{t("settings.menu_link_desc")}</p>
+        </div>
+      </header>
 
+      {/* ─── 1. Category tiles ─────────────────────── */}
+      <section className="space-y-3">
+        <SectionHeading title={t("menu_page.categories")} />
         {categories.length === 0 ? (
-          <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+          <div className="rounded-[22px] border border-[#e3ebf7] bg-white p-8 shadow-sm">
             <Empty>
               <EmptyHeader>
                 <EmptyMedia variant="icon">
@@ -662,10 +696,9 @@ export default function MenuManagement({
             </Empty>
           </div>
         ) : (
-          <div className="flex flex-wrap gap-2.5 pb-2 pt-1 px-1 -mx-1">
-            {/* "All" card */}
+          <div className="flex flex-wrap gap-3">
             <CategoryCard
-              icon={<LayoutGrid className="size-4" style={{ color: ACCENT_BLUE }} />}
+              icon={<LayoutGrid className="size-7" strokeWidth={1.8} style={{ color: "#2563eb" }} />}
               name={t("menu_page.all")}
               countLabel={menuItemsCountLabel(totalItemCount, t)}
               isSelected={selectedCategoryId === "all"}
@@ -679,20 +712,11 @@ export default function MenuManagement({
                   const glyph =
                     (cat.icon && String(cat.icon).trim()) ||
                     emojiForCategoryName(cat.name ?? "");
-                  if (glyph)
-                    return <span className="text-lg leading-none">{glyph}</span>;
-                  return (
-                    <UtensilsCrossed
-                      className="size-4"
-                      style={{ color: ACCENT_BLUE }}
-                    />
-                  );
+                  if (glyph) return <span className="text-[30px] leading-none drop-shadow-sm">{glyph}</span>;
+                  return <UtensilsCrossed className="size-7" strokeWidth={1.8} style={{ color: "#2563eb" }} />;
                 })()}
                 name={cat.name}
-                countLabel={menuItemsCountLabel(
-                  getItemCountForCategory(cat._id),
-                  t,
-                )}
+                countLabel={menuItemsCountLabel(getItemCountForCategory(cat._id), t)}
                 isSelected={selectedCategoryId === cat._id}
                 onClick={() => setSelectedCategoryId(cat._id)}
                 onEdit={() => {
@@ -706,208 +730,139 @@ export default function MenuManagement({
                   });
                   setCategoryDialogOpen(true);
                 }}
-                onDelete={
-                  canDeleteMenuItems
-                    ? () => handleDeleteCategory(cat._id)
-                    : undefined
-                }
+                onDelete={canDeleteMenuItems ? () => handleDeleteCategory(cat._id) : undefined}
                 isHidden={!cat.isActive}
               />
             ))}
 
-            {/* Add Category card */}
             <button
+              type="button"
               onClick={() => {
                 setEditingCategory(null);
                 setCategoryDialogOpen(true);
               }}
-              className="flex flex-col items-center justify-center gap-1 min-w-[88px] px-3 py-2.5 rounded-xl border-2 border-dashed border-slate-300 hover:border-brand text-slate-500 hover:text-brand transition-all cursor-pointer shrink-0 bg-white"
+              className="flex h-[96px] w-[104px] shrink-0 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-[#c7d6ee] bg-white/70 text-[#334155] transition hover:border-[#2563eb] hover:text-[#2563eb]"
             >
-              <Plus className="size-4" />
-              <span className="text-[10px] font-semibold whitespace-nowrap">
-                {t("menu_page.add_category")}
-              </span>
+              <Plus className="size-6 text-[#2563eb]" strokeWidth={2} />
+              <span className="text-[12px] font-semibold">{t("menu_page.add_category")}</span>
             </button>
           </div>
         )}
       </section>
 
-      {/* ─── 1b. Mall (Enterprise only) ───────────────── */}
-      {enterpriseSupplyMall ? (
-        <section className="space-y-3">
-          <h2 className="text-lg font-bold text-slate-900">{t("menu_page.mall")}</h2>
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
-            <MallPill
-              selected={mallView === "none"}
-              icon={<Package className="size-4" style={{ color: ACCENT_BLUE }} />}
-              onClick={() => setMallView("none")}
-            >
-              {t("menu_page.mall_all")}
-            </MallPill>
-
-            <MallPill
-              selected={mallView === "kitchen"}
-              icon={<ChefHat className="size-4" style={{ color: ACCENT_GREEN }} />}
-              onClick={() => {
-                setMallView("kitchen");
-                setSelectedCategoryId("all");
-                setSelectedMenuId("all");
-                setSelectedItems(new Set());
-              }}
-            >
-              {t("menu_page.mall_kitchen")}
-            </MallPill>
-
-            <MallPill
-              selected={mallView === "bar"}
-              icon={<Wine className="size-4" style={{ color: ACCENT_BLUE }} />}
-              onClick={() => {
-                setMallView("bar");
-                setSelectedCategoryId("all");
-                setSelectedMenuId("all");
-                setSelectedItems(new Set());
-              }}
-            >
-              {t("menu_page.mall_bar")}
-            </MallPill>
-          </div>
-        </section>
-      ) : null}
-
-      {/* ─── 2. Header + Filters ───────────────────── */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <h2 className="text-lg font-bold text-slate-900">
-            {mallTitle ??
-              (selectedCategoryId === "all"
+      {/* ─── 2. Toolbar ────────────────────────────── */}
+      <section className="flex flex-wrap items-center gap-3">
+        <div className="mr-2 shrink-0">
+          <SectionHeading
+            title={
+              selectedCategoryId === "all"
                 ? t("menu_page.all_items_title")
-                : t("menu_page.category_items", {
-                    name: selectedCategoryDisplayName,
-                  }))}
-          </h2>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {selectedFilteredCount > 0 && canDeleteMenuItems ? (
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-                onClick={handleDeleteSelectedItems}
-              >
-                <Trash2 className="mr-1.5 size-4" />
-                {t("menu_page.delete_selected", { selectedCount: selectedFilteredCount })}
-              </Button>
-            ) : null}
-            {enterpriseSupplyMall && mallView !== "none" ? (
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-slate-200 font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
-                onClick={() => setMallStockPickerOpen(true)}
-              >
-                <Boxes className="mr-1.5 size-4" />
-                {t("menu_page.mall_change_stock_btn")}
-              </Button>
-            ) : null}
-            <Button
-              size="sm"
-              className="bg-brand hover:bg-brand-hover text-white font-semibold"
-              onClick={() => {
-                if (
-                  (!categories || categories.length === 0) &&
-                  mallView === "none"
-                ) {
-                  toast.error(t("menu_page.create_category_first"));
-                  return;
-                }
-                setEditingItem(null);
-                setItemDialogOpen(true);
-              }}
+                : t("menu_page.category_items", { name: selectedCategoryDisplayName })
+            }
+            subtitle={t("menu_page.items_in_menu", {
+              count:
+                selectedCategoryId === "all" ? totalItemCount : getItemCountForCategory(selectedCategoryId),
+            })}
+          />
+        </div>
+        <div className="relative ml-auto w-[250px] min-w-[170px] shrink">
+          <Search className="pointer-events-none absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-[#0b1220]" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={t("menu_page.search_ph")}
+            className="h-12 rounded-2xl border-[#e3ebf7] bg-white pl-11 text-sm text-[#0b1220] shadow-[0_1px_2px_rgba(15,23,42,0.05)] placeholder:text-[#64748b]"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-[#94a3b8] hover:text-[#334155]"
             >
-              <Plus className="size-4 mr-1.5" />
-              {enterpriseSupplyMall && mallView !== "none"
-                ? t("menu_page.add_mall_item")
-                : t("menu_page.add_item")}
-            </Button>
-          </div>
+              <X className="size-3.5" />
+            </button>
+          )}
         </div>
 
-        {/* Menu filter pills + search */}
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          {mallView === "none" ? (
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
-            <MenuPill
-              selected={selectedMenuId === "all"}
-              onClick={() => setSelectedMenuId("all")}
-            >
-              {t("menu_page.all_menus")}
-            </MenuPill>
-            {menus.map((m) => (
-              <div key={m._id} className="relative group shrink-0">
-                <MenuPill
-                  selected={selectedMenuId === m._id}
-                  onClick={() => setSelectedMenuId(m._id)}
-                >
-                  {m.name}
-                </MenuPill>
-                <div className="absolute -top-1.5 -right-1.5 hidden group-hover:flex gap-0.5 z-10">
-                  <button
-                    onClick={() => {
-                      setEditingMenu(m);
-                      setNewMenuName(m.name);
-                      setMenuDialogOpen(true);
-                    }}
-                    className="w-4 h-4 rounded-full bg-slate-200 flex items-center justify-center cursor-pointer hover:bg-slate-300"
-                  >
-                    <Pencil className="size-2 text-slate-600" />
-                  </button>
-                  {canDeleteMenuItems ? (
-                  <button
-                    onClick={() => handleDeleteMenu(m._id)}
-                    className="w-4 h-4 rounded-full bg-slate-200 flex items-center justify-center cursor-pointer hover:bg-red-100"
-                  >
-                    <X className="size-2 text-red-400" />
-                  </button>
-                  ) : null}
-                </div>
-              </div>
-            ))}
-            <button
-              onClick={() => {
-                setEditingMenu(null);
-                setNewMenuName("");
-                setMenuDialogOpen(true);
-              }}
-              className="px-3 py-1.5 rounded-full text-xs font-medium text-slate-500 hover:text-brand transition-all cursor-pointer border border-dashed border-slate-300 hover:border-brand shrink-0 whitespace-nowrap bg-white"
-            >
-              <Plus className="size-3 inline-block mr-0.5 -mt-0.5" />
-              {t("menu_page.add_menu")}
-            </button>
-            </div>
-          ) : null}
+        <ToolbarSelect
+          icon={<Layers className="size-[18px]" strokeWidth={1.9} />}
+          value={selectedCategoryId}
+          onChange={(v) => setSelectedCategoryId(v as Id<"menuCategories"> | "all")}
+          options={[
+            { value: "all", label: t("menu_page.all_categories") },
+            ...categoriesForProductStrip.map((c) => ({ value: c._id, label: c.name })),
+          ]}
+        />
+        <ToolbarSelect
+          icon={<CircleDot className="size-[18px]" strokeWidth={1.9} />}
+          value={statusFilter}
+          onChange={(v) => setStatusFilter(v as "all" | "active" | "inactive")}
+          options={[
+            { value: "all", label: t("menu_page.status_all") },
+            { value: "active", label: t("menu_page.status_active") },
+            { value: "inactive", label: t("menu_page.status_inactive") },
+          ]}
+        />
 
-          <div className="relative w-full max-w-[260px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
-            <Input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={t("menu_page.search_ph")}
-              className="bg-white border-slate-200 text-slate-900 pl-10 h-9 text-sm"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
-              >
-                <X className="size-3.5" />
-              </button>
-            )}
+        <div className="flex flex-wrap items-center gap-3">
+          {selectedFilteredCount > 0 && canDeleteMenuItems ? (
+            <Button
+              variant="outline"
+              className="h-12 rounded-2xl border-red-200 bg-white px-4 text-red-600 hover:bg-red-50 hover:text-red-700"
+              onClick={handleDeleteSelectedItems}
+            >
+              <Trash2 className="mr-1.5 size-4" />
+              {t("menu_page.delete_selected", { selectedCount: selectedFilteredCount })}
+            </Button>
+          ) : null}
+          {enterpriseSupplyMall && mallView !== "none" ? (
+            <Button
+              variant="outline"
+              className="h-12 rounded-2xl border-[#e3ebf7] bg-white px-4 font-semibold text-[#334155]"
+              onClick={() => setMallStockPickerOpen(true)}
+            >
+              <Boxes className="mr-1.5 size-4" />
+              {t("menu_page.mall_change_stock_btn")}
+            </Button>
+          ) : null}
+          <div className="flex items-center gap-2">
+            <ViewToggleButton
+              active={viewMode === "grid"}
+              label={t("menu_page.view_grid")}
+              onClick={() => setViewMode("grid")}
+            >
+              <LayoutGrid className="size-[18px]" strokeWidth={2} />
+            </ViewToggleButton>
+            <ViewToggleButton
+              active={viewMode === "list"}
+              label={t("menu_page.view_list")}
+              onClick={() => setViewMode("list")}
+            >
+              <List className="size-[18px]" strokeWidth={2} />
+            </ViewToggleButton>
           </div>
+          <button
+            type="button"
+            className="inline-flex h-12 items-center gap-2 rounded-2xl px-6 text-[15px] font-semibold shadow-[0_10px_22px_-12px_rgba(37,99,235,0.9)] transition hover:opacity-95"
+            style={{ backgroundColor: "#1d5ff0", color: "#ffffff" }}
+            onClick={() => {
+              if ((!categories || categories.length === 0) && mallView === "none") {
+                toast.error(t("menu_page.create_category_first"));
+                return;
+              }
+              setEditingItem(null);
+              setItemDialogOpen(true);
+            }}
+          >
+            <Plus className="size-5" strokeWidth={2.2} />
+            {enterpriseSupplyMall && mallView !== "none" ? t("menu_page.add_mall_item") : t("menu_page.add_item")}
+          </button>
         </div>
       </section>
 
-      {/* ─── 3. Product Table ──────────────────────── */}
+      {/* ─── 3. Products ───────────────────────────── */}
       {filteredItems && filteredItems.length === 0 && (
-        <div className="rounded-2xl border border-slate-200 bg-white py-12 shadow-sm">
+        <div className="rounded-[22px] border border-[#e3ebf7] bg-white py-12 shadow-sm">
           <Empty>
             <EmptyHeader>
               <EmptyMedia variant="icon">
@@ -917,258 +872,161 @@ export default function MenuManagement({
               <EmptyDescription>
                 {categories.length === 0
                   ? t("menu_page.empty_items_no_cat")
-                  : searchQuery
+                  : searchQuery || statusFilter !== "all"
                     ? t("menu_page.empty_items_search")
                     : t("menu_page.empty_items_default")}
               </EmptyDescription>
             </EmptyHeader>
-            {(categories.length > 0 || (enterpriseSupplyMall && mallView !== "none")) &&
-              !searchQuery && (
+            {(categories.length > 0 || (enterpriseSupplyMall && mallView !== "none")) && !searchQuery && (
               <EmptyContent>
-                <div className="flex flex-wrap items-center justify-center gap-2">
-                  {enterpriseSupplyMall && mallView !== "none" ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="border-slate-200 font-semibold text-slate-700"
-                      onClick={() => setMallStockPickerOpen(true)}
-                    >
-                      <Boxes className="mr-1.5 size-4" />
-                      {t("menu_page.mall_change_stock_btn")}
-                    </Button>
-                  ) : null}
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      setEditingItem(null);
-                      setItemDialogOpen(true);
-                    }}
-                  >
-                    <Plus className="size-4 mr-1" />
-                    {enterpriseSupplyMall && mallView !== "none"
-                      ? t("menu_page.add_mall_item")
-                      : t("menu_page.add_item")}
-                  </Button>
-                </div>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setEditingItem(null);
+                    setItemDialogOpen(true);
+                  }}
+                >
+                  <Plus className="size-4 mr-1" />
+                  {enterpriseSupplyMall && mallView !== "none" ? t("menu_page.add_mall_item") : t("menu_page.add_item")}
+                </Button>
               </EmptyContent>
             )}
           </Empty>
         </div>
       )}
 
-      {filteredItems && filteredItems.length > 0 && (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          {/* Table header */}
-          <div className={cn(MENU_TABLE_GRID, "bg-slate-50 px-4 py-3")}>
+      {filteredItems && filteredItems.length > 0 && viewMode === "list" && (
+        <div className="overflow-hidden rounded-[22px] border border-[#e3ebf7] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_18px_36px_-28px_rgba(37,99,235,0.35)]">
+          <div className={cn(MENU_TABLE_GRID, "bg-[#f7f9fd] px-5 py-3.5")}>
             <div className="flex justify-center">
-              {canDeleteMenuItems ? (
-                <Checkbox checked={allChecked} onCheckedChange={toggleAll} />
-              ) : null}
+              {canDeleteMenuItems ? <Checkbox checked={allChecked} onCheckedChange={toggleAll} /> : null}
             </div>
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-              {t("menu_page.col_product")}
-            </span>
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 text-center">
-              {t("menu_page.col_stock")}
-            </span>
-            <span className="hidden text-[11px] font-semibold uppercase tracking-wider text-slate-500 text-center xl:block">
-              {t("menu_page.col_category")}
-            </span>
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 text-right">
-              {t("menu_page.col_price")}
-            </span>
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 text-center">
-              {t("menu_page.col_availability")}
-            </span>
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 text-center">
-              {t("menu_page.col_actions")}
-            </span>
+            <span className={TH}>{t("menu_page.col_product")}</span>
+            <span className={cn(TH, "hidden xl:block")}>{t("menu_page.col_category")}</span>
+            <span className={TH}>{t("menu_page.col_price")}</span>
+            <span className={TH}>{t("menu_page.col_stock")}</span>
+            <span className={TH}>{t("menu_page.col_availability")}</span>
+            <span className={cn(TH, "text-center")}>{t("menu_page.col_actions")}</span>
           </div>
 
-          {/* Table rows */}
           {filteredItems.map((item) => {
-            const category = categories.find(
-              (c) => c._id === item.categoryId
-            );
-            const catColor = category?.color ?? ACCENT_BLUE;
+            const category = categories.find((c) => c._id === item.categoryId);
             const isChecked = selectedItems.has(item._id);
-            const stockVal = item.trackStock
-              ? (item.currentStock ?? 0)
-              : null;
-            const isLowStock =
-              item.trackStock &&
-              item.lowStockThreshold !== undefined &&
-              (item.currentStock ?? 0) <= item.lowStockThreshold;
-            const isOutOfStock =
-              item.trackStock && (item.currentStock ?? 0) <= 0;
-            const stockUnitRaw = item.stockUnit?.trim();
-            const stockUnitDisplay =
-              stockUnitRaw === "pc"
-                ? t("menu_page.stock_unit_pc")
-                : stockUnitRaw;
-
             return (
               <div
                 key={item._id}
                 className={cn(
                   MENU_TABLE_GRID,
-                  "px-4 py-3 border-t border-slate-200 transition-colors",
-                  isChecked
-                    ? "bg-brand/5"
-                    : "bg-white hover:bg-slate-50"
+                  "border-t border-[#eef2f8] px-5 py-3 transition-colors",
+                  isChecked ? "bg-[#f1f6ff]" : "bg-white hover:bg-[#fafcff]",
                 )}
               >
-                {/* Checkbox */}
                 <div className="flex justify-center">
                   {canDeleteMenuItems ? (
-                    <Checkbox
-                      checked={isChecked}
-                      onCheckedChange={() => toggleItem(item._id)}
-                    />
+                    <Checkbox checked={isChecked} onCheckedChange={() => toggleItem(item._id)} />
                   ) : null}
                 </div>
 
-                {/* Product: Thumbnail + Name + Description */}
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
-                    {item.imageUrl ? (
-                      <img
-                        src={item.imageUrl}
-                        alt={item.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <span className="text-sm font-bold text-slate-500">
-                        {(item.name?.charAt(0) ?? "?").toUpperCase()}
-                      </span>
-                    )}
-                  </div>
+                <div className="flex min-w-0 items-center gap-3.5">
+                  <ProductThumb item={item} className="size-12 rounded-xl" />
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
-                      <p className="text-sm font-semibold text-slate-900 truncate">
-                        {item.name}
-                      </p>
-                      {item.isFavorite && (
-                        <Star className="size-3 text-amber-400 fill-amber-400 shrink-0" />
-                      )}
+                      <p className="truncate text-[14px] font-bold text-[#0b1220]">{item.name}</p>
+                      {item.isFavorite && <Star className="size-3 shrink-0 fill-amber-400 text-amber-400" />}
                     </div>
-                    {item.description && (
-                      <p className="text-xs text-slate-500 truncate max-w-[200px]">
-                        {item.description}
-                      </p>
-                    )}
-                    <p
-                      className="truncate text-[11px] font-semibold xl:hidden"
-                      style={{ color: catColor }}
-                    >
-                      {category?.name ?? "\u2014"}
-                    </p>
+                    {item.description ? (
+                      <p className="max-w-[260px] truncate text-[12px] text-[#64748b]">{item.description}</p>
+                    ) : null}
+                    <div className="mt-1 xl:hidden">
+                      <CategoryChip category={category} />
+                    </div>
                   </div>
                 </div>
 
-                {/* Stock (read-only; adjust from Stoku or edit row) */}
-                <div className="min-w-0 text-center">
-                  {stockVal !== null ? (
-                    <span
-                      className={cn(
-                        "inline-block text-sm font-medium tabular-nums",
-                        isOutOfStock
-                          ? "text-red-400"
-                          : isLowStock
-                            ? "text-amber-400"
-                            : "text-slate-600",
-                      )}
-                    >
-                      {stockVal}
-                      {stockUnitDisplay ? (
-                        <span className="text-[11px] font-normal text-slate-500">
-                          {" "}
-                          {stockUnitDisplay}
-                        </span>
-                      ) : null}
-                    </span>
-                  ) : (
-                    <span className="text-sm font-medium text-slate-400">
-                      {"\u2014"}
-                    </span>
-                  )}
+                <div className="hidden min-w-0 xl:block">
+                  <CategoryChip category={category} />
                 </div>
 
-                {/* Category */}
-                <div className="hidden min-w-0 justify-center xl:flex">
-                  <span
-                    className="text-[11px] font-semibold px-2.5 py-1 rounded-full truncate max-w-[120px]"
-                    style={{
-                      backgroundColor: `${catColor}18`,
-                      color: catColor,
-                    }}
-                  >
-                    {category?.name ?? "\u2014"}
-                  </span>
-                </div>
-
-                {/* Price */}
-                <span className="text-sm font-bold text-slate-900 text-right">
-                  {formatPrice(
-                    typeof item.price === "number" && Number.isFinite(item.price)
-                      ? item.price
-                      : 0,
-                  )}
+                <span className="text-[15px] font-bold tabular-nums text-[#0b1220]">
+                  {formatPrice(typeof item.price === "number" && Number.isFinite(item.price) ? item.price : 0)}
                 </span>
 
-                {/* Availability */}
-                <div className="flex justify-center">
-                  <button
-                    onClick={() => handleToggleAvailability(item._id)}
-                    className={cn(
-                      "text-[11px] font-semibold px-3 py-1 rounded-full cursor-pointer transition-colors whitespace-nowrap",
-                      item.available
-                        ? "bg-emerald-500/12 text-emerald-400 hover:bg-emerald-500/20"
-                        : "bg-red-500/12 text-red-400 hover:bg-red-500/20"
-                    )}
-                  >
-                    {item.available
-                      ? t("menu_page.in_stock")
-                      : t("menu_page.out_of_stock")}
-                  </button>
+                <StockCell item={item} t={t} />
+
+                <div className="flex items-center gap-2.5">
+                  <AvailabilitySwitch
+                    checked={item.available}
+                    label={t("menu_page.col_availability")}
+                    onChange={() => handleToggleAvailability(item._id)}
+                  />
+                  <StatusPill active={item.available} t={t} />
                 </div>
 
-                {/* Actions */}
-                <div className="flex items-center justify-center gap-0.5">
-                  {enterpriseSupplyMall && mallView !== "none" && item.trackStock ? (
-                    <button
-                      type="button"
-                      title={t("stock_page.change_title")}
-                      aria-label={t("stock_page.change_title")}
-                      onClick={() => openMallStockAdjust(item)}
-                      className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer hover:bg-slate-100 transition-colors text-slate-500 hover:text-brand"
-                    >
-                      <Boxes className="size-3.5" strokeWidth={2} />
-                    </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    title={t("btn.edit")}
-                    aria-label={t("btn.edit")}
-                    onClick={() => {
-                      setEditingItem(item);
-                      setItemDialogOpen(true);
-                    }}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer hover:bg-slate-100 transition-colors"
-                  >
-                    <Pencil className="size-3.5 text-slate-500" />
-                  </button>
-                  {canDeleteMenuItems ? (
-                  <button
-                    type="button"
-                    title={t("btn.delete")}
-                    aria-label={t("btn.delete")}
-                    onClick={() => handleDeleteItem(item._id)}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer hover:bg-red-500/10 transition-colors"
-                  >
-                    <Trash2 className="size-3.5 text-red-400" />
-                  </button>
-                  ) : null}
+                <RowActions
+                  t={t}
+                  onEdit={() => {
+                    setEditingItem(item);
+                    setItemDialogOpen(true);
+                  }}
+                  onDelete={canDeleteMenuItems ? () => handleDeleteItem(item._id) : undefined}
+                  onStock={
+                    enterpriseSupplyMall && mallView !== "none" && item.trackStock
+                      ? () => openMallStockAdjust(item)
+                      : undefined
+                  }
+                />
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {filteredItems && filteredItems.length > 0 && viewMode === "grid" && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+          {filteredItems.map((item) => {
+            const category = categories.find((c) => c._id === item.categoryId);
+            return (
+              <div
+                key={item._id}
+                className="group flex flex-col overflow-hidden rounded-[22px] border border-[#e3ebf7] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_18px_36px_-28px_rgba(37,99,235,0.35)] transition hover:-translate-y-0.5 hover:border-[#bcd3fb]"
+              >
+                <div className="relative h-40 bg-[linear-gradient(150deg,#f5f9ff,#e8f0ff)]">
+                  <ProductThumb item={item} className="h-full w-full" large />
+                  <div className="absolute left-3 top-3">
+                    <StatusPill active={item.available} t={t} />
+                  </div>
+                </div>
+                <div className="flex flex-1 flex-col gap-2 p-4">
+                  <div className="min-w-0">
+                    <p className="truncate text-[15px] font-bold text-[#0b1220]">{item.name}</p>
+                    {item.description ? (
+                      <p className="truncate text-[12px] text-[#64748b]">{item.description}</p>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <CategoryChip category={category} />
+                    <StockCell item={item} t={t} />
+                  </div>
+                  <div className="mt-auto flex items-center justify-between gap-2 border-t border-[#eef2f8] pt-3">
+                    <span className="text-[17px] font-bold tabular-nums text-[#0b1220]">
+                      {formatPrice(typeof item.price === "number" && Number.isFinite(item.price) ? item.price : 0)}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <AvailabilitySwitch
+                        checked={item.available}
+                        label={t("menu_page.col_availability")}
+                        onChange={() => handleToggleAvailability(item._id)}
+                      />
+                      <RowActions
+                        t={t}
+                        onEdit={() => {
+                          setEditingItem(item);
+                          setItemDialogOpen(true);
+                        }}
+                        onDelete={canDeleteMenuItems ? () => handleDeleteItem(item._id) : undefined}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             );
@@ -1221,6 +1079,7 @@ export default function MenuManagement({
           enterpriseSupplyRecipe={enterpriseSupplyRecipe}
           canEditVat={canEditVat}
           canEditRecipe={canEditRecipe}
+          stockActorName={stockActorName}
           dialogNewTitleOverride={
             enterpriseSupplyMall && mallView === "kitchen"
               ? "supply_kitchen"
@@ -1493,6 +1352,7 @@ export default function MenuManagement({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }
@@ -1522,50 +1382,272 @@ function CategoryCard({
     <div
       onClick={onClick}
       className={cn(
-        "relative group flex flex-col items-center gap-1 min-w-[88px] px-3 py-2.5 rounded-xl cursor-pointer transition-all shrink-0",
+        "group relative flex h-[96px] w-[104px] shrink-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl border px-2 transition",
         isSelected
-          ? "bg-brand/10 ring-2 ring-brand shadow-lg shadow-brand/10"
-          : "bg-white hover:bg-slate-50 border border-slate-200",
-        isHidden && "opacity-40"
+          ? "border-[#2563eb] bg-[linear-gradient(160deg,#eef4ff,#dfeaff)] shadow-[0_0_0_3px_rgba(37,99,235,0.12),0_10px_22px_-14px_rgba(37,99,235,0.7)]"
+          : "border-[#e3ebf7] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:border-[#bcd3fb]",
+        isHidden && "opacity-40",
       )}
     >
-      {/* Hover edit/delete buttons */}
       {(onEdit || onDelete) && (
-        <div className="absolute -top-1 -right-1 hidden group-hover:flex gap-0.5 z-10">
+        <div className="absolute -right-1.5 -top-1.5 z-10 hidden gap-0.5 group-hover:flex">
           {onEdit && (
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onEdit();
               }}
-              className="w-5 h-5 rounded-full bg-white border border-slate-200 flex items-center justify-center cursor-pointer hover:bg-slate-100"
+              className="flex size-6 cursor-pointer items-center justify-center rounded-full border border-[#e3ebf7] bg-white shadow-sm hover:bg-[#f1f5f9]"
             >
-              <Pencil className="size-2.5 text-slate-500" />
+              <Pencil className="size-3 text-[#334155]" />
             </button>
           )}
           {onDelete && (
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onDelete();
               }}
-              className="w-5 h-5 rounded-full bg-white border border-slate-200 flex items-center justify-center cursor-pointer hover:bg-red-100"
+              className="flex size-6 cursor-pointer items-center justify-center rounded-full border border-[#e3ebf7] bg-white shadow-sm hover:bg-red-50"
             >
-              <Trash2 className="size-2.5 text-red-400" />
+              <Trash2 className="size-3 text-red-500" />
             </button>
           )}
         </div>
       )}
+      <div className="flex h-9 items-center justify-center">{icon}</div>
+      <span className="max-w-[92px] truncate text-[13px] font-bold text-[#0b1220]">{name}</span>
+      <span className="text-[11px] leading-tight text-[#64748b]">{countLabel}</span>
+    </div>
+  );
+}
 
-      <div className="w-8 h-8 rounded-lg bg-brand/10 flex items-center justify-center">
-        {icon}
-      </div>
-      <span className="text-[11px] font-semibold text-slate-900 truncate max-w-[80px]">
-        {name}
+type Translate = (key: string, options?: Record<string, unknown>) => string;
+
+function SectionHeading({ title, subtitle }: { title: string; subtitle?: string }) {
+  return (
+    <div>
+      <h2 className="text-[19px] font-bold leading-tight tracking-tight text-[#0b1220]">{title}</h2>
+      {subtitle ? <p className="mt-0.5 text-[13px] text-[#64748b]">{subtitle}</p> : null}
+    </div>
+  );
+}
+
+function ToolbarSelect({
+  icon,
+  value,
+  onChange,
+  options,
+}: {
+  icon: ReactNode;
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className="h-12 w-[172px] shrink-0 rounded-2xl border-[#e3ebf7] bg-white px-4 text-[14px] font-semibold text-[#0b1220] shadow-[0_1px_2px_rgba(15,23,42,0.05)]">
+        <span className="flex min-w-0 items-center gap-2.5">
+          <span className="shrink-0 text-[#0b1220]">{icon}</span>
+          <SelectValue />
+        </span>
+      </SelectTrigger>
+      <SelectContent className="max-h-72 rounded-xl border-[#e3ebf7] bg-white text-[#0b1220]">
+        {options.map((o) => (
+          <SelectItem key={o.value} value={o.value} className="text-[13px] text-[#0b1220] focus:bg-[#f1f5ff] focus:text-[#0b1220]">
+            {o.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function ViewToggleButton({
+  active,
+  label,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  label: string;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      aria-pressed={active}
+      onClick={onClick}
+      className={cn(
+        "flex size-12 items-center justify-center rounded-2xl border transition",
+        active
+          ? "border-transparent shadow-[0_10px_22px_-12px_rgba(37,99,235,0.9)]"
+          : "border-[#e3ebf7] bg-white text-[#0b1220] shadow-[0_1px_2px_rgba(15,23,42,0.05)] hover:border-[#bcd3fb]",
+      )}
+      style={active ? { backgroundColor: "#1d5ff0", color: "#ffffff" } : undefined}
+    >
+      {children}
+    </button>
+  );
+}
+
+function ProductThumb({
+  item,
+  className,
+  large,
+}: {
+  item: Doc<"menuItems">;
+  className?: string;
+  large?: boolean;
+}) {
+  const imageUrl = (item as { imageUrl?: string | null }).imageUrl;
+  return (
+    <div className={cn("flex shrink-0 items-center justify-center overflow-hidden bg-[#f1f5fb]", className)}>
+      {imageUrl ? (
+        <img src={imageUrl} alt={item.name} className="h-full w-full object-cover" />
+      ) : (
+        <span className={cn("font-bold text-[#94a3b8]", large ? "text-4xl" : "text-sm")}>
+          {(item.name?.charAt(0) ?? "?").toUpperCase()}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function CategoryChip({ category }: { category?: Doc<"menuCategories"> }) {
+  if (!category) return <span className="text-[13px] text-[#94a3b8]">{"\u2014"}</span>;
+  const glyph = (category.icon && String(category.icon).trim()) || emojiForCategoryName(category.name ?? "");
+  return (
+    <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[#e3ebf7] bg-[#f7f9fd] px-2.5 py-1 text-[12px] font-semibold text-[#0b1220]">
+      {glyph ? <span className="text-[14px] leading-none">{glyph}</span> : <UtensilsCrossed className="size-3.5 text-[#2563eb]" />}
+      <span className="truncate">{category.name}</span>
+    </span>
+  );
+}
+
+/** Real stock info only: recipe ingredients (Enterprise), tracked stock, or a dash. */
+function StockCell({ item, t }: { item: Doc<"menuItems">; t: Translate }) {
+  const recipe = (item as { supplyRecipe?: unknown[] }).supplyRecipe;
+  if (Array.isArray(recipe) && recipe.length > 0) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[#0b1220]">
+        <Layers className="size-4 text-[#334155]" strokeWidth={1.9} />
+        {t("menu_page.ingredients_count", { count: recipe.length })}
       </span>
-      <span className="text-[9px] text-slate-500 leading-tight">
-        {countLabel}
+    );
+  }
+  if (item.trackStock) {
+    const stock = item.currentStock ?? 0;
+    const low = item.lowStockThreshold !== undefined && stock <= item.lowStockThreshold;
+    const unit = item.stockUnit?.trim() === "pc" ? t("menu_page.stock_unit_pc") : item.stockUnit?.trim();
+    return (
+      <span
+        className={cn(
+          "inline-flex items-center gap-1 text-[13px] font-semibold tabular-nums",
+          stock <= 0 ? "text-red-500" : low ? "text-amber-500" : "text-[#0b1220]",
+        )}
+      >
+        <Boxes className="size-4 opacity-70" strokeWidth={1.9} />
+        {stock}
+        {unit ? <span className="text-[11px] font-normal text-[#64748b]">{unit}</span> : null}
       </span>
+    );
+  }
+  return <span className="text-[13px] text-[#94a3b8]">{"\u2014"}</span>;
+}
+
+function AvailabilitySwitch({
+  checked,
+  label,
+  onChange,
+}: {
+  checked: boolean;
+  label: string;
+  onChange: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={onChange}
+      className="relative h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors"
+      style={{ backgroundColor: checked ? "#1d5ff0" : "#d7dee9" }}
+    >
+      <span
+        className="absolute top-0.5 size-5 rounded-full bg-white shadow-[0_1px_3px_rgba(15,23,42,0.35)] transition-all"
+        style={{ left: checked ? 22 : 2 }}
+      />
+    </button>
+  );
+}
+
+function StatusPill({ active, t }: { active: boolean; t: Translate }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold"
+      style={
+        active
+          ? { backgroundColor: "#eaf8ee", color: "#15803d" }
+          : { backgroundColor: "#fdeceb", color: "#dc2626" }
+      }
+    >
+      <span className="size-2 rounded-full" style={{ backgroundColor: active ? "#16a34a" : "#ef4444" }} />
+      {active ? t("menu_page.status_active") : t("menu_page.status_inactive")}
+    </span>
+  );
+}
+
+function RowActions({
+  t,
+  onEdit,
+  onDelete,
+  onStock,
+}: {
+  t: Translate;
+  onEdit: () => void;
+  onDelete?: () => void;
+  onStock?: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-center gap-1">
+      {onStock ? (
+        <button
+          type="button"
+          title={t("stock_page.change_title")}
+          aria-label={t("stock_page.change_title")}
+          onClick={onStock}
+          className="flex size-9 cursor-pointer items-center justify-center rounded-xl text-[#334155] transition hover:bg-[#f1f5fb] hover:text-[#2563eb]"
+        >
+          <Boxes className="size-4" strokeWidth={2} />
+        </button>
+      ) : null}
+      <button
+        type="button"
+        title={t("btn.edit")}
+        aria-label={t("btn.edit")}
+        onClick={onEdit}
+        className="flex size-9 cursor-pointer items-center justify-center rounded-xl text-[#0b1220] transition hover:bg-[#f1f5fb]"
+      >
+        <Pencil className="size-[18px]" strokeWidth={2} />
+      </button>
+      {onDelete ? (
+        <button
+          type="button"
+          title={t("btn.delete")}
+          aria-label={t("btn.delete")}
+          onClick={onDelete}
+          className="flex size-9 cursor-pointer items-center justify-center rounded-xl text-red-500 transition hover:bg-red-50"
+        >
+          <Trash2 className="size-[18px]" strokeWidth={2} />
+        </button>
+      ) : null}
     </div>
   );
 }

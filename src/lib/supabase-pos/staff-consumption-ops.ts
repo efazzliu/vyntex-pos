@@ -31,17 +31,21 @@ export async function getStaffConsumption(args: {
 }) {
   const r = await getRestaurantByLicense(args.licenseKey);
   const sid = uuidOrNull(args.staffId);
+  type Entry = {
+    _id: string;
+    total: number;
+    items: unknown[];
+    createdAt?: string;
+  };
   if (!sid) {
-    return {
-      entries: [] as Array<{
-        _id: string;
-        total: number;
-        items: unknown[];
-        createdAt?: string;
-      }>,
-      total: 0,
-    };
+    return { entries: [] as Entry[], todayEntries: [] as Entry[], total: 0 };
   }
+  const toEntry = (row: Record<string, unknown>): Entry => ({
+    _id: row.id as string,
+    items: row.items as unknown[],
+    total: Number(row.total),
+    createdAt: row.created_at as string,
+  });
   const { data, error } = await supabase
     .from("pos_staff_consumption")
     .select("*")
@@ -50,14 +54,22 @@ export async function getStaffConsumption(args: {
     .eq("cleared", false)
     .order("created_at", { ascending: false });
   assertNoPgError("Staff consumption list", error);
-  const entries = (data ?? []).map((row) => ({
-    _id: row.id as string,
-    items: row.items as unknown[],
-    total: Number(row.total),
-    createdAt: row.created_at as string,
-  }));
+  const entries = (data ?? []).map(toEntry);
   const total = entries.reduce((s, e) => s + e.total, 0);
-  return { entries, total };
+
+  /** Daily staff-meal limits count every entry from today, settled or not. */
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const { data: todayRows, error: todayErr } = await supabase
+    .from("pos_staff_consumption")
+    .select("id, items, total, created_at")
+    .eq("restaurant_id", r.id)
+    .eq("staff_id", sid)
+    .gte("created_at", startOfToday.toISOString());
+  assertNoPgError("Staff consumption today", todayErr);
+  const todayEntries = (todayRows ?? []).map(toEntry);
+
+  return { entries, todayEntries, total };
 }
 
 export async function getAllUnclearedConsumption(args: { licenseKey: string }) {
@@ -165,7 +177,7 @@ export async function addConsumption(args: Record<string, unknown>) {
     if (!isStaffMealAllowed(mealFields)) {
       throw new Error(staffMealNotAllowedError(itemName));
     }
-    const used = qtyUsedToday(existing.entries, id);
+    const used = qtyUsedToday(existing.todayEntries, id);
     const charge = chargeStaffMeal(rule, used, req.qty);
     if (charge.blocked || charge.allowedQty < req.qty) {
       throw new Error(staffMealLimitError(itemName, rule.dailyLimit));

@@ -200,7 +200,10 @@ export default function StaffConsumptionDialog({
     for (const item of staffMenuItems) {
       map.set(
         String(item._id),
-        qtyUsedToday(staffConsumption?.entries, String(item._id)),
+        qtyUsedToday(
+          staffConsumption?.todayEntries ?? staffConsumption?.entries,
+          String(item._id),
+        ),
       );
     }
     return map;

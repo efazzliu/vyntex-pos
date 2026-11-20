@@ -255,6 +255,11 @@ async function applySettledLinePlan(
   await recalcSaleTotals(orderId);
 }
 
+/** Each payment raises the sale's paid amount, so (sale, amount paid before) names one payment step. */
+function recipePaymentKey(orderId: string, paidBefore: number): string {
+  return `recipe:${orderId}:${Math.round(paidBefore * 100)}`;
+}
+
 /** Stock + total_sold for lines being paid (before rows are deleted on split). */
 async function applyStockSoldForSaleItemRows(
   restaurantId: string,
@@ -263,6 +268,8 @@ async function applyStockSoldForSaleItemRows(
   orderLabel: string,
   menuIdBySnapshot: Map<string, string> | null,
   licenseKey: string,
+  /** One payment step of one sale, e.g. `recipe:<saleId>:<paid before>`. */
+  recipeKey: string,
 ) {
   const qtyByMenuId = new Map<string, number>();
   const qtyDeductByMenuId = new Map<string, number>();
@@ -340,12 +347,15 @@ async function applyStockSoldForSaleItemRows(
     assertNoPgError("Log stock sale (partial split)", batchLogErr);
   }
 
+  // Paid lines leave the order, so each unit reaches this point once; the key stops a retried
+  // payment step from deducting the recipe again.
   await applySupplyRecipeAfterSale({
     restaurantId,
-    qtyByMenuItemId: qtyDeductByMenuId,
+    qtyByMenuItemId: qtyByMenuId,
     staffName,
     contextNote: `Order ${orderLabel}`,
     licenseKey,
+    idempotencyKey: recipeKey,
   });
 }
 
@@ -501,14 +511,7 @@ async function commitTrackedStockOnSend(args: {
       .insert(stockLogRows);
     assertNoPgError("Log stock on send", logErr);
   }
-
-  await applySupplyRecipeAfterSale({
-    restaurantId: r.id,
-    qtyByMenuItemId: qtyByMenuId,
-    staffName: args.staffName,
-    contextNote: args.note,
-    licenseKey: args.licenseKey,
-  });
+  // Recipe ingredients are deducted once when the lines are paid, not on (re)send.
   return qtyByMenuId;
 }
 
@@ -2043,6 +2046,7 @@ export async function payOrder(args: Record<string, unknown>) {
         order.order_number != null ? `#${order.order_number}` : String(orderId).slice(0, 8),
         menuIdBySnapshot,
         licenseKey,
+        recipePaymentKey(orderId, prevPaid),
       );
 
       await applySettledLinePlan(plan, orderId);
@@ -2266,6 +2270,7 @@ export async function payOrder(args: Record<string, unknown>) {
         : String(orderId).slice(0, 8),
       menuIdBySnapshotF,
       licenseKey,
+      recipePaymentKey(orderId, prevPaid),
     );
     await applySettledLinePlan(planF, orderId);
   }
@@ -2403,6 +2408,7 @@ export async function payOrder(args: Record<string, unknown>) {
         orderLabel,
         menuIdBySnapshot,
         licenseKey,
+        recipePaymentKey(orderId, prevPaid),
       );
     } catch (err) {
       console.warn("[POS] payOrder stock:", err);

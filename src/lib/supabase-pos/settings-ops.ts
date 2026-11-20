@@ -45,6 +45,7 @@ import {
 } from "@/lib/local-db.ts";
 import { assertNoPgError } from "./db-errors.ts";
 import { getRestaurantByLicense, clearRestaurantCache } from "./restaurant.ts";
+import { PRESERVED_PREF_KEYS } from "./general-prefs-store.ts";
 
 function isMissingPosPinBrandingColumn(err: { message?: string }): boolean {
   const msg = String(err.message ?? "").toLowerCase();
@@ -349,9 +350,24 @@ export async function updateGeneralPrefs(args: {
   prefs: Record<string, unknown>;
 }) {
   const r = await getRestaurantByLicense(args.licenseKey);
+  // The settings form only knows its own keys; keep Floor Plan rooms and the variant library.
+  let prefs = args.prefs;
+  if (PRESERVED_PREF_KEYS.some((k) => !(k in prefs))) {
+    const { data } = await supabase
+      .from("restaurants")
+      .select("pos_general_prefs")
+      .eq("id", r.id)
+      .maybeSingle();
+    const current = (data as { pos_general_prefs?: Record<string, unknown> } | null)?.pos_general_prefs;
+    if (current && typeof current === "object") {
+      for (const k of PRESERVED_PREF_KEYS) {
+        if (!(k in prefs) && k in current) prefs = { ...prefs, [k]: current[k] };
+      }
+    }
+  }
   const { error } = await supabase
     .from("restaurants")
-    .update({ pos_general_prefs: args.prefs })
+    .update({ pos_general_prefs: prefs })
     .eq("id", r.id);
   if (!error) {
     clearRestaurantCache(args.licenseKey);

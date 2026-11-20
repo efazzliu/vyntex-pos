@@ -37,6 +37,9 @@ import SettingsGeneralPanel, {
 } from "./settings-general-panel.tsx";
 import SettingsPaymentPanel from "./settings-payment-panel.tsx";
 import SettingsMenuPanel from "./settings-menu-panel.tsx";
+import SettingsCategoriesPage from "./settings-categories-page.tsx";
+import SettingsVariantsPage from "./settings-variants-page.tsx";
+import MenuBackdrop from "./menu-backdrop.tsx";
 import SettingsDevicesPanel from "./settings-devices-panel.tsx";
 import SettingsUsersPanel from "./settings-users-panel.tsx";
 import SettingsTaxPanel from "./settings-tax-panel.tsx";
@@ -151,6 +154,8 @@ type PosSettingsProps = {
   deviceId?: string;
   /** Opens a category directly (e.g. Stock → Inventory & stock rules). `nonce` re-triggers the same category. */
   jumpToCategory?: { category: SettingsCategoryId; nonce: number } | null;
+  /** Menu & Categories cards: open Products with the Settings breadcrumb. */
+  onOpenProducts?: () => void;
 };
 
 const SETTINGS_NAV: {
@@ -189,6 +194,7 @@ export default function PosSettings({
   staffName,
   deviceId,
   jumpToCategory,
+  onOpenProducts,
 }: PosSettingsProps) {
   const { t } = usePosLocale();
   const isAdminStaff = staffRole === "admin";
@@ -209,6 +215,11 @@ export default function PosSettings({
   }, [jumpToCategory]);
   const [printEditorOpen, setPrintEditorOpen] = useState(false);
   const [printEditorTitle, setPrintEditorTitle] = useState<string | null>(null);
+  /** Sub-page inside Menu & Categories (breadcrumb: Settings › Menu & Categories › Categories). */
+  const [menuSub, setMenuSub] = useState<"categories" | "variants" | null>(null);
+  useEffect(() => {
+    setMenuSub(null);
+  }, [activeCategory]);
   const [settingsQuery, setSettingsQuery] = useState("");
   const [settingsSearchOpen, setSettingsSearchOpen] = useState(false);
   const printEditorBackRef = useRef<(() => void) | null>(null);
@@ -552,11 +563,32 @@ export default function PosSettings({
       printEditorBackRef.current();
       return;
     }
+    if (menuSub) {
+      setMenuSub(null);
+      return;
+    }
     goSettingsHub();
+  };
+  const subPageTitle =
+    printEditorTitle ??
+    (activeCategory === "menu" && menuSub === "categories"
+      ? t("settings.menu_categories_title")
+      : activeCategory === "menu" && menuSub === "variants"
+        ? t("settings.menu_variants_title")
+        : null);
+  const goSubPageBack = () => {
+    if (printEditorTitle) printEditorBackRef.current?.();
+    else setMenuSub(null);
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+    <div
+      className={cn(
+        "flex h-full min-h-0 flex-col overflow-hidden",
+        activeCategory === "menu" && "relative isolate",
+      )}
+    >
+      {activeCategory === "menu" ? <MenuBackdrop /> : null}
       <div className="shrink-0 px-6 pt-6">
         <div className="flex h-9 min-w-0 items-center gap-3">
           <button
@@ -578,18 +610,18 @@ export default function PosSettings({
               {t("nav.settings")}
             </button>
             <ChevronRight className="size-3.5 shrink-0 text-[#8b93a7]" />
-            {printEditorTitle ? (
+            {subPageTitle ? (
               <>
                 <button
                   type="button"
-                  onClick={() => printEditorBackRef.current?.()}
+                  onClick={goSubPageBack}
                   className="min-w-0 truncate font-medium text-[#8b93a7] transition-colors hover:text-white cursor-pointer"
                 >
                   {t(activeNav.titleKey)}
                 </button>
                 <ChevronRight className="size-3.5 shrink-0 text-[#8b93a7]" />
                 <span className="min-w-0 truncate font-semibold text-white">
-                  {printEditorTitle}
+                  {subPageTitle}
                 </span>
               </>
             ) : (
@@ -744,7 +776,19 @@ export default function PosSettings({
         ) : null}
 
         {activeCategory === "menu" ? (
-          <SettingsMenuPanel t={t} onOpenMenu={() => onNavigate?.("menu")} />
+          menuSub === "categories" ? (
+            <SettingsCategoriesPage licenseKey={licenseKey} t={t} canDelete={staffRole === "admin"} />
+          ) : menuSub === "variants" ? (
+            <SettingsVariantsPage licenseKey={licenseKey} t={t} />
+          ) : (
+            <SettingsMenuPanel
+              t={t}
+              plan={plan}
+              onOpenMenu={() => (onOpenProducts ? onOpenProducts() : onNavigate?.("menu"))}
+              onOpenCategories={() => setMenuSub("categories")}
+              onOpenVariants={() => setMenuSub("variants")}
+            />
+          )
         ) : null}
 
         {activeCategory === "users" ? (
