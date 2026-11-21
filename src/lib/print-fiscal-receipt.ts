@@ -606,17 +606,6 @@ export async function printFiscalReceiptForPay(args: {
   settledSaleItems?: { id: string; quantity: number }[];
   payAmount?: number;
 }): Promise<PrintHtmlAsyncOutcome> {
-  const { sendOrderFiscalFileToElink } = await import("@/lib/elink-fiscal-file.ts");
-  const filed = await sendOrderFiscalFileToElink({
-    licenseKey: args.licenseKey,
-    orderId: args.orderId,
-    paymentMethod: args.paymentMethod,
-    settledSaleItems: args.settledSaleItems,
-    payAmount: args.payAmount,
-  });
-  if (!filed.ok) {
-    return { ok: false, error: filed.error ?? "elink" };
-  }
   const printed = await printPosSalesReceipt({
     ...args,
     templateType: "fiscal_receipt",

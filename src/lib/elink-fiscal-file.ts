@@ -108,6 +108,23 @@ function buildCouponBody(
   return { body: commands.join("\n"), orderSum: total };
 }
 
+/** Writes the lines just sent, without waiting for payment. */
+export async function sendLinesFiscalFileToElink(args: {
+  lines: FiscalItem[];
+  orderRef: string;
+  paymentMethod?: string;
+}): Promise<ElinkFiscalResult> {
+  const write = window.desktop?.writeElinkFiscalFile;
+  if (!write) return { ok: false, error: "elink-desktop" };
+
+  const built = buildCouponBody(args.lines, args.paymentMethod);
+  if ("error" in built) return { ok: false, error: built.error === "partial" ? "elink-partial" : "elink" };
+
+  const written = await write({ body: built.body, orderRef: args.orderRef });
+  if (!written.ok) return { ok: false, error: "elink" };
+  return written;
+}
+
 export async function sendOrderFiscalFileToElink(args: {
   licenseKey: string;
   orderId: string;

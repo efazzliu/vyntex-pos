@@ -108,6 +108,7 @@ import {
   printFiscalReceiptForPay,
   printNonFiscalReceiptForPay,
 } from "@/lib/print-fiscal-receipt.ts";
+import { sendLinesFiscalFileToElink } from "@/lib/elink-fiscal-file.ts";
 import {
   printComplimentarySlipForPay,
   printDebtVoucherForPay,
@@ -1487,6 +1488,27 @@ export default function OrderScreen({
       return `#${t("order.offline_ticket_ref_new")}`;
     };
 
+    const fileSentOrderToTemp = (orderRef: string) => {
+      const safeRef = orderRef.replace(/^#/, "").trim() || "order";
+      void sendLinesFiscalFileToElink({
+        lines,
+        orderRef: safeRef,
+        paymentMethod: "cash",
+      })
+        .then((filed) => {
+          if (filed.ok) return;
+          toast.error(
+            filed.error === "elink-partial"
+              ? t("order.fiscal_elink_partial")
+              : t("order.fiscal_elink_failed"),
+          );
+        })
+        .catch((elinkErr) => {
+          console.error("E-Link file:", elinkErr);
+          toast.error(t("order.fiscal_elink_failed"));
+        });
+    };
+
     if (!isOnline) {
       sendOrderInFlightRef.current = true;
       setIsSubmitting(true);
@@ -1501,7 +1523,9 @@ export default function OrderScreen({
         });
 
         // Queued offline (null) or immediate success — always print locally.
-        runTicketPrint(ticketRefForPrint(result));
+        const sentRef = ticketRefForPrint(result);
+        runTicketPrint(sentRef);
+        fileSentOrderToTemp(sentRef);
         setCart([]);
         onBack();
       } catch (error) {
@@ -1545,6 +1569,7 @@ export default function OrderScreen({
       }
 
       runTicketPrint(result.ticketOrderRef);
+      fileSentOrderToTemp(result.ticketOrderRef);
       onBack();
     } catch (error) {
       setCart(cartBackup);
