@@ -6,6 +6,16 @@ const INPUT_DIR = "C:\\Temp";
 
 const COMMAND_LINE = /^[STPC],[0-9]+,______,_,__;/;
 
+/** E-Link reads coupons as Windows-1250. Albanian ç/ë share those bytes with Latin-1. */
+function encodeWindows1250(text) {
+  const bytes = Buffer.alloc(text.length);
+  for (let i = 0; i < text.length; i += 1) {
+    const code = text.charCodeAt(i);
+    bytes[i] = code < 256 ? code : 0x3f;
+  }
+  return bytes;
+}
+
 function registerElinkFiscalIpc(ipcMain) {
   ipcMain.removeHandler("elink-write-fiscal");
   ipcMain.handle("elink-write-fiscal", async (_event, payload) => {
@@ -33,7 +43,7 @@ function registerElinkFiscalIpc(ipcMain) {
 
     try {
       fs.mkdirSync(INPUT_DIR, { recursive: true });
-      fs.writeFileSync(tmpPath, text, "utf8");
+      fs.writeFileSync(tmpPath, encodeWindows1250(text));
       fs.renameSync(tmpPath, finalPath);
       return { ok: true, path: finalPath };
     } catch (err) {

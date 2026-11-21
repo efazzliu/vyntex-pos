@@ -8,6 +8,7 @@ import { resolveOrderWithItemsForPrint } from "@/lib/supabase-pos/order-print-ca
 
 type FiscalItem = {
   _id?: string;
+  menuItemId?: string;
   name?: string;
   price?: number;
   quantity?: number;
@@ -45,6 +46,21 @@ function paymentCode(method: string | undefined): number {
   if (method === "card") return 3;
   if (method === "cash" || !method) return 0;
   return 1;
+}
+
+/**
+ * Enternet field order:
+ * name;price;qty;stand;group;tax;0;PLU;discount%;discount value
+ * PLU 0 is rejected by the fiscal printer (article does not exist).
+ */
+function pluCode(item: FiscalItem): string {
+  const raw = String(item.menuItemId ?? item._id ?? item.name ?? "artikull");
+  let hash = 2166136261;
+  for (const ch of raw) {
+    hash ^= ch.codePointAt(0) ?? 0;
+    hash = Math.imul(hash, 16777619);
+  }
+  return String((hash >>> 0) % 899999 + 100000);
 }
 
 function buildCouponBody(
@@ -98,13 +114,13 @@ function buildCouponBody(
     const lineTotal = Math.round(price * qty * 100) / 100;
     total += lineTotal;
     commands.push(
-      `S,1,______,_,__;${articleName(String(item.name ?? ""))};${money(price)};${quantity(qty)};1;1;${taxGroup(item.vatRate)};0;0;`,
+      `S,1,______,_,__;${articleName(String(item.name ?? ""))};${money(price)};${quantity(qty)};1;1;${taxGroup(item.vatRate)};0;${pluCode(item)};0;0;`,
     );
   }
 
   if (commands.length === 0 || total <= 0) return { error: "no-lines" };
 
-  commands.push(`T,1,______,_,__;${paymentCode(method)};${money(total)};;;;`);
+  commands.push(`T,1,______,_,__;${paymentCode(method)}`);
   return { body: commands.join("\n"), orderSum: total };
 }
 
