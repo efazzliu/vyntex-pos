@@ -6,6 +6,27 @@ const INPUT_DIR = "C:\\Temp";
 
 const COMMAND_LINE = /^[STPC],[0-9]+,______,_,__;/;
 
+/**
+ * FP-700KS rejects tax letter E (-150403). 18% on these Kosovo units is B.
+ * File code 5 stays 5; only the E-Link letter for that code changes.
+ */
+function mapElinkVat18ToB() {
+  const files = [
+    "C:\\ProgramData\\E-Link\\appsettings.json",
+    "C:\\Program Files\\E-Link\\appsettings.json",
+  ];
+  for (const file of files) {
+    try {
+      if (!fs.existsSync(file)) continue;
+      const text = fs.readFileSync(file, "utf8");
+      const next = text.replace(/"5"\s*:\s*"E"/g, '"5": "B"');
+      if (next !== text) fs.writeFileSync(file, next);
+    } catch {
+      /* Program Files may be read-only. ProgramData is the live config. */
+    }
+  }
+}
+
 /** E-Link reads coupons as Windows-1250. Albanian ç/ë share those bytes with Latin-1. */
 function encodeWindows1250(text) {
   const bytes = Buffer.alloc(text.length);
@@ -17,6 +38,7 @@ function encodeWindows1250(text) {
 }
 
 function registerElinkFiscalIpc(ipcMain) {
+  mapElinkVat18ToB();
   ipcMain.removeHandler("elink-write-fiscal");
   ipcMain.handle("elink-write-fiscal", async (_event, payload) => {
     const body = payload && typeof payload.body === "string" ? payload.body : "";
@@ -34,6 +56,8 @@ function registerElinkFiscalIpc(ipcMain) {
     if (!lines.some((line) => line.startsWith("S,")) || !lines.some((line) => line.startsWith("T,"))) {
       return { ok: false, error: "invalid-file" };
     }
+
+    mapElinkVat18ToB();
 
     const safeRef = orderRef.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 24) || "order";
     const name = `vyntex-${safeRef}-${Date.now()}.inp`;
