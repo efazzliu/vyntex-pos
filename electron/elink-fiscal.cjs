@@ -7,10 +7,11 @@ const INPUT_DIR = "C:\\Temp";
 const COMMAND_LINE = /^[STPC],[0-9]+,______,_,__;/;
 
 /**
- * FP-700KS rejects tax letter E (-150403). 18% on these Kosovo units is B.
- * File code 5 stays 5; only the E-Link letter for that code changes.
+ * FP-700KS speaks command 58. AUTO sends command 49 and the printer answers
+ * -150001 SYNTAX ERROR. Letter E is disabled on this unit (-150403); 18% is B.
+ * File tax code stays 5. Only the live E-Link config is adjusted.
  */
-function mapElinkVat18ToB() {
+function patchElinkForFp700Ks() {
   const files = [
     "C:\\ProgramData\\E-Link\\appsettings.json",
     "C:\\Program Files\\E-Link\\appsettings.json",
@@ -19,10 +20,14 @@ function mapElinkVat18ToB() {
     try {
       if (!fs.existsSync(file)) continue;
       const text = fs.readFileSync(file, "utf8");
-      const next = text.replace(/"5"\s*:\s*"E"/g, '"5": "B"');
-      if (next !== text) fs.writeFileSync(file, next);
+      const next = text
+        .replace(/"SaleCommand"\s*:\s*"(?:Auto|FP-700|FP700Plus|FP-700Plus)"/g, '"SaleCommand": "FP700"')
+        .replace(/"5"\s*:\s*"E"/g, '"5": "B"');
+      if (next === text) continue;
+      JSON.parse(next);
+      fs.writeFileSync(file, next);
     } catch {
-      /* Program Files may be read-only. ProgramData is the live config. */
+      /* Program Files may be read-only. A bad rewrite is skipped. */
     }
   }
 }
@@ -38,7 +43,7 @@ function encodeWindows1250(text) {
 }
 
 function registerElinkFiscalIpc(ipcMain) {
-  mapElinkVat18ToB();
+  patchElinkForFp700Ks();
   ipcMain.removeHandler("elink-write-fiscal");
   ipcMain.handle("elink-write-fiscal", async (_event, payload) => {
     const body = payload && typeof payload.body === "string" ? payload.body : "";
@@ -57,7 +62,7 @@ function registerElinkFiscalIpc(ipcMain) {
       return { ok: false, error: "invalid-file" };
     }
 
-    mapElinkVat18ToB();
+    patchElinkForFp700Ks();
 
     const safeRef = orderRef.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 24) || "order";
     const name = `vyntex-${safeRef}-${Date.now()}.inp`;
