@@ -42,10 +42,12 @@ function taxGroup(vatRate: unknown): number {
   return 3;
 }
 
-function paymentCode(method: string | undefined): number {
-  if (method === "card") return 3;
-  if (method === "cash" || !method) return 0;
-  return 1;
+/**
+ * The register at the till only accepts payment 0. Coupons sent with card (3)
+ * or other (1) were all moved to C:\Temp\PrintErrors.
+ */
+function paymentCode(_method: string | undefined): number {
+  return 0;
 }
 
 /**
@@ -106,7 +108,7 @@ function buildCouponBody(
   for (const item of chosen) {
     const price = Number(item.price);
     let qty = Number(item.quantity);
-    if (!Number.isFinite(price) || price < 0 || !Number.isFinite(qty) || qty <= 0) continue;
+    if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(qty) || qty <= 0) continue;
     if (item._id && settledQty.has(item._id)) {
       qty = Math.min(qty, settledQty.get(item._id) ?? qty);
     }
