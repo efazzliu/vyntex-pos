@@ -143,30 +143,14 @@ function clearStuckCoupons() {
 }
 
 /**
- * The cash register PC already runs Enternet F-Link (fiskal.exe) on COM4.
- * E-Link was taking that port and then rejecting the coupon. Leave F-Link
- * in place and only fall back to E-Link when F-Link is not running.
+ * F-Link already watches C:\Temp and printed today's coupons on COM4.
+ * E-Link takes that port, then the paper never comes out. Never start it.
+ * The image name is not always fiskal.exe (Task Manager shows "F-Link").
  */
 function ensureFiscalDriver() {
-  if (processRunning("fiskal.exe")) {
-    if (processRunning("E-Link.exe")) {
-      stopElink();
-      sleepMs(1500);
-    }
-    return;
-  }
-  if (configReady() && stampReady() && processRunning("E-Link.exe")) return;
+  if (!processRunning("E-Link.exe")) return;
   stopElink();
-  patchElinkForFp700Ks();
-  clearStuckCoupons();
-  if (startElink() && configReady()) {
-    try {
-      fs.mkdirSync(path.dirname(STAMP), { recursive: true });
-      fs.writeFileSync(STAMP, STAMP_VALUE);
-    } catch {
-      /* next order will try again */
-    }
-  }
+  sleepMs(1500);
 }
 
 /** E-Link reads coupons as Windows-1250. Albanian ç/ë share those bytes with Latin-1. */
