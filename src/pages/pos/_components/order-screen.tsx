@@ -108,7 +108,10 @@ import {
   printFiscalReceiptForPay,
   printNonFiscalReceiptForPay,
 } from "@/lib/print-fiscal-receipt.ts";
-import { sendOrderFiscalFileToElink } from "@/lib/elink-fiscal-file.ts";
+import {
+  sendLinesFiscalFileToElink,
+  sendOrderFiscalFileToElink,
+} from "@/lib/elink-fiscal-file.ts";
 import {
   printComplimentarySlipForPay,
   printDebtVoucherForPay,
@@ -1909,27 +1912,9 @@ export default function OrderScreen({
       paymentMethod?: PaymentMethod;
       settledSaleItems?: { id: string; quantity: number }[];
       payAmount?: number;
-      /** Drop the E-Link coupon in C:\Temp. Set on payment, not on reprint. */
-      writeElink?: boolean;
     },
   ) => {
     void (async () => {
-      if (extra?.writeElink && type !== "complimentary") {
-        try {
-          const filed = await sendOrderFiscalFileToElink({
-            licenseKey,
-            orderId: paidOrderId,
-            paymentMethod: extra.paymentMethod,
-          });
-          if (!filed.ok) {
-            toast.error(t("order.fiscal_elink_failed"));
-          }
-        } catch (elinkErr) {
-          console.error("E-Link file:", elinkErr);
-          toast.error(t("order.fiscal_elink_failed"));
-        }
-      }
-
       if (
         type !== "fiscal" &&
         type !== "non_fiscal" &&
@@ -2054,6 +2039,35 @@ export default function OrderScreen({
 
       await payOrder(payPayload);
 
+      if (!payingPartial && type !== "complimentary") {
+        const orderRef = String(
+          existingOrder.orderNumber ?? paidOrderId,
+        ).replace(/[^a-zA-Z0-9_-]/g, "");
+        const screenItems = orderWithItemsQuery?.items ?? [];
+        try {
+          const fromScreen =
+            screenItems.length > 0
+              ? await sendLinesFiscalFileToElink({
+                  lines: screenItems,
+                  orderRef,
+                  paymentMethod: method,
+                })
+              : { ok: false as const, error: "elink" };
+          const filed = fromScreen.ok
+            ? fromScreen
+            : await sendOrderFiscalFileToElink({
+                licenseKey,
+                orderId: String(paidOrderId),
+                paymentMethod: method,
+                orderNumber: existingOrder.orderNumber,
+              });
+          if (!filed.ok) toast.error(t("order.fiscal_elink_failed"));
+        } catch (elinkErr) {
+          console.error("E-Link file:", elinkErr);
+          toast.error(t("order.fiscal_elink_failed"));
+        }
+      }
+
       const resetSplitSelection = () => {
         setPendingPayAmount(null);
         setPendingSettledSaleItems(null);
@@ -2070,7 +2084,6 @@ export default function OrderScreen({
         paymentMethod: method,
         settledSaleItems: settledItems ?? undefined,
         payAmount,
-        writeElink: !payingPartial,
       };
 
       if (options?.confirmCash) {

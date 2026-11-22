@@ -66,13 +66,25 @@ export async function getCachedOrderWithItems(
   );
 }
 
+function hasBillableLines(order: OrderWithItemsForPrint): boolean {
+  return order.items.some((item) => {
+    if (item.status === "cancelled" || item.status === "voided") return false;
+    const price = Number(item.price);
+    const qty = Number(item.quantity);
+    return Number.isFinite(price) && price >= 0 && Number.isFinite(qty) && qty > 0;
+  });
+}
+
 /** Cache-first, then network. Throws if neither has a usable order. */
 export async function resolveOrderWithItemsForPrint(
   licenseKey: string,
   orderId: string,
+  options?: { fresh?: boolean },
 ): Promise<OrderWithItemsForPrint> {
-  const cached = await getCachedOrderWithItems(licenseKey, orderId);
-  if (cached) return cached;
+  if (!options?.fresh) {
+    const cached = await getCachedOrderWithItems(licenseKey, orderId);
+    if (cached && hasBillableLines(cached)) return cached;
+  }
 
   const live = asOrderWithItems(
     await runPosQuery("pos.orders.getOrderWithItems", { licenseKey, orderId }),

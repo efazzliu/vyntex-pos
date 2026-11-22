@@ -160,7 +160,6 @@ type TemplateTypeMeta = {
 };
 
 const TEMPLATE_TYPES: TemplateTypeMeta[] = [
-  { id: "fiscal_receipt", category: "sales", icon: Receipt },
   { id: "non_fiscal_receipt", category: "sales", icon: FileText },
   { id: "complimentary_slip", category: "sales", icon: Gift },
   { id: "debt_voucher", category: "sales", icon: CreditCard },
