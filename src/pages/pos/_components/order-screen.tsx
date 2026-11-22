@@ -2046,7 +2046,20 @@ export default function OrderScreen({
         const orderRef = String(
           existingOrder.orderNumber ?? paidOrderId,
         ).replace(/[^a-zA-Z0-9_-]/g, "");
-        const screenItems = orderWithItemsQuery?.items ?? [];
+        // The register refuses to reprogram an article mid-day, so each line must
+        // keep the PLU it got from its menu item when it was first printed.
+        const menuIdByName = new Map(
+          menuItems.map((m) => [String(m.name ?? "").trim().toLowerCase(), String(m._id)]),
+        );
+        const screenItems = (orderWithItemsQuery?.items ?? []).map((item) =>
+          item.menuItemId
+            ? item
+            : {
+                ...item,
+                menuItemId:
+                  menuIdByName.get(String(item.name ?? "").trim().toLowerCase()) ?? "",
+              },
+        );
         try {
           const fromScreen =
             screenItems.length > 0

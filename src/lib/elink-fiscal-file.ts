@@ -56,7 +56,7 @@ function paymentCode(_method: string | undefined): number {
  * PLU 0 is rejected by the fiscal printer (article does not exist).
  */
 function pluCode(item: FiscalItem): string {
-  const raw = String(item.menuItemId ?? item._id ?? item.name ?? "artikull");
+  const raw = String(item.menuItemId || item.name || item._id || "artikull");
   let hash = 2166136261;
   for (const ch of raw) {
     hash ^= ch.codePointAt(0) ?? 0;
