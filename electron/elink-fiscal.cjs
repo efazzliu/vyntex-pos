@@ -30,17 +30,19 @@ function processRunning(image) {
   }
 }
 
-function stopElink() {
-  for (const image of ["E-Link.exe", "fiskal.exe"]) {
-    try {
-      execFileSync("taskkill", ["/IM", image, "/F", "/T"], { stdio: "ignore", windowsHide: true });
-    } catch {
-      /* already stopped */
-    }
+function stopImage(image) {
+  try {
+    execFileSync("taskkill", ["/IM", image, "/F", "/T"], { stdio: "ignore", windowsHide: true });
+  } catch {
+    /* already stopped */
   }
+}
+
+function stopElink() {
+  stopImage("E-Link.exe");
   const start = Date.now();
   while (Date.now() - start < 4000) {
-    if (!processRunning("E-Link.exe") && !processRunning("fiskal.exe")) return;
+    if (!processRunning("E-Link.exe")) return;
     sleepMs(200);
   }
 }
@@ -140,8 +142,19 @@ function clearStuckCoupons() {
   }
 }
 
-/** Load FP-700 into the running E-Link once, and drop coupons it already rejected. */
-function ensureElinkFp700() {
+/**
+ * The cash register PC already runs Enternet F-Link (fiskal.exe) on COM4.
+ * E-Link was taking that port and then rejecting the coupon. Leave F-Link
+ * in place and only fall back to E-Link when F-Link is not running.
+ */
+function ensureFiscalDriver() {
+  if (processRunning("fiskal.exe")) {
+    if (processRunning("E-Link.exe")) {
+      stopElink();
+      sleepMs(1500);
+    }
+    return;
+  }
   if (configReady() && stampReady() && processRunning("E-Link.exe")) return;
   stopElink();
   patchElinkForFp700Ks();
@@ -185,7 +198,7 @@ function registerElinkFiscalIpc(ipcMain) {
       return { ok: false, error: "invalid-file" };
     }
 
-    ensureElinkFp700();
+    ensureFiscalDriver();
 
     const safeRef = orderRef.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 24) || "order";
     const name = `vyntex-${safeRef}-${Date.now()}.inp`;

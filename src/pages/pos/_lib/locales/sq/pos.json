@@ -474,6 +474,8 @@
   "btn.send": "Dërgo",
   "btn.pay": "Paguaj",
   "btn.print_bill": "Printo Faturën",
+  "btn.close_table": "Mbyll tavolinën",
+  "order.close_table_unsent": "Dërgo artikujt e rinj, pastaj mbylle tavolinën",
   "order.pay_not_allowed": "Ky rol nuk mund të kryejë pagesa te arka.",
   "btn.close": "Mbyll",
   "btn.add": "Shto",

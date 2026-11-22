@@ -27,6 +27,7 @@ import {
   Wine,
   Pencil,
   Trash2,
+  DoorOpen,
   LogOut,
   FileText,
   FileX,
@@ -2039,7 +2040,9 @@ export default function OrderScreen({
 
       await payOrder(payPayload);
 
-      if (!payingPartial && type !== "complimentary") {
+      // "Pa kupon" still records the payment and frees the table. It must not
+      // drop a coupon into E-Link, or the fiscal printer prints anyway.
+      if (!payingPartial && type !== "complimentary" && type !== "no_receipt") {
         const orderRef = String(
           existingOrder.orderNumber ?? paidOrderId,
         ).replace(/[^a-zA-Z0-9_-]/g, "");
@@ -2115,6 +2118,25 @@ export default function OrderScreen({
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleCloseTableWithoutFiscal = () => {
+    if (!existingOrder) return;
+    if (!canProcessPayment) {
+      toast.error(t("order.pay_not_allowed"));
+      return;
+    }
+    if (cart.length > 0) {
+      toast.error(t("order.close_table_unsent"));
+      return;
+    }
+    const methods = enabledPaymentMethods(paymentSettings);
+    const method: PaymentMethod = methods.includes("cash")
+      ? "cash"
+      : methods.includes("card")
+        ? "card"
+        : "cash";
+    void handleFinalPay("no_receipt", method);
   };
 
   // Handle debt customer confirm
@@ -3064,6 +3086,18 @@ export default function OrderScreen({
                     <Receipt className="size-4 mr-1.5" />
                     {t("btn.print_bill")}
                   </Button>
+                  {canProcessPayment ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="col-span-2"
+                      onClick={handleCloseTableWithoutFiscal}
+                      disabled={isSubmitting}
+                    >
+                      <DoorOpen className="size-4 mr-1.5" />
+                      {isSubmitting ? t("common.loading") : t("btn.close_table")}
+                    </Button>
+                  ) : null}
                 </>
               )}
 

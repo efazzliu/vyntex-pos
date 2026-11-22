@@ -474,6 +474,8 @@
   "btn.send": "Send",
   "btn.pay": "Pay",
   "btn.print_bill": "Print Bill",
+  "btn.close_table": "Close table",
+  "order.close_table_unsent": "Send the new items, then close the table",
   "order.pay_not_allowed": "This role cannot take payment at the counter.",
   "btn.close": "Close",
   "btn.add": "Add",
