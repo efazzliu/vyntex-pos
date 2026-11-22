@@ -2046,20 +2046,21 @@ export default function OrderScreen({
         const orderRef = String(
           existingOrder.orderNumber ?? paidOrderId,
         ).replace(/[^a-zA-Z0-9_-]/g, "");
-        // The register refuses to reprogram an article mid-day, so each line must
-        // keep the PLU it got from its menu item when it was first printed.
-        const menuIdByName = new Map(
-          menuItems.map((m) => [String(m.name ?? "").trim().toLowerCase(), String(m._id)]),
+        // The register refuses to program an article whose tax group differs from
+        // the one it was first printed with. Saved order lines can lose their menu
+        // link and VAT (they then read as 20%), so take both from the menu like the cart does.
+        const menuById = new Map(menuItems.map((m) => [String(m._id), m]));
+        const menuByName = new Map(
+          menuItems.map((m) => [String(m.name ?? "").trim().toLowerCase(), m]),
         );
-        const screenItems = (orderWithItemsQuery?.items ?? []).map((item) =>
-          item.menuItemId
-            ? item
-            : {
-                ...item,
-                menuItemId:
-                  menuIdByName.get(String(item.name ?? "").trim().toLowerCase()) ?? "",
-              },
-        );
+        const screenItems = (orderWithItemsQuery?.items ?? []).map((item) => {
+          const linkedId = (item as { menuItemId?: string }).menuItemId;
+          const menu =
+            (linkedId ? menuById.get(String(linkedId)) : undefined) ??
+            menuByName.get(String(item.name ?? "").trim().toLowerCase());
+          if (!menu) return item;
+          return { ...item, menuItemId: String(menu._id), vatRate: menu.vatRate };
+        });
         try {
           const fromScreen =
             screenItems.length > 0
