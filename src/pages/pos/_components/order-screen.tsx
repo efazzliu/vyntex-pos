@@ -108,7 +108,7 @@ import {
   printFiscalReceiptForPay,
   printNonFiscalReceiptForPay,
 } from "@/lib/print-fiscal-receipt.ts";
-import { sendLinesFiscalFileToElink } from "@/lib/elink-fiscal-file.ts";
+import { sendOrderFiscalFileToElink } from "@/lib/elink-fiscal-file.ts";
 import {
   printComplimentarySlipForPay,
   printDebtVoucherForPay,
@@ -1488,27 +1488,6 @@ export default function OrderScreen({
       return `#${t("order.offline_ticket_ref_new")}`;
     };
 
-    const fileSentOrderToTemp = (orderRef: string) => {
-      const safeRef = orderRef.replace(/^#/, "").trim() || "order";
-      void sendLinesFiscalFileToElink({
-        lines,
-        orderRef: safeRef,
-        paymentMethod: "cash",
-      })
-        .then((filed) => {
-          if (filed.ok) return;
-          toast.error(
-            filed.error === "elink-partial"
-              ? t("order.fiscal_elink_partial")
-              : t("order.fiscal_elink_failed"),
-          );
-        })
-        .catch((elinkErr) => {
-          console.error("E-Link file:", elinkErr);
-          toast.error(t("order.fiscal_elink_failed"));
-        });
-    };
-
     if (!isOnline) {
       sendOrderInFlightRef.current = true;
       setIsSubmitting(true);
@@ -1523,9 +1502,7 @@ export default function OrderScreen({
         });
 
         // Queued offline (null) or immediate success — always print locally.
-        const sentRef = ticketRefForPrint(result);
-        runTicketPrint(sentRef);
-        fileSentOrderToTemp(sentRef);
+        runTicketPrint(ticketRefForPrint(result));
         setCart([]);
         onBack();
       } catch (error) {
@@ -1569,7 +1546,6 @@ export default function OrderScreen({
       }
 
       runTicketPrint(result.ticketOrderRef);
-      fileSentOrderToTemp(result.ticketOrderRef);
       onBack();
     } catch (error) {
       setCart(cartBackup);
@@ -1933,17 +1909,36 @@ export default function OrderScreen({
       paymentMethod?: PaymentMethod;
       settledSaleItems?: { id: string; quantity: number }[];
       payAmount?: number;
+      /** Drop the E-Link coupon in C:\Temp. Set on payment, not on reprint. */
+      writeElink?: boolean;
     },
   ) => {
-    if (
-      type !== "fiscal" &&
-      type !== "non_fiscal" &&
-      type !== "complimentary" &&
-      type !== "debt"
-    ) {
-      return;
-    }
     void (async () => {
+      if (extra?.writeElink && type !== "complimentary") {
+        try {
+          const filed = await sendOrderFiscalFileToElink({
+            licenseKey,
+            orderId: paidOrderId,
+            paymentMethod: extra.paymentMethod,
+          });
+          if (!filed.ok) {
+            toast.error(t("order.fiscal_elink_failed"));
+          }
+        } catch (elinkErr) {
+          console.error("E-Link file:", elinkErr);
+          toast.error(t("order.fiscal_elink_failed"));
+        }
+      }
+
+      if (
+        type !== "fiscal" &&
+        type !== "non_fiscal" &&
+        type !== "complimentary" &&
+        type !== "debt"
+      ) {
+        return;
+      }
+
       try {
         const pr =
           type === "fiscal"
@@ -2075,6 +2070,7 @@ export default function OrderScreen({
         paymentMethod: method,
         settledSaleItems: settledItems ?? undefined,
         payAmount,
+        writeElink: !payingPartial,
       };
 
       if (options?.confirmCash) {
