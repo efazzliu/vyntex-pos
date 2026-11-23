@@ -126,6 +126,10 @@ function buildCouponBody(
   return { body: commands.join("\n"), orderSum: total };
 }
 
+export function elinkFiscalAvailable(): boolean {
+  return typeof window !== "undefined" && Boolean(window.desktop?.writeElinkFiscalFile);
+}
+
 /** Writes these lines to C:\Temp. Used when the order on screen is already loaded. */
 export async function sendLinesFiscalFileToElink(args: {
   lines: FiscalItem[];

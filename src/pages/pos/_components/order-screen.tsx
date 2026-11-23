@@ -110,6 +110,7 @@ import {
   printNonFiscalReceiptForPay,
 } from "@/lib/print-fiscal-receipt.ts";
 import {
+  elinkFiscalAvailable,
   sendLinesFiscalFileToElink,
   sendOrderFiscalFileToElink,
 } from "@/lib/elink-fiscal-file.ts";
@@ -1918,9 +1919,11 @@ export default function OrderScreen({
       paymentMethod?: PaymentMethod;
       settledSaleItems?: { id: string; quantity: number }[];
       payAmount?: number;
+      fiscalOnRegister?: boolean;
     },
   ) => {
     void (async () => {
+      if (type === "fiscal" && extra?.fiscalOnRegister) return;
       if (
         type !== "fiscal" &&
         type !== "non_fiscal" &&
@@ -2047,6 +2050,7 @@ export default function OrderScreen({
 
       // "Pa kupon" still records the payment and frees the table. It must not
       // drop a coupon into E-Link, or the fiscal printer prints anyway.
+      let fiscalOnRegister = false;
       if (!payingPartial && type !== "complimentary" && type !== "no_receipt") {
         const orderRef = String(
           existingOrder.orderNumber ?? paidOrderId,
@@ -2083,7 +2087,8 @@ export default function OrderScreen({
                 paymentMethod: method,
                 orderNumber: existingOrder.orderNumber,
               });
-          if (!filed.ok) toast.error(t("order.fiscal_elink_failed"));
+          if (filed.ok) fiscalOnRegister = true;
+          else toast.error(t("order.fiscal_elink_failed"));
         } catch (elinkErr) {
           console.error("E-Link file:", elinkErr);
           toast.error(t("order.fiscal_elink_failed"));
@@ -2106,6 +2111,7 @@ export default function OrderScreen({
         paymentMethod: method,
         settledSaleItems: settledItems ?? undefined,
         payAmount,
+        fiscalOnRegister,
       };
 
       if (options?.confirmCash) {
@@ -2677,7 +2683,7 @@ export default function OrderScreen({
                       onCancel={closePayDrawer}
                       onPrint={
                         cashConfirmed &&
-                        (pendingCashType === "fiscal" ||
+                        ((pendingCashType === "fiscal" && !elinkFiscalAvailable()) ||
                           pendingCashType === "non_fiscal")
                           ? () =>
                               printPaidReceipt(
