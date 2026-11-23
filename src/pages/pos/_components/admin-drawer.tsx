@@ -49,7 +49,17 @@ type AdminDrawerProps = {
   theme: "dark" | "light";
   /** Staff permission: hide audit log from this menu when false. */
   canViewAuditLog?: boolean;
+  /** Role grid + plan; hides screens the staff member may not open. */
+  isViewAllowed?: (view: PosView) => boolean;
+  /** Where the logo takes the user (floor for table staff). */
+  homeView?: PosView;
 };
+
+function roleLabel(role: string, t: (key: string) => string): string {
+  const key = `staff.role_${role}`;
+  const label = t(key);
+  return label === key ? role : label;
+}
 
 type NavItem = {
   id: PosView;
@@ -81,6 +91,7 @@ function AdminNavBody({
   plan,
   theme,
   canViewAuditLog,
+  isViewAllowed,
   onNav,
   onLogoClick,
   onLogout,
@@ -95,6 +106,7 @@ function AdminNavBody({
   plan: string;
   theme: "dark" | "light";
   canViewAuditLog: boolean;
+  isViewAllowed?: (view: PosView) => boolean;
   onNav: (view: PosView) => void;
   onLogoClick: () => void;
   onLogout: () => void;
@@ -119,10 +131,7 @@ function AdminNavBody({
               {businessName}
             </p>
             <p className="text-brand text-xs font-medium">
-              {staffName} &middot;{" "}
-              {staffRole === "manager"
-                ? t("staff.role_manager")
-                : t("staff.role_admin")}
+              {staffName} &middot; {roleLabel(staffRole, t)}
             </p>
           </>
         ) : (
@@ -133,10 +142,7 @@ function AdminNavBody({
               {businessName}
             </SheetTitle>
             <SheetDescription className="text-brand text-xs font-medium">
-              {staffName} &middot;{" "}
-              {staffRole === "manager"
-                ? t("staff.role_manager")
-                : t("staff.role_admin")}
+              {staffName} &middot; {roleLabel(staffRole, t)}
             </SheetDescription>
           </>
         )}
@@ -171,7 +177,10 @@ function AdminNavBody({
           (item) =>
             (item.id !== "audit-log" || canViewAuditLog) &&
             (item.id !== "kitchen-display" || kitchenDisplayNavState(plan) !== "hidden") &&
-            (item.id === "kitchen-display" || canAccessView(plan, item.id)),
+            (item.id === "kitchen-display" || canAccessView(plan, item.id)) &&
+            (!isViewAllowed ||
+              isViewAllowed(item.id) ||
+              (item.id === "kitchen-display" && kitchenDisplayNavState(plan) === "coming_soon")),
         ).map((item) => {
           const kds = item.id === "kitchen-display" ? kitchenDisplayNavState(plan) : "live";
           if (item.id === "kitchen-display" && kds === "coming_soon") {
@@ -263,6 +272,8 @@ export default function AdminDrawer({
   onLogout,
   theme,
   canViewAuditLog = true,
+  isViewAllowed,
+  homeView = "floor",
 }: AdminDrawerProps) {
   const { t } = usePosLocale();
   const light = theme === "light";
@@ -273,6 +284,7 @@ export default function AdminDrawer({
       return;
     }
     if (view === "audit-log" && !canViewAuditLog) return;
+    if (isViewAllowed && !isViewAllowed(view) && canAccessView(plan, view)) return;
     if (!canAccessView(plan, view)) {
       const required = getRequiredPlan(view);
       toast.error(
@@ -285,7 +297,7 @@ export default function AdminDrawer({
   };
 
   const handleLogoClick = () => {
-    onViewChange("floor");
+    onViewChange(homeView);
     if (!pinned) onOpenChange(false);
   };
 
@@ -305,6 +317,7 @@ export default function AdminDrawer({
       plan={plan}
       theme={theme}
       canViewAuditLog={canViewAuditLog}
+      isViewAllowed={isViewAllowed}
       onNav={handleNav}
       onLogoClick={handleLogoClick}
       onLogout={handleLogout}

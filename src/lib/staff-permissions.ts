@@ -162,11 +162,6 @@ export function isFullAccessStaffRole(role: string | undefined): boolean {
   return role === "admin";
 }
 
-/** Admin and manager may manage staff accounts (add / edit / remove). */
-export function canManageStaffAccounts(role: string | undefined): boolean {
-  return role === "admin" || role === "manager";
-}
-
 export function isFloorStaffRole(role: string | undefined): boolean {
   return role === "waiter" || role === "cashier";
 }
@@ -203,6 +198,205 @@ export function staffHasPermission(
   }
   // Managers (and other roles) without a stored row fall back to the role template.
   return permissionsForRole(staff.role ?? "")[key] === true;
+}
+
+// ── Module permission grid (Settings → Users & roles) ──────────────────────
+
+export type StaffModuleId =
+  | "orders"
+  | "tables"
+  | "payments"
+  | "discounts"
+  | "menu"
+  | "stock"
+  | "reports"
+  | "house"
+  | "staff"
+  | "settings"
+  | "fiscal";
+
+export type StaffModuleAction = "view" | "create" | "edit" | "delete";
+
+export const STAFF_MODULE_IDS: StaffModuleId[] = [
+  "orders",
+  "tables",
+  "payments",
+  "discounts",
+  "menu",
+  "stock",
+  "reports",
+  "house",
+  "staff",
+  "settings",
+  "fiscal",
+];
+
+export const STAFF_MODULE_ACTIONS: StaffModuleAction[] = ["view", "create", "edit", "delete"];
+
+export type StaffModuleMatrix = Partial<
+  Record<StaffModuleId, Partial<Record<StaffModuleAction, boolean>>>
+>;
+
+/**
+ * Every grid cell that changes something in the POS. A permission key is the
+ * existing per-staff switch; "access" cells live only in `permissions.modules`.
+ * Cells not listed here have no feature behind them and are not shown as checkboxes.
+ */
+export const STAFF_MODULE_CELLS: Record<
+  StaffModuleId,
+  Partial<Record<StaffModuleAction, StaffPermissionKey | "access">>
+> = {
+  orders: { view: "access", delete: "canVoidItems" },
+  tables: {
+    view: "access",
+    create: "access",
+    edit: "canTransferTables",
+    delete: "canMergeTables",
+  },
+  payments: {
+    view: "canChargeDebt",
+    create: "access",
+    edit: "canSplitBills",
+    delete: "access",
+  },
+  discounts: { create: "canGiveDiscount" },
+  menu: { view: "access", edit: "canManageMenu" },
+  stock: { view: "access", create: "canLogStaffConsumption", edit: "canManageStock" },
+  reports: { view: "canViewReports" },
+  house: { create: "canMarkComplimentary" },
+  staff: { view: "access", edit: "access" },
+  settings: { view: "access" },
+  fiscal: { view: "canViewAuditLog" },
+};
+
+type AccessDefaults = Partial<Record<StaffModuleId, Partial<Record<StaffModuleAction, boolean>>>>;
+
+const ALL_ACCESS: AccessDefaults = {
+  orders: { view: true },
+  tables: { view: true, create: true },
+  payments: { create: true, delete: true },
+  menu: { view: true },
+  stock: { view: true },
+  staff: { view: true, edit: true },
+  settings: { view: true },
+};
+
+/** What each role could already reach before the grid was saved for it. */
+const ROLE_ACCESS_DEFAULTS: Record<StaffRole, AccessDefaults> = {
+  admin: ALL_ACCESS,
+  manager: ALL_ACCESS,
+  cashier: { tables: { view: true }, payments: { create: true } },
+  waiter: { tables: { view: true } },
+  kitchen: {},
+  inventory: { stock: { view: true } },
+  accountant: {},
+  auditor: {},
+};
+
+export function isStaffModuleCell(module: StaffModuleId, action: StaffModuleAction): boolean {
+  return STAFF_MODULE_CELLS[module]?.[action] != null;
+}
+
+function storedModules(
+  staff: StaffPermissionHolder | null | undefined,
+): StaffModuleMatrix | undefined {
+  const raw = (staff?.permissions as { modules?: unknown } | null | undefined)?.modules;
+  return raw && typeof raw === "object" ? (raw as StaffModuleMatrix) : undefined;
+}
+
+/** The value saved in the grid for this staff member, or undefined when never saved. */
+export function staffModuleExplicit(
+  staff: StaffPermissionHolder | null | undefined,
+  module: StaffModuleId,
+  action: StaffModuleAction,
+): boolean | undefined {
+  const value = storedModules(staff)?.[module]?.[action];
+  return typeof value === "boolean" ? value : undefined;
+}
+
+/** Whether the grid allows this module action for the staff member. */
+export function staffCan(
+  staff: StaffPermissionHolder | null | undefined,
+  module: StaffModuleId,
+  action: StaffModuleAction,
+): boolean {
+  if (!staff || staff.isActive === false) return false;
+  if (isFullAccessStaffRole(staff.role)) return true;
+  const cell = STAFF_MODULE_CELLS[module]?.[action];
+  if (!cell) return false;
+  if (cell !== "access") return staffHasPermission(staff, cell);
+  const explicit = staffModuleExplicit(staff, module, action);
+  if (explicit !== undefined) return explicit;
+  return ROLE_ACCESS_DEFAULTS[staff.role as StaffRole]?.[module]?.[action] === true;
+}
+
+/** Grid as it should look for a role (or staff) that has not been saved yet. */
+export function defaultModuleMatrix(
+  role: string,
+  perms: StaffPermissions,
+  saved?: StaffModuleMatrix | null,
+): Record<StaffModuleId, Record<StaffModuleAction, boolean>> {
+  const holder: StaffPermissionHolder = {
+    role,
+    isActive: true,
+    permissions: { ...perms, modules: saved ?? undefined },
+  };
+  const out = {} as Record<StaffModuleId, Record<StaffModuleAction, boolean>>;
+  for (const module of STAFF_MODULE_IDS) {
+    const row = {} as Record<StaffModuleAction, boolean>;
+    for (const action of STAFF_MODULE_ACTIONS) {
+      row[action] = isStaffModuleCell(module, action) && staffCan(holder, module, action);
+    }
+    out[module] = row;
+  }
+  return out;
+}
+
+/** Turn a saved grid into the stored permissions object (switches + module access). */
+export function permissionsFromModuleMatrix(
+  matrix: StaffModuleMatrix,
+): StaffPermissions & { modules: StaffModuleMatrix } {
+  const perms = { ...ALL_OFF };
+  const modules: StaffModuleMatrix = {};
+  for (const module of STAFF_MODULE_IDS) {
+    for (const action of STAFF_MODULE_ACTIONS) {
+      const cell = STAFF_MODULE_CELLS[module]?.[action];
+      if (!cell) continue;
+      const on = matrix[module]?.[action] === true;
+      if (cell === "access") {
+        modules[module] = { ...(modules[module] ?? {}), [action]: on };
+      } else if (on) {
+        perms[cell] = true;
+      }
+    }
+  }
+  return { ...perms, modules };
+}
+
+/** Keep the saved grid when a staff row is re-saved from another editor. */
+export function withStoredModules<T extends object>(
+  perms: T,
+  previous: Record<string, unknown> | null | undefined,
+): T & { modules?: StaffModuleMatrix } {
+  const modules = (previous as { modules?: unknown } | null | undefined)?.modules;
+  if (!modules || typeof modules !== "object") return perms;
+  return { ...perms, modules: modules as StaffModuleMatrix };
+}
+
+let roleModuleOverrides: Partial<Record<StaffRole, StaffModuleMatrix>> = {};
+
+export function setRoleModuleOverrides(
+  map: Partial<Record<StaffRole, StaffModuleMatrix>> | null | undefined,
+): void {
+  roleModuleOverrides = map && typeof map === "object" ? { ...map } : {};
+}
+
+/** Saved grid for a role, used when a new staff member gets that role. */
+export function modulesForRole(role: string): StaffModuleMatrix | undefined {
+  if (isFullAccessStaffRole(role)) return undefined;
+  const matrix = roleModuleOverrides[role as StaffRole];
+  if (!matrix) return undefined;
+  return permissionsFromModuleMatrix(matrix).modules;
 }
 
 export const STAFF_PERMISSION_DENIED =

@@ -34,13 +34,23 @@ import {
 } from "../_lib/staff-pin.ts";
 import {
   ROLE_PERMISSION_TEMPLATES,
+  STAFF_MODULE_ACTIONS,
   STAFF_PERMISSION_KEYS,
+  defaultModuleMatrix,
   getRolePermissionOverrides,
   isFullAccessStaffRole,
+  isStaffModuleCell,
   loadRolePermissionOverrides,
+  modulesForRole,
   permissionsForRole,
+  permissionsFromModuleMatrix,
   rolePermissionOverridesCacheKey,
+  setRoleModuleOverrides,
   setRolePermissionOverride,
+  withStoredModules,
+  type StaffModuleAction,
+  type StaffModuleId,
+  type StaffModuleMatrix,
   type StaffPermissionKey,
   type StaffPermissions,
 } from "@/lib/staff-permissions.ts";
@@ -547,7 +557,7 @@ export default function SettingsUsersPanel({
         name: row.name,
         role: row.role,
         isActive,
-        permissions: permissionsFromRow(row),
+        permissions: withStoredModules(permissionsFromRow(row), row.permissions),
         actorStaffId,
         actorStaffName,
       });
@@ -1020,9 +1030,9 @@ function permShort(key: StaffPermissionKey): string {
   return PERM_SHORT[key];
 }
 
-type RoleAction = "view" | "create" | "edit" | "delete";
+type RoleAction = StaffModuleAction;
 
-const ROLE_ACTIONS: RoleAction[] = ["view", "create", "edit", "delete"];
+const ROLE_ACTIONS: RoleAction[] = STAFF_MODULE_ACTIONS;
 
 const ROLE_ACTION_LABEL: Record<RoleAction, string> = {
   view: "settings.users_col_view",
@@ -1032,123 +1042,36 @@ const ROLE_ACTION_LABEL: Record<RoleAction, string> = {
 };
 
 const ROLE_MODULES: {
-  id: string;
+  id: StaffModuleId;
   titleKey: string;
   descKey: string;
   icon: LucideIcon;
-  cells: Partial<Record<RoleAction, StaffPermissionKey>>;
 }[] = [
-  {
-    id: "orders",
-    titleKey: "settings.users_mod_orders",
-    descKey: "settings.users_mod_orders_desc",
-    icon: ShoppingBag,
-    cells: { delete: "canVoidItems" },
-  },
-  {
-    id: "tables",
-    titleKey: "settings.users_mod_tables",
-    descKey: "settings.users_mod_tables_desc",
-    icon: ArrowLeftRight,
-    cells: { edit: "canTransferTables", delete: "canMergeTables" },
-  },
-  {
-    id: "payments",
-    titleKey: "settings.users_mod_payments",
-    descKey: "settings.users_mod_payments_desc",
-    icon: Wallet,
-    cells: { create: "canSplitBills", edit: "canChargeDebt" },
-  },
-  {
-    id: "discounts",
-    titleKey: "settings.users_mod_discounts",
-    descKey: "settings.users_mod_discounts_desc",
-    icon: Percent,
-    cells: { create: "canGiveDiscount", edit: "canGiveDiscount" },
-  },
-  {
-    id: "menu",
-    titleKey: "settings.users_mod_menu",
-    descKey: "settings.users_mod_menu_desc",
-    icon: UtensilsCrossed,
-    cells: { view: "canManageMenu", create: "canManageMenu", edit: "canManageMenu", delete: "canManageMenu" },
-  },
-  {
-    id: "stock",
-    titleKey: "settings.users_mod_stock",
-    descKey: "settings.users_mod_stock_desc",
-    icon: PackageSearch,
-    cells: { view: "canManageStock", edit: "canManageStock", create: "canLogStaffConsumption" },
-  },
-  {
-    id: "reports",
-    titleKey: "settings.users_mod_reports",
-    descKey: "settings.users_mod_reports_desc",
-    icon: BarChart3,
-    cells: { view: "canViewReports" },
-  },
-  {
-    id: "house",
-    titleKey: "settings.users_mod_house",
-    descKey: "settings.users_mod_house_desc",
-    icon: Gift,
-    cells: { create: "canMarkComplimentary", edit: "canMarkComplimentary" },
-  },
-  {
-    id: "staff",
-    titleKey: "settings.users_mod_staff",
-    descKey: "settings.users_mod_staff_desc",
-    icon: Users,
-    cells: {},
-  },
-  {
-    id: "settings",
-    titleKey: "settings.users_mod_settings",
-    descKey: "settings.users_mod_settings_desc",
-    icon: Lock,
-    cells: {},
-  },
-  {
-    id: "fiscal",
-    titleKey: "settings.users_mod_fiscal",
-    descKey: "settings.users_mod_fiscal_desc",
-    icon: ClipboardList,
-    cells: { view: "canViewAuditLog" },
-  },
+  { id: "orders", titleKey: "settings.users_mod_orders", descKey: "settings.users_mod_orders_desc", icon: ShoppingBag },
+  { id: "tables", titleKey: "settings.users_mod_tables", descKey: "settings.users_mod_tables_desc", icon: ArrowLeftRight },
+  { id: "payments", titleKey: "settings.users_mod_payments", descKey: "settings.users_mod_payments_desc", icon: Wallet },
+  { id: "discounts", titleKey: "settings.users_mod_discounts", descKey: "settings.users_mod_discounts_desc", icon: Percent },
+  { id: "menu", titleKey: "settings.users_mod_menu", descKey: "settings.users_mod_menu_desc", icon: UtensilsCrossed },
+  { id: "stock", titleKey: "settings.users_mod_stock", descKey: "settings.users_mod_stock_desc", icon: PackageSearch },
+  { id: "reports", titleKey: "settings.users_mod_reports", descKey: "settings.users_mod_reports_desc", icon: BarChart3 },
+  { id: "house", titleKey: "settings.users_mod_house", descKey: "settings.users_mod_house_desc", icon: Gift },
+  { id: "staff", titleKey: "settings.users_mod_staff", descKey: "settings.users_mod_staff_desc", icon: Users },
+  { id: "settings", titleKey: "settings.users_mod_settings", descKey: "settings.users_mod_settings_desc", icon: Lock },
+  { id: "fiscal", titleKey: "settings.users_mod_fiscal", descKey: "settings.users_mod_fiscal_desc", icon: ClipboardList },
 ];
 
-type RoleModuleMatrix = Record<string, Record<RoleAction, boolean>>;
+type RoleModuleMatrix = Record<StaffModuleId, Record<RoleAction, boolean>>;
 
 function roleMatrixCacheKey(licenseKey: string): string {
   return `role-perm-matrix:${licenseKey}`;
 }
 
-function roleDefaultsAllOn(role: StaffRole): boolean {
-  const template = ROLE_PERMISSION_TEMPLATES[role];
-  return STAFF_PERMISSION_KEYS.every((key) => template[key] === true);
-}
-
 function buildRoleMatrix(
   role: StaffRole,
   perms: StaffPermissions,
-  saved?: RoleModuleMatrix | null,
+  saved?: StaffModuleMatrix | null,
 ): RoleModuleMatrix {
-  const fallbackOn = roleDefaultsAllOn(role);
-  const matrix: RoleModuleMatrix = {};
-  for (const module of ROLE_MODULES) {
-    const row = {} as Record<RoleAction, boolean>;
-    for (const action of ROLE_ACTIONS) {
-      const savedValue = saved?.[module.id]?.[action];
-      if (typeof savedValue === "boolean") {
-        row[action] = savedValue;
-        continue;
-      }
-      const permKey = module.cells[action];
-      row[action] = permKey ? perms[permKey] === true : fallbackOn;
-    }
-    matrix[module.id] = row;
-  }
-  return matrix;
+  return defaultModuleMatrix(role, perms, saved ? permissionsFromModuleMatrix(saved).modules : null);
 }
 
 function emptyRoleMatrices(): Record<StaffRole, RoleModuleMatrix> {
@@ -1159,29 +1082,19 @@ function emptyRoleMatrices(): Record<StaffRole, RoleModuleMatrix> {
   return drafts;
 }
 
-function permissionsFromMatrix(matrix: RoleModuleMatrix): StaffPermissions {
-  const next = {} as StaffPermissions;
-  for (const key of STAFF_PERMISSION_KEYS) next[key] = false;
-  for (const module of ROLE_MODULES) {
-    for (const action of ROLE_ACTIONS) {
-      const permKey = module.cells[action];
-      if (permKey && matrix[module.id]?.[action]) next[permKey] = true;
-    }
-  }
-  return next;
-}
-
 function matrixAllOn(matrix: RoleModuleMatrix): boolean {
   return ROLE_MODULES.every((module) =>
-    ROLE_ACTIONS.every((action) => matrix[module.id]?.[action] === true),
+    ROLE_ACTIONS.every(
+      (action) => !isStaffModuleCell(module.id, action) || matrix[module.id]?.[action] === true,
+    ),
   );
 }
 
-function matrixWithAll(matrix: RoleModuleMatrix, on: boolean): RoleModuleMatrix {
-  const next: RoleModuleMatrix = {};
+function matrixWithAll(on: boolean): RoleModuleMatrix {
+  const next = {} as RoleModuleMatrix;
   for (const module of ROLE_MODULES) {
     const row = {} as Record<RoleAction, boolean>;
-    for (const action of ROLE_ACTIONS) row[action] = on;
+    for (const action of ROLE_ACTIONS) row[action] = on && isStaffModuleCell(module.id, action);
     next[module.id] = row;
   }
   return next;
@@ -1228,12 +1141,13 @@ function RolePermissionsPane({
           getDataCache<Partial<Record<StaffRole, Partial<StaffPermissions>>>>(
             rolePermissionOverridesCacheKey(licenseKey),
           ),
-          getDataCache<Partial<Record<StaffRole, RoleModuleMatrix>>>(
+          getDataCache<Partial<Record<StaffRole, StaffModuleMatrix>>>(
             roleMatrixCacheKey(licenseKey),
           ),
         ]);
         if (cancelled) return;
         loadRolePermissionOverrides(cachedPerms);
+        setRoleModuleOverrides(cachedMatrix);
         const next = {} as Record<StaffRole, RoleModuleMatrix>;
         for (const role of ROLES) {
           next[role] = buildRoleMatrix(
@@ -1252,11 +1166,11 @@ function RolePermissionsPane({
     };
   }, [licenseKey]);
 
-  const toggleCell = (moduleId: string, action: RoleAction) => {
-    if (locked) return;
+  const toggleCell = (moduleId: StaffModuleId, action: RoleAction) => {
+    if (locked || !isStaffModuleCell(moduleId, action)) return;
     setMatrices((prev) => {
       const current = prev[selected] ?? buildRoleMatrix(selected, permissionsForRole(selected));
-      const row = { ...(current[moduleId] ?? { view: false, create: false, edit: false, delete: false }) };
+      const row = { ...current[moduleId] };
       row[action] = !row[action];
       return {
         ...prev,
@@ -1273,7 +1187,7 @@ function RolePermissionsPane({
     const nextOn = !allOn;
     setMatrices((prev) => ({
       ...prev,
-      [selected]: matrixWithAll(prev[selected] ?? matrix, nextOn),
+      [selected]: matrixWithAll(nextOn),
     }));
   };
 
@@ -1284,22 +1198,22 @@ function RolePermissionsPane({
     }
     if (saving) return;
     const nextMatrix = matrices[selected];
-    const nextPerms = permissionsFromMatrix(nextMatrix);
+    const nextPerms = permissionsFromModuleMatrix(nextMatrix);
     const targets = staffRows.filter((row) => row.role === selected);
     setSaving(true);
     try {
-      setRolePermissionOverride(selected, nextPerms);
+      const { modules: _modules, ...switches } = nextPerms;
+      setRolePermissionOverride(selected, switches);
       const overrides = getRolePermissionOverrides();
       const matrixCache =
-        (await getDataCache<Partial<Record<StaffRole, RoleModuleMatrix>>>(
+        (await getDataCache<Partial<Record<StaffRole, StaffModuleMatrix>>>(
           roleMatrixCacheKey(licenseKey),
         )) ?? {};
+      const nextMatrixCache = { ...matrixCache, [selected]: nextMatrix };
+      setRoleModuleOverrides(nextMatrixCache);
       await Promise.all([
         saveDataCache(rolePermissionOverridesCacheKey(licenseKey), overrides),
-        saveDataCache(roleMatrixCacheKey(licenseKey), {
-          ...matrixCache,
-          [selected]: nextMatrix,
-        }),
+        saveDataCache(roleMatrixCacheKey(licenseKey), nextMatrixCache),
       ]);
 
       for (const row of targets) {
@@ -1523,6 +1437,17 @@ function RolePermissionsPane({
                       </span>
                     </div>
                     {ROLE_ACTIONS.map((action) => {
+                      if (!isStaffModuleCell(module.id, action)) {
+                        return (
+                          <span
+                            key={action}
+                            className="flex justify-center text-sm text-[#8b93a7]/50"
+                            aria-hidden
+                          >
+                            —
+                          </span>
+                        );
+                      }
                       const on = locked || matrix[module.id]?.[action] === true;
                       if (locked) {
                         return (
@@ -1643,7 +1568,14 @@ function StaffEditor({
       setError(t("staff.err_pin_digits", { min: STAFF_PIN_MIN_LEN, max: STAFF_PIN_MAX_LEN }));
       return;
     }
-    const nextPerms = locked ? permissionsForRole(role) : permissions;
+    const switches = locked ? permissionsForRole(role) : permissions;
+    const roleModules = modulesForRole(role);
+    const nextPerms =
+      editing && editing.role === role
+        ? withStoredModules(switches, editing.permissions)
+        : roleModules
+          ? { ...switches, modules: roleModules }
+          : switches;
     setSaving(true);
     setError(null);
     try {

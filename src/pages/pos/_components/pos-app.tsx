@@ -51,7 +51,11 @@ import {
   loadRolePermissionOverrides,
   permissionsForRole,
   rolePermissionOverridesCacheKey,
+  staffCan,
   staffHasPermission,
+  staffModuleExplicit,
+  type StaffModuleAction,
+  type StaffModuleId,
   type StaffPermissions,
 } from "@/lib/staff-permissions.ts";
 import type { StaffRole } from "../_lib/types.ts";
@@ -212,6 +216,83 @@ function PosAppInner({
   const canManageStock = staffHasPermission(permissionHolder, "canManageStock");
   const canManageMenu = staffHasPermission(permissionHolder, "canManageMenu");
 
+  const can = (module: StaffModuleId, action: StaffModuleAction) =>
+    staffCan(permissionHolder, module, action);
+  const isFloorRole = isFloorStaffRole(activeStaff.role);
+  const isAdminOrManager = activeStaff.role === "admin" || activeStaff.role === "manager";
+
+  /** Grid permissions only; plan gating is applied by `viewAllowed`. */
+  const staffViewAllowed = (view: PosView): boolean => {
+    switch (view) {
+      case "home":
+        return true;
+      case "floor":
+      case "order":
+        return isFloorRole || can("tables", "view");
+      case "tables":
+        return can("tables", "create");
+      case "dashboard":
+      case "z-report":
+        return canViewReports;
+      case "menu":
+        return can("menu", "view");
+      case "stock":
+        return can("stock", "view");
+      case "order-history":
+        return can("orders", "view");
+      case "debt-ledger":
+        return can("payments", "view");
+      case "staff":
+        return can("staff", "view");
+      case "audit-log":
+        return canViewAuditLog;
+      case "settings":
+        return can("settings", "view");
+      case "kitchen-display":
+        return isAdminOrManager || activeStaff.role === "kitchen" || can("orders", "view");
+      default:
+        return false;
+    }
+  };
+
+  const viewAllowed = (view: PosView): boolean => {
+    if (!staffViewAllowed(view)) return false;
+    if (view === "home" || view === "floor" || view === "order") return true;
+    if (view === "kitchen-display") return kitchenDisplayNavState(activation.plan) === "live";
+    return canAccessView(activation.plan, view);
+  };
+
+  const BACK_OFFICE_VIEWS: PosView[] = [
+    "dashboard",
+    "menu",
+    "stock",
+    "order-history",
+    "tables",
+    "staff",
+    "z-report",
+    "audit-log",
+    "settings",
+  ];
+  const SIDEBAR_ROLE_VIEWS: Partial<Record<StaffRole, PosView[]>> = {
+    inventory: ["stock", "home"],
+    accountant: ["home", "dashboard", "z-report", "audit-log"],
+    auditor: ["home", "dashboard", "z-report", "audit-log"],
+    kitchen: ["home", "kitchen-display"],
+  };
+  const sidebarViews = SIDEBAR_ROLE_VIEWS[activeStaff.role as StaffRole] ?? ["home"];
+  const usePlainFloor = isFloorRole && !BACK_OFFICE_VIEWS.some(viewAllowed);
+  const useSidebarLayout =
+    !isFloorRole &&
+    !isAdminOrManager &&
+    ![...BACK_OFFICE_VIEWS, "floor" as PosView, "debt-ledger" as PosView, "kitchen-display" as PosView]
+      .filter((view) => !sidebarViews.includes(view))
+      .some(viewAllowed);
+
+  const paymentAccess = {
+    take: staffModuleExplicit(permissionHolder, "payments", "create") === true ? true : undefined,
+    refund: staffModuleExplicit(permissionHolder, "payments", "delete") === true ? true : undefined,
+  };
+
   const defaultView: PosView = useMemo(() => {
     if (isFloorStaffRole(activeStaff.role)) return "floor";
     if (activeStaff.role === "admin" || activeStaff.role === "manager") {
@@ -276,84 +357,65 @@ function PosAppInner({
     return () => window.removeEventListener("keydown", onEscape);
   }, [drawerOpen, onLogout]);
 
-  const setActiveViewForRole = useCallback(
+  const ALL_VIEWS: PosView[] = [
+    "home",
+    "floor",
+    "order",
+    "dashboard",
+    "kitchen-display",
+    "menu",
+    "stock",
+    "order-history",
+    "tables",
+    "staff",
+    "z-report",
+    "debt-ledger",
+    "audit-log",
+    "settings",
+  ];
+  const allowedViewsKey = ALL_VIEWS.filter(viewAllowed).join(",");
+  const allowedViews = useMemo(
+    () => new Set(allowedViewsKey.split(",").filter(Boolean) as PosView[]),
+    [allowedViewsKey],
+  );
+
+  const fallbackView: PosView = useMemo(() => {
+    if (allowedViews.has(defaultView)) return defaultView;
+    const order: PosView[] = [
+      "floor",
+      "dashboard",
+      "kitchen-display",
+      "stock",
+      "z-report",
+      "menu",
+      "order-history",
+      "settings",
+    ];
+    return order.find((view) => allowedViews.has(view)) ?? "home";
+  }, [allowedViews, defaultView]);
+
+  const goToView = useCallback(
     (view: PosView) => {
-      if (activeStaff.role === "inventory") {
-        if (view === "stock" && canAccessView(activation.plan, "stock")) {
-          setActiveView("stock");
-        }
-        return;
-      }
       if (view === "kitchen-display" && kitchenDisplayNavState(activation.plan) !== "live") {
         toast.info(t("msg.kitchen_coming_soon"));
         return;
       }
-      if (!canAccessView(activation.plan, view)) return;
-      if (view === "audit-log" && !canViewAuditLog) return;
+      if (!allowedViews.has(view)) return;
       setActiveView(view);
     },
-    [activeStaff.role, activation.plan, canViewAuditLog, t],
+    [activation.plan, allowedViews, t],
   );
+  const setActiveViewForRole = goToView;
+  const setActiveViewFromPlan = goToView;
 
+  /** Keep every role on a screen its plan and role grid allow. */
   useEffect(() => {
-    if (activeStaff.role !== "inventory") return;
-    if (!canAccessView(activation.plan, "stock")) return;
-    if (activeView !== "stock") setActiveView("stock");
-  }, [activeStaff.role, activation.plan, activeView]);
-
-  useEffect(() => {
-    if (activeStaff.role !== "kitchen") return;
-    if (kitchenDisplayNavState(activation.plan) !== "live") {
-      if (activeView === "kitchen-display") setActiveView("home");
+    if (activeView === "order") {
+      if (!selectedTableId || !allowedViews.has("order")) setActiveView(fallbackView);
       return;
     }
-    if (activeView !== "kitchen-display") setActiveView("kitchen-display");
-  }, [activeStaff.role, activation.plan, activeView]);
-
-  /** Keep admin/manager on an allowed view if plan or navigation left them on a locked screen. */
-  useEffect(() => {
-    if (activeStaff.role !== "admin" && activeStaff.role !== "manager") return;
-    if (activeView === "order" && selectedTableId) return;
-    if (activeView === "order" && !selectedTableId) {
-      setActiveView("floor");
-      return;
-    }
-    if (
-      activeView === "audit-log" &&
-      (!canViewAuditLog || !canAccessView(activation.plan, "audit-log"))
-    ) {
-      setActiveView(defaultAdminManagerLandingView(activation.plan));
-      return;
-    }
-    if (activeView === "kitchen-display" && kitchenDisplayNavState(activation.plan) !== "live") {
-      setActiveView(defaultAdminManagerLandingView(activation.plan));
-      return;
-    }
-    if (!canAccessView(activation.plan, activeView)) {
-      setActiveView(defaultAdminManagerLandingView(activation.plan));
-    }
-  }, [
-    activeStaff.role,
-    activation.plan,
-    activeView,
-    selectedTableId,
-    canViewAuditLog,
-  ]);
-
-  /** Accountant / auditor / other sidebar roles: drop back to home if the current view is not on their plan. */
-  useEffect(() => {
-    const r = activeStaff.role;
-    if (r === "admin" || r === "manager" || r === "waiter" || r === "inventory") return;
-    if (
-      activeView === "audit-log" &&
-      (!canViewAuditLog || !canAccessView(activation.plan, "audit-log"))
-    ) {
-      setActiveView("home");
-      return;
-    }
-    if (canAccessView(activation.plan, activeView)) return;
-    setActiveView("home");
-  }, [activeStaff.role, activation.plan, activeView, canViewAuditLog]);
+    if (!allowedViews.has(activeView)) setActiveView(fallbackView);
+  }, [activeView, allowedViews, fallbackView, selectedTableId]);
 
   useEffect(() => {
     if (
@@ -364,19 +426,6 @@ function PosAppInner({
       setDrawerOpen(false);
     }
   }, [activeView]);
-
-  const setActiveViewFromPlan = useCallback(
-    (view: PosView) => {
-      if (view === "kitchen-display" && kitchenDisplayNavState(activation.plan) !== "live") {
-        toast.info(t("msg.kitchen_coming_soon"));
-        return;
-      }
-      if (!canAccessView(activation.plan, view)) return;
-      if (view === "audit-log" && !canViewAuditLog) return;
-      setActiveView(view);
-    },
-    [activation.plan, canViewAuditLog, t],
-  );
 
   const [settingsJump, setSettingsJump] = useState<{
     category: SettingsCategoryId;
@@ -417,7 +466,7 @@ function PosAppInner({
   };
 
   // ── Waiter / cashier: full-screen floor plan ──────────────────────
-  if (isFloorStaffRole(activeStaff.role)) {
+  if (usePlainFloor) {
     if (activeView === "order" && selectedTableId) {
       return (
         <OfflineSyncManager>
@@ -435,6 +484,7 @@ function PosAppInner({
               canSplitBillsQuick={canSplitBillsQuick}
               canChargeDebtQuick={canChargeDebtQuick}
               canMarkComplimentaryQuick={canMarkComplimentaryQuick}
+              paymentAccess={paymentAccess}
               onOrderMovedToTable={setSelectedTableId}
               onBack={handleBackFromOrder}
               onLogout={onLogout}
@@ -467,8 +517,8 @@ function PosAppInner({
     );
   }
 
-  // ── Admin & Manager: pinned nav, hidden only on table workspace ───────
-  if (activeStaff.role === "admin" || activeStaff.role === "manager") {
+  // ── Admin, manager and any role given back-office screens in the role grid ───────
+  if (!useSidebarLayout) {
     const isFloorOrOrder =
       activeView === "floor" || activeView === "order";
     const isTableWorkspace =
@@ -476,15 +526,8 @@ function PosAppInner({
       activeView === "order" ||
       activeView === "tables";
 
-    // Helper: only render a gated view if the plan allows it (and staff permission for audit log)
     const gated = (view: PosView, node: ReactNode) =>
-      activeView === view &&
-      canAccessView(activation.plan, view) &&
-      (view !== "audit-log" || canViewAuditLog) &&
-      ((view !== "dashboard" && view !== "z-report") || canViewReports) &&
-      (view !== "kitchen-display" || kitchenDisplayNavState(activation.plan) === "live")
-        ? node
-        : null;
+      activeView === view && allowedViews.has(view) ? node : null;
 
     const adminDrawer = (
       <AdminDrawer
@@ -500,6 +543,8 @@ function PosAppInner({
         onLogout={onLogout}
         theme={theme}
         canViewAuditLog={canViewAuditLog}
+        isViewAllowed={(view) => allowedViews.has(view)}
+        homeView={allowedViews.has("floor") ? "floor" : fallbackView}
       />
     );
 
@@ -537,8 +582,15 @@ function PosAppInner({
                   licenseKey: activation.licenseKey,
                   onLogout,
                   onLogoClick: () => setDrawerOpen(true),
-                  role: activeStaff.role === "admin" ? "admin" : "manager",
-                  canLogStaffConsumption: true,
+                  role:
+                    activeStaff.role === "admin"
+                      ? "admin"
+                      : activeStaff.role === "manager"
+                        ? "manager"
+                        : activeStaff.role === "cashier"
+                          ? "cashier"
+                          : "waiter",
+                  canLogStaffConsumption: isAdminOrManager || canLogStaffConsumption,
                 }}
               />
             )}
@@ -557,11 +609,21 @@ function PosAppInner({
                 canSplitBillsQuick={canSplitBillsQuick}
                 canChargeDebtQuick={canChargeDebtQuick}
                 canMarkComplimentaryQuick={canMarkComplimentaryQuick}
+                paymentAccess={paymentAccess}
                 onOrderMovedToTable={setSelectedTableId}
                 onBack={handleBackFromOrder}
                 onLogout={onLogout}
               />
             )}
+
+            {gated("home", (
+              <PosHomeView
+                activation={activation}
+                plan={activation.plan}
+                onNavigate={setActiveViewFromPlan}
+                staffRole={activeStaff.role}
+              />
+            ))}
 
             {/* Dashboard */}
             {gated("dashboard", (

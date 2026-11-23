@@ -181,6 +181,8 @@ type OrderScreenProps = {
   canChargeDebtQuick?: boolean;
   /** If true: show complimentary (“On the house”) beside sent items only. If false: hide it entirely (not in the payment drawer). */
   canMarkComplimentaryQuick?: boolean;
+  /** Role grid grants (Payments → Create / Delete); when unset the payment settings decide. */
+  paymentAccess?: { take?: boolean; refund?: boolean };
   /** After transfer/merge, open the target table’s order screen */
   onOrderMovedToTable?: (tableId: Id<"tables">) => void;
   onBack: () => void;
@@ -358,6 +360,7 @@ export default function OrderScreen({
   canSplitBillsQuick = false,
   canChargeDebtQuick = false,
   canMarkComplimentaryQuick = false,
+  paymentAccess,
   onOrderMovedToTable,
   onBack,
   onLogout,
@@ -585,7 +588,9 @@ export default function OrderScreen({
   const paymentSettings = parsePosPaymentSettings(
     (companyQuery as { paymentSettings?: unknown } | undefined)?.paymentSettings,
   );
-  const canProcessPayment = posTerminalCanProcessPayment(staffRole, paymentSettings);
+  const canProcessPayment =
+    paymentAccess?.take === true || posTerminalCanProcessPayment(staffRole, paymentSettings);
+  const canRefund = paymentAccess?.refund === true || roleCanRefund(staffRole, paymentSettings);
   const availabilityRules = resolveOrderAvailabilityRulesFromCompany(
     companyQuery as
       | { enforceOrderAvailability?: unknown; stockRules?: unknown }
@@ -2957,7 +2962,7 @@ export default function OrderScreen({
                 staffId={staffId}
                 staffName={staffName}
                 staffRole={staffRole}
-                allowRefund={roleCanRefund(staffRole, paymentSettings)}
+                allowRefund={canRefund}
                 availabilityRules={availabilityRules}
                 menuItems={menuItems}
                 panelHost={orderBodyEl}

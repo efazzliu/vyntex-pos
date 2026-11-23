@@ -31,7 +31,7 @@ import {
   isValidStaffPinLength,
   sanitizeStaffPinInput,
 } from "../_lib/staff-pin.ts";
-import { permissionsForRole } from "@/lib/staff-permissions.ts";
+import { permissionsForRole, withStoredModules } from "@/lib/staff-permissions.ts";
 import type { StaffRole } from "../_lib/types.ts";
 import { BRAND } from "@/lib/brand-colors.ts";
 
@@ -354,6 +354,13 @@ export default function StaffDialog({
           pin.length > 0 && isValidStaffPinLength(pin.length)
             ? await hashString(pin)
             : undefined;
+        const savedPermissions =
+          editing.role === role
+            ? withStoredModules(
+                permissions,
+                editing.permissions as Record<string, unknown> | undefined,
+              )
+            : permissions;
         await updateStaff({
           licenseKey,
           staffId: editing._id,
@@ -361,7 +368,7 @@ export default function StaffDialog({
           role,
           pinHash,
           isActive,
-          permissions,
+          permissions: savedPermissions,
           actorStaffId,
           actorStaffName,
         });
@@ -370,7 +377,7 @@ export default function StaffDialog({
           name: name.trim(),
           role,
           isActive,
-          permissions,
+          permissions: savedPermissions,
           pinHash: pinHash ?? editing.pinHash,
         } as Doc<"staff">;
         const cached = (await getDataCache<Doc<"staff">[]>(`staff:${licenseKey}`)) ?? [];
