@@ -1119,7 +1119,11 @@ function RolePermissionsPane({
   const [selected, setSelected] = useState<StaffRole>("waiter");
   const [roleTab, setRoleTab] = useState<"permissions" | "limits" | "settings">("permissions");
   const [matrices, setMatrices] = useState<Record<StaffRole, RoleModuleMatrix>>(emptyRoleMatrices);
+  const [editedRoles, setEditedRoles] = useState<Set<StaffRole>>(() => new Set());
   const [saving, setSaving] = useState(false);
+  const staffMatrixKey = staffRows
+    .map((row) => `${row._id}:${row.role}:${JSON.stringify(row.permissions ?? null)}`)
+    .join("|");
   const q = query.trim().toLowerCase();
   const visibleRoles = ROLES.filter((role) => {
     if (!q) return true;
@@ -1150,13 +1154,27 @@ function RolePermissionsPane({
         setRoleModuleOverrides(cachedMatrix);
         const next = {} as Record<StaffRole, RoleModuleMatrix>;
         for (const role of ROLES) {
-          next[role] = buildRoleMatrix(
-            role,
-            permissionsForRole(role),
-            cachedMatrix?.[role] ?? null,
+          const saved = staffRows.find(
+            (row) =>
+              row.role === role &&
+              row.permissions &&
+              typeof row.permissions === "object" &&
+              row.permissions.modules &&
+              typeof row.permissions.modules === "object",
           );
+          next[role] = saved
+            ? defaultModuleMatrix(
+                role,
+                { ...permissionsForRole(role), ...(saved.permissions as Partial<StaffPermissions>) },
+                saved.permissions!.modules as Partial<StaffModuleMatrix>,
+              )
+            : buildRoleMatrix(role, permissionsForRole(role), cachedMatrix?.[role] ?? null);
         }
-        setMatrices(next);
+        setMatrices((prev) => {
+          const merged = { ...next };
+          for (const role of editedRoles) merged[role] = prev[role];
+          return merged;
+        });
       } catch {
         if (!cancelled) setMatrices(emptyRoleMatrices());
       }
@@ -1164,10 +1182,12 @@ function RolePermissionsPane({
     return () => {
       cancelled = true;
     };
-  }, [licenseKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [licenseKey, staffMatrixKey]);
 
   const toggleCell = (moduleId: StaffModuleId, action: RoleAction) => {
     if (locked || !isStaffModuleCell(moduleId, action)) return;
+    setEditedRoles((prev) => new Set(prev).add(selected));
     setMatrices((prev) => {
       const current = prev[selected] ?? buildRoleMatrix(selected, permissionsForRole(selected));
       const row = { ...current[moduleId] };
@@ -1185,6 +1205,7 @@ function RolePermissionsPane({
   const toggleSelectAll = () => {
     if (locked) return;
     const nextOn = !allOn;
+    setEditedRoles((prev) => new Set(prev).add(selected));
     setMatrices((prev) => ({
       ...prev,
       [selected]: matrixWithAll(nextOn),
@@ -1239,6 +1260,11 @@ function RolePermissionsPane({
         );
       }
 
+      setEditedRoles((prev) => {
+        const next = new Set(prev);
+        next.delete(selected);
+        return next;
+      });
       toast.success(
         targets.length > 0
           ? t("settings.users_role_perms_saved", { count: targets.length })

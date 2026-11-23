@@ -289,7 +289,11 @@ function PosAppInner({
       .some(viewAllowed);
 
   const paymentAccess = {
-    take: staffModuleExplicit(permissionHolder, "payments", "create") === true ? true : undefined,
+    take: (["create", "view", "edit", "delete"] as const).some(
+      (action) => staffModuleExplicit(permissionHolder, "payments", action) === true,
+    )
+      ? true
+      : undefined,
     refund: staffModuleExplicit(permissionHolder, "payments", "delete") === true ? true : undefined,
   };
 
