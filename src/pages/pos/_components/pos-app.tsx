@@ -45,11 +45,16 @@ import {
   kitchenDisplayNavState,
 } from "../_lib/plan-features.ts";
 import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
+import { getDataCache } from "@/lib/local-db.ts";
 import {
   isFloorStaffRole,
+  loadRolePermissionOverrides,
   permissionsForRole,
+  rolePermissionOverridesCacheKey,
   staffHasPermission,
+  type StaffPermissions,
 } from "@/lib/staff-permissions.ts";
+import type { StaffRole } from "../_lib/types.ts";
 import type { SettingsCategoryId } from "./pos-settings-categories.ts";
 import { parsePosSecuritySettings } from "@/lib/pos-security-config.ts";
 import {
@@ -135,6 +140,18 @@ function PosAppInner({
     (companyDetails as { securitySettings?: unknown } | undefined)?.securitySettings,
   ).sessionTimeoutMinutes;
   usePosIdleLock(idleMinutes, onLogout, t("settings.sec_idle_locked"));
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const cached = await getDataCache<Partial<Record<StaffRole, Partial<StaffPermissions>>>>(
+        rolePermissionOverridesCacheKey(activation.licenseKey),
+      );
+      if (!cancelled) loadRolePermissionOverrides(cached);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activation.licenseKey]);
   useEffect(() => {
     const cd = parsePosCustomerDisplay(
       (companyDetails as { customerDisplay?: unknown } | undefined)?.customerDisplay,
