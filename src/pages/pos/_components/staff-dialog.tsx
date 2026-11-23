@@ -313,8 +313,8 @@ export default function StaffDialog({
   };
 
   const togglePermission = (key: keyof Permissions) => {
-    // Admins & managers always have all permissions
-    if (role === "admin" || role === "manager") return;
+    // Admin always has all permissions
+    if (role === "admin") return;
     setPermissions((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
@@ -542,7 +542,7 @@ export default function StaffDialog({
             <Label className="text-[#8b93a7] text-xs uppercase tracking-wider">
               {t("staff.access_permissions")}
             </Label>
-            {(role === "admin" || role === "manager") && (
+            {role === "admin" && (
               <p className="text-[10px] text-brand">
                 {t("staff.admin_all_permissions_hint")}
               </p>
@@ -560,7 +560,7 @@ export default function StaffDialog({
                   <Switch
                     checked={Boolean(permissions[perm.key])}
                     onCheckedChange={() => togglePermission(perm.key)}
-                    disabled={role === "admin" || role === "manager"}
+                    disabled={role === "admin"}
                     className="shrink-0"
                   />
                 </div>

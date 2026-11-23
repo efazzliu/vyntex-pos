@@ -1454,8 +1454,19 @@ function RolePermissionsPane({
                     </div>
                     {ROLE_ACTIONS.map((action) => {
                       const permKey = module.cells[action];
+                      if (!permKey) {
+                        return (
+                          <span
+                            key={action}
+                            className="flex justify-center text-sm text-[#8b93a7]/50"
+                            aria-hidden
+                          >
+                            —
+                          </span>
+                        );
+                      }
                       const on = roleCellOn(locked, template, permKey);
-                      if (!permKey || locked || !loaded) {
+                      if (locked || !loaded) {
                         return (
                           <span key={action} className="flex justify-center">
                             <span
@@ -1464,10 +1475,8 @@ function RolePermissionsPane({
                                 on
                                   ? "border-brand bg-brand"
                                   : "border-[#d5dbe6]/40 bg-white/40",
-                                !permKey && !locked && "opacity-40",
                               )}
                               style={on ? onPurple : undefined}
-                              aria-hidden={!permKey}
                             >
                               {on ? <Check className="size-3" style={onPurple} /> : null}
                             </span>

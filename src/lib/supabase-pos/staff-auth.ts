@@ -5,7 +5,7 @@ import { isLocalDevicePosAdmin, uuidOrNull } from "./uuid.ts";
 import {
   STAFF_INACTIVE_DENIED,
   STAFF_PERMISSION_DENIED,
-  isFullAccessStaffRole,
+  canManageStaffAccounts,
   staffHasPermission,
   type StaffPermissionKey,
 } from "@/lib/staff-permissions.ts";
@@ -62,7 +62,7 @@ export async function assertStaffCanManageStaff(args: {
   const staff = await loadStaffMember(args.licenseKey, actorId);
   if (!staff) throw new Error(STAFF_PERMISSION_DENIED);
   if (staff.isActive === false) throw new Error(STAFF_INACTIVE_DENIED);
-  if (!isFullAccessStaffRole(staff.role)) {
+  if (!canManageStaffAccounts(staff.role)) {
     throw new Error(STAFF_PERMISSION_DENIED);
   }
 }

@@ -157,7 +157,13 @@ export const PERMISSION_LABEL_KEYS: Record<StaffPermissionKey, string> = {
   canViewAuditLog: "staff.perm_audit_label",
 };
 
+/** Only admin is locked to every permission in the role editor. */
 export function isFullAccessStaffRole(role: string | undefined): boolean {
+  return role === "admin";
+}
+
+/** Admin and manager may manage staff accounts (add / edit / remove). */
+export function canManageStaffAccounts(role: string | undefined): boolean {
   return role === "admin" || role === "manager";
 }
 
@@ -191,7 +197,12 @@ export function staffHasPermission(
 ): boolean {
   if (!staff || staff.isActive === false) return false;
   if (isFullAccessStaffRole(staff.role)) return true;
-  return staff.permissions?.[key] === true;
+  const raw = staff.permissions;
+  if (raw && typeof raw === "object" && typeof raw[key] === "boolean") {
+    return raw[key] === true;
+  }
+  // Managers (and other roles) without a stored row fall back to the role template.
+  return permissionsForRole(staff.role ?? "")[key] === true;
 }
 
 export const STAFF_PERMISSION_DENIED =

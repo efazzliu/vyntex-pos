@@ -180,52 +180,35 @@ function PosAppInner({
   // Fetch staff permissions for consumption access
   const staffList = useQuery('pos.staff.getStaff', { licenseKey: activation.licenseKey });
   const currentStaffDoc = staffList?.find((s) => s._id === activeStaff.id);
-  const canLogStaffConsumption = currentStaffDoc?.permissions?.canLogStaffConsumption ?? false;
-  const canTransferTables =
-    activeStaff.role === "admin" ||
-    activeStaff.role === "manager" ||
-    (currentStaffDoc?.permissions?.canTransferTables ?? false);
-
-  const staffPerms = currentStaffDoc?.permissions;
-  const canMergeTables =
-    activeStaff.role === "admin" ||
-    activeStaff.role === "manager" ||
-    staffPerms?.canMergeTables === true ||
-    (staffPerms?.canMergeTables !== false &&
-      Boolean(staffPerms?.canTransferTables));
-  const canSplitBillsQuick =
-    activeStaff.role === "admin" ||
-    activeStaff.role === "manager" ||
-    staffPerms?.canSplitBills === true;
-
-  const canChargeDebtQuick =
-    canAccessView(activation.plan, "debt-ledger") &&
-    (activeStaff.role === "admin" ||
-      activeStaff.role === "manager" ||
-      currentStaffDoc?.permissions?.canChargeDebt === true);
-
-  const canMarkComplimentaryQuick =
-    canAccessView(activation.plan, "debt-ledger") &&
-    (activeStaff.role === "admin" ||
-      activeStaff.role === "manager" ||
-      currentStaffDoc?.permissions?.canMarkComplimentary === true);
-
-  const canViewAuditLog =
-    activeStaff.role === "admin" ||
-    activeStaff.role === "manager" ||
-    activeStaff.role === "auditor" ||
-    currentStaffDoc?.permissions?.canViewAuditLog === true;
-
-  const canViewReports = staffHasPermission(
-    currentStaffDoc ?? { role: activeStaff.role, isActive: true },
-    "canViewReports",
-  );
-
   const permissionHolder = currentStaffDoc ?? {
     role: activeStaff.role,
     isActive: true,
     permissions: permissionsForRole(activeStaff.role),
   };
+  const canLogStaffConsumption = staffHasPermission(
+    permissionHolder,
+    "canLogStaffConsumption",
+  );
+  const canTransferTables = staffHasPermission(permissionHolder, "canTransferTables");
+  const canMergeTables =
+    staffHasPermission(permissionHolder, "canMergeTables") ||
+    (permissionHolder.permissions?.canMergeTables !== false &&
+      staffHasPermission(permissionHolder, "canTransferTables"));
+  const canSplitBillsQuick = staffHasPermission(permissionHolder, "canSplitBills");
+
+  const canChargeDebtQuick =
+    canAccessView(activation.plan, "debt-ledger") &&
+    staffHasPermission(permissionHolder, "canChargeDebt");
+
+  const canMarkComplimentaryQuick =
+    canAccessView(activation.plan, "debt-ledger") &&
+    staffHasPermission(permissionHolder, "canMarkComplimentary");
+
+  const canViewAuditLog =
+    activeStaff.role === "auditor" ||
+    staffHasPermission(permissionHolder, "canViewAuditLog");
+
+  const canViewReports = staffHasPermission(permissionHolder, "canViewReports");
   const canManageStock = staffHasPermission(permissionHolder, "canManageStock");
   const canManageMenu = staffHasPermission(permissionHolder, "canManageMenu");
 
