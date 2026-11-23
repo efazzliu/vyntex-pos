@@ -89,6 +89,51 @@ export const ROLE_PERMISSION_TEMPLATES: Record<StaffRole, StaffPermissions> = {
   },
 };
 
+/** Venue-level overrides of role defaults (e.g. from Role Permissions editor). */
+let rolePermissionOverrides: Partial<Record<StaffRole, StaffPermissions>> = {};
+
+export function rolePermissionOverridesCacheKey(licenseKey: string): string {
+  return `role-perm-templates:${licenseKey}`;
+}
+
+export function loadRolePermissionOverrides(
+  map: Partial<Record<StaffRole, Partial<StaffPermissions>>> | null | undefined,
+): void {
+  const next: Partial<Record<StaffRole, StaffPermissions>> = {};
+  if (map && typeof map === "object") {
+    for (const role of Object.keys(map) as StaffRole[]) {
+      if (isFullAccessStaffRole(role)) continue;
+      const raw = map[role];
+      if (!raw || typeof raw !== "object") continue;
+      const base = ROLE_PERMISSION_TEMPLATES[role]
+        ? { ...ROLE_PERMISSION_TEMPLATES[role] }
+        : { ...ALL_OFF };
+      for (const key of STAFF_PERMISSION_KEYS) {
+        if (typeof raw[key] === "boolean") base[key] = raw[key];
+      }
+      next[role] = base;
+    }
+  }
+  rolePermissionOverrides = next;
+}
+
+export function setRolePermissionOverride(role: StaffRole, perms: StaffPermissions): void {
+  if (isFullAccessStaffRole(role)) return;
+  rolePermissionOverrides = {
+    ...rolePermissionOverrides,
+    [role]: { ...perms },
+  };
+}
+
+export function getRolePermissionOverrides(): Partial<Record<StaffRole, StaffPermissions>> {
+  const out: Partial<Record<StaffRole, StaffPermissions>> = {};
+  for (const role of Object.keys(rolePermissionOverrides) as StaffRole[]) {
+    const perms = rolePermissionOverrides[role];
+    if (perms) out[role] = { ...perms };
+  }
+  return out;
+}
+
 export const PRIMARY_STAFF_ROLES: StaffRole[] = [
   "admin",
   "manager",
@@ -121,6 +166,9 @@ export function isFloorStaffRole(role: string | undefined): boolean {
 }
 
 export function permissionsForRole(role: string): StaffPermissions {
+  if (isFullAccessStaffRole(role)) return { ...ALL_ON };
+  const override = rolePermissionOverrides[role as StaffRole];
+  if (override) return { ...override };
   if (role in ROLE_PERMISSION_TEMPLATES) {
     return { ...ROLE_PERMISSION_TEMPLATES[role as StaffRole] };
   }

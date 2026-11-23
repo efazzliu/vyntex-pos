@@ -35,8 +35,12 @@ import {
 import {
   ROLE_PERMISSION_TEMPLATES,
   STAFF_PERMISSION_KEYS,
+  getRolePermissionOverrides,
   isFullAccessStaffRole,
+  loadRolePermissionOverrides,
   permissionsForRole,
+  rolePermissionOverridesCacheKey,
+  setRolePermissionOverride,
   type StaffPermissionKey,
   type StaffPermissions,
 } from "@/lib/staff-permissions.ts";
@@ -370,6 +374,20 @@ export default function SettingsUsersPanel({
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<string[]>([]);
   const [editor, setEditor] = useState<StaffRow | "new" | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const cached = await getDataCache<Partial<Record<StaffRole, Partial<StaffPermissions>>>>(
+        rolePermissionOverridesCacheKey(licenseKey),
+      );
+      if (cancelled) return;
+      loadRolePermissionOverrides(cached);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [licenseKey]);
 
   const staffRows = useMemo((): StaffRow[] => {
     if (!Array.isArray(staffQuery)) return [];
@@ -944,7 +962,14 @@ export default function SettingsUsersPanel({
       ) : null}
 
       {tab === "roles" ? (
-        <RolePermissionsPane t={t} staffRows={staffRows} />
+        <RolePermissionsPane
+          t={t}
+          staffRows={staffRows}
+          licenseKey={licenseKey}
+          actorStaffId={actorStaffId}
+          actorStaffName={actorStaffName}
+          updateStaff={updateStaff}
+        />
       ) : null}
 
       {tab === "activity" ? (
@@ -1063,6 +1088,13 @@ const ROLE_MODULES: {
     cells: { view: "canViewReports" },
   },
   {
+    id: "house",
+    titleKey: "settings.users_mod_house",
+    descKey: "settings.users_mod_house_desc",
+    icon: Gift,
+    cells: { create: "canMarkComplimentary", edit: "canMarkComplimentary" },
+  },
+  {
     id: "staff",
     titleKey: "settings.users_mod_staff",
     descKey: "settings.users_mod_staff_desc",
@@ -1085,6 +1117,24 @@ const ROLE_MODULES: {
   },
 ];
 
+const ROLE_MODULE_PERMISSION_KEYS: StaffPermissionKey[] = Array.from(
+  new Set(
+    ROLE_MODULES.flatMap((module) =>
+      ROLE_ACTIONS.map((action) => module.cells[action]).filter(
+        (key): key is StaffPermissionKey => Boolean(key),
+      ),
+    ),
+  ),
+);
+
+function emptyRoleDrafts(): Record<StaffRole, StaffPermissions> {
+  const drafts = {} as Record<StaffRole, StaffPermissions>;
+  for (const role of ROLES) {
+    drafts[role] = permissionsForRole(role);
+  }
+  return drafts;
+}
+
 function roleCellOn(
   locked: boolean,
   template: StaffPermissions,
@@ -1098,13 +1148,24 @@ function roleCellOn(
 function RolePermissionsPane({
   t,
   staffRows,
+  licenseKey,
+  actorStaffId,
+  actorStaffName,
+  updateStaff,
 }: {
   t: Translate;
   staffRows: StaffRow[];
+  licenseKey: string;
+  actorStaffId?: string;
+  actorStaffName?: string;
+  updateStaff: (args: Record<string, unknown>) => Promise<unknown>;
 }) {
   const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<StaffRole>("manager");
+  const [selected, setSelected] = useState<StaffRole>("waiter");
   const [roleTab, setRoleTab] = useState<"permissions" | "limits" | "settings">("permissions");
+  const [drafts, setDrafts] = useState<Record<StaffRole, StaffPermissions>>(emptyRoleDrafts);
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
   const q = query.trim().toLowerCase();
   const visibleRoles = ROLES.filter((role) => {
     if (!q) return true;
@@ -1112,11 +1173,99 @@ function RolePermissionsPane({
     return `${t(meta.titleKey)} ${t(meta.descKey)} ${role}`.toLowerCase().includes(q);
   });
   const meta = ROLE_META[selected];
-  const template = ROLE_PERMISSION_TEMPLATES[selected];
   const locked = isFullAccessStaffRole(selected);
-  const allOn = ROLE_MODULES.every((module) =>
-    ROLE_ACTIONS.every((action) => roleCellOn(locked, template, module.cells[action])),
-  );
+  const template = locked ? ROLE_PERMISSION_TEMPLATES[selected] : drafts[selected];
+  const allOn =
+    locked ||
+    ROLE_MODULE_PERMISSION_KEYS.every((key) => template[key] === true);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const cached = await getDataCache<Partial<Record<StaffRole, Partial<StaffPermissions>>>>(
+        rolePermissionOverridesCacheKey(licenseKey),
+      );
+      if (cancelled) return;
+      loadRolePermissionOverrides(cached);
+      setDrafts(emptyRoleDrafts());
+      setLoaded(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [licenseKey]);
+
+  const togglePermission = (key: StaffPermissionKey) => {
+    if (locked || !loaded) return;
+    setDrafts((prev) => ({
+      ...prev,
+      [selected]: {
+        ...prev[selected],
+        [key]: !prev[selected][key],
+      },
+    }));
+  };
+
+  const toggleSelectAll = () => {
+    if (locked || !loaded) return;
+    const nextOn = !allOn;
+    setDrafts((prev) => {
+      const next = { ...prev[selected] };
+      for (const key of ROLE_MODULE_PERMISSION_KEYS) {
+        next[key] = nextOn;
+      }
+      return { ...prev, [selected]: next };
+    });
+  };
+
+  const save = async () => {
+    if (locked) {
+      toast.message(t("settings.users_perm_locked"));
+      return;
+    }
+    if (!loaded || saving) return;
+    const nextPerms = drafts[selected];
+    const targets = staffRows.filter((row) => row.role === selected);
+    setSaving(true);
+    try {
+      setRolePermissionOverride(selected, nextPerms);
+      const overrides = getRolePermissionOverrides();
+      await saveDataCache(rolePermissionOverridesCacheKey(licenseKey), overrides);
+
+      for (const row of targets) {
+        await updateStaff({
+          licenseKey,
+          staffId: row._id,
+          name: row.name,
+          role: row.role,
+          isActive: row.isActive !== false,
+          permissions: nextPerms,
+          actorStaffId,
+          actorStaffName,
+        });
+      }
+
+      if (targets.length > 0) {
+        const cached = (await getDataCache<StaffRow[]>(`staff:${licenseKey}`)) ?? [];
+        await saveDataCache(
+          `staff:${licenseKey}`,
+          cached.map((row) =>
+            row.role === selected ? { ...row, permissions: nextPerms } : row,
+          ),
+        );
+      }
+
+      toast.success(
+        targets.length > 0
+          ? t("settings.users_role_perms_saved", { count: targets.length })
+          : t("settings.users_role_perms_saved_template"),
+      );
+    } catch (err) {
+      toast.error(errorMessageFromUnknown(err, t("staff.err_unexpected")));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="grid items-start gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
@@ -1129,6 +1278,8 @@ function RolePermissionsPane({
             type="button"
             className="h-8 shrink-0 rounded-full bg-brand px-3 text-xs hover:bg-brand-hover"
             style={onPurple}
+            disabled
+            title={t("settings.users_add_role_soon")}
           >
             <Plus className="size-3.5" />
             {t("settings.users_add_role")}
@@ -1241,23 +1392,34 @@ function RolePermissionsPane({
           <div>
             <h3 className="text-base font-semibold text-white">{t("settings.users_mod_permissions")}</h3>
             <p className="mt-0.5 text-sm text-[#8b93a7]">{t("settings.users_mod_permissions_lead")}</p>
+            {locked ? (
+              <p className="mt-1 text-xs text-brand">{t("settings.users_perm_locked")}</p>
+            ) : null}
           </div>
-          <span className="inline-flex items-center gap-2 text-sm text-[#8b93a7]">
+          <button
+            type="button"
+            disabled={locked || !loaded}
+            onClick={toggleSelectAll}
+            className={cn(
+              "inline-flex items-center gap-2 text-sm",
+              locked || !loaded ? "cursor-not-allowed text-[#8b93a7]/60" : "text-[#8b93a7] hover:text-white",
+            )}
+          >
             <span
               className={cn(
-                "relative inline-flex h-5 w-9 rounded-full",
+                "relative inline-flex h-5 w-9 rounded-full transition-colors",
                 allOn ? "bg-brand" : "bg-[#e2e8f0]",
               )}
             >
               <span
                 className={cn(
-                  "absolute top-0.5 size-4 rounded-full bg-white shadow-sm",
+                  "absolute top-0.5 size-4 rounded-full bg-white shadow-sm transition-all",
                   allOn ? "right-0.5" : "left-0.5",
                 )}
               />
             </span>
             {t("settings.users_select_all")}
-          </span>
+          </button>
         </div>
 
         <div className="mt-3 overflow-x-auto">
@@ -1291,18 +1453,45 @@ function RolePermissionsPane({
                       </span>
                     </div>
                     {ROLE_ACTIONS.map((action) => {
-                      const on = roleCellOn(locked, template, module.cells[action]);
+                      const permKey = module.cells[action];
+                      const on = roleCellOn(locked, template, permKey);
+                      if (!permKey || locked || !loaded) {
+                        return (
+                          <span key={action} className="flex justify-center">
+                            <span
+                              className={cn(
+                                "flex size-5 items-center justify-center rounded-md border",
+                                on
+                                  ? "border-brand bg-brand"
+                                  : "border-[#d5dbe6]/40 bg-white/40",
+                                !permKey && !locked && "opacity-40",
+                              )}
+                              style={on ? onPurple : undefined}
+                              aria-hidden={!permKey}
+                            >
+                              {on ? <Check className="size-3" style={onPurple} /> : null}
+                            </span>
+                          </span>
+                        );
+                      }
                       return (
                         <span key={action} className="flex justify-center">
-                          <span
+                          <button
+                            type="button"
+                            role="checkbox"
+                            aria-checked={on}
+                            aria-label={`${t(module.titleKey)} — ${t(ROLE_ACTION_LABEL[action])}`}
+                            onClick={() => togglePermission(permKey)}
                             className={cn(
-                              "flex size-5 items-center justify-center rounded-md border",
-                              on ? "border-brand bg-brand" : "border-[#d5dbe6] bg-white",
+                              "flex size-5 items-center justify-center rounded-md border transition-colors",
+                              on
+                                ? "border-brand bg-brand"
+                                : "border-[#d5dbe6] bg-white hover:border-brand/60",
                             )}
                             style={on ? onPurple : undefined}
                           >
                             {on ? <Check className="size-3" style={onPurple} /> : null}
-                          </span>
+                          </button>
                         </span>
                       );
                     })}
@@ -1318,11 +1507,13 @@ function RolePermissionsPane({
         <div className="mt-5 flex justify-end">
           <Button
             type="button"
-            className="h-10 rounded-xl bg-brand px-4 hover:bg-brand-hover"
+            disabled={locked || !loaded || saving}
+            onClick={() => void save()}
+            className="h-10 rounded-xl bg-brand px-4 hover:bg-brand-hover disabled:opacity-50"
             style={onPurple}
           >
             <Check className="size-4" />
-            {t("settings.users_save")}
+            {saving ? t("settings.users_saving") : t("settings.users_save")}
           </Button>
         </div>
       </section>
