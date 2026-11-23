@@ -1117,32 +1117,74 @@ const ROLE_MODULES: {
   },
 ];
 
-const ROLE_MODULE_PERMISSION_KEYS: StaffPermissionKey[] = Array.from(
-  new Set(
-    ROLE_MODULES.flatMap((module) =>
-      ROLE_ACTIONS.map((action) => module.cells[action]).filter(
-        (key): key is StaffPermissionKey => Boolean(key),
-      ),
-    ),
-  ),
-);
+type RoleModuleMatrix = Record<string, Record<RoleAction, boolean>>;
 
-function emptyRoleDrafts(): Record<StaffRole, StaffPermissions> {
-  const drafts = {} as Record<StaffRole, StaffPermissions>;
+function roleMatrixCacheKey(licenseKey: string): string {
+  return `role-perm-matrix:${licenseKey}`;
+}
+
+function roleDefaultsAllOn(role: StaffRole): boolean {
+  const template = ROLE_PERMISSION_TEMPLATES[role];
+  return STAFF_PERMISSION_KEYS.every((key) => template[key] === true);
+}
+
+function buildRoleMatrix(
+  role: StaffRole,
+  perms: StaffPermissions,
+  saved?: RoleModuleMatrix | null,
+): RoleModuleMatrix {
+  const fallbackOn = roleDefaultsAllOn(role);
+  const matrix: RoleModuleMatrix = {};
+  for (const module of ROLE_MODULES) {
+    const row = {} as Record<RoleAction, boolean>;
+    for (const action of ROLE_ACTIONS) {
+      const savedValue = saved?.[module.id]?.[action];
+      if (typeof savedValue === "boolean") {
+        row[action] = savedValue;
+        continue;
+      }
+      const permKey = module.cells[action];
+      row[action] = permKey ? perms[permKey] === true : fallbackOn;
+    }
+    matrix[module.id] = row;
+  }
+  return matrix;
+}
+
+function emptyRoleMatrices(): Record<StaffRole, RoleModuleMatrix> {
+  const drafts = {} as Record<StaffRole, RoleModuleMatrix>;
   for (const role of ROLES) {
-    drafts[role] = permissionsForRole(role);
+    drafts[role] = buildRoleMatrix(role, permissionsForRole(role));
   }
   return drafts;
 }
 
-function roleCellOn(
-  locked: boolean,
-  template: StaffPermissions,
-  cell: StaffPermissionKey | undefined,
-): boolean {
-  if (locked) return true;
-  if (!cell) return false;
-  return template[cell] === true;
+function permissionsFromMatrix(matrix: RoleModuleMatrix): StaffPermissions {
+  const next = {} as StaffPermissions;
+  for (const key of STAFF_PERMISSION_KEYS) next[key] = false;
+  for (const module of ROLE_MODULES) {
+    for (const action of ROLE_ACTIONS) {
+      const permKey = module.cells[action];
+      if (permKey && matrix[module.id]?.[action]) next[permKey] = true;
+    }
+  }
+  return next;
+}
+
+function matrixAllOn(matrix: RoleModuleMatrix): boolean {
+  return ROLE_MODULES.every((module) =>
+    ROLE_ACTIONS.every((action) => matrix[module.id]?.[action] === true),
+  );
+}
+
+function matrixWithAll(matrix: RoleModuleMatrix, on: boolean): RoleModuleMatrix {
+  const next: RoleModuleMatrix = {};
+  for (const module of ROLE_MODULES) {
+    const row = {} as Record<RoleAction, boolean>;
+    for (const action of ROLE_ACTIONS) row[action] = on;
+    next[module.id] = row;
+  }
+  return next;
 }
 
 function RolePermissionsPane({
@@ -1163,8 +1205,7 @@ function RolePermissionsPane({
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<StaffRole>("waiter");
   const [roleTab, setRoleTab] = useState<"permissions" | "limits" | "settings">("permissions");
-  const [drafts, setDrafts] = useState<Record<StaffRole, StaffPermissions>>(emptyRoleDrafts);
-  const [loaded, setLoaded] = useState(false);
+  const [matrices, setMatrices] = useState<Record<StaffRole, RoleModuleMatrix>>(emptyRoleMatrices);
   const [saving, setSaving] = useState(false);
   const q = query.trim().toLowerCase();
   const visibleRoles = ROLES.filter((role) => {
@@ -1174,48 +1215,66 @@ function RolePermissionsPane({
   });
   const meta = ROLE_META[selected];
   const locked = isFullAccessStaffRole(selected);
-  const template = locked ? ROLE_PERMISSION_TEMPLATES[selected] : drafts[selected];
-  const allOn =
-    locked ||
-    ROLE_MODULE_PERMISSION_KEYS.every((key) => template[key] === true);
+  const matrix = locked
+    ? buildRoleMatrix(selected, ROLE_PERMISSION_TEMPLATES[selected])
+    : matrices[selected];
+  const allOn = locked || matrixAllOn(matrix);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const cached = await getDataCache<Partial<Record<StaffRole, Partial<StaffPermissions>>>>(
-        rolePermissionOverridesCacheKey(licenseKey),
-      );
-      if (cancelled) return;
-      loadRolePermissionOverrides(cached);
-      setDrafts(emptyRoleDrafts());
-      setLoaded(true);
+      try {
+        const [cachedPerms, cachedMatrix] = await Promise.all([
+          getDataCache<Partial<Record<StaffRole, Partial<StaffPermissions>>>>(
+            rolePermissionOverridesCacheKey(licenseKey),
+          ),
+          getDataCache<Partial<Record<StaffRole, RoleModuleMatrix>>>(
+            roleMatrixCacheKey(licenseKey),
+          ),
+        ]);
+        if (cancelled) return;
+        loadRolePermissionOverrides(cachedPerms);
+        const next = {} as Record<StaffRole, RoleModuleMatrix>;
+        for (const role of ROLES) {
+          next[role] = buildRoleMatrix(
+            role,
+            permissionsForRole(role),
+            cachedMatrix?.[role] ?? null,
+          );
+        }
+        setMatrices(next);
+      } catch {
+        if (!cancelled) setMatrices(emptyRoleMatrices());
+      }
     })();
     return () => {
       cancelled = true;
     };
   }, [licenseKey]);
 
-  const togglePermission = (key: StaffPermissionKey) => {
-    if (locked || !loaded) return;
-    setDrafts((prev) => ({
-      ...prev,
-      [selected]: {
-        ...prev[selected],
-        [key]: !prev[selected][key],
-      },
-    }));
+  const toggleCell = (moduleId: string, action: RoleAction) => {
+    if (locked) return;
+    setMatrices((prev) => {
+      const current = prev[selected] ?? buildRoleMatrix(selected, permissionsForRole(selected));
+      const row = { ...(current[moduleId] ?? { view: false, create: false, edit: false, delete: false }) };
+      row[action] = !row[action];
+      return {
+        ...prev,
+        [selected]: {
+          ...current,
+          [moduleId]: row,
+        },
+      };
+    });
   };
 
   const toggleSelectAll = () => {
-    if (locked || !loaded) return;
+    if (locked) return;
     const nextOn = !allOn;
-    setDrafts((prev) => {
-      const next = { ...prev[selected] };
-      for (const key of ROLE_MODULE_PERMISSION_KEYS) {
-        next[key] = nextOn;
-      }
-      return { ...prev, [selected]: next };
-    });
+    setMatrices((prev) => ({
+      ...prev,
+      [selected]: matrixWithAll(prev[selected] ?? matrix, nextOn),
+    }));
   };
 
   const save = async () => {
@@ -1223,14 +1282,25 @@ function RolePermissionsPane({
       toast.message(t("settings.users_perm_locked"));
       return;
     }
-    if (!loaded || saving) return;
-    const nextPerms = drafts[selected];
+    if (saving) return;
+    const nextMatrix = matrices[selected];
+    const nextPerms = permissionsFromMatrix(nextMatrix);
     const targets = staffRows.filter((row) => row.role === selected);
     setSaving(true);
     try {
       setRolePermissionOverride(selected, nextPerms);
       const overrides = getRolePermissionOverrides();
-      await saveDataCache(rolePermissionOverridesCacheKey(licenseKey), overrides);
+      const matrixCache =
+        (await getDataCache<Partial<Record<StaffRole, RoleModuleMatrix>>>(
+          roleMatrixCacheKey(licenseKey),
+        )) ?? {};
+      await Promise.all([
+        saveDataCache(rolePermissionOverridesCacheKey(licenseKey), overrides),
+        saveDataCache(roleMatrixCacheKey(licenseKey), {
+          ...matrixCache,
+          [selected]: nextMatrix,
+        }),
+      ]);
 
       for (const row of targets) {
         await updateStaff({
@@ -1398,11 +1468,11 @@ function RolePermissionsPane({
           </div>
           <button
             type="button"
-            disabled={locked || !loaded}
+            disabled={locked}
             onClick={toggleSelectAll}
             className={cn(
               "inline-flex items-center gap-2 text-sm",
-              locked || !loaded ? "cursor-not-allowed text-[#8b93a7]/60" : "text-[#8b93a7] hover:text-white",
+              locked ? "cursor-not-allowed text-[#8b93a7]/60" : "text-[#8b93a7] hover:text-white",
             )}
           >
             <span
@@ -1453,32 +1523,15 @@ function RolePermissionsPane({
                       </span>
                     </div>
                     {ROLE_ACTIONS.map((action) => {
-                      const permKey = module.cells[action];
-                      if (!permKey) {
-                        return (
-                          <span
-                            key={action}
-                            className="flex justify-center text-sm text-[#8b93a7]/50"
-                            aria-hidden
-                          >
-                            —
-                          </span>
-                        );
-                      }
-                      const on = roleCellOn(locked, template, permKey);
-                      if (locked || !loaded) {
+                      const on = locked || matrix[module.id]?.[action] === true;
+                      if (locked) {
                         return (
                           <span key={action} className="flex justify-center">
                             <span
-                              className={cn(
-                                "flex size-5 items-center justify-center rounded-md border",
-                                on
-                                  ? "border-brand bg-brand"
-                                  : "border-[#d5dbe6]/40 bg-white/40",
-                              )}
-                              style={on ? onPurple : undefined}
+                              className="flex size-5 items-center justify-center rounded-md border border-brand bg-brand"
+                              style={onPurple}
                             >
-                              {on ? <Check className="size-3" style={onPurple} /> : null}
+                              <Check className="size-3" style={onPurple} />
                             </span>
                           </span>
                         );
@@ -1490,7 +1543,7 @@ function RolePermissionsPane({
                             role="checkbox"
                             aria-checked={on}
                             aria-label={`${t(module.titleKey)} — ${t(ROLE_ACTION_LABEL[action])}`}
-                            onClick={() => togglePermission(permKey)}
+                            onClick={() => toggleCell(module.id, action)}
                             className={cn(
                               "flex size-5 items-center justify-center rounded-md border transition-colors",
                               on
@@ -1516,7 +1569,7 @@ function RolePermissionsPane({
         <div className="mt-5 flex justify-end">
           <Button
             type="button"
-            disabled={locked || !loaded || saving}
+            disabled={locked || saving}
             onClick={() => void save()}
             className="h-10 rounded-xl bg-brand px-4 hover:bg-brand-hover disabled:opacity-50"
             style={onPurple}
