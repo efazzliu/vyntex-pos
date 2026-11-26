@@ -890,6 +890,7 @@ export default function PosSettings({
           <SettingsDevicesPanel
             t={t}
             licenseKey={licenseKey}
+            plan={plan}
             onOpenPrintLayout={() => setActiveCategory("print")}
           />
         ) : null}

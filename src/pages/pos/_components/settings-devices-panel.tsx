@@ -81,6 +81,7 @@ import {
   type PrinterConnectionKind,
   type PrinterRole,
 } from "@/lib/pos-printer-routing.ts";
+import { maxPrintersForPlan } from "../_lib/plan-features.ts";
 
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 
@@ -251,12 +252,14 @@ function tableMissingToast(t: Translate) {
 type SettingsDevicesPanelProps = {
   t: Translate;
   licenseKey: string;
+  plan?: string;
   onOpenPrintLayout: () => void;
 };
 
 export default function SettingsDevicesPanel({
   t,
   licenseKey,
+  plan = "professional",
   onOpenPrintLayout,
 }: SettingsDevicesPanelProps) {
   const printersQuery = useQuery("pos.settings.getPrinters", { licenseKey });
@@ -403,8 +406,31 @@ export default function SettingsDevicesPanel({
   };
 
   const printersLoading = printersQuery === undefined;
+  const printerCap = maxPrintersForPlan(plan);
+  const atPrinterLimit = printers.length >= printerCap;
 
-  const addPrinterButton = (
+  const openAddPrinter = (kind: "system" | "ip" | "bluetooth") => {
+    if (printers.length >= printerCap) {
+      toast.error(t("msg.printer_limit", { count: printerCap, plan }));
+      return;
+    }
+    if (kind === "system") setSystemOpen(true);
+    else if (kind === "ip") setAddIpOpen(true);
+    else void handleBluetoothPrinter();
+  };
+
+  const addPrinterButton = atPrinterLimit ? (
+    <Button
+      type="button"
+      className="h-10 rounded-xl bg-brand px-4 font-semibold hover:bg-brand-hover"
+      onClick={() =>
+        toast.error(t("msg.printer_limit", { count: printerCap, plan }))
+      }
+    >
+      <Plus className="size-4" />
+      {t("settings.add_printer")}
+    </Button>
+  ) : (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
@@ -429,18 +455,18 @@ export default function SettingsDevicesPanel({
         {invokeSystemPrinters ? (
           <DropdownMenuItem
             className="gap-2"
-            onSelect={() => setSystemOpen(true)}
+            onSelect={() => openAddPrinter("system")}
           >
             <Usb className="size-4 text-brand" />
             {t("settings.add_usb_printer")}
           </DropdownMenuItem>
         ) : null}
-        <DropdownMenuItem className="gap-2" onSelect={() => setAddIpOpen(true)}>
+        <DropdownMenuItem className="gap-2" onSelect={() => openAddPrinter("ip")}>
           <Wifi className="size-4 text-brand" />
           {t("settings.add_ip_printer")}
         </DropdownMenuItem>
         {invokeSystemPrinters ? (
-          <DropdownMenuItem className="gap-2" onSelect={handleBluetoothPrinter}>
+          <DropdownMenuItem className="gap-2" onSelect={() => openAddPrinter("bluetooth")}>
             <Bluetooth className="size-4 text-brand" />
             {t("settings.add_bluetooth_printer")}
           </DropdownMenuItem>

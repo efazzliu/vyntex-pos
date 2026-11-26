@@ -58,6 +58,7 @@ import {
   tableScaleXY,
 } from "@/lib/pos-floor-layout.ts";
 import { usePosLocale } from "./pos-locale-provider.tsx";
+import { maxFloorsForPlan } from "../_lib/plan-features.ts";
 
 /** Floor scale: a 1.0 m square table is 80 px at 100 % zoom. */
 const PX_PER_M = 80;
@@ -298,7 +299,13 @@ const MENU_ITEM =
 const FIELD =
   "h-10 w-full rounded-[10px] border border-[#e2e8f0] bg-white px-3 text-sm text-[#0f172a] outline-none transition placeholder:text-[#94a3b8] focus:border-[#005bd6] focus:ring-2 focus:ring-[#005bd6]/15";
 
-export default function FloorPlanEditor({ licenseKey }: { licenseKey: string }) {
+export default function FloorPlanEditor({
+  licenseKey,
+  plan = "professional",
+}: {
+  licenseKey: string;
+  plan?: string;
+}) {
   const { t } = usePosLocale();
   const isOnline = useOnlineStatus();
   const tablesQuery = useQuery("pos.tables.getTables", { licenseKey });
@@ -932,6 +939,11 @@ export default function FloorPlanEditor({ licenseKey }: { licenseKey: string }) 
       toast.error(t("floor.zone_exists"));
       return;
     }
+    const floorCap = maxFloorsForPlan(plan);
+    if (zones.length >= floorCap) {
+      toast.error(t("msg.floor_limit", { count: floorCap, plan }));
+      return;
+    }
     setCreatingZone(true);
     const slot = nextFloorTableSlot(0);
     try {
@@ -1350,6 +1362,7 @@ export default function FloorPlanEditor({ licenseKey }: { licenseKey: string }) 
               newZone={newZone}
               setNewZone={setNewZone}
               creating={creatingZone}
+              addDisabled={zones.length >= maxFloorsForPlan(plan)}
               onAdd={() => void addZone()}
               onRename={(z) => {
                 setRenameFor(z);
@@ -1766,6 +1779,7 @@ function ZonesPanel({
   newZone,
   setNewZone,
   creating,
+  addDisabled,
   onAdd,
   onRename,
   onDelete,
@@ -1778,6 +1792,7 @@ function ZonesPanel({
   newZone: string;
   setNewZone: (v: string) => void;
   creating: boolean;
+  addDisabled?: boolean;
   onAdd: () => void;
   onRename: (zone: string) => void;
   onDelete: (zone: string) => void;
@@ -1823,14 +1838,15 @@ function ZonesPanel({
           value={newZone}
           onChange={(e) => setNewZone(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !creating) onAdd();
+            if (e.key === "Enter" && !creating && !addDisabled) onAdd();
           }}
           placeholder={t("floor.room_name_ph")}
+          disabled={addDisabled}
           className={FIELD}
         />
         <button
           type="button"
-          disabled={creating || !newZone.trim()}
+          disabled={creating || addDisabled || !newZone.trim()}
           onClick={onAdd}
           className="inline-flex h-10 shrink-0 items-center gap-1 rounded-[10px] px-3 text-sm font-semibold disabled:opacity-40"
           style={{ backgroundColor: "#005bd6", color: "#ffffff" }}

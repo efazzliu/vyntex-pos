@@ -206,15 +206,15 @@
     "tiers": {
       "starter": {
         "name": "Starter",
-        "description": "Restaurant POS essentials — 1-month free trial, then subscribe.",
+        "description": "The Essentials — for cafés, fast food, and small venues. 1-month free trial, then subscribe.",
         "features": [
-          "1 terminal",
-          "Floor plan & live orders",
-          "Menu management",
+          "1 location · 5 staff · 1 terminal · 1 printer · 1 floor",
+          "Basic POS, tables, and menu",
+          "Basic stock (no CSV export)",
+          "Basic Z-Report & daily report",
           "Order history",
-          "Inventory management",
-          "Table management",
-          "Staff permissions & roles",
+          "Staff PINs & roles",
+          "No split bills or debt management",
           "Receipt & device settings"
         ]
       },

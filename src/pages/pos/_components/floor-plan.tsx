@@ -79,15 +79,22 @@ type WaiterInfo = {
 type FloorPlanProps = {
   licenseKey: string;
   isEditor: boolean;
+  plan?: string;
   onTableSelect?: (tableId: Id<"tables">) => void;
   waiter?: WaiterInfo;
 };
 
-export default function FloorPlan({ licenseKey, isEditor, onTableSelect, waiter }: FloorPlanProps) {
+export default function FloorPlan({
+  licenseKey,
+  isEditor,
+  plan,
+  onTableSelect,
+  waiter,
+}: FloorPlanProps) {
   const isWaiterFullScreen = !!waiter;
 
   if (isEditor) {
-    return <FloorPlanEditor licenseKey={licenseKey} />;
+    return <FloorPlanEditor licenseKey={licenseKey} plan={plan} />;
   }
 
   return (

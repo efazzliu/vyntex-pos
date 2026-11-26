@@ -35,7 +35,9 @@ export function normalizePlan(plan: string): PlanName {
 }
 
 /**
- * Starter — core POS plus simplified “today” overview (no full analytics pack).
+ * Starter — essentials for cafés / fast food / small venues:
+ * 1 location, 5 staff, 1 terminal, 1 printer, 1 floor; basic stock & daily report;
+ * no CSV export, split bills, or debt.
  */
 const STARTER_VIEWS: PosView[] = [
   "home",
@@ -94,20 +96,18 @@ export const PLAN_FEATURE_DESCRIPTIONS: Record<
   { tagline: string; posModules: string[]; commercialAddOns: string[] }
 > = {
   starter: {
-    tagline: "Essential POS with tables, inventory, and staff roles.",
+    tagline: "The Essentials — for cafés, fast food, and small venues.",
     posModules: [
-      "Floor plan & live orders",
-      "Menu management",
+      "1 location · 5 staff · 1 terminal · 1 printer · 1 floor",
+      "Basic POS, tables, and menu",
+      "Basic stock (no CSV export)",
+      "Basic Z-Report & daily report",
       "Order history",
-      "Table / seating management",
-      "Stock & inventory",
-      "Staff, PINs & roles",
-      "Device & receipt settings",
-      "Today overview (simplified)",
-      "Z-report / shift closing",
+      "Staff PINs & roles",
+      "Receipt & device settings",
     ],
     commercialAddOns: [
-      "Typically 1 terminal / small team (set max terminals in admin)",
+      "No split bills or debt management",
       "Email support",
     ],
   },
@@ -182,6 +182,68 @@ export function maxTerminalsCapForPlan(plan: string): number {
   if (tier === "starter") return 1;
   if (tier === "professional") return 5;
   return 50;
+}
+
+/** Max staff accounts (PIN users) per venue. */
+export function maxStaffForPlan(plan: string): number {
+  const tier = normalizePlan(plan);
+  if (tier === "starter") return 5;
+  if (tier === "professional") return 25;
+  return 200;
+}
+
+/** Max configured POS printers per venue. */
+export function maxPrintersForPlan(plan: string): number {
+  const tier = normalizePlan(plan);
+  if (tier === "starter") return 1;
+  if (tier === "professional") return 10;
+  return 50;
+}
+
+/** Max floor zones / rooms per venue. */
+export function maxFloorsForPlan(plan: string): number {
+  const tier = normalizePlan(plan);
+  if (tier === "starter") return 1;
+  if (tier === "professional") return 10;
+  return 50;
+}
+
+/** Max owned venues (locations) for this plan tier. */
+export function maxLocationsForPlan(plan: string): number {
+  const tier = normalizePlan(plan);
+  if (tier === "starter") return 1;
+  if (tier === "professional") return 1;
+  return 50;
+}
+
+/** CSV / spreadsheet export (stock, etc.). Starter: blocked. */
+export function canExportCsv(plan: string): boolean {
+  return normalizePlan(plan) !== "starter";
+}
+
+/** Z-Report history beyond the live daily close. Starter: live / basic only. */
+export function canViewZReportHistory(plan: string): boolean {
+  return normalizePlan(plan) !== "starter";
+}
+
+/** Multi-day / custom dashboard date ranges. Starter: today (daily report) only. */
+export function canUseMultiDayReports(plan: string): boolean {
+  return normalizePlan(plan) !== "starter";
+}
+
+export function planLimitReachedMessage(
+  kind: "staff" | "printer" | "floor" | "location" | "terminal",
+  plan: string,
+): string {
+  const tier = planLabel(plan);
+  const caps: Record<typeof kind, number> = {
+    staff: maxStaffForPlan(plan),
+    printer: maxPrintersForPlan(plan),
+    floor: maxFloorsForPlan(plan),
+    location: maxLocationsForPlan(plan),
+    terminal: maxTerminalsCapForPlan(plan),
+  };
+  return `${tier} plan allows up to ${caps[kind]} ${kind}${caps[kind] === 1 ? "" : "s"}. Upgrade to add more.`;
 }
 
 /** Effective terminal slots: min(stored license limit, plan cap). */

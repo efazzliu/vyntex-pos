@@ -21,6 +21,7 @@ import { Plus, Pencil, Trash2, Users, Shield, ChefHat, UserCheck, Crown, Package
 import StaffDialog from "./staff-dialog.tsx";
 import { usePosLocale } from "./pos-locale-provider.tsx";
 import { BRAND } from "@/lib/brand-colors.ts";
+import { maxStaffForPlan } from "../_lib/plan-features.ts";
 
 type StaffManagementProps = {
   licenseKey: string;
@@ -69,6 +70,17 @@ export default function StaffManagement({
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<Doc<"staff"> | null>(null);
+  const staffCap = maxStaffForPlan(plan);
+  const atStaffLimit = staffList.length >= staffCap;
+
+  const openCreateStaff = () => {
+    if (staffList.length >= staffCap) {
+      toast.error(t("msg.staff_limit", { count: staffCap, plan }));
+      return;
+    }
+    setEditingStaff(null);
+    setDialogOpen(true);
+  };
 
   const isLoading = false;
 
@@ -116,13 +128,7 @@ export default function StaffManagement({
   if (staffList.length === 0) {
     return (
       <div className="p-6 lg:p-8">
-        <Header
-          t={t}
-          onAdd={() => {
-            setEditingStaff(null);
-            setDialogOpen(true);
-          }}
-        />
+        <Header t={t} onAdd={openCreateStaff} addDisabled={atStaffLimit} />
         <div className="mt-16">
           <Empty>
             <EmptyHeader>
@@ -133,13 +139,7 @@ export default function StaffManagement({
               <EmptyDescription>{t("staff_page.empty_desc")}</EmptyDescription>
             </EmptyHeader>
             <EmptyContent>
-              <Button
-                size="sm"
-                onClick={() => {
-                  setEditingStaff(null);
-                  setDialogOpen(true);
-                }}
-              >
+              <Button size="sm" onClick={openCreateStaff} disabled={atStaffLimit}>
                 <Plus className="size-4 mr-1" />
                 {t("staff.add_staff")}
               </Button>
@@ -172,13 +172,7 @@ export default function StaffManagement({
   // ── Main View — List ──────────────────────────────────
   return (
     <div className="p-6 lg:p-8 space-y-6">
-      <Header
-        t={t}
-        onAdd={() => {
-          setEditingStaff(null);
-          setDialogOpen(true);
-        }}
-      />
+      <Header t={t} onAdd={openCreateStaff} addDisabled={atStaffLimit} />
 
       {/* Table list */}
       <div className="rounded-xl border border-[#1e2a45] bg-[#131A2E] overflow-hidden">
@@ -308,9 +302,11 @@ export default function StaffManagement({
 
 function Header({
   onAdd,
+  addDisabled,
   t,
 }: {
   onAdd: () => void;
+  addDisabled?: boolean;
   t: (k: string, o?: Record<string, unknown>) => string;
 }) {
   return (
@@ -322,7 +318,7 @@ function Header({
         </h1>
         <p className="text-[#8b93a7] text-sm mt-1">{t("staff_page.subtitle")}</p>
       </div>
-      <Button size="sm" onClick={onAdd}>
+      <Button size="sm" onClick={onAdd} disabled={addDisabled}>
         <Plus className="size-4 mr-1" />
         {t("staff.add_staff")}
       </Button>

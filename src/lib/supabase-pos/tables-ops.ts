@@ -5,6 +5,10 @@ import { getRestaurantByLicense } from "./restaurant.ts";
 import { floorTableFromRow } from "./mappers.ts";
 import { isPostgrestExposeOrCacheError } from "./floor-sync.ts";
 import { moveFloorRoom } from "./floor-room-ops.ts";
+import {
+  maxFloorsForPlan,
+  planLimitReachedMessage,
+} from "@/pages/pos/_lib/plan-features.ts";
 export async function getTables(licenseKey: string) {
   const r = await getRestaurantByLicense(licenseKey);
   const { data, error } = await supabase
@@ -148,6 +152,16 @@ export async function createTable(args: {
 }) {
   const r = await getRestaurantByLicense(args.licenseKey);
   const existing = await getTables(args.licenseKey);
+  const zoneName = args.zone.trim();
+  const zones = new Set(
+    existing.map((t) => String(t.zone ?? "").trim()).filter(Boolean),
+  );
+  const isNewZone = zoneName.length > 0 && ![...zones].some(
+    (z) => z.toLowerCase() === zoneName.toLowerCase(),
+  );
+  if (isNewZone && zones.size >= maxFloorsForPlan(r.plan)) {
+    throw new Error(planLimitReachedMessage("floor", r.plan));
+  }
   const zoneTables = existing.filter((t) => t.zone === args.zone);
   const tableName =
     args.name?.trim() ||

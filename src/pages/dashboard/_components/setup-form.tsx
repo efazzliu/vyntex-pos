@@ -16,7 +16,10 @@ import { toast } from "sonner";
 import { supabase } from "@/lib/supabase.ts";
 import { setDashboardRestaurantId } from "@/hooks/use-dashboard-restaurant.ts";
 import { errorMessageFromUnknown } from "@/lib/supabase-pos/db-errors.ts";
-import { planTerminalFloor } from "@/pages/pos/_lib/plan-features.ts";
+import {
+  maxLocationsForPlan,
+  planTerminalFloor,
+} from "@/pages/pos/_lib/plan-features.ts";
 import { defaultSelfServeTrialExpiry, FREE_TRIAL_QUERY_VALUE } from "@/lib/free-trial.ts";
 import { POS_LICENSE_LOCALE_INSERT, localeFieldsFromCurrencyCode } from "@/lib/pos-locale-defaults.ts";
 import { APP_VERSION_LABEL, VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
@@ -180,6 +183,20 @@ export default function SetupForm() {
       const u = authData.user;
       const meta = u?.user_metadata as { full_name?: string } | undefined;
       const ownerName = (meta?.full_name && String(meta.full_name).trim()) || null;
+
+      if (u?.id) {
+        const locationCap = maxLocationsForPlan(plan);
+        const { count: ownedCount, error: ownedError } = await supabase
+          .from("restaurants")
+          .select("id", { count: "exact", head: true })
+          .eq("owner_user_id", u.id);
+        if (ownedError) throw ownedError;
+        if ((ownedCount ?? 0) >= locationCap) {
+          toast.error(t("activate.error.location_limit", { count: locationCap }));
+          setLoading(false);
+          return;
+        }
+      }
 
       const newLicenseKey = generateLicenseKey();
 
