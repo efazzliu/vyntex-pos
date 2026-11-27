@@ -40,8 +40,27 @@
     },
     "features": {
       "label": "Features",
-      "title": "Everything you need to run your restaurant",
+      "whyLabel": "Why Choose VyntexPOS?",
+      "title": "Everything Your Restaurant Needs",
       "subtitle": "Vyntex POS combines powerful POS features with an intuitive interface, so your team can focus on what matters — great service.",
+      "cards": {
+        "smartOrdering": {
+          "title": "Smart Ordering",
+          "description": "Fast, simple and intuitive POS for your staff."
+        },
+        "kitchenPrinting": {
+          "title": "Kitchen & Bar Printing",
+          "description": "Send orders instantly to kitchen, bar or any printer."
+        },
+        "tableManagement": {
+          "title": "Table Management",
+          "description": "Manage tables, areas and orders in real time."
+        },
+        "reportsAnalytics": {
+          "title": "Reports & Analytics",
+          "description": "Track sales, performance and grow your business."
+        }
+      },
       "smart_order": {
         "title": "Smart Order Management",
         "description": "Handle dine-in, takeaway, and delivery orders seamlessly. Real-time kitchen display integration keeps your team in sync."
