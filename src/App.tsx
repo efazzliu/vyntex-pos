@@ -14,6 +14,7 @@ import PublicLayout from "./components/public-layout.tsx";
 import VynTypes from "./pages/vyn-types/page.tsx";
 import ProductDemo from "./pages/product-demo/page.tsx";
 import Pricing from "./pages/pricing/page.tsx";
+import Features from "./pages/features/page.tsx";
 import About from "./pages/about/page.tsx";
 import Contact from "./pages/contact/page.tsx";
 import LegalTerms from "./pages/legal/terms/page.tsx";
@@ -143,6 +144,7 @@ export default function App() {
             <Route path="/" element={<DesktopHomeRoute />} />
             <Route path="/vyn-types" element={<VynTypes />} />
             <Route path="/product-demo" element={<ProductDemo />} />
+            <Route path="/features" element={<Features />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />

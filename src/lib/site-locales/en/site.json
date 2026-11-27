@@ -1,6 +1,7 @@
 {
   "nav": {
     "home": "Home",
+    "features": "Features",
     "vynTypes": "VYN Types",
     "pricing": "Pricing",
     "about": "About",
@@ -246,6 +247,114 @@
         ]
       }
     }
+  },
+  "featuresPage": {
+    "badge": "Features",
+    "heroTitleBefore": "Powerful",
+    "heroTitleHighlight": "Features",
+    "heroTitleAfter": "for Modern",
+    "heroTitleRestaurants": "Restaurants",
+    "heroSubtitle": "Everything you need to run, manage and grow your restaurant — in one complete POS system.",
+    "ctaTrial": "Start Free Trial",
+    "ctaDemo": "Watch Demo",
+    "tabs": {
+      "all": "All Features",
+      "pos": "POS & Ordering",
+      "tables": "Tables",
+      "kds": "KDS",
+      "inventory": "Inventory",
+      "staff": "Staff",
+      "reports": "Reports",
+      "enterprise": "Enterprise"
+    },
+    "cards": {
+      "pos": {
+        "title": "Smart POS & Ordering",
+        "description": "Fast, intuitive POS with orders, modifiers, split bills and payments."
+      },
+      "tables": {
+        "title": "Tables & Floor Management",
+        "description": "Manage tables, floors and zones with full real-time control."
+      },
+      "kds": {
+        "title": "Kitchen Display (KDS)",
+        "description": "Send orders to the kitchen instantly and keep your team in sync."
+      },
+      "inventory": {
+        "title": "Inventory & Recipes",
+        "description": "Track stock, manage suppliers and create recipes with automatic deduction."
+      },
+      "staff": {
+        "title": "Staff & Permissions",
+        "description": "Manage your team with roles, PIN access and full permission control."
+      },
+      "reports": {
+        "title": "Reports & Analytics",
+        "description": "Track sales, performance and growth with detailed reports and exports."
+      }
+    },
+    "enterpriseHint": "Enterprise adds multi-location control, supply management, custom reports, and more — see plans below.",
+    "plansLabel": "Choose the Right Plan",
+    "plansTitle": "Compare Starter, Professional and Enterprise",
+    "plans": {
+      "starter": {
+        "name": "Starter",
+        "tagline": "The Essentials",
+        "description": "Everything you need to start and run a small restaurant.",
+        "cta": "Choose Starter",
+        "items": [
+          "1 Location",
+          "Up to 5 Staff",
+          "1 Terminal",
+          "1 Printer",
+          "1 Floor (Layout)",
+          "Basic Inventory (Stock)",
+          "Basic Z-Report",
+          "Daily Reports"
+        ]
+      },
+      "professional": {
+        "name": "Professional",
+        "tagline": "The Complete Operation",
+        "description": "A complete solution for restaurants with higher volume and a full team.",
+        "cta": "Choose Professional",
+        "items": [
+          "1 Location",
+          "Up to 25 Staff",
+          "Up to 5 Terminals",
+          "Multiple Printers",
+          "Multiple Floors & Zones",
+          "Advanced Inventory",
+          "Split Bills & Debt Management",
+          "KDS (Kitchen Display) — coming soon",
+          "Advanced Z-Report & Exports",
+          "Detailed Reports & Analytics"
+        ]
+      },
+      "enterprise": {
+        "name": "Enterprise",
+        "tagline": "Business Intelligence & Control",
+        "description": "Built for restaurant groups and businesses that need advanced control and scalability.",
+        "cta": "Choose Enterprise",
+        "items": [
+          "Multi-Location (Central Dashboard)",
+          "Custom Staff Limits",
+          "Up to 50 Terminals per Location",
+          "Supply Management",
+          "Recipe Management & Costing",
+          "Advanced Inventory",
+          "Custom Reports & Scheduled Emails",
+          "API & Webhooks — coming soon",
+          "Advanced Roles & Permissions",
+          "Detailed Audit Log",
+          "White-label Branding — coming soon",
+          "Priority Support & SLA"
+        ]
+      }
+    },
+    "comparisonTitle": "Feature Comparison",
+    "comparisonSubtitle": "See the full, detailed comparison of all features across plans",
+    "comparisonCta": "View Full Comparison"
   },
   "about": {
     "badge": "About",
