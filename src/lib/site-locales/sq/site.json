@@ -59,6 +59,14 @@
         "reportsAnalytics": {
           "title": "Reports & Analytics",
           "description": "Track sales, performance and grow your business."
+        },
+        "payments": {
+          "title": "Seamless Payments",
+          "description": "Prano karta, cash dhe split bills me checkout të shpejtë."
+        },
+        "inventory": {
+          "title": "Inventory Control",
+          "description": "Ndjek stokun automatikisht dhe mos mbet pa produkt në orët e ngarkuara."
         }
       },
       "smart_order": {
