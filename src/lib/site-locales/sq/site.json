@@ -22,6 +22,65 @@
     "operational": "Të gjitha sistemet në funksion",
     "version": "v{{v}}"
   },
+  "footerPremium": {
+    "brand": {
+      "description": "Sistemi POS all-in-one për restorante, i ndërtuar për ta thjeshtuar biznesin tuaj.",
+      "socialNote": "Na ndiqni në Instagram për përditësime të produktit."
+    },
+    "cta": {
+      "title": "Ready to Transform Your Restaurant?",
+      "subtitle": "Thjeshto operacionet, shërbe më shpejt dhe rrit biznesin me VyntexPOS.",
+      "trial": "Start Free Trial",
+      "sales": "Contact Sales"
+    },
+    "product": {
+      "title": "Product",
+      "features": "Features",
+      "posOrdering": "POS & Ordering",
+      "kds": "Kitchen Display (KDS)",
+      "inventory": "Inventory & Recipes",
+      "reports": "Reports & Analytics",
+      "integrations": "Integrations"
+    },
+    "solutions": {
+      "title": "Solutions",
+      "restaurants": "Restaurants",
+      "cafes": "Cafés",
+      "fastFood": "Fast Food",
+      "bars": "Bars & Pubs",
+      "multiLocation": "Multi-location",
+      "enterprise": "Enterprise"
+    },
+    "resources": {
+      "title": "Resources",
+      "videoTutorials": "Video Tutorials",
+      "faq": "FAQ",
+      "contactSupport": "Help & Support"
+    },
+    "company": {
+      "title": "Company",
+      "about": "About Us",
+      "pricing": "Pricing",
+      "contact": "Contact",
+      "partner": "Become a Partner"
+    },
+    "newsletter": {
+      "title": "Stay Updated with VyntexPOS",
+      "subtitle": "Merr përditësime produkti, veçori të reja dhe insights për restorante.",
+      "placeholder": "Shkruaj emailin",
+      "subscribe": "Subscribe",
+      "loading": "Duke u regjistruar…",
+      "success": "Faleminderit — je në listë. Do të të kontaktojmë.",
+      "invalid": "Ju lutemi shkruani një email të vlefshëm.",
+      "error": "Diçka shkoi keq. Provo përsëri.",
+      "unavailable": "Regjistrimi i newsletter është përkohësisht i padisponueshëm."
+    },
+    "legal": {
+      "navLabel": "Ligjore",
+      "contactSupport": "Contact Support"
+    },
+    "builtFor": "Built for Modern Restaurants."
+  },
   "home": {
     "hero": {
       "badge": "Restaurant POS — Tani në dispozicion",
