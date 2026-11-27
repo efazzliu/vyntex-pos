@@ -40,8 +40,27 @@
     },
     "features": {
       "label": "Veçoritë",
-      "title": "Gjithçka që ju duhet për restorantin",
+      "whyLabel": "Why Choose VyntexPOS?",
+      "title": "Everything Your Restaurant Needs",
       "subtitle": "Vyntex POS bashkon fuqinë e POS-it me një ndërfaqe të thjeshtë, që stafi juaj të fokusohet te shërbimi i shkëlqyer.",
+      "cards": {
+        "smartOrdering": {
+          "title": "Smart Ordering",
+          "description": "Fast, simple and intuitive POS for your staff."
+        },
+        "kitchenPrinting": {
+          "title": "Kitchen & Bar Printing",
+          "description": "Send orders instantly to kitchen, bar or any printer."
+        },
+        "tableManagement": {
+          "title": "Table Management",
+          "description": "Manage tables, areas and orders in real time."
+        },
+        "reportsAnalytics": {
+          "title": "Reports & Analytics",
+          "description": "Track sales, performance and grow your business."
+        }
+      },
       "smart_order": {
         "title": "Menaxhim inteligjent i porosive",
         "description": "Menaxhoni në restorant, për të marrë me vete dhe dërgesa. Integrimi me kuzhinën në kohë reale mban ekipin të sinkronizuar."
