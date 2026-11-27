@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import {
   Monitor,
   ShieldCheck,
+  ShoppingBag,
   Users,
   Zap,
   type LucideProps,
@@ -11,7 +12,12 @@ import {
 import { cn } from "@/lib/utils.ts";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase.ts";
 
-type StatKey = "restaurants" | "devices" | "uptime" | "orderProcessing";
+type StatKey =
+  | "restaurants"
+  | "devices"
+  | "transactions"
+  | "uptime"
+  | "orderProcessing";
 
 type StatConfig = {
   key: StatKey;
@@ -25,6 +31,7 @@ type StatConfig = {
 const STAT_ICONS: Record<StatKey, ComponentType<LucideProps>> = {
   restaurants: Users,
   devices: Monitor,
+  transactions: ShoppingBag,
   uptime: ShieldCheck,
   orderProcessing: Zap,
 };
@@ -33,6 +40,7 @@ const STAT_ICONS: Record<StatKey, ComponentType<LucideProps>> = {
 const FALLBACK_STATS: StatConfig[] = [
   { key: "restaurants", value: 0, suffix: "", decimals: 0, textValue: "—" },
   { key: "devices", value: 0, suffix: "", decimals: 0, textValue: "—" },
+  { key: "transactions", value: 0, suffix: "", decimals: 0, textValue: "—" },
   { key: "uptime", value: 99.9, suffix: "%", decimals: 1 },
   { key: "orderProcessing", value: 0, suffix: "", decimals: 0, textValue: "speed" },
 ];
@@ -49,6 +57,7 @@ function buildLiveStats(data: PlatformStats): StatConfig[] {
   return [
     { key: "restaurants", value: data.restaurants, suffix: "+", decimals: 0 },
     { key: "devices", value: Math.max(devices, 0), suffix: "+", decimals: 0 },
+    { key: "transactions", value: data.paid_orders, suffix: "+", decimals: 0 },
     { key: "uptime", value: 99.9, suffix: "%", decimals: 1 },
     { key: "orderProcessing", value: 0, suffix: "", decimals: 0, textValue: "speed" },
   ];
