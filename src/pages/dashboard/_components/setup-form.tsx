@@ -62,6 +62,8 @@ const ACTIVATION_PLAN_SLIDES = [
       "activate.plan.professional.f4",
       "activate.plan.professional.f5",
       "activate.plan.professional.f6",
+      "activate.plan.professional.f7",
+      "activate.plan.professional.f8",
     ],
   },
   {

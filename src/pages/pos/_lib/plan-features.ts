@@ -54,7 +54,9 @@ const STARTER_VIEWS: PosView[] = [
 ];
 
 /**
- * Professional — full analytics dashboard, KDS, debt ledger, audit log (same module set as Enterprise).
+ * Professional — The Complete Operation for one busy restaurant:
+ * 1 location, 25 staff, 5 terminals, many printers/floors; advanced stock, split bills,
+ * debt, audit log, advanced Z-Report & analytics, CSV/Excel export; KDS coming soon.
  */
 const PROFESSIONAL_VIEWS: PosView[] = [
   ...STARTER_VIEWS,
@@ -112,20 +114,19 @@ export const PLAN_FEATURE_DESCRIPTIONS: Record<
     ],
   },
   professional: {
-    tagline: "Full restaurant operations for one location.",
+    tagline: "The Complete Operation — for restaurants with staff, kitchen, and higher order volume.",
     posModules: [
-      "Everything in Starter",
-      "Up to 5 terminals (enforced with plan cap)",
-      "Kitchen display (KDS) workflow",
-      "Split bills / partial payments",
-      "Advanced analytics dashboard",
-      "Dashboard & sales overview",
-      "Customer debt (house accounts)",
+      "1 location · 25 staff · 5 terminals",
+      "Multiple printers · multiple floors & zones",
+      "Advanced stock + CSV / Excel export",
+      "Split bills & debt management",
       "Audit log",
+      "Advanced Z-Report & analytics reports",
+      "Kitchen display (KDS) — coming soon",
     ],
     commercialAddOns: [
       "Priority in-app support channel",
-      "Higher terminal limits on Enterprise",
+      "Higher limits & supply workflows on Enterprise",
     ],
   },
   enterprise: {
@@ -192,19 +193,19 @@ export function maxStaffForPlan(plan: string): number {
   return 200;
 }
 
-/** Max configured POS printers per venue. */
+/** Max configured POS printers per venue. Starter: 1; Professional: many; Enterprise: highest. */
 export function maxPrintersForPlan(plan: string): number {
   const tier = normalizePlan(plan);
   if (tier === "starter") return 1;
-  if (tier === "professional") return 10;
+  if (tier === "professional") return 15;
   return 50;
 }
 
-/** Max floor zones / rooms per venue. */
+/** Max floor zones / rooms per venue. Starter: 1; Professional: many; Enterprise: highest. */
 export function maxFloorsForPlan(plan: string): number {
   const tier = normalizePlan(plan);
   if (tier === "starter") return 1;
-  if (tier === "professional") return 10;
+  if (tier === "professional") return 15;
   return 50;
 }
 
