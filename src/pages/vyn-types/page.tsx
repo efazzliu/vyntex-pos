@@ -59,6 +59,20 @@ const HIGHLIGHT_KEYS = [
   { id: "secure", icon: ShieldCheck },
 ] as const;
 
+const PHOTO_CLIP_ID = "vyn-photo-clip";
+
+function PhotoClipDefs() {
+  return (
+    <svg width="0" height="0" className="absolute" aria-hidden focusable="false">
+      <defs>
+        <clipPath id={PHOTO_CLIP_ID} clipPathUnits="objectBoundingBox">
+          <path d="M0.39 0 Q0.32 0 0.2992 0.065 L0.0208 0.935 Q0 1 0.07 1 L0.93 1 Q1 1 1 0.935 L1 0.065 Q1 0 0.93 0 Z" />
+        </clipPath>
+      </defs>
+    </svg>
+  );
+}
+
 function VynTypeCard({
   typeKey,
   index,
@@ -76,28 +90,27 @@ function VynTypeCard({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-40px" }}
       transition={{ delay: index * 0.06, duration: 0.45 }}
-      className="group relative flex min-h-[220px] overflow-hidden rounded-[1.35rem] border border-neutral-200/80 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.06)] sm:min-h-[240px]"
+      className="group relative flex min-h-[250px] overflow-hidden rounded-[1.75rem] border border-neutral-200/70 bg-white shadow-[0_10px_40px_rgba(15,23,42,0.07)] sm:min-h-[290px]"
     >
-      {/* Text column */}
-      <div className="relative z-10 flex w-[58%] flex-col justify-between p-5 sm:w-[55%] sm:p-6 lg:p-7">
+      <div className="relative z-10 flex w-[60%] flex-col justify-between p-5 sm:p-7">
         <div>
-          <span className="inline-flex size-10 items-center justify-center rounded-xl bg-brand/10 text-brand">
-            <Icon className="size-5" strokeWidth={1.75} />
+          <span className="inline-flex size-14 items-center justify-center rounded-2xl bg-brand/10 text-brand sm:size-16">
+            <Icon className="size-7 sm:size-8" strokeWidth={1.75} />
           </span>
-          <h3 className="mt-4 text-lg font-bold tracking-tight text-neutral-950 sm:text-xl">
+          <h3 className="mt-4 text-xl font-bold tracking-tight text-neutral-950 sm:text-2xl">
             {t(`vynTypes.types.${typeKey}.name`)}
           </h3>
-          <p className="mt-1.5 text-sm leading-relaxed text-neutral-500">
+          <p className="mt-2 max-w-[16rem] text-sm leading-snug text-neutral-500 sm:text-base">
             {t(`vynTypes.types.${typeKey}.description`)}
           </p>
-          <ul className="mt-4 flex w-max flex-nowrap gap-1.5 sm:gap-2">
+          <ul className="mt-4 flex w-max flex-nowrap gap-2 sm:gap-2.5">
             {Array.isArray(tags) &&
               tags.map((tag) => (
                 <li
                   key={tag}
-                  className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-brand/20 bg-white px-2.5 py-1 text-xs font-medium text-neutral-800 shadow-[0_2px_8px_rgba(15,23,42,0.08)]"
+                  className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-900 shadow-[0_2px_10px_rgba(15,23,42,0.08)] sm:px-4 sm:py-2 sm:text-sm"
                 >
-                  <Check className="size-3 text-brand" strokeWidth={2.5} />
+                  <Check className="size-3.5 text-brand" strokeWidth={2.75} />
                   {tag}
                 </li>
               ))}
@@ -107,30 +120,23 @@ function VynTypeCard({
           <Link
             to="/pricing"
             aria-label={t(`vynTypes.types.${typeKey}.name`)}
-            className="inline-flex size-10 items-center justify-center rounded-xl bg-brand text-white transition-colors hover:bg-brand/90"
+            className="inline-flex h-11 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-brand-hover text-white shadow-[0_6px_16px_rgba(0,91,214,0.3)] transition-transform hover:scale-[1.04] sm:h-12 sm:w-16"
           >
-            <ArrowRight className="size-4" />
+            <ArrowRight className="size-5" />
           </Link>
         </div>
       </div>
 
-      {/* Diagonal image */}
       <div
-        className="absolute inset-y-0 right-0 w-[48%] sm:w-[50%]"
-        style={{
-          clipPath: "polygon(18% 0%, 100% 0%, 100% 100%, 0% 100%)",
-        }}
+        className="absolute bottom-3 right-3 top-3 w-[52%] overflow-hidden sm:bottom-4 sm:right-4 sm:top-4"
+        style={{ clipPath: `url(#${PHOTO_CLIP_ID})` }}
       >
         <img
           src={TYPE_IMAGES[typeKey]}
           alt=""
-          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
           loading="lazy"
           decoding="async"
-        />
-        <div
-          className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/25 to-transparent"
-          aria-hidden
         />
       </div>
     </motion.article>
@@ -142,6 +148,7 @@ export default function VynTypesPage() {
 
   return (
     <div className="bg-white text-neutral-950">
+      <PhotoClipDefs />
       {/* Hero */}
       <section className="relative overflow-hidden border-b border-neutral-100 pt-28 pb-12 sm:pt-32 sm:pb-14">
         <div
