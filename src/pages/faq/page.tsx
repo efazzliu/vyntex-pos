@@ -14,9 +14,6 @@ import {
 import { Button } from "@/components/ui/button.tsx";
 import { cn } from "@/lib/utils.ts";
 
-/** FAQ page accent — matches the requested premium FAQ reference. */
-const ACCENT = "#D7192D";
-
 const FAQ_KEYS = [
   "trial",
   "creditCard",
@@ -54,10 +51,9 @@ function FaqAccordionItem({
       className={cn(
         "rounded-2xl border bg-white transition-shadow",
         open
-          ? "shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
+          ? "border-brand/40 shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
           : "border-neutral-200",
       )}
-      style={open ? { borderColor: `${ACCENT}55` } : undefined}
     >
       <h3 className="m-0">
         <button
@@ -72,12 +68,10 @@ function FaqAccordionItem({
             {t(`faqPage.items.${itemKey}.q`)}
           </span>
           <span
-            className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border"
-            style={{
-              borderColor: open ? `${ACCENT}55` : "#E5E7EB",
-              color: ACCENT,
-              backgroundColor: open ? `${ACCENT}0F` : "transparent",
-            }}
+            className={cn(
+              "inline-flex size-8 shrink-0 items-center justify-center rounded-full border text-brand",
+              open ? "border-brand/40 bg-brand/10" : "border-neutral-200 bg-transparent",
+            )}
             aria-hidden
           >
             {open ? <Minus className="size-4" /> : <Plus className="size-4" />}
@@ -111,14 +105,13 @@ export default function FaqPage() {
   const [openKey, setOpenKey] = useState<(typeof FAQ_KEYS)[number] | null>("trial");
 
   return (
-    <div className="bg-white text-neutral-950" data-faq-page="light">
-      {/* Hero */}
+    <div className="bg-white text-neutral-950">
       <section className="relative overflow-hidden border-b border-neutral-200 pt-28 pb-14 sm:pt-32 sm:pb-16">
         <div
-          className="pointer-events-none absolute inset-0 opacity-[0.45]"
+          className="pointer-events-none absolute inset-0 opacity-50"
           style={{
             backgroundImage:
-              "radial-gradient(circle at 20% 20%, rgba(215,25,45,0.06), transparent 40%), radial-gradient(circle at 80% 0%, rgba(15,23,42,0.04), transparent 35%)",
+              "radial-gradient(circle at 18% 18%, color-mix(in srgb, var(--brand) 10%, transparent), transparent 42%), radial-gradient(circle at 82% 8%, color-mix(in srgb, var(--brand-accent) 8%, transparent), transparent 38%)",
           }}
           aria-hidden
         />
@@ -126,8 +119,7 @@ export default function FaqPage() {
           <motion.span
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wider"
-            style={{ borderColor: `${ACCENT}33`, color: ACCENT, backgroundColor: `${ACCENT}0D` }}
+            className="inline-flex items-center rounded-full border border-brand/25 bg-brand/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-brand"
           >
             {t("faqPage.badge")}
           </motion.span>
@@ -138,7 +130,9 @@ export default function FaqPage() {
             className="mt-5 text-balance text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl"
           >
             {t("faqPage.titleBefore")}{" "}
-            <span style={{ color: ACCENT }}>{t("faqPage.titleHighlight")}</span>
+            <span className="bg-gradient-to-r from-brand to-brand-sky bg-clip-text text-transparent">
+              {t("faqPage.titleHighlight")}
+            </span>
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 14 }}
@@ -151,10 +145,8 @@ export default function FaqPage() {
         </div>
       </section>
 
-      {/* Main two-column */}
       <section className="py-14 sm:py-20">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 sm:px-6 lg:grid-cols-[0.9fr_1.35fr] lg:gap-10 lg:px-8">
-          {/* Left support */}
           <aside className="space-y-5 lg:sticky lg:top-28 lg:self-start">
             <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
               <h2 className="text-xl font-bold tracking-tight text-neutral-950">
@@ -167,10 +159,7 @@ export default function FaqPage() {
               <ul className="mt-6 space-y-5">
                 {BENEFITS.map(({ id, icon: Icon }) => (
                   <li key={id} className="flex gap-3">
-                    <span
-                      className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-xl"
-                      style={{ backgroundColor: `${ACCENT}12`, color: ACCENT }}
-                    >
+                    <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand">
                       <Icon className="size-4" strokeWidth={2} />
                     </span>
                     <div>
@@ -186,12 +175,9 @@ export default function FaqPage() {
               </ul>
             </div>
 
-            <div className="rounded-2xl border border-neutral-200 bg-[#FAFAFA] p-5">
+            <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-5">
               <div className="flex items-start gap-3">
-                <span
-                  className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl"
-                  style={{ backgroundColor: `${ACCENT}12`, color: ACCENT }}
-                >
+                <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-accent/15 text-brand-accent">
                   <Clock3 className="size-4" />
                 </span>
                 <div className="min-w-0 flex-1">
@@ -203,8 +189,7 @@ export default function FaqPage() {
                   </p>
                   <Button
                     asChild
-                    className="mt-4 h-10 rounded-full px-5 font-semibold text-white"
-                    style={{ backgroundColor: ACCENT }}
+                    className="mt-4 h-10 rounded-full bg-brand px-5 font-semibold text-white hover:bg-brand/90"
                   >
                     <Link to="/contact" className="inline-flex items-center gap-1.5">
                       {t("faqPage.sidebar.helpCta")}
@@ -216,7 +201,6 @@ export default function FaqPage() {
             </div>
           </aside>
 
-          {/* Right accordion */}
           <div className="space-y-3">
             {FAQ_KEYS.map((key) => (
               <FaqAccordionItem
