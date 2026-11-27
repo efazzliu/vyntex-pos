@@ -93,6 +93,10 @@ declare module "*.sql?raw" {
 
 interface ImportMetaEnv {
   readonly VITE_SUPPORT_EMAIL?: string;
+  readonly VITE_SUPPORT_PHONE?: string;
+  readonly VITE_WHATSAPP_NUMBER?: string;
+  readonly VITE_WHATSAPP_URL?: string;
+  readonly VITE_TIKTOK_URL?: string;
   readonly VITE_PLATFORM_ADMIN_EMAILS?: string;
   /** Legacy: single Windows x64 installer URL (CDN / Supabase Storage). */
   readonly VITE_RESTAURANT_POS_EXE_URL?: string;

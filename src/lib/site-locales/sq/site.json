@@ -303,7 +303,10 @@
         "title": "Product Demo",
         "description": "Eksploroni VyntexPOS në veprim."
       }
-    }
+    },
+    "callUs": "Na telefononi",
+    "socialMedia": "Rrjetet sociale",
+    "emailFormHint": "Na dërgoni mesazh me formularin"
   },
   "vynTypes": {
     "badge": "VYN Type",
