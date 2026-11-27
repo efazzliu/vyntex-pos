@@ -18,9 +18,10 @@ function digitsOnly(value: string): string {
 }
 
 /**
- * Public phone / WhatsApp / TikTok. Intentionally empty until real values are provided via
- * `VITE_SUPPORT_PHONE`, `VITE_WHATSAPP_NUMBER` (or `VITE_WHATSAPP_URL`) and `VITE_TIKTOK_URL`;
- * the marketing contact page only shows channels that are configured.
+ * Public phone / WhatsApp / TikTok. Phone and WhatsApp stay empty until real values are provided via
+ * `VITE_SUPPORT_PHONE` and `VITE_WHATSAPP_NUMBER` (or `VITE_WHATSAPP_URL`); TikTok defaults to the
+ * official account and can be overridden with `VITE_TIKTOK_URL`. The marketing contact page only
+ * shows channels that are configured.
  */
 export const SUPPORT_PHONE = envTrim(import.meta.env.VITE_SUPPORT_PHONE);
 export const SUPPORT_TEL_HREF = SUPPORT_PHONE ? `tel:${SUPPORT_PHONE.replace(/[^\d+]/g, "")}` : "";
@@ -33,7 +34,8 @@ export const VYNTEX_WHATSAPP_URL = whatsappUrlEnv
     ? `https://wa.me/${whatsappDigits}`
     : "";
 
-export const VYNTEX_TIKTOK_URL = envTrim(import.meta.env.VITE_TIKTOK_URL);
+export const VYNTEX_TIKTOK_URL =
+  envTrim(import.meta.env.VITE_TIKTOK_URL) || "https://www.tiktok.com/@vyntexpos";
 
 /**
  * Marketing contact page: show the support address as a clickable `mailto` link.
