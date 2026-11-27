@@ -303,7 +303,10 @@
         "title": "Product Demo",
         "description": "Explore VyntexPOS in action."
       }
-    }
+    },
+    "callUs": "Call Us",
+    "socialMedia": "Social Media",
+    "emailFormHint": "Send us a message using the form"
   },
   "vynTypes": {
     "badge": "VYN Type",

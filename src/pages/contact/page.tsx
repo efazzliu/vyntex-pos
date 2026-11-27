@@ -11,9 +11,13 @@ import {
   Headphones,
   Layers,
   Mail,
+  MessageCircle,
   MessageSquare,
   MonitorPlay,
+  Music2,
+  Phone,
   Send,
+  Share2,
   ShieldCheck,
   User,
   Zap,
@@ -27,7 +31,11 @@ import {
   SUPPORT_BUSINESS_EMAIL_READY,
   SUPPORT_EMAIL,
   SUPPORT_MAILTO_HREF,
+  SUPPORT_PHONE,
+  SUPPORT_TEL_HREF,
   VYNTEX_INSTAGRAM_URL,
+  VYNTEX_TIKTOK_URL,
+  VYNTEX_WHATSAPP_URL,
 } from "@/lib/site-constants.ts";
 
 const HERO_IMAGE =
@@ -65,17 +73,31 @@ function Instagram({ className }: { className?: string }) {
   );
 }
 
+type SocialChip = {
+  id: string;
+  label: string;
+  icon: LucideIcon | typeof Instagram;
+  href: string;
+};
+
 type InfoRow = {
   id: string;
   icon: LucideIcon | typeof Instagram;
   title: string;
-  value: string;
+  value?: string;
   href?: string;
   external?: boolean;
+  onClick?: () => void;
+  chips?: SocialChip[];
 };
+
+const rowClass =
+  "flex w-full items-center gap-3 rounded-xl border border-neutral-200/80 bg-white px-3.5 py-3 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)]";
+const rowInteractiveClass = "transition-colors hover:border-brand/30 hover:bg-brand/[0.03]";
 
 function InfoRowItem({ row }: { row: InfoRow }) {
   const Icon = row.icon;
+  const interactive = Boolean(row.href || row.onClick);
   const body = (
     <>
       <span className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand">
@@ -85,26 +107,71 @@ function InfoRowItem({ row }: { row: InfoRow }) {
         <span className="block text-sm font-bold leading-tight text-neutral-950">
           {row.title}
         </span>
-        <span className="mt-0.5 block text-sm leading-snug text-neutral-500">{row.value}</span>
+        {row.value ? (
+          <span className="mt-0.5 block break-words text-sm leading-snug text-neutral-500">
+            {row.value}
+          </span>
+        ) : null}
       </span>
-      {row.href ? <ChevronRight className="size-4 shrink-0 text-neutral-800" aria-hidden /> : null}
+      {interactive ? <ChevronRight className="size-4 shrink-0 text-neutral-800" aria-hidden /> : null}
     </>
   );
-  const className =
-    "flex items-center gap-3 rounded-xl border border-neutral-200/80 bg-white px-3.5 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]";
 
-  if (!row.href) return <li className={className}>{body}</li>;
-  return (
-    <li>
-      <a
-        href={row.href}
-        {...(row.external ? { target: "_blank", rel: "noreferrer" } : {})}
-        className={`${className} transition-colors hover:border-brand/30 hover:bg-brand/[0.03]`}
-      >
-        {body}
-      </a>
-    </li>
-  );
+  if (row.chips) {
+    return (
+      <li className={rowClass}>
+        <span className="inline-flex size-11 shrink-0 items-center justify-center self-start rounded-xl bg-brand/10 text-brand">
+          <Icon className="size-5" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-bold leading-tight text-neutral-950">
+            {row.title}
+          </span>
+          <span className="mt-2 flex flex-wrap gap-2">
+            {row.chips.map((chip) => {
+              const ChipIcon = chip.icon;
+              return (
+                <a
+                  key={chip.id}
+                  href={chip.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-sm font-medium text-neutral-900 transition-colors hover:border-brand/40 hover:bg-brand/5 hover:text-brand"
+                >
+                  <ChipIcon className="size-4 text-brand" />
+                  {chip.label}
+                </a>
+              );
+            })}
+          </span>
+        </span>
+      </li>
+    );
+  }
+
+  if (row.href) {
+    return (
+      <li>
+        <a
+          href={row.href}
+          {...(row.external ? { target: "_blank", rel: "noreferrer" } : {})}
+          className={`${rowClass} ${rowInteractiveClass}`}
+        >
+          {body}
+        </a>
+      </li>
+    );
+  }
+  if (row.onClick) {
+    return (
+      <li>
+        <button type="button" onClick={row.onClick} className={`${rowClass} ${rowInteractiveClass} cursor-pointer`}>
+          {body}
+        </button>
+      </li>
+    );
+  }
+  return <li className={rowClass}>{body}</li>;
 }
 
 function FieldLabel({ htmlFor, children }: { htmlFor: string; children: string }) {
@@ -153,43 +220,58 @@ export default function ContactPage() {
     }
   };
 
+  const scrollToForm = () => {
+    document.getElementById("contact-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const socialChips: SocialChip[] = [
+    { id: "instagram", label: "Instagram", icon: Instagram, href: VYNTEX_INSTAGRAM_URL },
+    ...(VYNTEX_WHATSAPP_URL
+      ? [{ id: "whatsapp", label: "WhatsApp", icon: MessageCircle, href: VYNTEX_WHATSAPP_URL }]
+      : []),
+    ...(VYNTEX_TIKTOK_URL
+      ? [{ id: "tiktok", label: "TikTok", icon: Music2, href: VYNTEX_TIKTOK_URL }]
+      : []),
+  ];
+
   const rows: InfoRow[] = [
-    ...(SUPPORT_BUSINESS_EMAIL_READY
+    SUPPORT_BUSINESS_EMAIL_READY
+      ? {
+          id: "email",
+          icon: Mail,
+          title: t("contact.emailUs"),
+          value: SUPPORT_EMAIL,
+          href: SUPPORT_MAILTO_HREF,
+        }
+      : {
+          id: "email",
+          icon: Mail,
+          title: t("contact.emailUs"),
+          value: t("contact.emailFormHint"),
+          onClick: scrollToForm,
+        },
+    ...(SUPPORT_PHONE && SUPPORT_TEL_HREF
       ? [
           {
-            id: "email",
-            icon: Mail,
-            title: t("contact.emailUs"),
-            value: SUPPORT_EMAIL,
-            href: SUPPORT_MAILTO_HREF,
+            id: "call",
+            icon: Phone,
+            title: t("contact.callUs"),
+            value: SUPPORT_PHONE,
+            href: SUPPORT_TEL_HREF,
           } satisfies InfoRow,
         ]
       : []),
     {
-      id: "instagram",
-      icon: Instagram,
-      title: t("contact.instagramRowTitle"),
-      value: "@vyntexpos",
-      href: VYNTEX_INSTAGRAM_URL,
-      external: true,
-    },
-    {
-      id: "chat",
-      icon: MessageSquare,
-      title: t("contact.liveChat"),
-      value: t("contact.liveChatValue"),
+      id: "social",
+      icon: Share2,
+      title: t("contact.socialMedia"),
+      chips: socialChips,
     },
     {
       id: "response",
       icon: Clock,
       title: t("contact.responseTime"),
       value: t("contact.responseValue"),
-    },
-    {
-      id: "enterprise",
-      icon: ShieldCheck,
-      title: t("contact.enterpriseTitle"),
-      value: t("contact.enterpriseValue"),
     },
   ];
 
@@ -310,7 +392,8 @@ export default function ContactPage() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.45, delay: 0.08 }}
-            className="rounded-3xl border border-neutral-200/70 bg-white p-5 shadow-[0_10px_40px_rgba(15,23,42,0.07)] sm:p-7"
+            id="contact-form"
+            className="scroll-mt-28 rounded-3xl border border-neutral-200/70 bg-white p-5 shadow-[0_10px_40px_rgba(15,23,42,0.07)] sm:p-7"
           >
             <h2 className="text-2xl font-extrabold tracking-tight text-neutral-950">
               {t("contact.formTitle")}

@@ -9,6 +9,32 @@ export const SUPPORT_EMAIL = raw && raw.includes("@") ? raw : "support@vyntexpos
 export const SUPPORT_MAILTO_HREF = `mailto:${SUPPORT_EMAIL}`;
 export const VYNTEX_INSTAGRAM_URL = "https://www.instagram.com/vyntexpos/";
 
+function envTrim(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function digitsOnly(value: string): string {
+  return value.replace(/[^\d]/g, "");
+}
+
+/**
+ * Public phone / WhatsApp / TikTok. Intentionally empty until real values are provided via
+ * `VITE_SUPPORT_PHONE`, `VITE_WHATSAPP_NUMBER` (or `VITE_WHATSAPP_URL`) and `VITE_TIKTOK_URL`;
+ * the marketing contact page only shows channels that are configured.
+ */
+export const SUPPORT_PHONE = envTrim(import.meta.env.VITE_SUPPORT_PHONE);
+export const SUPPORT_TEL_HREF = SUPPORT_PHONE ? `tel:${SUPPORT_PHONE.replace(/[^\d+]/g, "")}` : "";
+
+const whatsappUrlEnv = envTrim(import.meta.env.VITE_WHATSAPP_URL);
+const whatsappDigits = digitsOnly(envTrim(import.meta.env.VITE_WHATSAPP_NUMBER));
+export const VYNTEX_WHATSAPP_URL = whatsappUrlEnv
+  ? whatsappUrlEnv
+  : whatsappDigits
+    ? `https://wa.me/${whatsappDigits}`
+    : "";
+
+export const VYNTEX_TIKTOK_URL = envTrim(import.meta.env.VITE_TIKTOK_URL);
+
 /**
  * Marketing contact page: show the support address as a clickable `mailto` link.
  * Set to `true` once the business inbox is live; while `false`, visitors use the form only.
