@@ -764,9 +764,19 @@
     "visionText": "Të jemi platforma kryesore POS në rajon e më gjerë, e njohur për inovacionin, besueshmërinë dhe suksesin e bizneseve që shërbejmë.",
     "storyBadge": "Historia jonë",
     "storyTitle": "Udhëtimi i VyntexPOS",
-    "storyText": "VyntexPOS u krijua nga përvoja reale në biznes dhe një qëllim i qartë — të ndërtojmë një zgjidhje POS të fuqishme, praktike dhe të shkallëzueshme, të përshtatur për industrinë e hospitalitetit. Sot, VyntexPOS i ndihmon bizneset të punojnë më zgjuar dhe të ofrojnë një përvojë më të mirë për mysafirët.",
-    "firstCustomerDate": "20 Nëntor 2026",
-    "firstCustomerText": "Klienti ynë i parë iu bashkua VyntexPOS",
+    "timeline": [
+      {
+        "date": "2026",
+        "title": "Lind VyntexPOS",
+        "text": "Fillojmë të ndërtojmë një POS modern “gjithçka në një” për restorante, kafene, bare dhe hotele."
+      },
+      {
+        "date": "20 Nëntor 2026",
+        "title": "Klienti ynë i parë",
+        "text": "Klienti i parë i bashkohet VyntexPOS dhe fillon të punojë në platformë."
+      }
+    ],
+    "timelineNext": "Historia vazhdon…",
     "valuesBadge": "Vlerat tona",
     "valuesTitleBefore": "Çfarë na",
     "valuesTitleHighlight": "Drejton",
