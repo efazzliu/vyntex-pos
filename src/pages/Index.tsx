@@ -8,8 +8,8 @@ export default function Index() {
   return (
     <>
       <HeroSection />
-      <StatsSection />
       <FeaturesSection />
+      <StatsSection />
       <FaqSection />
       <CTASection />
     </>
