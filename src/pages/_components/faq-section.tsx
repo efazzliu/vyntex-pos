@@ -5,12 +5,6 @@ import { AnimatePresence, motion } from "motion/react";
 import { ArrowRight, Minus, Plus } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 
-/** Homepage FAQ preview — Ultra Premium Minimal red identity. */
-const ACCENT = "#D7192D";
-const BORDER = "#E5E7EB";
-const MUTED = "#6B7280";
-const INK = "#111111";
-
 const PREVIEW_KEYS = ["trial", "devices", "locations"] as const;
 
 function FaqPreviewItem({
@@ -30,9 +24,10 @@ function FaqPreviewItem({
     <div
       className={cn(
         "rounded-xl border bg-white transition-[border-color,box-shadow]",
-        open ? "shadow-[0_1px_2px_rgba(17,17,17,0.04)]" : "",
+        open
+          ? "border-brand/40 shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
+          : "border-neutral-200",
       )}
-      style={{ borderColor: open ? `${ACCENT}66` : BORDER }}
     >
       <h3 className="m-0">
         <button
@@ -43,16 +38,14 @@ function FaqPreviewItem({
           onClick={onToggle}
           className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left sm:px-5"
         >
-          <span className="text-sm font-semibold sm:text-[15px]" style={{ color: INK }}>
+          <span className="text-sm font-semibold text-neutral-950 sm:text-[15px]">
             {t(`home.faq.previewItems.${itemKey}.q`)}
           </span>
           <span
-            className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border"
-            style={{
-              borderColor: open ? `${ACCENT}55` : BORDER,
-              color: ACCENT,
-              backgroundColor: open ? `${ACCENT}0F` : "transparent",
-            }}
+            className={cn(
+              "inline-flex size-7 shrink-0 items-center justify-center rounded-full border text-brand",
+              open ? "border-brand/40 bg-brand/10" : "border-neutral-200 bg-transparent",
+            )}
             aria-hidden
           >
             {open ? <Minus className="size-3.5" /> : <Plus className="size-3.5" />}
@@ -71,10 +64,7 @@ function FaqPreviewItem({
             transition={{ duration: 0.25, ease: "easeOut" }}
             className="overflow-hidden"
           >
-            <p
-              className="border-t px-4 pb-4 pt-3 text-sm leading-relaxed sm:px-5"
-              style={{ borderColor: BORDER, color: MUTED }}
-            >
+            <p className="border-t border-neutral-100 px-4 pb-4 pt-3 text-sm leading-relaxed text-neutral-500 sm:px-5">
               {t(`home.faq.previewItems.${itemKey}.a`)}
             </p>
           </motion.div>
@@ -89,10 +79,9 @@ export default function FaqSection() {
   const [openKey, setOpenKey] = useState<(typeof PREVIEW_KEYS)[number] | null>(null);
 
   return (
-    <section id="faq" className="scroll-mt-24 bg-white py-16 sm:py-20" data-faq-preview="light">
+    <section id="faq" className="scroll-mt-24 border-b border-neutral-200 bg-white py-16 sm:py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="grid items-start gap-8 lg:grid-cols-[0.85fr_1.4fr_auto] lg:gap-10">
-          {/* Left — title */}
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -100,19 +89,17 @@ export default function FaqSection() {
             transition={{ duration: 0.45 }}
             className="max-w-sm"
           >
-            <h2
-              className="text-balance text-2xl font-bold tracking-tight sm:text-3xl"
-              style={{ color: INK }}
-            >
+            <h2 className="text-balance text-2xl font-bold tracking-tight text-neutral-950 sm:text-3xl">
               {t("home.faq.titleBefore")}{" "}
-              <span style={{ color: ACCENT }}>{t("home.faq.titleHighlight")}</span>
+              <span className="bg-gradient-to-r from-brand to-brand-sky bg-clip-text text-transparent">
+                {t("home.faq.titleHighlight")}
+              </span>
             </h2>
-            <p className="mt-3 text-sm leading-relaxed sm:text-[15px]" style={{ color: MUTED }}>
+            <p className="mt-3 text-sm leading-relaxed text-neutral-500 sm:text-[15px]">
               {t("home.faq.previewSubtitle")}
             </p>
           </motion.div>
 
-          {/* Center — 3 accordion items */}
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -130,7 +117,6 @@ export default function FaqSection() {
             ))}
           </motion.div>
 
-          {/* Right — View All */}
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -140,8 +126,7 @@ export default function FaqSection() {
           >
             <Link
               to="/faq"
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full border-2 px-5 text-sm font-semibold transition-colors hover:bg-[#D7192D]/[0.06] sm:w-auto lg:w-auto"
-              style={{ borderColor: ACCENT, color: ACCENT }}
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full border-2 border-brand px-5 text-sm font-semibold text-brand transition-colors hover:bg-brand/5 sm:w-auto"
             >
               {t("home.faq.viewAll")}
               <ArrowRight className="size-4" />
