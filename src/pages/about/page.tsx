@@ -86,7 +86,7 @@ export default function AboutPage() {
                     whileInView={{ opacity: 1, x: 0 }}
                     viewport={{ once: true }}
                     transition={{ delay: i * 0.1, duration: 0.5 }}
-                    className="flex gap-6 pb-8 last:pb-0"
+                    className="flex gap-6"
                   >
                     <div className="flex flex-col items-center">
                       <div className="w-3 h-3 rounded-full bg-gradient-to-r from-brand to-brand-accent shrink-0 mt-1.5" />
@@ -94,7 +94,7 @@ export default function AboutPage() {
                         <div className="w-px flex-1 bg-border mt-2" />
                       )}
                     </div>
-                    <div>
+                    <div className={i < milestones.length - 1 ? "pb-8" : undefined}>
                       <span className="text-sm font-bold text-primary">{m.year}</span>
                       <p className="text-sm text-muted-foreground mt-0.5">{m.event}</p>
                     </div>
