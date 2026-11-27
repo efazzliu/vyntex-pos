@@ -220,14 +220,15 @@
       },
       "professional": {
         "name": "Professional",
-        "description": "Restaurant POS i plotë për një lokacion — 1 muaj provë falas, pastaj nga $99/muaj.",
+        "description": "The Complete Operation — për restorante me staf, kuzhinë dhe volum më të madh porosish. 1 muaj provë falas, pastaj nga $99/muaj.",
         "features": [
-          "Gjithçka në Starter",
-          "Deri në 5 terminale",
-          "Rrjedhë ekrani kuzhine",
-          "Ndarje faturash",
-          "Analitikë e avancuar",
-          "Mbështetje prioritare në chat"
+          "1 lokacion · 25 staf · 5 terminale",
+          "Printerë të shumtë · floors dhe zones të shumta",
+          "Stock i avancuar + eksport CSV / Excel",
+          "Split Bills dhe Debt Management",
+          "Audit Log",
+          "Z-Report i avancuar dhe raporte analitike",
+          "KDS — coming soon"
         ]
       },
       "enterprise": {

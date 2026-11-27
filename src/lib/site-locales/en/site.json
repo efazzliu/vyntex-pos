@@ -220,14 +220,15 @@
       },
       "professional": {
         "name": "Professional",
-        "description": "Full Restaurant POS for one location — 1-month free trial, then from $99/mo.",
+        "description": "The Complete Operation — for restaurants with staff, kitchen, and higher order volume. 1-month free trial, then from $99/mo.",
         "features": [
-          "Everything in Starter",
-          "Up to 5 terminals",
-          "Kitchen display workflow",
-          "Split bills",
-          "Advanced analytics",
-          "Priority chat support"
+          "1 location · 25 staff · 5 terminals",
+          "Multiple printers · multiple floors & zones",
+          "Advanced stock + CSV / Excel export",
+          "Split bills & debt management",
+          "Audit log",
+          "Advanced Z-Report & analytics reports",
+          "Kitchen display (KDS) — coming soon"
         ]
       },
       "enterprise": {

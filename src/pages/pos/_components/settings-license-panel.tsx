@@ -41,12 +41,15 @@ const PLAN_FEATURES: Record<PlanName, string[]> = {
     "settings.lic_feat_no_split_debt",
   ],
   professional: [
-    "settings.lic_feat_starter_all",
-    "settings.lic_feat_kds",
+    "settings.lic_feat_pro_limits",
+    "settings.lic_feat_stock_advanced",
+    "settings.lic_feat_export",
     "settings.lic_feat_split",
-    "settings.lic_feat_analytics",
     "settings.lic_feat_debt",
     "settings.lic_feat_audit",
+    "settings.lic_feat_zreport_advanced",
+    "settings.lic_feat_analytics",
+    "settings.lic_feat_kds_soon",
   ],
   enterprise: [
     "settings.lic_feat_pro_all",
