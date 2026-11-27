@@ -1,15 +1,38 @@
 import { motion } from "motion/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ComponentType } from "react";
 import { useTranslation } from "react-i18next";
+import {
+  Activity,
+  MonitorSmartphone,
+  ShoppingBag,
+  Store,
+  Zap,
+  type LucideProps,
+} from "lucide-react";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase.ts";
 
+type StatKey =
+  | "restaurants"
+  | "devices"
+  | "transactions"
+  | "uptime"
+  | "orderProcessing";
+
 type StatConfig = {
-  key: string;
+  key: StatKey;
   value: number;
   suffix: string;
   decimals: number;
   /** When set, render this text instead of an animated number (product fact, not traction). */
   textValue?: string;
+};
+
+const STAT_ICONS: Record<StatKey, ComponentType<LucideProps>> = {
+  restaurants: Store,
+  devices: MonitorSmartphone,
+  transactions: ShoppingBag,
+  uptime: Activity,
+  orderProcessing: Zap,
 };
 
 /** Shown immediately and kept if live platform stats can't be loaded (e.g. before the
@@ -19,7 +42,7 @@ const FALLBACK_STATS: StatConfig[] = [
   { key: "devices", value: 0, suffix: "", decimals: 0, textValue: "—" },
   { key: "transactions", value: 0, suffix: "", decimals: 0, textValue: "—" },
   { key: "uptime", value: 99.9, suffix: "%", decimals: 1 },
-  { key: "orderProcessing", value: 0, suffix: "", decimals: 0, textValue: "live" },
+  { key: "orderProcessing", value: 0, suffix: "", decimals: 0, textValue: "speed" },
 ];
 
 type PlatformStats = {
@@ -36,7 +59,7 @@ function buildLiveStats(data: PlatformStats): StatConfig[] {
     { key: "devices", value: Math.max(devices, 0), suffix: "+", decimals: 0 },
     { key: "transactions", value: data.paid_orders, suffix: "+", decimals: 0 },
     { key: "uptime", value: 99.9, suffix: "%", decimals: 1 },
-    { key: "orderProcessing", value: 0, suffix: "", decimals: 0, textValue: "live" },
+    { key: "orderProcessing", value: 0, suffix: "", decimals: 0, textValue: "speed" },
   ];
 }
 
@@ -173,30 +196,37 @@ export default function StatsSection() {
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8 lg:gap-10">
-          {stats.map((cfg, i) => (
-            <motion.div
-              key={cfg.key}
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.12, duration: 0.5 }}
-              className="text-center"
-            >
-              <AnimatedCounter
-                value={cfg.value}
-                suffix={cfg.suffix}
-                decimals={cfg.decimals}
-                textValue={
-                  cfg.textValue === "live"
-                    ? t("home.stats.liveValue")
-                    : cfg.textValue
-                }
-              />
-              <div className="mt-2 text-sm sm:text-base text-white/50">
-                {t(`home.stats.${cfg.key}`)}
-              </div>
-            </motion.div>
-          ))}
+          {stats.map((cfg, i) => {
+            const Icon = STAT_ICONS[cfg.key];
+            const displayText =
+              cfg.textValue === "speed"
+                ? t("home.stats.processingSpeed")
+                : cfg.textValue;
+
+            return (
+              <motion.div
+                key={cfg.key}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.12, duration: 0.5 }}
+                className="flex flex-col items-center text-center"
+              >
+                <div className="mb-4 flex size-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5 shadow-[0_0_24px_rgba(0,91,214,0.12)]">
+                  <Icon className="size-5 text-brand-accent" strokeWidth={2} />
+                </div>
+                <AnimatedCounter
+                  value={cfg.value}
+                  suffix={cfg.suffix}
+                  decimals={cfg.decimals}
+                  textValue={displayText}
+                />
+                <div className="mt-2 text-sm sm:text-base text-white/50">
+                  {t(`home.stats.${cfg.key}`)}
+                </div>
+              </motion.div>
+            );
+          })}
         </div>
       </div>
     </section>
