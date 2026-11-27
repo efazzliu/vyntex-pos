@@ -90,12 +90,12 @@ function VynTypeCard({
           <p className="mt-1.5 text-sm leading-relaxed text-neutral-500">
             {t(`vynTypes.types.${typeKey}.description`)}
           </p>
-          <ul className="mt-4 flex flex-wrap gap-2">
+          <ul className="mt-4 flex w-max flex-nowrap gap-1.5 sm:gap-2">
             {Array.isArray(tags) &&
               tags.map((tag) => (
                 <li
                   key={tag}
-                  className="inline-flex items-center gap-1 rounded-full border border-brand/20 bg-brand/[0.04] px-2.5 py-1 text-xs font-medium text-neutral-800"
+                  className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-brand/20 bg-white px-2.5 py-1 text-xs font-medium text-neutral-800 shadow-[0_2px_8px_rgba(15,23,42,0.08)]"
                 >
                   <Check className="size-3 text-brand" strokeWidth={2.5} />
                   {tag}
