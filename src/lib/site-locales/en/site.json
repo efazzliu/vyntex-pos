@@ -256,7 +256,54 @@
     "responseBody": "We typically respond within 24 hours on business days. Enterprise clients get priority support.",
     "toastRequired": "Please fill in all required fields",
     "toastSuccess": "Message sent! We'll get back to you soon.",
-    "toastError": "Failed to send message. Please try again."
+    "toastError": "Failed to send message. Please try again.",
+    "heroBadge": "Contact Us",
+    "heroTitleBefore": "Get in Touch with",
+    "heroTitleHighlight": "VyntexPOS",
+    "heroSubtitle": "Have a question, need support or want to learn more? We're here to help you.",
+    "instagramRowTitle": "Instagram",
+    "liveChatValue": "Chat icon, bottom-right corner",
+    "responseValue": "Within 24 hours, business days",
+    "enterpriseTitle": "Enterprise Support",
+    "enterpriseValue": "Priority support included",
+    "demoTitle": "Explore the Product Demo",
+    "demoBody": "See how VyntexPOS works for your business.",
+    "demoCta": "View Demo",
+    "formTitle": "Send Us a Message",
+    "formSubtitle": "Fill out the form below and our team will get back to you as soon as possible.",
+    "fullName": "Full Name",
+    "emailAddress": "Email Address",
+    "subjectLabel": "Subject",
+    "messageLabel": "Message",
+    "phFullName": "Your full name",
+    "phEmailAddress": "Your email address",
+    "phSubjectSelect": "Select a subject",
+    "phMessageNew": "Write your message here...",
+    "subjects": {
+      "general": "General inquiry",
+      "sales": "Sales & pricing",
+      "support": "Technical support",
+      "billing": "Billing & subscription",
+      "partnership": "Partnership"
+    },
+    "highlights": {
+      "fast": {
+        "title": "Fast Response",
+        "description": "We reply within 24 hours on business days."
+      },
+      "dedicated": {
+        "title": "Dedicated Support",
+        "description": "Real people, real help."
+      },
+      "everyone": {
+        "title": "For All Clients",
+        "description": "Sales, support and general inquiries."
+      },
+      "demo": {
+        "title": "Product Demo",
+        "description": "Explore VyntexPOS in action."
+      }
+    }
   },
   "vynTypes": {
     "badge": "VYN Type",
