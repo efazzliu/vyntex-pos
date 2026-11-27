@@ -2,21 +2,16 @@ import { motion } from "motion/react";
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Activity,
-  MonitorSmartphone,
-  ShoppingBag,
-  Store,
+  Monitor,
+  ShieldCheck,
+  Users,
   Zap,
   type LucideProps,
 } from "lucide-react";
+import { cn } from "@/lib/utils.ts";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase.ts";
 
-type StatKey =
-  | "restaurants"
-  | "devices"
-  | "transactions"
-  | "uptime"
-  | "orderProcessing";
+type StatKey = "restaurants" | "devices" | "uptime" | "orderProcessing";
 
 type StatConfig = {
   key: StatKey;
@@ -28,19 +23,16 @@ type StatConfig = {
 };
 
 const STAT_ICONS: Record<StatKey, ComponentType<LucideProps>> = {
-  restaurants: Store,
-  devices: MonitorSmartphone,
-  transactions: ShoppingBag,
-  uptime: Activity,
+  restaurants: Users,
+  devices: Monitor,
+  uptime: ShieldCheck,
   orderProcessing: Zap,
 };
 
-/** Shown immediately and kept if live platform stats can't be loaded (e.g. before the
- * `vyntex_public_platform_stats` migration is applied) — real facts, never invented traction. */
+/** Shown immediately and kept if live platform stats can't be loaded — never invent traction. */
 const FALLBACK_STATS: StatConfig[] = [
   { key: "restaurants", value: 0, suffix: "", decimals: 0, textValue: "—" },
   { key: "devices", value: 0, suffix: "", decimals: 0, textValue: "—" },
-  { key: "transactions", value: 0, suffix: "", decimals: 0, textValue: "—" },
   { key: "uptime", value: 99.9, suffix: "%", decimals: 1 },
   { key: "orderProcessing", value: 0, suffix: "", decimals: 0, textValue: "speed" },
 ];
@@ -57,7 +49,6 @@ function buildLiveStats(data: PlatformStats): StatConfig[] {
   return [
     { key: "restaurants", value: data.restaurants, suffix: "+", decimals: 0 },
     { key: "devices", value: Math.max(devices, 0), suffix: "+", decimals: 0 },
-    { key: "transactions", value: data.paid_orders, suffix: "+", decimals: 0 },
     { key: "uptime", value: 99.9, suffix: "%", decimals: 1 },
     { key: "orderProcessing", value: 0, suffix: "", decimals: 0, textValue: "speed" },
   ];
@@ -91,7 +82,7 @@ function useLivePlatformStats(): StatConfig[] {
   return stats;
 }
 
-function AnimatedCounter({
+function StatValue({
   value,
   suffix,
   decimals,
@@ -114,7 +105,7 @@ function AnimatedCounter({
     let cancelled = false;
 
     const animate = () => {
-      const duration = 2000;
+      const duration = 1800;
       const startTime = performance.now();
 
       const step = (timestamp: number) => {
@@ -140,9 +131,7 @@ function AnimatedCounter({
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
-          animate();
-        }
+        if (entry.isIntersecting) animate();
       },
       { threshold: 0.3 },
     );
@@ -157,24 +146,16 @@ function AnimatedCounter({
 
   if (textValue) {
     return (
-      <div
-        ref={ref}
-        className="text-4xl sm:text-5xl font-bold tabular-nums bg-gradient-to-r from-brand to-brand-accent bg-clip-text text-transparent"
-      >
+      <div ref={ref} className="text-2xl font-bold tracking-tight text-neutral-900 sm:text-[1.65rem]">
         {textValue}
       </div>
     );
   }
 
   return (
-    <div
-      ref={ref}
-      className="text-4xl sm:text-5xl font-bold text-white tabular-nums"
-    >
+    <div ref={ref} className="text-2xl font-bold tracking-tight text-neutral-900 tabular-nums sm:text-[1.65rem]">
       {display}
-      <span className="bg-gradient-to-r from-brand to-brand-accent bg-clip-text text-transparent">
-        {suffix}
-      </span>
+      <span className="text-brand">{suffix}</span>
     </div>
   );
 }
@@ -184,18 +165,9 @@ export default function StatsSection() {
   const stats = useLivePlatformStats();
 
   return (
-    <section className="relative py-24 overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-r from-[#060B18] via-[#0A1628] to-[#060B18]" />
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(ellipse at center, rgba(0,91,214,0.08), transparent 70%)",
-        }}
-      />
-
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8 lg:gap-10">
+    <section className="border-y border-neutral-200 bg-white py-10 sm:py-12">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-col divide-y divide-neutral-200 sm:flex-row sm:items-center sm:justify-between sm:divide-x sm:divide-y-0">
           {stats.map((cfg, i) => {
             const Icon = STAT_ICONS[cfg.key];
             const displayText =
@@ -206,23 +178,29 @@ export default function StatsSection() {
             return (
               <motion.div
                 key={cfg.key}
-                initial={{ opacity: 0, y: 30 }}
+                initial={{ opacity: 0, y: 12 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: i * 0.12, duration: 0.5 }}
-                className="flex flex-col items-center text-center"
+                transition={{ delay: i * 0.06, duration: 0.4 }}
+                className={cn(
+                  "flex flex-1 items-center justify-center gap-3.5 py-5 sm:px-4 sm:py-1",
+                )}
               >
-                <div className="mb-4 flex size-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5 shadow-[0_0_24px_rgba(0,91,214,0.12)]">
-                  <Icon className="size-5 text-brand-accent" strokeWidth={2} />
-                </div>
-                <AnimatedCounter
-                  value={cfg.value}
-                  suffix={cfg.suffix}
-                  decimals={cfg.decimals}
-                  textValue={displayText}
+                <Icon
+                  className="size-8 shrink-0 text-brand sm:size-9"
+                  strokeWidth={1.6}
+                  aria-hidden
                 />
-                <div className="mt-2 text-sm sm:text-base text-white/50">
-                  {t(`home.stats.${cfg.key}`)}
+                <div className="min-w-0 text-left">
+                  <StatValue
+                    value={cfg.value}
+                    suffix={cfg.suffix}
+                    decimals={cfg.decimals}
+                    textValue={displayText}
+                  />
+                  <div className="mt-0.5 text-sm text-neutral-500">
+                    {t(`home.stats.${cfg.key}`)}
+                  </div>
                 </div>
               </motion.div>
             );
