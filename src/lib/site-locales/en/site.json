@@ -764,9 +764,19 @@
     "visionText": "To be the leading POS platform in the region and beyond, recognized for innovation, reliability and the success of the businesses we serve.",
     "storyBadge": "Our Story",
     "storyTitle": "The VyntexPOS Journey",
-    "storyText": "VyntexPOS was created from real business experience and a clear goal — to build a powerful, practical and scalable POS solution tailored for the hospitality industry. Today, VyntexPOS helps businesses operate smarter and deliver a better guest experience.",
-    "firstCustomerDate": "Nov 20, 2026",
-    "firstCustomerText": "Our first customer joined VyntexPOS",
+    "timeline": [
+      {
+        "date": "2026",
+        "title": "VyntexPOS is born",
+        "text": "We start building a modern, all-in-one POS for restaurants, cafés, bars and hotels."
+      },
+      {
+        "date": "Nov 20, 2026",
+        "title": "Our first customer",
+        "text": "The first customer joins VyntexPOS and goes live on the platform."
+      }
+    ],
+    "timelineNext": "The story continues…",
     "valuesBadge": "Our Values",
     "valuesTitleBefore": "What",
     "valuesTitleHighlight": "Drives Us",

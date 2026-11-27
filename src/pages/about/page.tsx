@@ -93,6 +93,11 @@ function PillarCard({
 export default function AboutPage() {
   const { t } = useTranslation("site");
   const primaryCtaHref = useMarketingPrimaryCtaHref();
+  const timeline = t("about.timeline", { returnObjects: true }) as {
+    date: string;
+    title: string;
+    text: string;
+  }[];
 
   return (
     <div className="relative overflow-hidden bg-white text-neutral-950">
@@ -277,14 +282,31 @@ export default function AboutPage() {
             <h2 className="mt-3 text-2xl font-extrabold tracking-tight sm:text-[1.75rem]">
               {t("about.storyTitle")}
             </h2>
-            <p className="mt-3 text-sm leading-relaxed text-neutral-600">
-              {t("about.storyText")}
-            </p>
-            <p className="mt-4 inline-flex items-center gap-2.5 rounded-xl border border-brand/15 bg-white px-3.5 py-2 text-sm shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-              <CalendarDays className="size-4 shrink-0 text-brand" />
-              <span className="font-bold text-brand">{t("about.firstCustomerDate")}</span>
-              <span className="text-neutral-600">{t("about.firstCustomerText")}</span>
-            </p>
+            <ol className="mt-4">
+              {timeline.map((item, i) => (
+                <li key={item.date} className="flex gap-3.5">
+                  <div className="flex flex-col items-center">
+                    <span className="mt-1 size-3 shrink-0 rounded-full bg-gradient-to-br from-brand to-brand-accent ring-4 ring-brand/10" />
+                    <span className="mt-1 w-px flex-1 bg-gradient-to-b from-brand/40 to-neutral-200" />
+                  </div>
+                  <div className={i < timeline.length - 1 ? "pb-4" : "pb-3"}>
+                    <p className="text-xs font-bold uppercase tracking-wide text-brand">
+                      {item.date}
+                    </p>
+                    <h3 className="mt-0.5 text-[15px] font-extrabold leading-tight text-neutral-950">
+                      {item.title}
+                    </h3>
+                    <p className="mt-1 text-sm leading-relaxed text-neutral-600">{item.text}</p>
+                  </div>
+                </li>
+              ))}
+              <li className="flex gap-3.5">
+                <span className="mt-0.5 size-3 shrink-0 rounded-full border-2 border-dashed border-brand/50 bg-white" />
+                <p className="text-sm font-semibold italic text-neutral-500">
+                  {t("about.timelineNext")}
+                </p>
+              </li>
+            </ol>
           </div>
         </motion.section>
 
