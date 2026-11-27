@@ -16,7 +16,6 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import { cn } from "@/lib/utils.ts";
 
 const TYPE_KEYS = [
   "restaurant",
@@ -202,34 +201,32 @@ export default function VynTypesPage() {
       {/* Bottom highlights */}
       <section className="pb-20 sm:pb-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div
-            className={cn(
-              "grid grid-cols-1 gap-6 rounded-2xl border border-neutral-200 bg-neutral-50/90 px-5 py-6",
-              "sm:grid-cols-2 sm:gap-0 sm:px-2 sm:py-5",
-              "lg:grid-cols-4",
-            )}
-          >
-            {HIGHLIGHT_KEYS.map(({ id, icon: Icon }, i) => (
-              <div
-                key={id}
-                className={cn(
-                  "flex items-start gap-3 px-3 sm:px-5",
-                  i > 0 && "sm:border-l sm:border-neutral-200",
-                )}
-              >
-                <span className="mt-0.5 inline-flex shrink-0 text-brand">
-                  <Icon className="size-5" strokeWidth={1.75} />
-                </span>
-                <div>
-                  <p className="text-sm font-bold text-neutral-950">
-                    {t(`vynTypes.highlights.${id}.title`)}
-                  </p>
-                  <p className="mt-0.5 text-xs text-neutral-500 sm:text-sm">
-                    {t(`vynTypes.highlights.${id}.description`)}
-                  </p>
-                </div>
-              </div>
-            ))}
+          <div className="rounded-[1.75rem] border border-neutral-200/60 bg-gradient-to-b from-neutral-50 to-neutral-100/60 px-4 py-5 shadow-[0_6px_24px_rgba(15,23,42,0.04)] sm:px-6 sm:py-6 lg:px-4 lg:py-7">
+            <ul className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-y-6 lg:flex lg:items-center lg:gap-0">
+              {HIGHLIGHT_KEYS.map(({ id, icon: Icon }, i) => (
+                <li key={id} className="flex items-center lg:flex-1">
+                  {i > 0 ? (
+                    <span
+                      className="mr-0 hidden h-12 w-px shrink-0 bg-neutral-300/70 lg:block"
+                      aria-hidden
+                    />
+                  ) : null}
+                  <div className="flex flex-1 items-center gap-3 px-2 lg:justify-center lg:px-3">
+                    <span className="relative inline-flex size-10 shrink-0 sm:size-11 lg:size-10 items-center justify-center rounded-full bg-gradient-to-br from-brand/15 to-white text-brand shadow-[0_2px_10px_rgba(0,91,214,0.12)]">
+                      <Icon className="size-[22px]" strokeWidth={1.6} />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-[15px] font-bold leading-tight text-neutral-950">
+                        {t(`vynTypes.highlights.${id}.title`)}
+                      </p>
+                      <p className="mt-1 text-[13px] leading-snug text-neutral-500">
+                        {t(`vynTypes.highlights.${id}.description`)}
+                      </p>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       </section>
