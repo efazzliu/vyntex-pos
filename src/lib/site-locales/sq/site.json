@@ -733,42 +733,70 @@
     }
   },
   "about": {
-    "badge": "Rreth nesh",
-    "title": "Ndërtimi i së ardhmes së teknologjisë hoteliere",
-    "subtitle": "Po ndërtojmë Vyntex POS me një mision të thjeshtë: ta bëjmë teknologjinë e restorantit po aq elegjante sa përvoja e ngrënies.",
-    "storyTitle": "Historia jonë",
-    "storyP1": "Po krijojmë Vyntex POS sepse pamë një industri me sisteme të vjetra që frustronte stafin dhe klientët. Restorantet meritojnë teknologji që punon fort.",
-    "storyP2": "Në 2026 filluam ta kthejmë vizionin në produkt të vërtetë — një POS modern për operatorë kudo. Jemi në fillim dhe të fokusuar; rruga jonë shtrihet te çdo biznes hospitaliteti që meriton mjete më të mira.",
-    "valuesLabel": "Vlerat tona",
-    "journeyLabel": "Udhëtimi ynë",
+    "heroBadge": "Rreth VyntexPOS",
+    "heroLine1": "Ndërtuar për Restorante.",
+    "heroLine2Before": "Drejtuar nga",
+    "heroHighlight": "Inovacioni.",
+    "heroSubtitle": "VyntexPOS është një zgjidhje moderne POS “gjithçka në një”, e krijuar për të ndihmuar restorantet, kafenetë, barat, hotelet e më shumë të punojnë më zgjuar, më shpejt dhe më efikas.",
+    "ctaMission": "Misioni ynë",
+    "ctaStory": "Historia jonë",
+    "stats": {
+      "plans": {
+        "value": "3",
+        "label": "Plane fleksibël"
+      },
+      "types": {
+        "value": "6",
+        "label": "Lloje biznesesh"
+      },
+      "trial": {
+        "value": "1 Muaj",
+        "label": "Falas në Professional"
+      },
+      "uptime": {
+        "value": "99.9%",
+        "label": "Disponueshmëri & besueshmëri"
+      }
+    },
+    "missionTitle": "Misioni ynë",
+    "missionText": "Të fuqizojmë bizneset me një sistem POS të besueshëm, të lehtë për t’u përdorur dhe të shkallëzueshëm, që thjeshton operacionet ditore, rrit efikasitetin dhe nxit rritjen.",
+    "visionTitle": "Vizioni ynë",
+    "visionText": "Të jemi platforma kryesore POS në rajon e më gjerë, e njohur për inovacionin, besueshmërinë dhe suksesin e bizneseve që shërbejmë.",
+    "storyBadge": "Historia jonë",
+    "storyTitle": "Udhëtimi i VyntexPOS",
+    "storyText": "VyntexPOS u krijua nga përvoja reale në biznes dhe një qëllim i qartë — të ndërtojmë një zgjidhje POS të fuqishme, praktike dhe të shkallëzueshme, të përshtatur për industrinë e hospitalitetit. Sot, VyntexPOS i ndihmon bizneset të punojnë më zgjuar dhe të ofrojnë një përvojë më të mirë për mysafirët.",
+    "firstCustomerDate": "20 Nëntor 2026",
+    "firstCustomerText": "Klienti ynë i parë iu bashkua VyntexPOS",
+    "valuesBadge": "Vlerat tona",
+    "valuesTitleBefore": "Çfarë na",
+    "valuesTitleHighlight": "Drejton",
+    "valuesSubtitle": "Parimet kryesore që udhëheqin gjithçka që bëjmë te VyntexPOS.",
     "values": {
       "innovation": {
-        "title": "Inovacioni i parë",
-        "description": "Shtyjmë kufijtë e çfarë mund të bëjë një POS, me teknologji moderne për përvoja të shkëlqyera."
+        "title": "Inovacion",
+        "description": "Zgjidhje moderne që përgjigjen nevojave reale të biznesit."
       },
       "reliability": {
         "title": "Besueshmëri",
-        "description": "Garanci 99.9% disponueshmërie. Biznesi juaj varet nga ne — e marrim seriozisht."
+        "description": "Një sistem i qëndrueshëm dhe i sigurt mbi të cilin mund të mbështeteni gjithmonë."
       },
       "customer": {
         "title": "Fokus te klienti",
-        "description": "Çdo veçori lind nga probleme reale të operatorëve të restoranteve. Komenti juaj drejton produktin."
+        "description": "Suksesi juaj është prioriteti ynë."
       },
-      "global": {
-        "title": "Vizion global",
-        "description": "Projektuar për biznese kudo. Shumë monedha, shumë gjuhë dhe përputhje me rregulloret lokale ndërsa rritemi."
+      "growth": {
+        "title": "Rritje së bashku",
+        "description": "Ne rritemi kur rriten klientët tanë."
       }
     },
-    "milestones": [
-      {
-        "year": "2026",
-        "event": "Fillon zhvillimi i Vyntex POS — po ndërtojmë produktin dhe po shkruajmë të ardhmen e hospitalitetit"
-      },
-      {
-        "year": "20 Nëntor 2026",
-        "event": "Klienti ynë i parë bashkohet me Vyntex POS — restoranti i parë fillon të punojë në platformë"
-      }
-    ]
+    "cta": {
+      "line1": "Bashkohuni me restorantet",
+      "line2Before": "që po përdorin",
+      "highlight": "VyntexPOS.",
+      "subtitle": "Një zgjidhje POS e besueshme për restorante, kafene, bare, hotele e më shumë.",
+      "getStarted": "Fillo tani",
+      "bookDemo": "Rezervo demo"
+    }
   },
   "legal": {
     "badge": "Ligjore",
