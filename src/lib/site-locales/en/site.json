@@ -6,7 +6,8 @@
     "pricing": "Pricing",
     "about": "About",
     "contact": "Contact",
-    "dashboard": "Dashboard"
+    "dashboard": "Dashboard",
+    "faq": "FAQ"
   },
   "footer": {
     "tagline": "Enterprise-grade POS platform for modern restaurants. Streamline your operations with elegance.",
@@ -994,29 +995,29 @@
       "navMenu": "Menu",
       "navOrders": "Orders",
       "navNotifications": "Notifications",
-        "menuAll": "All",
-        "menuPickTable": "Choose a table first to add items.",
-        "menuItemAddToOrder": "Add to Order",
-        "menuItemSelect": "Select",
-        "menuItemCustomize": "Customize",
-        "menuAddProducts": "Add products ({{count}})",
-        "menuAddProducts_other": "Add products ({{count}})",
-        "menuClearSelection": "Clear selection",
-        "menuSelectedCount": "{{count}} selected item",
-        "menuSelectedCount_other": "{{count}} selected items",
-        "menuPickTableHint": "Choose a table to send {{count}} item.",
-        "menuPickTableHint_other": "Choose a table to send {{count}} items.",
-        "customizationTitle": "Customization",
-        "customizationNote": "Extra note",
-        "customizationNotePh": "e.g. allergy…",
-        "customizationRequired": "Choose",
-        "menuItemCategory": "Category",
-        "menuItemClose": "Close",
-        "menuQrTitle": "Menu QR",
-        "menuQrHint": "Show this code to the guest so they can open the menu.",
-        "menuQrClose": "Close",
-        "menuQrUnavailable": "Menu QR is not available yet.",
-        "ordersEmpty": "No open tables yet.",
+      "menuAll": "All",
+      "menuPickTable": "Choose a table first to add items.",
+      "menuItemAddToOrder": "Add to Order",
+      "menuItemSelect": "Select",
+      "menuItemCustomize": "Customize",
+      "menuAddProducts": "Add products ({{count}})",
+      "menuAddProducts_other": "Add products ({{count}})",
+      "menuClearSelection": "Clear selection",
+      "menuSelectedCount": "{{count}} selected item",
+      "menuSelectedCount_other": "{{count}} selected items",
+      "menuPickTableHint": "Choose a table to send {{count}} item.",
+      "menuPickTableHint_other": "Choose a table to send {{count}} items.",
+      "customizationTitle": "Customization",
+      "customizationNote": "Extra note",
+      "customizationNotePh": "e.g. allergy…",
+      "customizationRequired": "Choose",
+      "menuItemCategory": "Category",
+      "menuItemClose": "Close",
+      "menuQrTitle": "Menu QR",
+      "menuQrHint": "Show this code to the guest so they can open the menu.",
+      "menuQrClose": "Close",
+      "menuQrUnavailable": "Menu QR is not available yet.",
+      "ordersEmpty": "No open tables yet.",
       "notifEmpty": "No kitchen updates right now.",
       "notifKitchen": "In kitchen",
       "notifReady": "Ready — pick up",
@@ -1269,5 +1270,74 @@
     "tabAnalytics": "Analytics",
     "liveBadge": "Demo mode",
     "ctaHint": "Ready to run this at your restaurant?"
+  },
+  "faqPage": {
+    "badge": "FAQ",
+    "titleBefore": "Frequently Asked",
+    "titleHighlight": "Questions",
+    "subtitle": "Find quick answers to the most common questions about VyntexPOS.",
+    "sidebar": {
+      "title": "Have a Question?",
+      "description": "Everything you need to know about VyntexPOS, in one place.",
+      "benefits": {
+        "setup": {
+          "title": "Fast Setup",
+          "description": "Get up and running in minutes."
+        },
+        "secure": {
+          "title": "Secure & Reliable",
+          "description": "Your business data is always protected."
+        },
+        "support": {
+          "title": "Dedicated Support",
+          "description": "We’re here to help, anytime."
+        }
+      },
+      "helpTitle": "Still need help?",
+      "helpDescription": "Contact our support team.",
+      "helpCta": "Contact Support"
+    },
+    "items": {
+      "trial": {
+        "q": "Can I try VyntexPOS for free?",
+        "a": "Yes. New accounts can start with one month of Restaurant POS on the Professional plan at no charge, so you can run real menus, tables, orders, and staff workflows. After the trial you choose a paid plan that fits your business."
+      },
+      "creditCard": {
+        "q": "Do I need a credit card to start?",
+        "a": "No. You can begin setup and use the free trial without entering card details. Billing only applies once you subscribe after the trial."
+      },
+      "devices": {
+        "q": "What devices are supported?",
+        "a": "Vyntex POS runs in the browser on modern Windows, macOS, and tablets—use the screens you already have at the host stand or service stations. Dedicated receipt printers and payment terminals can be added as your setup grows."
+      },
+      "offline": {
+        "q": "Does VyntexPOS work offline?",
+        "a": "VyntexPOS is built for cloud-first operation with reliable sync when you are online. For spotty connectivity, plan redundant access (backup link or mobile hotspot) for busy service. Full offline mode guidance continues to evolve with the product."
+      },
+      "printers": {
+        "q": "Can I connect multiple printers?",
+        "a": "Yes, based on your plan. Starter includes 1 printer per venue. Professional supports multiple printers (kitchen, bar, and receipt stations). Enterprise unlocks the highest printer limits for larger operations."
+      },
+      "locations": {
+        "q": "Can I manage multiple restaurant locations?",
+        "a": "Starter and Professional are designed for a single location. Multi-location management and centralized controls are available on Enterprise. Contact us if you already run several venues so we can align on the right setup."
+      },
+      "security": {
+        "q": "Is my business data secure?",
+        "a": "Yes. Data lives in secure cloud infrastructure with industry-standard encryption in transit and at rest, role-based staff access, and sign-in protections for owners and managers. You stay in control of who can see and change sensitive settings."
+      },
+      "upgrade": {
+        "q": "Can I upgrade my subscription anytime?",
+        "a": "Yes. You can move to a higher plan when your restaurant needs more terminals, staff, printers, or Enterprise capabilities. Review current options on the Pricing page or contact us if you need help choosing."
+      },
+      "expiry": {
+        "q": "What happens when my subscription expires?",
+        "a": "When a trial or paid period ends, renew or choose a plan to keep full Restaurant POS access. If you need help restoring service, use Contact Support and our team will assist with renewal."
+      },
+      "support": {
+        "q": "Do you provide technical support?",
+        "a": "Yes. Use the site chat, the Contact form, or your plan’s support channel. Starter and above include help resources; Professional adds priority in-app support. We typically respond within one business day, faster for priority tiers."
+      }
+    }
   }
 }

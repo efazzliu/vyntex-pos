@@ -66,7 +66,7 @@ const SOLUTION_LINKS: NavLink[] = [
 
 const RESOURCE_LINKS: NavLink[] = [
   { labelKey: "footerPremium.resources.videoTutorials", href: "/product-demo" },
-  { labelKey: "footerPremium.resources.faq", href: "/#faq" },
+  { labelKey: "footerPremium.resources.faq", href: "/faq" },
   { labelKey: "footerPremium.resources.contactSupport", href: "/contact" },
 ];
 
