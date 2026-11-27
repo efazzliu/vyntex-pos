@@ -66,9 +66,9 @@ const PROFESSIONAL_VIEWS: PosView[] = [
 ];
 
 /**
- * Enterprise — same POS modules as Professional today; differentiate with limits, support & roadmap
- * (e.g. more terminals, priority support, future multi-site / API). Use `hasEnterpriseExtras` when
- * you add Enterprise-only toggles in the UI.
+ * Enterprise — Business Intelligence & Control for multi-venue operators:
+ * multi-location, high staff/terminals, supply + recipes, centralized / enterprise dashboard,
+ * custom & scheduled reports. API/webhooks and white-label remain roadmap helpers below.
  */
 const ENTERPRISE_VIEWS: PosView[] = [...PROFESSIONAL_VIEWS];
 
@@ -130,23 +130,34 @@ export const PLAN_FEATURE_DESCRIPTIONS: Record<
     ],
   },
   enterprise: {
-    tagline: "Professional feature set with room to scale.",
+    tagline:
+      "Business Intelligence & Control — for companies running multiple restaurants and centralized operations.",
     posModules: [
-      "Everything in Professional (same POS screens today)",
-      "Full analytics dashboard & sales overview",
-      "Kitchen & bar supply (mall / furnizim) workflows in Menu and Stock",
-      "Optional supply recipe (ingredients per portion) with automatic stock deduction on sale",
+      "Multi-location (up to 50 venues)",
+      "Staff by agreement (very high practical limit) · up to 50 terminals / location",
+      "Centralized / enterprise dashboard",
+      "Supply management · recipe management · ingredient costing",
+      "Advanced inventory",
+      "Multi-location analytics · custom reports · scheduled email reports",
+      "Advanced roles & permissions · detailed audit history",
+      "Priority support & SLA",
+      "API & webhooks · white-label branding — coming soon",
     ],
     commercialAddOns: [
-      "Highest terminal limits & rollout support",
-      "Priority / dedicated support, SLA-style agreements",
-      "Roadmap: multi-location rollups, integrations, API access (when shipped)",
+      "Highest terminal / printer / floor limits",
+      "Dedicated onboarding & SLA-style agreements",
     ],
   },
 };
 
+/** Enterprise dashboard extras: live ops, profitability, custom reports, scheduled reports UI. */
 export function hasEnterpriseExtras(plan: string): boolean {
   return normalizePlan(plan) === "enterprise";
+}
+
+/** Alias — centralized / BI-style POS overview for Enterprise. */
+export function hasEnterpriseCentralDashboard(plan: string): boolean {
+  return hasEnterpriseExtras(plan);
 }
 
 /**
@@ -163,6 +174,26 @@ export function hasEnterpriseSupplyMall(plan: string): boolean {
  */
 export function hasEnterpriseSupplyRecipe(plan: string): boolean {
   return normalizePlan(plan) === "enterprise";
+}
+
+/** Enterprise-only custom reports + scheduled email report UI (when POS is open). */
+export function hasEnterpriseCustomReports(plan: string): boolean {
+  return hasEnterpriseExtras(plan);
+}
+
+/**
+ * Public API & webhooks for Enterprise — not shipped yet.
+ * Keep false until integrations land; marketing should say “coming soon”.
+ */
+export function hasEnterpriseApiAccess(_plan: string): boolean {
+  return false;
+}
+
+/**
+ * Full white-label branding for Enterprise — not shipped yet (logo/theme theming exists for all plans).
+ */
+export function hasEnterpriseWhiteLabel(_plan: string): boolean {
+  return false;
 }
 
 /**
@@ -185,12 +216,15 @@ export function maxTerminalsCapForPlan(plan: string): number {
   return 50;
 }
 
-/** Max staff accounts (PIN users) per venue. */
+/**
+ * Max staff accounts (PIN users) per venue.
+ * Enterprise: very high practical ceiling (“by agreement” commercially).
+ */
 export function maxStaffForPlan(plan: string): number {
   const tier = normalizePlan(plan);
   if (tier === "starter") return 5;
   if (tier === "professional") return 25;
-  return 200;
+  return 9999;
 }
 
 /** Max configured POS printers per venue. Starter: 1; Professional: many; Enterprise: highest. */

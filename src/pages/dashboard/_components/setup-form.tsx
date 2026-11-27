@@ -77,6 +77,7 @@ const ACTIVATION_PLAN_SLIDES = [
       "activate.plan.enterprise.f5",
       "activate.plan.enterprise.f6",
       "activate.plan.enterprise.f7",
+      "activate.plan.enterprise.f8",
     ],
   },
 ] as const;

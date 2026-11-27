@@ -52,9 +52,16 @@ const PLAN_FEATURES: Record<PlanName, string[]> = {
     "settings.lic_feat_kds_soon",
   ],
   enterprise: [
-    "settings.lic_feat_pro_all",
+    "settings.lic_feat_ent_limits",
+    "settings.lic_feat_ent_dashboard",
     "settings.lic_feat_supply",
+    "settings.lic_feat_recipe",
+    "settings.lic_feat_ingredient_cost",
+    "settings.lic_feat_custom_reports",
+    "settings.lic_feat_scheduled_reports",
     "settings.lic_feat_priority",
+    "settings.lic_feat_api_soon",
+    "settings.lic_feat_whitelabel_soon",
   ],
 };
 

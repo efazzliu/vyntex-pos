@@ -233,15 +233,16 @@
       },
       "enterprise": {
         "name": "Enterprise",
-        "description": "Same powerful POS as Professional, built to scale with your business.",
+        "description": "Business Intelligence & Control — for companies managing multiple restaurants and centralized operations. 1-month free trial, then from $189/mo.",
         "features": [
-          "Everything in Professional",
-          "Kitchen & bar supply inventory (mall) in Menu & Stock",
-          "Supply recipe (ingredients per portion) with automatic stock deduction",
-          "Higher terminal limits",
-          "Priority & dedicated support",
-          "SLA-style options & onboarding",
-          "Multi-location & API roadmap (coming soon)"
+          "Multi-location (up to 50 venues)",
+          "Staff by agreement · up to 50 terminals / location",
+          "Centralized dashboard · supply & recipe management",
+          "Ingredient costing · advanced inventory",
+          "Multi-location analytics · custom & scheduled reports",
+          "Advanced roles · detailed audit history",
+          "Priority support & SLA",
+          "API & webhooks · white-label — coming soon"
         ]
       }
     }
