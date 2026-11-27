@@ -6,21 +6,18 @@ import {
   ArrowRight,
   BarChart3,
   Boxes,
-  Check,
   ChefHat,
-  Layers,
   LayoutGrid,
   Monitor,
   Package,
   Play,
   Sparkles,
-  Trophy,
   Users,
-  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { cn } from "@/lib/utils.ts";
 import { registerUrlWithFreeTrial } from "@/lib/free-trial.ts";
+import PlanComparison from "./_components/plan-comparison.tsx";
 
 type FeatureCategory =
   | "all"
@@ -57,12 +54,6 @@ const CATEGORY_TABS: { id: FeatureCategory; icon: typeof Monitor }[] = [
   { id: "reports", icon: BarChart3 },
   { id: "enterprise", icon: Boxes },
 ];
-
-const PLAN_META = [
-  { id: "starter", icon: Zap, popular: false },
-  { id: "professional", icon: Trophy, popular: true },
-  { id: "enterprise", icon: Layers, popular: false },
-] as const;
 
 function PosHeroVisual() {
   return (
@@ -144,11 +135,6 @@ export default function FeaturesPage() {
     }
     return FEATURE_CARDS.filter((c) => c.category === activeCategory);
   }, [activeCategory]);
-
-  const planFeatures = (id: string) => {
-    const raw = t(`featuresPage.plans.${id}.items`, { returnObjects: true });
-    return Array.isArray(raw) ? (raw as string[]) : [];
-  };
 
   return (
     <>
@@ -283,77 +269,9 @@ export default function FeaturesPage() {
         </div>
       </section>
 
-      {/* Plan comparison */}
-      <section className="border-t border-border bg-muted/30 py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-3xl text-center">
-            <p className="text-sm font-semibold uppercase tracking-widest text-primary">
-              {t("featuresPage.plansLabel")}
-            </p>
-            <h2 className="mt-3 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-              {t("featuresPage.plansTitle")}
-            </h2>
-          </div>
+      <PlanComparison />
 
-          <div className="mt-12 grid grid-cols-1 gap-6 lg:grid-cols-3">
-            {PLAN_META.map((plan) => {
-              const Icon = plan.icon;
-              const items = planFeatures(plan.id);
-              return (
-                <div
-                  key={plan.id}
-                  className={cn(
-                    "relative flex flex-col rounded-2xl border bg-card p-6 shadow-sm",
-                    plan.popular
-                      ? "border-brand shadow-lg shadow-brand/10 ring-1 ring-brand/30"
-                      : "border-border",
-                  )}
-                >
-                  {plan.popular ? (
-                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-brand to-brand-sky px-3 py-1 text-xs font-bold text-white shadow">
-                      {t("pricing.mostPopular")}
-                    </span>
-                  ) : null}
-                  <div className="mb-4 flex size-11 items-center justify-center rounded-xl bg-gradient-to-br from-brand/15 to-brand-accent/15">
-                    <Icon className="size-5 text-primary" />
-                  </div>
-                  <h3 className="text-xl font-bold text-foreground">
-                    {t(`featuresPage.plans.${plan.id}.name`)}
-                  </h3>
-                  <p className="mt-1 text-sm font-medium text-primary">
-                    {t(`featuresPage.plans.${plan.id}.tagline`)}
-                  </p>
-                  <p className="mt-3 text-sm text-muted-foreground">
-                    {t(`featuresPage.plans.${plan.id}.description`)}
-                  </p>
-                  <ul className="mt-6 flex-1 space-y-2.5">
-                    {items.map((item) => (
-                      <li key={item} className="flex items-start gap-2.5 text-sm text-foreground">
-                        <Check className="mt-0.5 size-4 shrink-0 text-primary" />
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <Button
-                    className={cn(
-                      "mt-8 h-11 w-full rounded-full font-semibold",
-                      plan.popular
-                        ? "bg-gradient-to-r from-brand to-brand-sky text-white shadow-md shadow-brand/25"
-                        : "",
-                    )}
-                    variant={plan.popular ? "default" : "outline"}
-                    onClick={() => navigate("/pricing")}
-                  >
-                    {t(`featuresPage.plans.${plan.id}.cta`)}
-                  </Button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* Full comparison CTA */}
+      {/* Pricing deep-link */}
       <section className="border-t border-border bg-background py-12">
         <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-4 px-4 sm:flex-row sm:items-center sm:px-6 lg:px-8">
           <div>
