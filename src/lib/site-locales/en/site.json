@@ -76,6 +76,7 @@
       "devices": "Devices in Use",
       "transactions": "Orders Processed",
       "orderProcessing": "Order Processing",
+      "processingSpeed": "< 1s",
       "liveValue": "Live",
       "countries": "Countries Worldwide"
     },
