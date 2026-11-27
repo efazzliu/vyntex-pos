@@ -233,15 +233,16 @@
       },
       "enterprise": {
         "name": "Enterprise",
-        "description": "I njëjti POS si Professional, për rritje dhe kufij më të lartë.",
+        "description": "Business Intelligence & Control — për kompani që menaxhojnë disa restorante dhe operacione të centralizuara. 1 muaj provë falas, pastaj nga $189/muaj.",
         "features": [
-          "Gjithçka në Professional",
-          "Furnizim kuzhinë & shank (mall) në menu dhe stok",
-          "Recetë furnizimi (përbërës për porcion) me zbritje automatike të stokut",
-          "Kufij më të lartë terminalësh",
-          "Mbështetje prioritare & e dedikuar",
-          "Opsione SLA & onboarding",
-          "Roadmap: shumë lokacione & API (së shpejti)"
+          "Multi-location (deri 50 lokacione)",
+          "Staf sipas marrëveshjes · deri 50 terminale / lokacion",
+          "Dashboard i centralizuar · Supply & Recipe Management",
+          "Ingredient Costing · Advanced Inventory",
+          "Multi-location Analytics · Custom & Scheduled Reports",
+          "Role të avancuara · Audit History i detajuar",
+          "Priority Support & SLA",
+          "API & Webhooks · White-label — coming soon"
         ]
       }
     }
