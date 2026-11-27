@@ -22,9 +22,6 @@ import {
 } from "@/lib/site-constants.ts";
 import { cn } from "@/lib/utils.ts";
 
-/** Footer / CTA accent — scoped to this light marketing footer only. */
-const VYNTEX_RED = "#D7192D";
-
 function InstagramIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -141,20 +138,13 @@ function CtaBanner() {
   const trialHref = useMarketingPrimaryCtaHref();
 
   return (
-    <div
-      className="relative overflow-hidden rounded-3xl px-6 py-10 sm:px-10 sm:py-12 lg:px-14"
-      style={{
-        background: `linear-gradient(135deg, ${VYNTEX_RED} 0%, #A01022 55%, #7A0C1A 100%)`,
-      }}
-    >
+    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand via-brand-sky to-brand-accent px-6 py-10 sm:px-10 sm:py-12 lg:px-14">
       <div
-        className="pointer-events-none absolute -right-10 -top-16 h-56 w-56 rounded-full opacity-30 blur-3xl"
-        style={{ background: "#FF6B7A" }}
+        className="pointer-events-none absolute -right-10 -top-16 h-56 w-56 rounded-full bg-white/20 opacity-40 blur-3xl"
         aria-hidden
       />
       <div
-        className="pointer-events-none absolute -bottom-20 left-10 h-48 w-48 rounded-full opacity-20 blur-3xl"
-        style={{ background: "#FFB4BC" }}
+        className="pointer-events-none absolute -bottom-20 left-10 h-48 w-48 rounded-full bg-brand-accent/40 opacity-40 blur-3xl"
         aria-hidden
       />
 
@@ -300,8 +290,7 @@ function NewsletterBlock() {
         <Button
           type="submit"
           disabled={status === "loading"}
-          className="h-11 shrink-0 rounded-full px-6 font-semibold text-white"
-          style={{ backgroundColor: VYNTEX_RED }}
+          className="h-11 shrink-0 rounded-full bg-gradient-to-r from-brand to-brand-sky px-6 font-semibold text-white shadow-md shadow-brand/20 hover:from-brand-hover hover:to-brand-hover"
         >
           {status === "loading"
             ? t("footerPremium.newsletter.loading")
@@ -351,7 +340,7 @@ export default function Footer() {
                 target="_blank"
                 rel="noreferrer"
                 aria-label="Instagram"
-                className="inline-flex size-10 items-center justify-center rounded-full border border-neutral-200 text-neutral-600 transition-colors hover:border-[#D7192D]/40 hover:text-[#D7192D]"
+                className="inline-flex size-10 items-center justify-center rounded-full border border-neutral-200 text-neutral-600 transition-colors hover:border-brand/40 hover:text-brand"
               >
                 <InstagramIcon className="size-4" />
               </a>
@@ -407,11 +396,7 @@ export default function Footer() {
         </div>
 
         <div className="flex items-center gap-1.5 pb-8">
-          <span
-            className="size-1.5 rounded-full"
-            style={{ backgroundColor: VYNTEX_RED }}
-            aria-hidden
-          />
+          <span className="size-1.5 rounded-full bg-brand-accent" aria-hidden />
           <span className="text-xs text-neutral-400">{t("footer.operational")}</span>
         </div>
       </div>
