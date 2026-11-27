@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ComponentType } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "motion/react";
 import { useTranslation } from "react-i18next";
@@ -11,10 +11,8 @@ import {
   Headphones,
   Layers,
   Mail,
-  MessageCircle,
   MessageSquare,
   MonitorPlay,
-  Music2,
   Phone,
   Send,
   Share2,
@@ -23,6 +21,11 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
+import {
+  InstagramBrandIcon,
+  TikTokBrandIcon,
+  WhatsAppBrandIcon,
+} from "@/components/brand-icons.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import { toast } from "sonner";
@@ -50,39 +53,18 @@ const HIGHLIGHTS = [
   { id: "demo", icon: MonitorPlay },
 ] as const;
 
-// lucide-react dropped brand icons; local copy of the old Instagram glyph
-function Instagram({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
-      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
-      <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
-    </svg>
-  );
-}
+type IconComponent = ComponentType<{ className?: string }>;
 
 type SocialChip = {
   id: string;
   label: string;
-  icon: LucideIcon | typeof Instagram;
+  icon: IconComponent;
   href: string;
 };
 
 type InfoRow = {
   id: string;
-  icon: LucideIcon | typeof Instagram;
+  icon: IconComponent;
   title: string;
   value?: string;
   href?: string;
@@ -127,7 +109,7 @@ function InfoRowItem({ row }: { row: InfoRow }) {
           <span className="block text-sm font-bold leading-tight text-neutral-950">
             {row.title}
           </span>
-          <span className="mt-2 flex flex-wrap gap-2">
+          <span className="mt-2.5 flex flex-wrap gap-2.5">
             {row.chips.map((chip) => {
               const ChipIcon = chip.icon;
               return (
@@ -136,10 +118,11 @@ function InfoRowItem({ row }: { row: InfoRow }) {
                   href={chip.href}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-sm font-medium text-neutral-900 transition-colors hover:border-brand/40 hover:bg-brand/5 hover:text-brand"
+                  aria-label={chip.label}
+                  title={chip.label}
+                  className="inline-flex size-11 items-center justify-center rounded-full border border-neutral-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.06)] transition-all hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-md"
                 >
-                  <ChipIcon className="size-4 text-brand" />
-                  {chip.label}
+                  <ChipIcon className="size-6" />
                 </a>
               );
             })}
@@ -225,12 +208,12 @@ export default function ContactPage() {
   };
 
   const socialChips: SocialChip[] = [
-    { id: "instagram", label: "Instagram", icon: Instagram, href: VYNTEX_INSTAGRAM_URL },
+    { id: "instagram", label: "Instagram", icon: InstagramBrandIcon, href: VYNTEX_INSTAGRAM_URL },
     ...(VYNTEX_WHATSAPP_URL
-      ? [{ id: "whatsapp", label: "WhatsApp", icon: MessageCircle, href: VYNTEX_WHATSAPP_URL }]
+      ? [{ id: "whatsapp", label: "WhatsApp", icon: WhatsAppBrandIcon, href: VYNTEX_WHATSAPP_URL }]
       : []),
     ...(VYNTEX_TIKTOK_URL
-      ? [{ id: "tiktok", label: "TikTok", icon: Music2, href: VYNTEX_TIKTOK_URL }]
+      ? [{ id: "tiktok", label: "TikTok", icon: TikTokBrandIcon, href: VYNTEX_TIKTOK_URL }]
       : []),
   ];
 
