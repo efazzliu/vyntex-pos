@@ -256,7 +256,54 @@
     "responseBody": "Zakonisht përgjigjemi brenda 24 orëve në ditët e punës. Klientët enterprise kanë përparësi.",
     "toastRequired": "Plotësoni të gjitha fushat e detyrueshme",
     "toastSuccess": "Mesazhi u dërgua! Do t'ju përgjigjemi së shpejti.",
-    "toastError": "Dështoi dërgimi. Provoni përsëri."
+    "toastError": "Dështoi dërgimi. Provoni përsëri.",
+    "heroBadge": "Contact Us",
+    "heroTitleBefore": "Get in Touch with",
+    "heroTitleHighlight": "VyntexPOS",
+    "heroSubtitle": "Keni pyetje, keni nevojë për ndihmë ose doni të mësoni më shumë? Jemi këtu për t'ju ndihmuar.",
+    "instagramRowTitle": "Instagram",
+    "liveChatValue": "Ikona e chat-it, poshtë djathtas",
+    "responseValue": "Brenda 24 orësh, ditët e punës",
+    "enterpriseTitle": "Enterprise Support",
+    "enterpriseValue": "Support me prioritet i përfshirë",
+    "demoTitle": "Explore the Product Demo",
+    "demoBody": "Shihni si funksionon VyntexPOS për biznesin tuaj.",
+    "demoCta": "View Demo",
+    "formTitle": "Send Us a Message",
+    "formSubtitle": "Plotësoni formularin më poshtë dhe ekipi ynë do t'ju kthejë përgjigje sa më shpejt.",
+    "fullName": "Full Name",
+    "emailAddress": "Email Address",
+    "subjectLabel": "Subject",
+    "messageLabel": "Message",
+    "phFullName": "Emri juaj i plotë",
+    "phEmailAddress": "Email-i juaj",
+    "phSubjectSelect": "Zgjidhni një subjekt",
+    "phMessageNew": "Shkruani mesazhin tuaj këtu...",
+    "subjects": {
+      "general": "Pyetje e përgjithshme",
+      "sales": "Shitje & çmime",
+      "support": "Mbështetje teknike",
+      "billing": "Faturim & abonim",
+      "partnership": "Partneritet"
+    },
+    "highlights": {
+      "fast": {
+        "title": "Fast Response",
+        "description": "Përgjigjemi brenda 24 orësh në ditët e punës."
+      },
+      "dedicated": {
+        "title": "Dedicated Support",
+        "description": "Njerëz realë, ndihmë reale."
+      },
+      "everyone": {
+        "title": "For All Clients",
+        "description": "Shitje, support dhe pyetje të përgjithshme."
+      },
+      "demo": {
+        "title": "Product Demo",
+        "description": "Eksploroni VyntexPOS në veprim."
+      }
+    }
   },
   "vynTypes": {
     "badge": "VYN Type",
