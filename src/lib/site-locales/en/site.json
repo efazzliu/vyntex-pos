@@ -22,6 +22,65 @@
     "operational": "All systems operational",
     "version": "v{{v}}"
   },
+  "footerPremium": {
+    "brand": {
+      "description": "The all-in-one restaurant POS system built to simplify your business.",
+      "socialNote": "Follow us on Instagram for product updates."
+    },
+    "cta": {
+      "title": "Ready to Transform Your Restaurant?",
+      "subtitle": "Simplify your operations, serve faster and grow your business with VyntexPOS.",
+      "trial": "Start Free Trial",
+      "sales": "Contact Sales"
+    },
+    "product": {
+      "title": "Product",
+      "features": "Features",
+      "posOrdering": "POS & Ordering",
+      "kds": "Kitchen Display (KDS)",
+      "inventory": "Inventory & Recipes",
+      "reports": "Reports & Analytics",
+      "integrations": "Integrations"
+    },
+    "solutions": {
+      "title": "Solutions",
+      "restaurants": "Restaurants",
+      "cafes": "Cafés",
+      "fastFood": "Fast Food",
+      "bars": "Bars & Pubs",
+      "multiLocation": "Multi-location",
+      "enterprise": "Enterprise"
+    },
+    "resources": {
+      "title": "Resources",
+      "videoTutorials": "Video Tutorials",
+      "faq": "FAQ",
+      "contactSupport": "Help & Support"
+    },
+    "company": {
+      "title": "Company",
+      "about": "About Us",
+      "pricing": "Pricing",
+      "contact": "Contact",
+      "partner": "Become a Partner"
+    },
+    "newsletter": {
+      "title": "Stay Updated with VyntexPOS",
+      "subtitle": "Get product updates, new features and useful restaurant insights.",
+      "placeholder": "Enter your email",
+      "subscribe": "Subscribe",
+      "loading": "Subscribing…",
+      "success": "Thanks — you’re on the list. We’ll be in touch.",
+      "invalid": "Please enter a valid email address.",
+      "error": "Something went wrong. Please try again.",
+      "unavailable": "Newsletter signup is temporarily unavailable."
+    },
+    "legal": {
+      "navLabel": "Legal",
+      "contactSupport": "Contact Support"
+    },
+    "builtFor": "Built for Modern Restaurants."
+  },
   "home": {
     "hero": {
       "badge": "Restaurant POS — Now Available",
