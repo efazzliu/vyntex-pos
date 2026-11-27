@@ -39,7 +39,9 @@ export function PosOrderingMock() {
               key={label}
               className={cn(
                 "rounded-lg px-3 py-2 text-xs font-semibold",
-                i === 0 ? "bg-[#E31E24] text-white" : "bg-neutral-100 text-neutral-600",
+                i === 0
+                  ? "bg-gradient-to-r from-brand to-brand-sky text-white"
+                  : "bg-neutral-100 text-neutral-600",
               )}
             >
               {label}
@@ -57,14 +59,14 @@ export function PosOrderingMock() {
           ].map(([name, price]) => (
             <div key={name} className="mt-2 flex justify-between text-xs text-neutral-700">
               <span>{name}</span>
-              <span className="font-semibold">{price}</span>
+              <span className="font-semibold text-brand-accent">{price}</span>
             </div>
           ))}
           <div className="mt-3 flex items-center justify-between border-t border-neutral-200 pt-2 text-sm font-bold text-neutral-900">
             <span>Total</span>
             <span>€12.50</span>
           </div>
-          <div className="mt-2 rounded-lg bg-[#E31E24] py-2 text-center text-xs font-bold text-white">
+          <div className="mt-2 rounded-lg bg-gradient-to-r from-brand to-brand-sky py-2 text-center text-xs font-bold text-white">
             Pay · Split
           </div>
         </div>
@@ -89,7 +91,7 @@ export function TablesMock() {
             key={t.n}
             className={cn(
               "flex aspect-square flex-col items-center justify-center rounded-xl border text-xs font-semibold",
-              t.s === "busy" && "border-[#E31E24]/40 bg-[#FFF5F5] text-[#E31E24]",
+              t.s === "busy" && "border-brand/40 bg-brand/10 text-brand",
               t.s === "free" && "border-neutral-200 bg-white text-neutral-600",
               t.s === "reserved" && "border-amber-200 bg-amber-50 text-amber-700",
             )}
@@ -103,7 +105,7 @@ export function TablesMock() {
         <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-[10px] font-semibold text-neutral-600">
           Zone A
         </span>
-        <span className="rounded-full bg-[#E31E24]/10 px-2.5 py-1 text-[10px] font-semibold text-[#E31E24]">
+        <span className="rounded-full bg-brand/10 px-2.5 py-1 text-[10px] font-semibold text-brand">
           Zone B
         </span>
       </div>
@@ -125,9 +127,9 @@ export function KdsMock() {
             key={ticket.id}
             className={cn(
               "rounded-xl border p-2.5",
-              ticket.tone === "busy" && "border-[#E31E24]/30 bg-[#FFF5F5]",
+              ticket.tone === "busy" && "border-brand/30 bg-brand/5",
               ticket.tone === "wait" && "border-neutral-200 bg-neutral-50",
-              ticket.tone === "ok" && "border-emerald-200 bg-emerald-50",
+              ticket.tone === "ok" && "border-brand-accent/30 bg-brand-accent/10",
               ticket.tone === "prio" && "border-amber-300 bg-amber-50",
             )}
           >
@@ -163,7 +165,7 @@ export function InventoryMock() {
             <span
               className={cn(
                 "rounded-full px-2 py-0.5 text-[10px] font-bold",
-                row.low ? "bg-[#E31E24]/10 text-[#E31E24]" : "bg-emerald-100 text-emerald-700",
+                row.low ? "bg-amber-100 text-amber-700" : "bg-brand-accent/15 text-brand-accent",
               )}
             >
               {row.qty}
@@ -184,15 +186,15 @@ export function StaffMock() {
             key={name}
             className={cn(
               "rounded-xl border px-3 py-3 text-center",
-              i === 0
-                ? "border-[#E31E24]/40 bg-[#FFF5F5]"
-                : "border-neutral-200 bg-neutral-50",
+              i === 0 ? "border-brand/40 bg-brand/5" : "border-neutral-200 bg-neutral-50",
             )}
           >
             <div
               className={cn(
                 "mx-auto flex size-8 items-center justify-center rounded-full text-xs font-bold",
-                i === 0 ? "bg-[#E31E24] text-white" : "bg-neutral-200 text-neutral-600",
+                i === 0
+                  ? "bg-gradient-to-r from-brand to-brand-sky text-white"
+                  : "bg-neutral-200 text-neutral-600",
               )}
             >
               {name[0]}
@@ -219,15 +221,15 @@ export function StaffMock() {
 export function ReportsMock() {
   return (
     <MockChrome title="Reports · Analytics">
-      <div className="flex items-end gap-1.5 h-24">
+      <div className="flex h-24 items-end gap-1.5">
         {[40, 65, 48, 80, 55, 92, 70].map((h, i) => (
           <div
             key={i}
-            className="flex-1 rounded-t-md"
-            style={{
-              height: `${h}%`,
-              backgroundColor: i === 5 ? "#E31E24" : "#FEE2E2",
-            }}
+            className={cn(
+              "flex-1 rounded-t-md",
+              i === 5 ? "bg-brand" : "bg-brand/20",
+            )}
+            style={{ height: `${h}%` }}
           />
         ))}
       </div>
@@ -266,12 +268,12 @@ export function EnterpriseMock() {
             </div>
             <div className="text-right">
               <p className="text-xs font-bold text-neutral-900">{row.sales}</p>
-              <p className="text-[10px] font-semibold text-emerald-600">{row.status}</p>
+              <p className="text-[10px] font-semibold text-brand-accent">{row.status}</p>
             </div>
           </div>
         ))}
       </div>
-      <div className="mt-3 rounded-lg border border-dashed border-[#E31E24]/30 bg-[#FFF5F5] px-3 py-2 text-center text-[11px] font-semibold text-[#E31E24]">
+      <div className="mt-3 rounded-lg border border-dashed border-brand/30 bg-brand/5 px-3 py-2 text-center text-[11px] font-semibold text-brand">
         Supply · Recipes · Custom reports
       </div>
     </MockChrome>
