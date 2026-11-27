@@ -3,29 +3,40 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase.ts";
 
-type StatConfig = { key: string; value: number; suffix: string; decimals: number };
+type StatConfig = {
+  key: string;
+  value: number;
+  suffix: string;
+  decimals: number;
+  /** When set, render this text instead of an animated number (product fact, not traction). */
+  textValue?: string;
+};
 
 /** Shown immediately and kept if live platform stats can't be loaded (e.g. before the
  * `vyntex_public_platform_stats` migration is applied) — real facts, never invented traction. */
 const FALLBACK_STATS: StatConfig[] = [
-  { key: "modules", value: 6, suffix: "", decimals: 0 },
+  { key: "restaurants", value: 0, suffix: "", decimals: 0, textValue: "—" },
+  { key: "devices", value: 0, suffix: "", decimals: 0, textValue: "—" },
+  { key: "transactions", value: 0, suffix: "", decimals: 0, textValue: "—" },
   { key: "uptime", value: 99.9, suffix: "%", decimals: 1 },
-  { key: "trial", value: 1, suffix: "", decimals: 0 },
-  { key: "support", value: 24, suffix: "/7", decimals: 0 },
+  { key: "orderProcessing", value: 0, suffix: "", decimals: 0, textValue: "live" },
 ];
 
 type PlatformStats = {
   restaurants: number;
   paid_orders: number;
-  countries: number;
+  countries?: number;
+  devices?: number;
 };
 
 function buildLiveStats(data: PlatformStats): StatConfig[] {
+  const devices = typeof data.devices === "number" ? data.devices : 0;
   return [
     { key: "restaurants", value: data.restaurants, suffix: "+", decimals: 0 },
-    { key: "uptime", value: 99.9, suffix: "%", decimals: 1 },
+    { key: "devices", value: Math.max(devices, 0), suffix: "+", decimals: 0 },
     { key: "transactions", value: data.paid_orders, suffix: "+", decimals: 0 },
-    { key: "countries", value: Math.max(data.countries, 1), suffix: "+", decimals: 0 },
+    { key: "uptime", value: 99.9, suffix: "%", decimals: 1 },
+    { key: "orderProcessing", value: 0, suffix: "", decimals: 0, textValue: "live" },
   ];
 }
 
@@ -61,15 +72,18 @@ function AnimatedCounter({
   value,
   suffix,
   decimals,
+  textValue,
 }: {
   value: number;
   suffix: string;
   decimals: number;
+  textValue?: string;
 }) {
   const [display, setDisplay] = useState("0");
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (textValue) return;
     const el = ref.current;
     if (!el) return;
 
@@ -116,7 +130,18 @@ function AnimatedCounter({
       observer.disconnect();
       cancelAnimationFrame(frameId);
     };
-  }, [value, decimals]);
+  }, [value, decimals, textValue]);
+
+  if (textValue) {
+    return (
+      <div
+        ref={ref}
+        className="text-4xl sm:text-5xl font-bold tabular-nums bg-gradient-to-r from-brand to-brand-accent bg-clip-text text-transparent"
+      >
+        {textValue}
+      </div>
+    );
+  }
 
   return (
     <div
@@ -147,20 +172,25 @@ export default function StatsSection() {
       />
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8 lg:gap-10">
           {stats.map((cfg, i) => (
             <motion.div
               key={cfg.key}
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ delay: i * 0.15, duration: 0.5 }}
+              transition={{ delay: i * 0.12, duration: 0.5 }}
               className="text-center"
             >
               <AnimatedCounter
                 value={cfg.value}
                 suffix={cfg.suffix}
                 decimals={cfg.decimals}
+                textValue={
+                  cfg.textValue === "live"
+                    ? t("home.stats.liveValue")
+                    : cfg.textValue
+                }
               />
               <div className="mt-2 text-sm sm:text-base text-white/50">
                 {t(`home.stats.${cfg.key}`)}
