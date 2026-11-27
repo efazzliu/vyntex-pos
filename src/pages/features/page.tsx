@@ -1,59 +1,12 @@
-import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { motion, AnimatePresence } from "motion/react";
-import {
-  ArrowRight,
-  BarChart3,
-  Boxes,
-  ChefHat,
-  LayoutGrid,
-  Monitor,
-  Package,
-  Play,
-  Sparkles,
-  Users,
-} from "lucide-react";
+import { motion } from "motion/react";
+import { ArrowRight, Play, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { cn } from "@/lib/utils.ts";
 import { registerUrlWithFreeTrial } from "@/lib/free-trial.ts";
+import CategoryNav from "./_components/category-nav.tsx";
 import PlanComparison from "./_components/plan-comparison.tsx";
-
-type FeatureCategory =
-  | "all"
-  | "pos"
-  | "tables"
-  | "kds"
-  | "inventory"
-  | "staff"
-  | "reports"
-  | "enterprise";
-
-type FeatureCard = {
-  id: string;
-  category: FeatureCategory;
-  icon: typeof Monitor;
-};
-
-const FEATURE_CARDS: FeatureCard[] = [
-  { id: "pos", category: "pos", icon: Monitor },
-  { id: "tables", category: "tables", icon: LayoutGrid },
-  { id: "kds", category: "kds", icon: ChefHat },
-  { id: "inventory", category: "inventory", icon: Package },
-  { id: "staff", category: "staff", icon: Users },
-  { id: "reports", category: "reports", icon: BarChart3 },
-];
-
-const CATEGORY_TABS: { id: FeatureCategory; icon: typeof Monitor }[] = [
-  { id: "all", icon: Sparkles },
-  { id: "pos", icon: Monitor },
-  { id: "tables", icon: LayoutGrid },
-  { id: "kds", icon: ChefHat },
-  { id: "inventory", icon: Package },
-  { id: "staff", icon: Users },
-  { id: "reports", icon: BarChart3 },
-  { id: "enterprise", icon: Boxes },
-];
 
 function PosHeroVisual() {
   return (
@@ -96,7 +49,7 @@ function PosHeroVisual() {
                 <span className="font-semibold text-brand-accent">{price}</span>
               </div>
             ))}
-            <div className="mt-3 border-t border-white/10 pt-2 flex items-center justify-between text-sm font-bold text-white">
+            <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-2 text-sm font-bold text-white">
               <span>Total</span>
               <span>€16.00</span>
             </div>
@@ -126,15 +79,6 @@ function PosHeroVisual() {
 export default function FeaturesPage() {
   const { t } = useTranslation("site");
   const navigate = useNavigate();
-  const [activeCategory, setActiveCategory] = useState<FeatureCategory>("all");
-
-  const visibleCards = useMemo(() => {
-    if (activeCategory === "all") return FEATURE_CARDS;
-    if (activeCategory === "enterprise") {
-      return FEATURE_CARDS.filter((c) => c.id === "inventory" || c.id === "reports");
-    }
-    return FEATURE_CARDS.filter((c) => c.category === activeCategory);
-  }, [activeCategory]);
 
   return (
     <>
@@ -195,83 +139,11 @@ export default function FeaturesPage() {
         </div>
       </section>
 
-      {/* Category tabs + feature grid */}
-      <section className="border-t border-border bg-background pb-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="-mt-6 overflow-x-auto pb-2">
-            <div className="inline-flex min-w-full gap-2 rounded-2xl border border-border bg-card p-2 shadow-sm sm:min-w-0 sm:flex-wrap">
-              {CATEGORY_TABS.map((tab) => {
-                const Icon = tab.icon;
-                const active = activeCategory === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setActiveCategory(tab.id)}
-                    className={cn(
-                      "inline-flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-colors",
-                      active
-                        ? "bg-gradient-to-r from-brand to-brand-sky text-white shadow-md shadow-brand/20"
-                        : "text-muted-foreground hover:bg-accent hover:text-foreground",
-                    )}
-                  >
-                    <Icon className="size-4" />
-                    {t(`featuresPage.tabs.${tab.id}`)}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+      <CategoryNav />
 
-          <div className="mt-10 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-            <AnimatePresence mode="popLayout">
-              {visibleCards.map((card, i) => {
-                const Icon = card.icon;
-                return (
-                  <motion.article
-                    key={card.id}
-                    layout
-                    initial={{ opacity: 0, y: 16 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.98 }}
-                    transition={{ delay: i * 0.04, duration: 0.35 }}
-                    className="group relative flex flex-col rounded-2xl border border-border bg-card p-6 shadow-sm transition-all hover:border-brand/30 hover:shadow-lg hover:shadow-brand/5"
-                  >
-                    <div className="mb-4 flex size-11 items-center justify-center rounded-xl bg-gradient-to-br from-brand/15 to-brand-accent/15">
-                      <Icon className="size-5 text-primary" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-foreground">
-                      {t(`featuresPage.cards.${card.id}.title`)}
-                    </h3>
-                    <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">
-                      {t(`featuresPage.cards.${card.id}.description`)}
-                    </p>
-                    <div className="mt-5 flex justify-end">
-                      <span className="inline-flex size-8 items-center justify-center rounded-full bg-brand/10 text-primary transition group-hover:bg-brand group-hover:text-white">
-                        <ArrowRight className="size-4" />
-                      </span>
-                    </div>
-                  </motion.article>
-                );
-              })}
-            </AnimatePresence>
-          </div>
-
-          {activeCategory === "enterprise" ? (
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="mt-6 text-center text-sm text-muted-foreground"
-            >
-              {t("featuresPage.enterpriseHint")}
-            </motion.p>
-          ) : null}
-        </div>
-      </section>
-
+      {/* Preserved plan comparison — separate from category browsing */}
       <PlanComparison />
 
-      {/* Pricing deep-link */}
       <section className="border-t border-border bg-background py-12">
         <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-4 px-4 sm:flex-row sm:items-center sm:px-6 lg:px-8">
           <div>

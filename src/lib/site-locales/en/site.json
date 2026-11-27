@@ -257,6 +257,7 @@
     "heroSubtitle": "Everything you need to run, manage and grow your restaurant — in one complete POS system.",
     "ctaTrial": "Start Free Trial",
     "ctaDemo": "Watch Demo",
+    "tabsLabel": "Feature categories",
     "tabs": {
       "all": "All Features",
       "pos": "POS & Ordering",
@@ -266,6 +267,15 @@
       "staff": "Staff",
       "reports": "Reports",
       "enterprise": "Enterprise"
+    },
+    "overviewTitle": "Explore every capability",
+    "overviewSubtitle": "Browse modules by category. Switching tabs only updates this page — it never changes your subscription or unlocks POS features.",
+    "exploreCategory": "Explore",
+    "learnMore": "Learn more",
+    "availability": {
+      "professional": "Professional+",
+      "enterprise": "Enterprise",
+      "comingSoon": "Coming soon"
     },
     "cards": {
       "pos": {
@@ -291,6 +301,91 @@
       "reports": {
         "title": "Reports & Analytics",
         "description": "Track sales, performance and growth with detailed reports and exports."
+      }
+    },
+    "categories": {
+      "pos": {
+        "title": "POS & Ordering",
+        "description": "Take orders fast, apply modifiers and discounts, and close tickets with flexible payments — built for busy service.",
+        "items": {
+          "quickOrder": "Quick Order Entry",
+          "modifiers": "Product Modifiers",
+          "splitBills": "Split Bills",
+          "multiplePayments": "Multiple Payments",
+          "discounts": "Discounts",
+          "orderHistory": "Order History"
+        }
+      },
+      "tables": {
+        "title": "Tables",
+        "description": "Run floors, zones and table status in real time so the dining room stays organized from seat to payment.",
+        "items": {
+          "floorManagement": "Floor Management",
+          "tableLayout": "Table Layout",
+          "zones": "Zones",
+          "reservations": "Table Reservations",
+          "tableTransfer": "Table Transfer",
+          "mergeTables": "Merge Tables"
+        }
+      },
+      "kds": {
+        "title": "Kitchen Display (KDS)",
+        "description": "A kitchen display workflow to keep stations aligned on live tickets. KDS is on the Professional roadmap and marked coming soon until it ships.",
+        "items": {
+          "liveOrders": "Live Kitchen Orders",
+          "orderStatus": "Order Status",
+          "prepQueue": "Preparation Queue",
+          "stations": "Kitchen Stations",
+          "barDisplay": "Bar Display",
+          "priority": "Order Priority"
+        }
+      },
+      "inventory": {
+        "title": "Inventory",
+        "description": "Track stock levels, adjust inventory and get low-stock visibility. Suppliers and recipe BOM workflows are Enterprise.",
+        "items": {
+          "stockManagement": "Stock Management",
+          "stockAdjustments": "Stock Adjustments",
+          "lowStock": "Low Stock Alerts",
+          "suppliers": "Suppliers",
+          "purchaseOrders": "Purchase Orders",
+          "recipes": "Recipe Management"
+        }
+      },
+      "staff": {
+        "title": "Staff",
+        "description": "Manage team members with PIN login and roles. Activity audit trails require Professional or higher.",
+        "items": {
+          "staffManagement": "Staff Management",
+          "pinLogin": "PIN Login",
+          "roles": "Roles & Permissions",
+          "shifts": "Shifts",
+          "activity": "Staff Activity"
+        }
+      },
+      "reports": {
+        "title": "Reports",
+        "description": "Close the day with Z-Reports and dig into sales, payments and performance. Advanced analytics and CSV export need Professional+.",
+        "items": {
+          "salesAnalytics": "Sales Analytics",
+          "zReports": "Z-Reports",
+          "paymentReports": "Payment Reports",
+          "productPerformance": "Product Performance",
+          "staffPerformance": "Staff Performance",
+          "csvExport": "CSV / Excel Export"
+        }
+      },
+      "enterprise": {
+        "title": "Enterprise",
+        "description": "Centralized control for multi-location operators: supply, recipe costing, custom reporting and a shared dashboard. API & webhooks remain coming soon.",
+        "items": {
+          "multiLocation": "Multi-location Management",
+          "supply": "Supply Management",
+          "recipeCosting": "Recipe Costing",
+          "centralDashboard": "Central Dashboard",
+          "apiWebhooks": "API & Webhooks",
+          "customReports": "Custom Reports"
+        }
       }
     },
     "enterpriseHint": "Enterprise adds multi-location control, supply management, custom reports, and more — see plans below.",
