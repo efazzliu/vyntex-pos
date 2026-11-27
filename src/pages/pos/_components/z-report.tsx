@@ -71,6 +71,7 @@ import {
   type PrintHtmlAsyncOutcome,
 } from "@/lib/print-html.ts";
 import { usePosLocale } from "./pos-locale-provider.tsx";
+import { canViewZReportHistory } from "../_lib/plan-features.ts";
 import {
   STAFF_PIN_MAX_LEN,
   STAFF_PIN_MIN_LEN,
@@ -175,6 +176,7 @@ type ZReportProps = {
   licenseKey: string;
   staffId: string;
   staffName: string;
+  plan?: string;
 };
 
 type ViewMode = "live" | "history" | "history-detail";
@@ -183,13 +185,15 @@ export default function ZReport({
   licenseKey,
   staffId,
   staffName,
+  plan = "professional",
 }: ZReportProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("live");
   const [selectedReportIdx, setSelectedReportIdx] = useState<number | null>(
     null
   );
+  const allowHistory = canViewZReportHistory(plan);
 
-  if (viewMode === "history") {
+  if (allowHistory && viewMode === "history") {
     return (
       <ZReportHistory
         licenseKey={licenseKey}
@@ -203,7 +207,7 @@ export default function ZReport({
     );
   }
 
-  if (viewMode === "history-detail" && selectedReportIdx !== null) {
+  if (allowHistory && viewMode === "history-detail" && selectedReportIdx !== null) {
     return (
       <ZReportHistoryDetail
         licenseKey={licenseKey}
@@ -219,6 +223,7 @@ export default function ZReport({
       licenseKey={licenseKey}
       staffId={staffId}
       staffName={staffName}
+      showHistory={allowHistory}
       onShowHistory={() => setViewMode("history")}
     />
   );
@@ -230,11 +235,13 @@ function LiveZReport({
   licenseKey,
   staffId,
   staffName,
+  showHistory = true,
   onShowHistory,
 }: {
   licenseKey: string;
   staffId: string;
   staffName: string;
+  showHistory?: boolean;
   onShowHistory: () => void;
 }) {
   const { t, formatPrice, language } = usePosLocale();
@@ -663,6 +670,7 @@ function LiveZReport({
             <FileText className="size-4 text-[#64748b]" />
             <h2 className="text-[16px] font-bold text-[#0f172a]">{t("zreport.latest_reports")}</h2>
           </div>
+          {showHistory ? (
           <button
             type="button"
             onClick={onShowHistory}
@@ -670,6 +678,7 @@ function LiveZReport({
           >
             {t("zreport.view_history")} →
           </button>
+          ) : null}
         </div>
         {!lastXPrint && !latestZ?.createdAt ? (
           <p className="px-5 pb-5 text-sm text-[#64748b]">{t("zreport.no_reports")}</p>

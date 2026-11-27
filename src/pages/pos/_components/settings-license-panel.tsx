@@ -31,14 +31,14 @@ type SettingsLicensePanelProps = {
 
 const PLAN_FEATURES: Record<PlanName, string[]> = {
   starter: [
+    "settings.lic_feat_starter_limits",
     "settings.lic_feat_floor",
     "settings.lic_feat_menu",
     "settings.lic_feat_history",
-    "settings.lic_feat_tables",
-    "settings.lic_feat_stock",
-    "settings.lic_feat_staff",
+    "settings.lic_feat_stock_basic",
     "settings.lic_feat_today",
-    "settings.lic_feat_zreport",
+    "settings.lic_feat_zreport_basic",
+    "settings.lic_feat_no_split_debt",
   ],
   professional: [
     "settings.lic_feat_starter_all",

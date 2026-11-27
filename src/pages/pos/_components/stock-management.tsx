@@ -54,10 +54,12 @@ import StockHistoryDialog from "./stock-history-dialog.tsx";
 import StockAllHistory from "./stock-all-history.tsx";
 import { usePosLocale } from "./pos-locale-provider.tsx";
 import ItemDialog from "./item-dialog.tsx";
+import { canExportCsv } from "../_lib/plan-features.ts";
 
 type StockManagementProps = {
   licenseKey: string;
   staffName: string;
+  plan?: string;
   /** Enterprise: menu stock, kitchen supply, and bar supply tabs. */
   enterpriseSupplyMall?: boolean;
   canManageStock?: boolean;
@@ -164,6 +166,7 @@ const FIELD_CLASS =
 export default function StockManagement({
   licenseKey,
   staffName,
+  plan = "professional",
   enterpriseSupplyMall = false,
   canManageStock = true,
   canManageMenu = false,
@@ -171,6 +174,7 @@ export default function StockManagement({
 }: StockManagementProps) {
   const { t, formatPrice, language } = usePosLocale();
   const dateLocale = language === "sq" ? sqLocale : enUS;
+  const allowCsvExport = canExportCsv(plan);
   const tabs: StockTab[] = enterpriseSupplyMall
     ? ["menu", "supply_kitchen", "supply_bar"]
     : ["menu"];
@@ -409,6 +413,10 @@ export default function StockManagement({
   };
 
   const exportCsv = () => {
+    if (!canExportCsv(plan)) {
+      toast.error(t("msg.export_plan_required"));
+      return;
+    }
     if (filteredRows.length === 0) {
       toast.info(t("stock_page.export_empty"));
       return;
@@ -519,6 +527,7 @@ export default function StockManagement({
             <p className="mt-0.5 text-sm text-[#64748b]">{t("stock_page.v2_subtitle")}</p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            {allowCsvExport ? (
             <button
               type="button"
               onClick={exportCsv}
@@ -527,6 +536,7 @@ export default function StockManagement({
               <Download className="size-4 text-[#64748b]" />
               {t("stock_page.export")}
             </button>
+            ) : null}
             {canManageStock ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

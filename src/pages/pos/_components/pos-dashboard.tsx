@@ -1840,6 +1840,15 @@ export default function PosDashboard({
               />
             </>
           ) : null}
+          {showStarterLayout ? (
+            <div className="inline-flex h-10 items-center rounded-xl border border-[#e2e8f0] bg-white px-3 text-sm font-medium text-[#0f172a]">
+              {t("starter_overview.date_label")}:{" "}
+              {parseYmdToLocalNoon(dashboardRangeFromYmd).toLocaleDateString(
+                language === "sq" ? "sq-AL" : "en-GB",
+                { weekday: "short", day: "numeric", month: "short", year: "numeric" },
+              )}
+            </div>
+          ) : (
           <DashboardRangeCalendar
             fromYmd={dashboardRangeFromYmd}
             toYmd={dashboardRangeToYmd}
@@ -1847,6 +1856,7 @@ export default function PosDashboard({
             language={language}
             t={t}
           />
+          )}
         </div>
       </div>
 

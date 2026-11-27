@@ -12,6 +12,10 @@ import {
   loadStaffMember,
 } from "./staff-auth.ts";
 import { permissionsForRole } from "@/lib/staff-permissions.ts";
+import {
+  maxStaffForPlan,
+  planLimitReachedMessage,
+} from "@/pages/pos/_lib/plan-features.ts";
 
 function normalizeStaffRlsError(error: { message?: string; code?: string } | null): Error | null {
   if (!error) return null;
@@ -55,6 +59,15 @@ export async function createStaff(args: {
     actorStaffId: args.actorStaffId,
   });
   const r = await getRestaurantByLicense(args.licenseKey);
+  const staffCap = maxStaffForPlan(r.plan);
+  const { count: staffCount, error: countError } = await supabase
+    .from("staff")
+    .select("id", { count: "exact", head: true })
+    .eq("restaurant_id", r.id);
+  if (countError) throw normalizeStaffRlsError(countError) ?? countError;
+  if ((staffCount ?? 0) >= staffCap) {
+    throw new Error(planLimitReachedMessage("staff", r.plan));
+  }
   const { data, error } = await supabase
     .from("staff")
     .insert({

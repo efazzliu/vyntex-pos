@@ -720,6 +720,7 @@ function PosAppInner({
                 <FloorPlan
                   licenseKey={activation.licenseKey}
                   isEditor={true}
+                  plan={activation.plan}
                 />
               </div>
             ))}
@@ -742,6 +743,7 @@ function PosAppInner({
                 <StockManagement
                   licenseKey={activation.licenseKey}
                   staffName={activeStaff.name}
+                  plan={activation.plan}
                   enterpriseSupplyMall={hasEnterpriseSupplyMall(activation.plan)}
                   canManageStock={canManageStock}
                   canManageMenu={canManageMenu}
@@ -769,6 +771,7 @@ function PosAppInner({
                   licenseKey={activation.licenseKey}
                   staffId={activeStaff.id}
                   staffName={activeStaff.name}
+                  plan={activation.plan}
                 />
               </div>
             ))}
@@ -844,6 +847,7 @@ function PosAppInner({
               <StockManagement
                 licenseKey={activation.licenseKey}
                 staffName={activeStaff.name}
+                plan={activation.plan}
                 enterpriseSupplyMall={hasEnterpriseSupplyMall(activation.plan)}
                 canManageStock={canManageStock}
                 canManageMenu={canManageMenu}
@@ -899,6 +903,7 @@ function PosAppInner({
                   licenseKey={activation.licenseKey}
                   staffId={activeStaff.id}
                   staffName={activeStaff.name}
+                  plan={activation.plan}
                 />
               </div>
             )}

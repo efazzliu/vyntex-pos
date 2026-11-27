@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import {
   canAccessView,
   hasSplitBills,
+  maxStaffForPlan,
   normalizePlan,
 } from "../_lib/plan-features.ts";
 import {
@@ -725,7 +726,15 @@ export default function SettingsUsersPanel({
                   type="button"
                   className="h-10 rounded-full bg-brand px-4 hover:bg-brand-hover"
                   style={onPurple}
-                  onClick={() => setEditor("new")}
+                  disabled={staffRows.length >= maxStaffForPlan(plan)}
+                  onClick={() => {
+                    const cap = maxStaffForPlan(plan);
+                    if (staffRows.length >= cap) {
+                      toast.error(t("msg.staff_limit", { count: cap, plan }));
+                      return;
+                    }
+                    setEditor("new");
+                  }}
                 >
                   <Plus className="size-4" />
                   {t("staff.add_staff")}

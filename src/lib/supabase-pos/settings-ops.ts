@@ -46,6 +46,10 @@ import {
 import { assertNoPgError } from "./db-errors.ts";
 import { getRestaurantByLicense, clearRestaurantCache } from "./restaurant.ts";
 import { PRESERVED_PREF_KEYS } from "./general-prefs-store.ts";
+import {
+  maxPrintersForPlan,
+  planLimitReachedMessage,
+} from "@/pages/pos/_lib/plan-features.ts";
 
 function isMissingPosPinBrandingColumn(err: { message?: string }): boolean {
   const msg = String(err.message ?? "").toLowerCase();
@@ -645,6 +649,11 @@ export async function addPrinter(args: {
   role: string;
 }) {
   const r = await getRestaurantByLicense(args.licenseKey);
+  const printerCap = maxPrintersForPlan(r.plan);
+  const existing = await getPrinters(args.licenseKey);
+  if (existing.length >= printerCap) {
+    throw new Error(planLimitReachedMessage("printer", r.plan));
+  }
   const { data, error } = await supabase
     .from("pos_printers")
     .insert({

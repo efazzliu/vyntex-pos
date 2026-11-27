@@ -206,15 +206,15 @@
     "tiers": {
       "starter": {
         "name": "Starter",
-        "description": "Restaurant POS bazë — 1 muaj provë falas, pastaj abonim.",
+        "description": "The Essentials — për kafene, fast food dhe lokale të vogla. 1 muaj provë falas, pastaj abonim.",
         "features": [
-          "1 terminal",
-          "Plan dyshemeje & porosi live",
-          "Menaxhim menuje",
-          "Histori porosish",
-          "Menaxhim inventari",
-          "Menaxhim tavolinash",
-          "Leje & role stafi",
+          "1 lokacion · 5 staf · 1 terminal · 1 printer · 1 floor",
+          "POS bazë, tavolina dhe menu",
+          "Stock bazik (pa eksport CSV)",
+          "Z-Report bazik dhe raport ditor",
+          "Historia e porosive",
+          "PIN dhe role stafi",
+          "Pa Split Bills dhe Debt Management",
           "Cilësime pajisjesh & faturash"
         ]
       },
