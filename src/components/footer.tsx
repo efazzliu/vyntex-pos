@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   ArrowRight,
@@ -315,17 +315,25 @@ export default function Footer() {
   const { t } = useTranslation("site");
   const { language } = useSiteLanguage();
   const year = new Date().getFullYear();
+  const { pathname } = useLocation();
+  const showCtaBanner = pathname !== "/about";
 
   return (
     <footer className="border-t border-neutral-200 bg-white text-neutral-900">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        {/* Final CTA */}
-        <div className="py-12 sm:py-14">
-          <CtaBanner />
-        </div>
+        {showCtaBanner ? (
+          <div className="py-12 sm:py-14">
+            <CtaBanner />
+          </div>
+        ) : null}
 
         {/* Main columns */}
-        <div className="grid grid-cols-1 gap-10 border-t border-neutral-200 py-12 sm:grid-cols-2 lg:grid-cols-5 lg:gap-8">
+        <div
+          className={cn(
+            "grid grid-cols-1 gap-10 py-12 sm:grid-cols-2 lg:grid-cols-5 lg:gap-8",
+            showCtaBanner && "border-t border-neutral-200",
+          )}
+        >
           <div className="sm:col-span-2 lg:col-span-1">
             <Link to="/" className="inline-flex items-center gap-2">
               <img src={VYNTEX_APP_LOGO_SRC} alt="Vyntex POS" className="size-8" />

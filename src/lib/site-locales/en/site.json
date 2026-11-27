@@ -733,42 +733,70 @@
     }
   },
   "about": {
-    "badge": "About",
-    "title": "Building the future of hospitality technology",
-    "subtitle": "We're building Vyntex POS around a simple mission: make restaurant technology as elegant as the dining experiences it powers.",
-    "storyTitle": "Our Story",
-    "storyP1": "We're creating Vyntex POS because we saw an industry stuck with outdated, clunky systems that frustrated both staff and customers. Restaurants deserve technology that works as hard as they do.",
-    "storyP2": "In 2026 we began turning that vision into a real product — a modern POS built for operators worldwide. We're early, focused, and just getting started; our roadmap extends to every hospitality business that deserves better tools.",
-    "valuesLabel": "Our Values",
-    "journeyLabel": "Our Journey",
+    "heroBadge": "About VyntexPOS",
+    "heroLine1": "Built for Restaurants.",
+    "heroLine2Before": "Driven by",
+    "heroHighlight": "Innovation.",
+    "heroSubtitle": "VyntexPOS is a modern, all-in-one POS solution designed to help restaurants, cafés, bars, hotels and more run smarter, faster and more efficiently.",
+    "ctaMission": "Our Mission",
+    "ctaStory": "Our Story",
+    "stats": {
+      "plans": {
+        "value": "3",
+        "label": "Flexible Plans"
+      },
+      "types": {
+        "value": "6",
+        "label": "Business Types"
+      },
+      "trial": {
+        "value": "1 Month",
+        "label": "Free on Professional"
+      },
+      "uptime": {
+        "value": "99.9%",
+        "label": "Uptime & Reliability"
+      }
+    },
+    "missionTitle": "Our Mission",
+    "missionText": "To empower businesses with a reliable, easy-to-use and scalable POS system that simplifies daily operations, boosts efficiency and drives growth.",
+    "visionTitle": "Our Vision",
+    "visionText": "To be the leading POS platform in the region and beyond, recognized for innovation, reliability and the success of the businesses we serve.",
+    "storyBadge": "Our Story",
+    "storyTitle": "The VyntexPOS Journey",
+    "storyText": "VyntexPOS was created from real business experience and a clear goal — to build a powerful, practical and scalable POS solution tailored for the hospitality industry. Today, VyntexPOS helps businesses operate smarter and deliver a better guest experience.",
+    "firstCustomerDate": "Nov 20, 2026",
+    "firstCustomerText": "Our first customer joined VyntexPOS",
+    "valuesBadge": "Our Values",
+    "valuesTitleBefore": "What",
+    "valuesTitleHighlight": "Drives Us",
+    "valuesSubtitle": "The core principles that guide everything we do at VyntexPOS.",
     "values": {
       "innovation": {
-        "title": "Innovation First",
-        "description": "We push the boundaries of what POS systems can do, leveraging cutting-edge technology to deliver exceptional experiences."
+        "title": "Innovation",
+        "description": "Modern solutions that solve real business needs."
       },
       "reliability": {
         "title": "Reliability",
-        "description": "99.9% uptime guarantee. Your business depends on us, and we take that responsibility seriously."
+        "description": "A stable and secure system you can always count on."
       },
       "customer": {
-        "title": "Customer Obsession",
-        "description": "Every feature we build starts with a real problem faced by real restaurant operators. Your feedback drives our roadmap."
+        "title": "Customer Focus",
+        "description": "Your success is our priority."
       },
-      "global": {
-        "title": "Global Vision",
-        "description": "Designed for businesses worldwide. Multi-currency, multi-language, and built to meet local regulations as we grow."
+      "growth": {
+        "title": "Growth Together",
+        "description": "We grow when our clients grow."
       }
     },
-    "milestones": [
-      {
-        "year": "2026",
-        "event": "Vyntex POS development begins — building the product and writing what's next for hospitality"
-      },
-      {
-        "year": "Nov 20, 2026",
-        "event": "Our first customer joins Vyntex POS — the first restaurant goes live on the platform"
-      }
-    ]
+    "cta": {
+      "line1": "Join Restaurants",
+      "line2Before": "Already Using",
+      "highlight": "VyntexPOS.",
+      "subtitle": "A trusted POS solution for restaurants, cafés, bars, hotels and more.",
+      "getStarted": "Get Started",
+      "bookDemo": "Book a Demo"
+    }
   },
   "legal": {
     "badge": "Legal",
