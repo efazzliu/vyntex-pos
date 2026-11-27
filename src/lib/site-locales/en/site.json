@@ -259,17 +259,93 @@
     "toastError": "Failed to send message. Please try again."
   },
   "vynTypes": {
-    "badge": "VYN Types",
-    "title": "Choose your perfect POS",
-    "subtitle": "Vyntex POS is designed for specific business types. Each VYN Type comes fully loaded with features tailored to your industry.",
+    "badge": "VYN Type",
+    "titleBefore": "One Platform. Every",
+    "titleHighlight": "VYN Type.",
+    "title": "One Platform. Every VYN Type.",
+    "subtitle": "VyntexPOS adapts to your business, with the right tools and workflow for every type of venue.",
     "included": "Included Features",
     "viewPlans": "View Plans & Pricing",
     "active": "Active",
     "comingSoon": "Coming Soon",
     "soon": "Soon",
+    "types": {
+      "restaurant": {
+        "name": "VYN Restaurant",
+        "description": "Complete management for modern restaurants.",
+        "tags": [
+          "Tables",
+          "Orders",
+          "Kitchen"
+        ]
+      },
+      "cafe": {
+        "name": "VYN Café",
+        "description": "Perfect for cafés, coffee shops and lounges.",
+        "tags": [
+          "Orders",
+          "Barista",
+          "Takeaway"
+        ]
+      },
+      "bar": {
+        "name": "VYN Bar",
+        "description": "Fast and efficient service for bars and pubs.",
+        "tags": [
+          "Orders",
+          "Bar",
+          "Happy Hour"
+        ]
+      },
+      "hotel": {
+        "name": "VYN Hotel",
+        "description": "Manage your hotel operations with integrated POS.",
+        "tags": [
+          "Rooms",
+          "Orders",
+          "Services"
+        ]
+      },
+      "fastFood": {
+        "name": "VYN Fast Food",
+        "description": "Built for speed, takeaway and high-volume orders.",
+        "tags": [
+          "Counter",
+          "Takeaway",
+          "Delivery"
+        ]
+      },
+      "bakery": {
+        "name": "VYN Bakery",
+        "description": "A simple and powerful solution for bakeries.",
+        "tags": [
+          "Sales",
+          "Products",
+          "Stock"
+        ]
+      }
+    },
+    "highlights": {
+      "flexible": {
+        "title": "Flexible & Scalable",
+        "description": "For any type of business."
+      },
+      "workflows": {
+        "title": "Tailored Workflows",
+        "description": "Designed for your industry."
+      },
+      "setup": {
+        "title": "Quick Setup",
+        "description": "Start in minutes."
+      },
+      "secure": {
+        "title": "Trusted & Secure",
+        "description": "Your data is protected."
+      }
+    },
     "restaurant": {
-      "name": "Restaurant POS",
-      "description": "Complete restaurant management with order tracking, table management, kitchen display, and more. Built for every type of dining experience.",
+      "name": "VYN Restaurant",
+      "description": "Complete management for modern restaurants.",
       "features": [
         "Smart Order Management",
         "Table & Floor Plans",
@@ -282,16 +358,16 @@
       ]
     },
     "coffee": {
-      "name": "Coffee POS",
-      "description": "Streamlined for coffee shops and cafés. Fast checkout, loyalty programs, and barista workflow optimization."
+      "name": "VYN Café",
+      "description": "Perfect for cafés, coffee shops and lounges."
     },
     "bar": {
-      "name": "Bar POS",
-      "description": "Tab management, cocktail recipes, inventory tracking for spirits, and age verification tools."
+      "name": "VYN Bar",
+      "description": "Fast and efficient service for bars and pubs."
     },
     "hotel": {
-      "name": "Hotel POS",
-      "description": "Room service integration, guest billing, multi-outlet management, and property management sync."
+      "name": "VYN Hotel",
+      "description": "Manage your hotel operations with integrated POS."
     },
     "fitness": {
       "name": "Fitness POS",

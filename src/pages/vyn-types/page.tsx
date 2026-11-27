@@ -1,130 +1,231 @@
+import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { motion } from "motion/react";
 import {
-  UtensilsCrossed,
-  Coffee,
-  Wine,
-  Hotel,
-  Dumbbell,
-  Check,
   ArrowRight,
+  BedDouble,
+  Check,
+  Coffee,
+  Layers,
+  Rocket,
+  Sandwich,
+  ShieldCheck,
+  UtensilsCrossed,
+  Wine,
+  CakeSlice,
+  Zap,
+  type LucideIcon,
 } from "lucide-react";
-import { useTranslation } from "react-i18next";
-import { Button } from "@/components/ui/button.tsx";
-import { Badge } from "@/components/ui/badge.tsx";
-import PageHeader from "@/components/page-header.tsx";
-import { useNavigate } from "react-router-dom";
+import { cn } from "@/lib/utils.ts";
 
-const COMING_KEYS = ["coffee", "bar", "hotel", "fitness"] as const;
-const COMING_ICONS = [Coffee, Wine, Hotel, Dumbbell] as const;
+const TYPE_KEYS = [
+  "restaurant",
+  "cafe",
+  "bar",
+  "hotel",
+  "fastFood",
+  "bakery",
+] as const;
+
+const TYPE_ICONS: Record<(typeof TYPE_KEYS)[number], LucideIcon> = {
+  restaurant: UtensilsCrossed,
+  cafe: Coffee,
+  bar: Wine,
+  hotel: BedDouble,
+  fastFood: Sandwich,
+  bakery: CakeSlice,
+};
+
+/** Venue photography — Unsplash, cropped for card masks. */
+const TYPE_IMAGES: Record<(typeof TYPE_KEYS)[number], string> = {
+  restaurant:
+    "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=900&h=700&fit=crop&q=80",
+  cafe:
+    "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=900&h=700&fit=crop&q=80",
+  bar:
+    "https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=900&h=700&fit=crop&q=80",
+  hotel:
+    "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=900&h=700&fit=crop&q=80",
+  fastFood:
+    "https://images.unsplash.com/photo-1552566626-52f8b828add9?w=900&h=700&fit=crop&q=80",
+  bakery:
+    "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=900&h=700&fit=crop&q=80",
+};
+
+const HIGHLIGHT_KEYS = [
+  { id: "flexible", icon: Zap },
+  { id: "workflows", icon: Layers },
+  { id: "setup", icon: Rocket },
+  { id: "secure", icon: ShieldCheck },
+] as const;
+
+function VynTypeCard({
+  typeKey,
+  index,
+}: {
+  typeKey: (typeof TYPE_KEYS)[number];
+  index: number;
+}) {
+  const { t } = useTranslation("site");
+  const Icon = TYPE_ICONS[typeKey];
+  const tags = t(`vynTypes.types.${typeKey}.tags`, { returnObjects: true }) as string[];
+
+  return (
+    <motion.article
+      initial={{ opacity: 0, y: 22 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-40px" }}
+      transition={{ delay: index * 0.06, duration: 0.45 }}
+      className="group relative flex min-h-[220px] overflow-hidden rounded-[1.35rem] border border-neutral-200/80 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.06)] sm:min-h-[240px]"
+    >
+      {/* Text column */}
+      <div className="relative z-10 flex w-[58%] flex-col justify-between p-5 sm:w-[55%] sm:p-6 lg:p-7">
+        <div>
+          <span className="inline-flex size-10 items-center justify-center rounded-xl bg-brand/10 text-brand">
+            <Icon className="size-5" strokeWidth={1.75} />
+          </span>
+          <h3 className="mt-4 text-lg font-bold tracking-tight text-neutral-950 sm:text-xl">
+            {t(`vynTypes.types.${typeKey}.name`)}
+          </h3>
+          <p className="mt-1.5 text-sm leading-relaxed text-neutral-500">
+            {t(`vynTypes.types.${typeKey}.description`)}
+          </p>
+          <ul className="mt-4 flex flex-wrap gap-2">
+            {Array.isArray(tags) &&
+              tags.map((tag) => (
+                <li
+                  key={tag}
+                  className="inline-flex items-center gap-1 rounded-full border border-brand/20 bg-brand/[0.04] px-2.5 py-1 text-xs font-medium text-neutral-800"
+                >
+                  <Check className="size-3 text-brand" strokeWidth={2.5} />
+                  {tag}
+                </li>
+              ))}
+          </ul>
+        </div>
+        <div className="mt-5">
+          <Link
+            to="/pricing"
+            aria-label={t(`vynTypes.types.${typeKey}.name`)}
+            className="inline-flex size-10 items-center justify-center rounded-xl bg-brand text-white transition-colors hover:bg-brand/90"
+          >
+            <ArrowRight className="size-4" />
+          </Link>
+        </div>
+      </div>
+
+      {/* Diagonal image */}
+      <div
+        className="absolute inset-y-0 right-0 w-[48%] sm:w-[50%]"
+        style={{
+          clipPath: "polygon(18% 0%, 100% 0%, 100% 100%, 0% 100%)",
+        }}
+      >
+        <img
+          src={TYPE_IMAGES[typeKey]}
+          alt=""
+          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+          loading="lazy"
+          decoding="async"
+        />
+        <div
+          className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/25 to-transparent"
+          aria-hidden
+        />
+      </div>
+    </motion.article>
+  );
+}
 
 export default function VynTypesPage() {
   const { t } = useTranslation("site");
-  const navigate = useNavigate();
-
-  const restaurantFeatures = t("vynTypes.restaurant.features", {
-    returnObjects: true,
-  }) as string[];
 
   return (
-    <>
-      <PageHeader
-        badge={t("vynTypes.badge")}
-        title={t("vynTypes.title")}
-        subtitle={t("vynTypes.subtitle")}
-      />
-
-      <section className="pb-24 bg-background">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="relative rounded-2xl border-2 border-brand/30 bg-card p-8 lg:p-12 mb-16 overflow-hidden"
+    <div className="bg-white text-neutral-950">
+      {/* Hero */}
+      <section className="relative overflow-hidden border-b border-neutral-100 pt-28 pb-12 sm:pt-32 sm:pb-14">
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 85% 12%, color-mix(in srgb, var(--brand) 9%, transparent), transparent 42%), radial-gradient(circle at 10% 88%, color-mix(in srgb, var(--brand-accent) 8%, transparent), transparent 40%)",
+          }}
+          aria-hidden
+        />
+        <div className="relative mx-auto max-w-3xl px-4 text-center sm:px-6">
+          <motion.span
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="inline-flex items-center gap-1.5 rounded-full border border-brand/20 bg-brand/10 px-3.5 py-1.5 text-xs font-semibold tracking-wide text-brand"
           >
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-brand to-brand-accent" />
+            <Layers className="size-3.5" />
+            {t("vynTypes.badge")}
+          </motion.span>
+          <motion.h1
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+            className="mt-5 text-balance text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl"
+          >
+            {t("vynTypes.titleBefore")}{" "}
+            <span className="bg-gradient-to-r from-brand to-brand-sky bg-clip-text text-transparent">
+              {t("vynTypes.titleHighlight")}
+            </span>
+          </motion.h1>
+          <motion.p
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="mx-auto mt-4 max-w-2xl text-base text-neutral-500 sm:text-lg"
+          >
+            {t("vynTypes.subtitle")}
+          </motion.p>
+        </div>
+      </section>
 
-            <div className="flex flex-col lg:flex-row gap-8 lg:gap-12">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-brand/10 to-brand-accent/10 flex items-center justify-center">
-                    <UtensilsCrossed className="size-6 text-primary" />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-foreground">
-                      {t("vynTypes.restaurant.name")}
-                    </h2>
-                    <Badge className="bg-brand-accent/10 text-brand-accent border-brand-accent/20 hover:bg-brand-accent/15">
-                      {t("vynTypes.active")}
-                    </Badge>
-                  </div>
-                </div>
-                <p className="text-muted-foreground mb-6 max-w-lg">
-                  {t("vynTypes.restaurant.description")}
-                </p>
-                <Button
-                  size="lg"
-                  onClick={() => navigate("/pricing")}
-                  className="bg-gradient-to-r from-brand to-brand-sky hover:from-brand-hover hover:to-brand-hover text-white border-0"
-                >
-                  {t("vynTypes.viewPlans")}
-                  <ArrowRight className="ml-1 size-4" />
-                </Button>
-              </div>
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">
-                  {t("vynTypes.included")}
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {Array.isArray(restaurantFeatures) &&
-                    restaurantFeatures.map((feature) => (
-                      <div key={feature} className="flex items-center gap-2">
-                        <Check className="size-4 text-brand-accent shrink-0" />
-                        <span className="text-sm text-foreground">{feature}</span>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            </div>
-          </motion.div>
+      {/* Cards grid */}
+      <section className="py-12 sm:py-16">
+        <div className="mx-auto grid max-w-7xl grid-cols-1 gap-5 px-4 sm:px-6 md:grid-cols-2 md:gap-6 lg:px-8">
+          {TYPE_KEYS.map((key, i) => (
+            <VynTypeCard key={key} typeKey={key} index={i} />
+          ))}
+        </div>
+      </section>
 
-          <div>
-            <h3 className="text-sm font-semibold tracking-widest uppercase bg-gradient-to-r from-brand to-brand-accent bg-clip-text text-transparent mb-6">
-              {t("vynTypes.comingSoon")}
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {COMING_KEYS.map((key, i) => {
-                const Icon = COMING_ICONS[i];
-                return (
-                  <motion.div
-                    key={key}
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: i * 0.1, duration: 0.5 }}
-                    className="rounded-xl border border-border bg-card p-6 opacity-75"
-                  >
-                    <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center mb-4">
-                      <Icon className="size-5 text-muted-foreground" />
-                    </div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <h4 className="font-semibold text-foreground">
-                        {t(`vynTypes.${key}.name`)}
-                      </h4>
-                      <Badge variant="secondary" className="text-xs">
-                        {t("vynTypes.soon")}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                      {t(`vynTypes.${key}.description`)}
-                    </p>
-                  </motion.div>
-                );
-              })}
-            </div>
+      {/* Bottom highlights */}
+      <section className="pb-20 sm:pb-24">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div
+            className={cn(
+              "grid grid-cols-1 gap-6 rounded-2xl border border-neutral-200 bg-neutral-50/90 px-5 py-6",
+              "sm:grid-cols-2 sm:gap-0 sm:px-2 sm:py-5",
+              "lg:grid-cols-4",
+            )}
+          >
+            {HIGHLIGHT_KEYS.map(({ id, icon: Icon }, i) => (
+              <div
+                key={id}
+                className={cn(
+                  "flex items-start gap-3 px-3 sm:px-5",
+                  i > 0 && "sm:border-l sm:border-neutral-200",
+                )}
+              >
+                <span className="mt-0.5 inline-flex shrink-0 text-brand">
+                  <Icon className="size-5" strokeWidth={1.75} />
+                </span>
+                <div>
+                  <p className="text-sm font-bold text-neutral-950">
+                    {t(`vynTypes.highlights.${id}.title`)}
+                  </p>
+                  <p className="mt-0.5 text-xs text-neutral-500 sm:text-sm">
+                    {t(`vynTypes.highlights.${id}.description`)}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
-    </>
+    </div>
   );
 }

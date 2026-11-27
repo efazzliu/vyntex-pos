@@ -259,43 +259,119 @@
     "toastError": "Dështoi dërgimi. Provoni përsëri."
   },
   "vynTypes": {
-    "badge": "Llojet VYN",
-    "title": "Zgjidhni POS-in ideal",
-    "subtitle": "Vyntex POS është projektuar për lloje të ndryshme biznesi. Çdo lloj VYN vjen me veçori për industrinë tuaj.",
-    "included": "Veçori të përfshira",
-    "viewPlans": "Shiko planet & çmimet",
-    "active": "Aktiv",
-    "comingSoon": "Së shpejti",
-    "soon": "Së shpejti",
+    "badge": "VYN Type",
+    "titleBefore": "One Platform. Every",
+    "titleHighlight": "VYN Type.",
+    "title": "One Platform. Every VYN Type.",
+    "subtitle": "VyntexPOS përshtatet me biznesin tuaj, me mjetet dhe workflow-in e duhur për çdo lloj venue.",
+    "included": "Included Features",
+    "viewPlans": "View Plans & Pricing",
+    "active": "Active",
+    "comingSoon": "Coming Soon",
+    "soon": "Soon",
+    "types": {
+      "restaurant": {
+        "name": "VYN Restaurant",
+        "description": "Complete management for modern restaurants.",
+        "tags": [
+          "Tables",
+          "Orders",
+          "Kitchen"
+        ]
+      },
+      "cafe": {
+        "name": "VYN Café",
+        "description": "Perfect for cafés, coffee shops and lounges.",
+        "tags": [
+          "Orders",
+          "Barista",
+          "Takeaway"
+        ]
+      },
+      "bar": {
+        "name": "VYN Bar",
+        "description": "Fast and efficient service for bars and pubs.",
+        "tags": [
+          "Orders",
+          "Bar",
+          "Happy Hour"
+        ]
+      },
+      "hotel": {
+        "name": "VYN Hotel",
+        "description": "Manage your hotel operations with integrated POS.",
+        "tags": [
+          "Rooms",
+          "Orders",
+          "Services"
+        ]
+      },
+      "fastFood": {
+        "name": "VYN Fast Food",
+        "description": "Built for speed, takeaway and high-volume orders.",
+        "tags": [
+          "Counter",
+          "Takeaway",
+          "Delivery"
+        ]
+      },
+      "bakery": {
+        "name": "VYN Bakery",
+        "description": "A simple and powerful solution for bakeries.",
+        "tags": [
+          "Sales",
+          "Products",
+          "Stock"
+        ]
+      }
+    },
+    "highlights": {
+      "flexible": {
+        "title": "Flexible & Scalable",
+        "description": "Për çdo lloj biznesi."
+      },
+      "workflows": {
+        "title": "Tailored Workflows",
+        "description": "I dizajnuar për industrinë tuaj."
+      },
+      "setup": {
+        "title": "Quick Setup",
+        "description": "Nisu brenda minutash."
+      },
+      "secure": {
+        "title": "Trusted & Secure",
+        "description": "Të dhënat tuaja mbrohen."
+      }
+    },
     "restaurant": {
-      "name": "Restaurant POS",
-      "description": "Menaxhim i plotë restoranti me porosi, tavolina, ekran kuzhine dhe më shumë. Për çdo stil ngrënieje.",
+      "name": "VYN Restaurant",
+      "description": "Complete management for modern restaurants.",
       "features": [
-        "Menaxhim inteligjent porosish",
-        "Tavolina & plan dyshemeje",
-        "Sistem ekrani kuzhine",
-        "Ndarje faturash & pagesa",
-        "Mbështetje shumë lokacionesh",
-        "Analitikë në kohë reale",
-        "Menaxhim stafi",
-        "Kontroll inventari"
+        "Smart Order Management",
+        "Table & Floor Plans",
+        "Kitchen Display System",
+        "Split Bills & Payments",
+        "Multi-Location Support",
+        "Real-Time Analytics",
+        "Staff Management",
+        "Inventory Control"
       ]
     },
     "coffee": {
-      "name": "Coffee POS",
-      "description": "Për kafene: pagesë e shpejtë, programe besnikërie dhe rrjedhë pune për baristët."
+      "name": "VYN Café",
+      "description": "Perfect for cafés, coffee shops and lounges."
     },
     "bar": {
-      "name": "Bar POS",
-      "description": "Menaxhim tavolinash, receta koktejesh, inventar pijesh dhe verifikim moshe."
+      "name": "VYN Bar",
+      "description": "Fast and efficient service for bars and pubs."
     },
     "hotel": {
-      "name": "Hotel POS",
-      "description": "Shërbim në dhomë, faturim mytesh, menaxhim shumë pikash dhe lidhje me PMS."
+      "name": "VYN Hotel",
+      "description": "Manage your hotel operations with integrated POS."
     },
     "fitness": {
       "name": "Fitness POS",
-      "description": "Anëtarësime, rezervim klasash, seanca personale dhe shitje suplementesh."
+      "description": "Membership management, class booking, personal training sessions, and supplement sales tracking."
     }
   },
   "pricing": {
