@@ -257,6 +257,7 @@
     "heroSubtitle": "Gjithçka që të duhet për të drejtuar, menaxhuar dhe rritur restorantin — në një sistem POS të plotë.",
     "ctaTrial": "Fillo provën falas",
     "ctaDemo": "Shiko demo",
+    "tabsLabel": "Kategoritë e veçorive",
     "tabs": {
       "all": "Të gjitha",
       "pos": "POS & Porosi",
@@ -266,6 +267,15 @@
       "staff": "Staf",
       "reports": "Raporte",
       "enterprise": "Enterprise"
+    },
+    "overviewTitle": "Eksploro çdo aftësi",
+    "overviewSubtitle": "Shfleto modulet sipas kategorisë. Ndryshimi i tab-eve përditëson vetëm këtë faqe — nuk ndryshon abonimin dhe nuk hap funksione POS.",
+    "exploreCategory": "Eksploro",
+    "learnMore": "Mëso më shumë",
+    "availability": {
+      "professional": "Professional+",
+      "enterprise": "Enterprise",
+      "comingSoon": "Coming soon"
     },
     "cards": {
       "pos": {
@@ -291,6 +301,91 @@
       "reports": {
         "title": "Raporte & Analitikë",
         "description": "Ndjek shitjet, performancën dhe rritjen me raporte dhe eksporte të detajuara."
+      }
+    },
+    "categories": {
+      "pos": {
+        "title": "POS & Porosi",
+        "description": "Merr porosi shpejt, aplikoj modifiers dhe zbritje, dhe mbyll biletat me pagesa fleksibile — i ndërtuar për shërbim të ngarkuar.",
+        "items": {
+          "quickOrder": "Quick Order Entry",
+          "modifiers": "Product Modifiers",
+          "splitBills": "Split Bills",
+          "multiplePayments": "Multiple Payments",
+          "discounts": "Discounts",
+          "orderHistory": "Order History"
+        }
+      },
+      "tables": {
+        "title": "Tavolina",
+        "description": "Menaxho floors, zones dhe statusin e tavolinave në kohë reale që salla të mbetet e organizuar.",
+        "items": {
+          "floorManagement": "Floor Management",
+          "tableLayout": "Table Layout",
+          "zones": "Zones",
+          "reservations": "Table Reservations",
+          "tableTransfer": "Table Transfer",
+          "mergeTables": "Merge Tables"
+        }
+      },
+      "kds": {
+        "title": "Kitchen Display (KDS)",
+        "description": "Workflow për ekranin e kuzhinës që stacionet të jenë të sinkronizuara. KDS është në roadmap të Professional dhe shënohet coming soon derisa të dalë.",
+        "items": {
+          "liveOrders": "Live Kitchen Orders",
+          "orderStatus": "Order Status",
+          "prepQueue": "Preparation Queue",
+          "stations": "Kitchen Stations",
+          "barDisplay": "Bar Display",
+          "priority": "Order Priority"
+        }
+      },
+      "inventory": {
+        "title": "Inventar",
+        "description": "Ndjek nivelet e stokut, bëj rregullime dhe shiko low-stock. Furnitorët dhe recipe BOM janë Enterprise.",
+        "items": {
+          "stockManagement": "Stock Management",
+          "stockAdjustments": "Stock Adjustments",
+          "lowStock": "Low Stock Alerts",
+          "suppliers": "Suppliers",
+          "purchaseOrders": "Purchase Orders",
+          "recipes": "Recipe Management"
+        }
+      },
+      "staff": {
+        "title": "Staf",
+        "description": "Menaxho anëtarët e ekipit me PIN login dhe role. Audit i aktivitetit kërkon Professional ose më lart.",
+        "items": {
+          "staffManagement": "Staff Management",
+          "pinLogin": "PIN Login",
+          "roles": "Roles & Permissions",
+          "shifts": "Shifts",
+          "activity": "Staff Activity"
+        }
+      },
+      "reports": {
+        "title": "Raporte",
+        "description": "Mbyll ditën me Z-Reports dhe shiko shitjet, pagesat dhe performancën. Analitika e avancuar dhe CSV kërkojnë Professional+.",
+        "items": {
+          "salesAnalytics": "Sales Analytics",
+          "zReports": "Z-Reports",
+          "paymentReports": "Payment Reports",
+          "productPerformance": "Product Performance",
+          "staffPerformance": "Staff Performance",
+          "csvExport": "CSV / Excel Export"
+        }
+      },
+      "enterprise": {
+        "title": "Enterprise",
+        "description": "Kontroll i centralizuar për operacione multi-location: supply, recipe costing, custom reporting dhe dashboard i përbashkët. API & webhooks mbeten coming soon.",
+        "items": {
+          "multiLocation": "Multi-location Management",
+          "supply": "Supply Management",
+          "recipeCosting": "Recipe Costing",
+          "centralDashboard": "Central Dashboard",
+          "apiWebhooks": "API & Webhooks",
+          "customReports": "Custom Reports"
+        }
       }
     },
     "enterpriseHint": "Enterprise shton multi-location, supply management, custom reports dhe më shumë — shiko planet më poshtë.",
