@@ -59,6 +59,14 @@
         "reportsAnalytics": {
           "title": "Reports & Analytics",
           "description": "Track sales, performance and grow your business."
+        },
+        "payments": {
+          "title": "Seamless Payments",
+          "description": "Accept card, cash and split bills with a fast checkout."
+        },
+        "inventory": {
+          "title": "Inventory Control",
+          "description": "Track stock automatically and never run out during a rush."
         }
       },
       "smart_order": {

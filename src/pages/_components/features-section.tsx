@@ -1,6 +1,14 @@
 import { Link } from "react-router-dom";
 import { motion } from "motion/react";
-import { ArrowRight, BarChart3, LayoutGrid, Monitor, Printer } from "lucide-react";
+import {
+  ArrowRight,
+  BarChart3,
+  CreditCard,
+  LayoutGrid,
+  Monitor,
+  Package,
+  Printer,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 const FEATURE_CARDS = [
@@ -8,6 +16,8 @@ const FEATURE_CARDS = [
   { id: "kitchenPrinting", icon: Printer, href: "/features" },
   { id: "tableManagement", icon: LayoutGrid, href: "/features" },
   { id: "reportsAnalytics", icon: BarChart3, href: "/features" },
+  { id: "payments", icon: CreditCard, href: "/features" },
+  { id: "inventory", icon: Package, href: "/features" },
 ] as const;
 
 export default function FeaturesSection() {
@@ -35,7 +45,7 @@ export default function FeaturesSection() {
           </h2>
         </motion.div>
 
-        <div className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURE_CARDS.map((card, i) => {
             const Icon = card.icon;
             return (
