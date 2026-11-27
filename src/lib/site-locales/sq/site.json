@@ -211,6 +211,24 @@
           "q": "Si marrim ndihmë pasi të fillojmë?",
           "a": "Përdorni chat-in në sajt, formularin e kontaktit ose kanalin e mbështetjes së planit (Starter dhe më lart përfshijnë burime ndihme; Professional shton chat prioritet). Synojmë përgjigje brenda një dite pune, më shpejt për nivelet prioritare."
         }
+      },
+      "titleBefore": "Frequently Asked",
+      "titleHighlight": "Questions",
+      "previewSubtitle": "Përgjigje të shpejta për pyetjet më të shpeshta rreth VyntexPOS.",
+      "viewAll": "View All FAQs",
+      "previewItems": {
+        "trial": {
+          "q": "Can I try VyntexPOS for free?",
+          "a": "Yes. New accounts can start with one month of Restaurant POS on the Professional plan at no charge, so you can run real menus, tables, orders, and staff workflows. After the trial you choose a paid plan that fits your business."
+        },
+        "devices": {
+          "q": "What devices are supported?",
+          "a": "Vyntex POS runs in the browser on modern Windows, macOS, and tablets—use the screens you already have at the host stand or service stations. Dedicated receipt printers and payment terminals can be added as your setup grows."
+        },
+        "locations": {
+          "q": "Can I manage multiple restaurant locations?",
+          "a": "Starter and Professional are designed for a single location. Multi-location management and centralized controls are available on Enterprise. Contact us if you already run several venues so we can align on the right setup."
+        }
       }
     }
   },

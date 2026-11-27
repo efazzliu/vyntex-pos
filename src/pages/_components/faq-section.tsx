@@ -1,84 +1,152 @@
-import { motion } from "motion/react";
-import { ChevronDown } from "lucide-react";
+import { useId, useState } from "react";
+import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useState } from "react";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible.tsx";
+import { AnimatePresence, motion } from "motion/react";
+import { ArrowRight, Minus, Plus } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 
-const FAQ_KEYS = [
-  "trial",
-  "credit_card",
-  "devices",
-  "offline",
-  "locations",
-  "data_security",
-  "payments",
-  "support",
-] as const;
+/** Homepage FAQ preview — Ultra Premium Minimal red identity. */
+const ACCENT = "#D7192D";
+const BORDER = "#E5E7EB";
+const MUTED = "#6B7280";
+const INK = "#111111";
 
-function FaqRow({ itemKey, index }: { itemKey: (typeof FAQ_KEYS)[number]; index: number }) {
+const PREVIEW_KEYS = ["trial", "devices", "locations"] as const;
+
+function FaqPreviewItem({
+  itemKey,
+  open,
+  onToggle,
+}: {
+  itemKey: (typeof PREVIEW_KEYS)[number];
+  open: boolean;
+  onToggle: () => void;
+}) {
   const { t } = useTranslation("site");
-  const [open, setOpen] = useState(false);
+  const panelId = useId();
+  const buttonId = useId();
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ delay: index * 0.05, duration: 0.4 }}
-      className="rounded-xl border border-border bg-card/80 backdrop-blur-sm overflow-hidden"
+    <div
+      className={cn(
+        "rounded-xl border bg-white transition-[border-color,box-shadow]",
+        open ? "shadow-[0_1px_2px_rgba(17,17,17,0.04)]" : "",
+      )}
+      style={{ borderColor: open ? `${ACCENT}66` : BORDER }}
     >
-      <Collapsible open={open} onOpenChange={setOpen}>
-        <CollapsibleTrigger className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left hover:bg-muted/30 transition-colors">
-          <span className="font-medium text-foreground pr-2">{t(`home.faq.items.${itemKey}.q`)}</span>
-          <ChevronDown
-            className={cn(
-              "size-5 shrink-0 text-primary transition-transform duration-200",
-              open && "rotate-180",
-            )}
-          />
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className="px-5 pb-4 pt-0 text-sm leading-relaxed text-muted-foreground border-t border-border/60">
-            <p className="pt-3">{t(`home.faq.items.${itemKey}.a`)}</p>
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
-    </motion.div>
+      <h3 className="m-0">
+        <button
+          type="button"
+          id={buttonId}
+          aria-expanded={open}
+          aria-controls={panelId}
+          onClick={onToggle}
+          className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left sm:px-5"
+        >
+          <span className="text-sm font-semibold sm:text-[15px]" style={{ color: INK }}>
+            {t(`home.faq.previewItems.${itemKey}.q`)}
+          </span>
+          <span
+            className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border"
+            style={{
+              borderColor: open ? `${ACCENT}55` : BORDER,
+              color: ACCENT,
+              backgroundColor: open ? `${ACCENT}0F` : "transparent",
+            }}
+            aria-hidden
+          >
+            {open ? <Minus className="size-3.5" /> : <Plus className="size-3.5" />}
+          </span>
+        </button>
+      </h3>
+      <AnimatePresence initial={false}>
+        {open ? (
+          <motion.div
+            id={panelId}
+            role="region"
+            aria-labelledby={buttonId}
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            className="overflow-hidden"
+          >
+            <p
+              className="border-t px-4 pb-4 pt-3 text-sm leading-relaxed sm:px-5"
+              style={{ borderColor: BORDER, color: MUTED }}
+            >
+              {t(`home.faq.previewItems.${itemKey}.a`)}
+            </p>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </div>
   );
 }
 
 export default function FaqSection() {
   const { t } = useTranslation("site");
+  const [openKey, setOpenKey] = useState<(typeof PREVIEW_KEYS)[number] | null>(null);
 
   return (
-    <section id="faq" className="scroll-mt-24 py-24 sm:py-32 bg-background">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
+    <section id="faq" className="scroll-mt-24 bg-white py-16 sm:py-20" data-faq-preview="light">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="grid items-start gap-8 lg:grid-cols-[0.85fr_1.4fr_auto] lg:gap-10">
+          {/* Left — title */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: 0.45 }}
+            className="max-w-sm"
           >
-            <span className="text-sm font-semibold tracking-widest uppercase bg-gradient-to-r from-brand to-brand-accent bg-clip-text text-transparent">
-              {t("home.faq.label")}
-            </span>
-            <h2 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
-              {t("home.faq.title")}
+            <h2
+              className="text-balance text-2xl font-bold tracking-tight sm:text-3xl"
+              style={{ color: INK }}
+            >
+              {t("home.faq.titleBefore")}{" "}
+              <span style={{ color: ACCENT }}>{t("home.faq.titleHighlight")}</span>
             </h2>
-            <p className="mt-4 text-lg text-muted-foreground">{t("home.faq.subtitle")}</p>
+            <p className="mt-3 text-sm leading-relaxed sm:text-[15px]" style={{ color: MUTED }}>
+              {t("home.faq.previewSubtitle")}
+            </p>
           </motion.div>
-        </div>
 
-        <div className="flex flex-col gap-3">
-          {FAQ_KEYS.map((key, i) => (
-            <FaqRow key={key} itemKey={key} index={i} />
-          ))}
+          {/* Center — 3 accordion items */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.45, delay: 0.05 }}
+            className="flex min-w-0 flex-col gap-2.5"
+          >
+            {PREVIEW_KEYS.map((key) => (
+              <FaqPreviewItem
+                key={key}
+                itemKey={key}
+                open={openKey === key}
+                onToggle={() => setOpenKey((prev) => (prev === key ? null : key))}
+              />
+            ))}
+          </motion.div>
+
+          {/* Right — View All */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.45, delay: 0.1 }}
+            className="flex lg:h-full lg:items-center lg:justify-end"
+          >
+            <Link
+              to="/faq"
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full border-2 px-5 text-sm font-semibold transition-colors hover:bg-[#D7192D]/[0.06] sm:w-auto lg:w-auto"
+              style={{ borderColor: ACCENT, color: ACCENT }}
+            >
+              {t("home.faq.viewAll")}
+              <ArrowRight className="size-4" />
+            </Link>
+          </motion.div>
         </div>
       </div>
     </section>
