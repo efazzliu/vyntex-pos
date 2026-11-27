@@ -69,11 +69,14 @@
     },
     "stats": {
       "modules": "Module kryesore POS",
-      "uptime": "Disponueshmëri e garantuar",
+      "uptime": "Uptime",
       "trial": "Muaj falas në Professional",
       "support": "Mbështetje prioritare",
-      "restaurants": "Restorante të shërbyera",
-      "transactions": "Porosi të përpunuara",
+      "restaurants": "Restaurants",
+      "devices": "Devices in Use",
+      "transactions": "Orders Processed",
+      "orderProcessing": "Order Processing",
+      "liveValue": "Live",
       "countries": "Vende në botë"
     },
     "cta": {

@@ -69,11 +69,14 @@
     },
     "stats": {
       "modules": "Core POS Modules",
-      "uptime": "Uptime Guaranteed",
+      "uptime": "Uptime",
       "trial": "Month Free On Professional",
       "support": "Priority Support",
-      "restaurants": "Restaurants Served",
+      "restaurants": "Restaurants",
+      "devices": "Devices in Use",
       "transactions": "Orders Processed",
+      "orderProcessing": "Order Processing",
+      "liveValue": "Live",
       "countries": "Countries Worldwide"
     },
     "cta": {
