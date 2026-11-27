@@ -1,6 +1,7 @@
 {
   "nav": {
     "home": "Ballina",
+    "features": "Veçoritë",
     "vynTypes": "Llojet VYN",
     "pricing": "Çmimet",
     "about": "Rreth nesh",
@@ -246,6 +247,114 @@
         ]
       }
     }
+  },
+  "featuresPage": {
+    "badge": "Veçoritë",
+    "heroTitleBefore": "Veçori",
+    "heroTitleHighlight": "të fuqishme",
+    "heroTitleAfter": "për",
+    "heroTitleRestaurants": "Restorante Moderne",
+    "heroSubtitle": "Gjithçka që të duhet për të drejtuar, menaxhuar dhe rritur restorantin — në një sistem POS të plotë.",
+    "ctaTrial": "Fillo provën falas",
+    "ctaDemo": "Shiko demo",
+    "tabs": {
+      "all": "Të gjitha",
+      "pos": "POS & Porosi",
+      "tables": "Tavolina",
+      "kds": "KDS",
+      "inventory": "Inventar",
+      "staff": "Staf",
+      "reports": "Raporte",
+      "enterprise": "Enterprise"
+    },
+    "cards": {
+      "pos": {
+        "title": "POS inteligjent & Porosi",
+        "description": "POS i shpejtë me porosi, modifiers, split bills dhe pagesa."
+      },
+      "tables": {
+        "title": "Tavolina & Floor Management",
+        "description": "Menaxho tavolina, floors dhe zones me kontroll real-time."
+      },
+      "kds": {
+        "title": "Kitchen Display (KDS)",
+        "description": "Dërgo porositë në kuzhinë menjëherë dhe mbaj ekipin të sinkronizuar."
+      },
+      "inventory": {
+        "title": "Inventar & Receta",
+        "description": "Ndjek stokun, menaxho furnizimin dhe krijo receta me zbritje automatike."
+      },
+      "staff": {
+        "title": "Staf & Leje",
+        "description": "Menaxho ekipin me role, PIN dhe kontroll të plotë lejesh."
+      },
+      "reports": {
+        "title": "Raporte & Analitikë",
+        "description": "Ndjek shitjet, performancën dhe rritjen me raporte dhe eksporte të detajuara."
+      }
+    },
+    "enterpriseHint": "Enterprise shton multi-location, supply management, custom reports dhe më shumë — shiko planet më poshtë.",
+    "plansLabel": "Zgjidh planin e duhur",
+    "plansTitle": "Krahaso Starter, Professional dhe Enterprise",
+    "plans": {
+      "starter": {
+        "name": "Starter",
+        "tagline": "The Essentials",
+        "description": "Gjithçka që të duhet për të nisur dhe drejtuar një lokal të vogël.",
+        "cta": "Zgjidh Starter",
+        "items": [
+          "1 Lokacion",
+          "Deri 5 Staf",
+          "1 Terminal",
+          "1 Printer",
+          "1 Floor (Layout)",
+          "Inventar bazik (Stock)",
+          "Z-Report bazik",
+          "Raporte ditore"
+        ]
+      },
+      "professional": {
+        "name": "Professional",
+        "tagline": "The Complete Operation",
+        "description": "Zgjidhje e plotë për restorante me volum më të madh dhe ekip të plotë.",
+        "cta": "Zgjidh Professional",
+        "items": [
+          "1 Lokacion",
+          "Deri 25 Staf",
+          "Deri 5 Terminale",
+          "Printerë të shumtë",
+          "Floors & Zones të shumta",
+          "Inventar i avancuar",
+          "Split Bills & Debt Management",
+          "KDS — coming soon",
+          "Z-Report i avancuar & eksporte",
+          "Raporte & Analitikë të detajuara"
+        ]
+      },
+      "enterprise": {
+        "name": "Enterprise",
+        "tagline": "Business Intelligence & Control",
+        "description": "Për grupe restorantesh dhe biznese që duan kontroll të avancuar dhe shkallëzim.",
+        "cta": "Zgjidh Enterprise",
+        "items": [
+          "Multi-Location (Dashboard i centralizuar)",
+          "Limite stafi sipas marrëveshjes",
+          "Deri 50 terminale / lokacion",
+          "Supply Management",
+          "Recipe Management & Costing",
+          "Inventar i avancuar",
+          "Custom Reports & Scheduled Emails",
+          "API & Webhooks — coming soon",
+          "Role & Permissions të avancuara",
+          "Audit Log i detajuar",
+          "White-label — coming soon",
+          "Priority Support & SLA"
+        ]
+      }
+    },
+    "comparisonTitle": "Krahasimi i veçorive",
+    "comparisonSubtitle": "Shiko krahasimin e plotë të të gjitha veçorive nëpër plane",
+    "comparisonCta": "Shiko krahasimin e plotë"
   },
   "about": {
     "badge": "Rreth nesh",

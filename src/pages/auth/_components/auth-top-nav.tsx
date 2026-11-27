@@ -11,6 +11,7 @@ import { VYNTEX_APP_LOGO_SRC } from "@/lib/site-constants.ts";
 
 const navItems = [
   { key: "home", href: "/" },
+  { key: "features", href: "/features" },
   { key: "vynTypes", href: "/vyn-types" },
   { key: "pricing", href: "/pricing" },
   { key: "about", href: "/about" },

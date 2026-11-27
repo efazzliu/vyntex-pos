@@ -14,7 +14,7 @@ export default function Footer() {
       {
         categoryKey: "footer.product",
         links: [
-          { labelKey: "footer.features", href: "/" },
+          { labelKey: "footer.features", href: "/features" },
           { labelKey: "nav.vynTypes", href: "/vyn-types" },
           { labelKey: "nav.pricing", href: "/pricing" },
         ],
