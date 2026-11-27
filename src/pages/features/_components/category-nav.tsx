@@ -25,9 +25,6 @@ import {
   TablesMock,
 } from "./category-mockups.tsx";
 
-/** Scoped accent for Features category browsing only — marketing UI, not licensing. */
-const VYNTEX_RED = "#E31E24";
-
 export type FeatureCategory =
   | "all"
   | "pos"
@@ -192,7 +189,7 @@ function AvailabilityBadge({ availability }: { availability: Availability }) {
     availability === "comingSoon"
       ? "border-neutral-200 bg-neutral-100 text-neutral-500"
       : availability === "enterprise"
-        ? "border-[#E31E24]/25 bg-[#FFF5F5] text-[#E31E24]"
+        ? "border-brand-accent/30 bg-brand-accent/10 text-brand-accent"
         : "border-brand/20 bg-brand/10 text-brand";
 
   return (
@@ -226,11 +223,8 @@ function CategoryDetail({
       )}
     >
       <div>
-        <div
-          className="mb-4 flex size-12 items-center justify-center rounded-2xl"
-          style={{ backgroundColor: `${VYNTEX_RED}14` }}
-        >
-          <Icon className="size-6" style={{ color: VYNTEX_RED }} />
+        <div className="mb-4 flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-brand/15 to-brand-accent/15">
+          <Icon className="size-6 text-brand" />
         </div>
         <h3 className="text-2xl font-bold tracking-tight text-neutral-950 sm:text-3xl">
           {t(`featuresPage.categories.${category.id}.title`)}
@@ -246,9 +240,8 @@ function CategoryDetail({
               className="flex items-start gap-2.5 border-b border-neutral-100 py-2.5 last:border-b-0"
             >
               <Check
-                className="mt-0.5 size-4 shrink-0"
+                className="mt-0.5 size-4 shrink-0 text-brand-accent"
                 strokeWidth={2.5}
-                style={{ color: VYNTEX_RED }}
               />
               <span className="flex flex-wrap items-center text-sm font-medium text-neutral-800">
                 {t(`featuresPage.categories.${category.id}.items.${item.id}`)}
@@ -261,8 +254,7 @@ function CategoryDetail({
         {category.learnMoreHref ? (
           <Link
             to={category.learnMoreHref}
-            className="mt-6 inline-flex items-center gap-1.5 text-sm font-semibold transition-colors hover:opacity-80"
-            style={{ color: VYNTEX_RED }}
+            className="mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-brand transition-colors hover:text-brand-hover"
           >
             {t("featuresPage.learnMore")}
             <ArrowRight className="size-4" />
@@ -333,10 +325,9 @@ export default function CategoryNav() {
                   className={cn(
                     "inline-flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all",
                     isActive
-                      ? "text-white shadow-sm"
+                      ? "bg-gradient-to-r from-brand to-brand-sky text-white shadow-md shadow-brand/20"
                       : "text-neutral-500 hover:bg-white hover:text-neutral-900",
                   )}
-                  style={isActive ? { backgroundColor: VYNTEX_RED } : undefined}
                 >
                   <Icon className="size-4" />
                   {t(`featuresPage.tabs.${tab.id}`)}
@@ -378,13 +369,10 @@ export default function CategoryNav() {
                           key={card.id}
                           type="button"
                           onClick={() => setActive(card.id)}
-                          className="group flex flex-col rounded-2xl border border-neutral-200 bg-[#FAFAFA] p-6 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-all hover:border-[#E31E24]/35 hover:shadow-md"
+                          className="group flex flex-col rounded-2xl border border-neutral-200 bg-[#FAFAFA] p-6 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-all hover:border-brand/35 hover:shadow-md hover:shadow-brand/5"
                         >
-                          <div
-                            className="mb-4 flex size-11 items-center justify-center rounded-xl"
-                            style={{ backgroundColor: `${VYNTEX_RED}14` }}
-                          >
-                            <Icon className="size-5" style={{ color: VYNTEX_RED }} />
+                          <div className="mb-4 flex size-11 items-center justify-center rounded-xl bg-gradient-to-br from-brand/15 to-brand-accent/15">
+                            <Icon className="size-5 text-brand" />
                           </div>
                           <h3 className="text-lg font-semibold text-neutral-950">
                             {t(`featuresPage.cards.${card.id}.title`)}
@@ -392,10 +380,7 @@ export default function CategoryNav() {
                           <p className="mt-2 flex-1 text-sm leading-relaxed text-neutral-500">
                             {t(`featuresPage.cards.${card.id}.description`)}
                           </p>
-                          <span
-                            className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold"
-                            style={{ color: VYNTEX_RED }}
-                          >
+                          <span className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-brand">
                             {t("featuresPage.exploreCategory")}
                             <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
                           </span>
